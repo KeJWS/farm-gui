@@ -1,0 +1,2017 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的小农场 · GUI 版</title>
+<meta name="description" content="文字种田游戏《我的小农场》的网页 GUI 版：种菜、浇水、钓鱼、卖鱼、扩张农场。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%BE%3C/text%3E%3C/svg%3E">
+<style>
+/* ================= 我的小农场 · 样式 ================= */
+:root{
+  --bg:#f6ecd8;
+  --bg2:#efe0c3;
+  --ink:#3d3122;
+  --ink-2:#6d5b45;
+  --ink-3:#9a866c;
+  --panel:rgba(255,253,247,.86);
+  --panel-2:rgba(255,253,247,.6);
+  --line:rgba(122,96,60,.16);
+  --line-2:rgba(122,96,60,.28);
+  --green:#4f9c5f;
+  --green-d:#37794a;
+  --soil:#8b5c3d;
+  --soil-d:#6d462e;
+  --gold:#d9a32c;
+  --gold-l:#f0c65a;
+  --red:#c9554a;
+  --blue:#3f7fc4;
+  --r:18px;
+  --shadow:0 8px 24px rgba(102,78,44,.10), 0 1px 0 rgba(255,255,255,.7) inset;
+  --shadow-hover:0 14px 30px rgba(102,78,44,.16);
+}
+
+*{ box-sizing:border-box; }
+
+html,body{ height:100%; }
+
+body{
+  margin:0;
+  font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(1200px 600px at 15% -10%, #fff8e8 0%, transparent 60%),
+    radial-gradient(900px 500px at 95% 0%, #eaf6e6 0%, transparent 55%),
+    linear-gradient(160deg, var(--bg) 0%, var(--bg2) 100%);
+  background-attachment:fixed;
+  -webkit-font-smoothing:antialiased;
+  font-size:14px;
+}
+
+button{ font-family:inherit; }
+
+/* ---------------- 顶栏 ---------------- */
+
+.topbar{
+  position:sticky; top:0; z-index:50;
+  display:flex; align-items:center; gap:18px;
+  padding:12px 20px;
+  background:rgba(255,251,242,.82);
+  backdrop-filter:blur(14px) saturate(1.2);
+  border-bottom:1px solid var(--line);
+  box-shadow:0 6px 20px rgba(120,95,60,.07);
+}
+
+.brand{ display:flex; align-items:center; gap:11px; }
+.logo{
+  width:42px; height:42px; display:grid; place-items:center;
+  font-size:23px; border-radius:13px;
+  background:linear-gradient(160deg,#ffeab5,#f7d179);
+  box-shadow:0 4px 10px rgba(190,140,50,.28), 0 0 0 1px rgba(255,255,255,.6) inset;
+}
+.brand-txt h1{ margin:0; font-size:17px; letter-spacing:.5px; }
+.brand-txt p{ margin:1px 0 0; font-size:12px; color:var(--ink-2); }
+
+.hud{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+
+.chip{
+  display:inline-flex; align-items:center; gap:7px;
+  height:34px; padding:0 13px;
+  border-radius:999px;
+  background:#fffdf7;
+  border:1px solid var(--line);
+  box-shadow:0 2px 6px rgba(120,95,60,.07);
+  font-weight:600; font-size:13px; color:var(--ink);
+  white-space:nowrap;
+}
+.chip.coins b{ color:var(--gold); font-size:14px; font-variant-numeric:tabular-nums; }
+.chip.energy{ padding-right:14px; }
+.chip .ebar{
+  width:74px; height:9px; border-radius:99px; overflow:hidden;
+  background:#ece1cb; box-shadow:0 0 0 1px rgba(120,95,60,.08) inset;
+}
+.chip .ebar i{
+  display:block; height:100%; width:100%;
+  border-radius:99px;
+  background:linear-gradient(90deg,#7fd08a,#4f9c5f);
+  transition:width .35s cubic-bezier(.2,.8,.3,1), background .3s;
+}
+.chip.energy.low .ebar i{ background:linear-gradient(90deg,#f0b25a,#e08a3c); }
+.chip.energy.empty .ebar i{ background:linear-gradient(90deg,#e08a7a,#c9554a); }
+.chip b#hud-etxt{ font-variant-numeric:tabular-nums; font-size:12.5px; color:var(--ink-2); }
+
+.chip.weather{ background:linear-gradient(160deg,#fff8e2,#ffeebf); border-color:rgba(200,160,60,.35); }
+.chip.weather[data-w="cloudy"]{ background:linear-gradient(160deg,#f2f4f7,#e3e8ef); }
+.chip.weather[data-w="rain"]{ background:linear-gradient(160deg,#e9f1fb,#d6e4f7); }
+.chip.weather[data-w="storm"]{ background:linear-gradient(160deg,#e8e3f2,#d5cde8); }
+
+.top-actions{ margin-left:auto; display:flex; gap:8px; }
+.icon-btn{
+  width:36px; height:36px; border-radius:11px; font-size:16px; cursor:pointer;
+  background:#fffdf7; border:1px solid var(--line); color:var(--ink-2);
+  box-shadow:0 2px 6px rgba(120,95,60,.07);
+  transition:transform .15s, box-shadow .15s, background .15s;
+}
+.icon-btn:hover{ transform:translateY(-1px); box-shadow:0 6px 14px rgba(120,95,60,.14); background:#fff; }
+.icon-btn.off{ opacity:.45; }
+
+/* ---------------- 布局 ---------------- */
+
+.layout{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 372px;
+  gap:16px;
+  padding:16px 20px 40px;
+  max-width:1560px; margin:0 auto;
+  align-items:start;
+}
+.col-main,.col-side{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+
+.panel{
+  background:rgba(255,253,248,.94);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  box-shadow:var(--shadow);
+  padding:15px 16px 16px;
+}
+.panel-head{
+  display:flex; align-items:center; gap:10px;
+  margin:0 0 12px;
+}
+.panel-head h2{
+  margin:0; font-size:14.5px; font-weight:800; letter-spacing:.4px;
+  display:flex; align-items:center; gap:6px;
+}
+.panel-head .muted{ margin-left:auto; font-size:12px; color:var(--ink-3); font-weight:600; }
+.legend{
+  margin-left:auto; display:flex; gap:12px; flex-wrap:wrap;
+  font-size:11.5px; color:var(--ink-3); font-weight:600;
+}
+.legend .ripe-hint{ color:var(--green-d); }
+
+/* ---------------- 农田 ---------------- */
+
+.farm{
+  background:
+    radial-gradient(700px 220px at 50% -40%, rgba(255,255,255,.85), transparent 70%),
+    rgba(255,253,248,.94);
+}
+
+.plot-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(148px, 1fr));
+  gap:11px;
+}
+
+.plot{  position:relative;
+  border-radius:15px;
+  padding:10px 11px 11px;
+  background:linear-gradient(180deg,#fdf8ec 0%, #f7efdd 55%, #efe4cd 100%);
+  border:1px solid var(--line);
+  box-shadow:0 3px 10px rgba(120,95,60,.08), 0 1px 0 rgba(255,255,255,.8) inset;
+  cursor:pointer;
+  transition:transform .14s ease, box-shadow .14s ease, border-color .14s;
+  overflow:hidden;
+  min-height:150px;
+  display:flex; flex-direction:column;
+}
+.plot::after{ /* 土垄 */
+  content:""; position:absolute; left:0; right:0; bottom:0; height:34px;
+  background:repeating-linear-gradient(90deg, rgba(160,120,80,.13) 0 9px, rgba(160,120,80,0) 9px 20px);
+  opacity:.7; pointer-events:none;
+}
+.plot:hover{ transform:translateY(-2px); box-shadow:var(--shadow-hover); border-color:var(--line-2); }
+.plot:active{ transform:translateY(0) scale(.995); }
+
+.plot.empty{ background:linear-gradient(180deg,#faf4e6,#f1e6d1); }
+
+/* 空地：CSS 画的土堆 */
+.plot-art.soil{
+  width:66px; height:34px; margin:8px auto 6px;
+  border-radius:50% 50% 42% 42% / 62% 62% 38% 38%;
+  background:
+    radial-gradient(circle at 22% 42%, rgba(255,255,255,.14) 0 2px, transparent 3px),
+    radial-gradient(circle at 68% 62%, rgba(0,0,0,.14) 0 2px, transparent 3px),
+    radial-gradient(circle at 45% 25%, #b0835b 0%, #96613f 48%, #7a4c31 100%);
+  box-shadow:
+    inset 0 3px 5px rgba(255,255,255,.22),
+    inset 0 -6px 10px rgba(0,0,0,.22),
+    0 3px 6px rgba(90,65,35,.22);
+  position:relative;
+  display:grid; place-items:center;
+  transition:transform .2s;
+}
+.plot-art.soil .seed-dot{
+  font-size:13px; font-weight:900; color:rgba(255,255,255,.55);
+  text-shadow:0 1px 2px rgba(0,0,0,.25);
+  transform:translateY(-1px);
+}
+.plot:hover .plot-art.soil{ transform:scale(1.06); }
+
+.plot.ripe{
+  border-color:rgba(79,156,95,.55);
+  box-shadow:0 0 0 2px rgba(79,156,95,.16), 0 8px 22px rgba(79,156,95,.18);
+  animation:ripePulse 2.2s ease-in-out infinite;
+}
+@keyframes ripePulse{
+  0%,100%{ box-shadow:0 0 0 2px rgba(79,156,95,.14), 0 6px 18px rgba(79,156,95,.14); }
+  50%{ box-shadow:0 0 0 4px rgba(79,156,95,.22), 0 10px 26px rgba(79,156,95,.26); }
+}
+.plot.waited{ border-color:rgba(240,180,80,.5); }
+
+.plot-top{ display:flex; align-items:center; gap:5px; height:16px; }
+.plot-no{
+  font-size:10.5px; font-weight:800; color:var(--ink-3);
+  background:rgba(255,255,255,.75); border-radius:6px; padding:1px 6px;
+  border:1px solid var(--line);
+}
+.plot-badges{ margin-left:auto; display:flex; gap:3px; font-size:11px; }
+
+.plot-art{
+  font-size:41px; line-height:1.1; text-align:center; margin:5px 0 3px;
+  filter:drop-shadow(0 3px 4px rgba(90,65,35,.18));
+  transition:transform .2s;
+}
+.plot:hover .plot-art{ transform:scale(1.07) rotate(-2deg); }
+.plot.ripe .plot-art{ animation:bob 1.8s ease-in-out infinite; }
+@keyframes bob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-4px); } }
+
+.plot-name{
+  font-size:12px; font-weight:800; text-align:center; color:var(--ink);
+  display:flex; align-items:center; justify-content:center; gap:5px;
+}
+.plot-name small{ font-weight:600; color:var(--ink-3); font-size:10.5px; }
+
+.bar{
+  height:6px; border-radius:99px; margin:7px 0 6px;
+  background:rgba(120,95,60,.13); overflow:hidden;
+}
+.bar i{
+  display:block; height:100%; border-radius:99px;
+  background:linear-gradient(90deg,#8ed29a,#4f9c5f);
+  transition:width .4s cubic-bezier(.2,.8,.3,1);
+}
+.plot.ripe .bar i{ background:linear-gradient(90deg,var(--gold-l),var(--gold)); }
+
+.plot-foot{
+  margin-top:auto; font-size:11px; text-align:center; font-weight:700;
+  color:var(--ink-2); position:relative; z-index:1;
+}
+.plot-foot.can{ color:var(--green-d); }
+.plot-foot .warn{ color:#b4771f; }
+
+/* 农田底部按钮 */
+.farm-foot{
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:9px; margin-top:13px;
+}
+
+/* ---------------- 按钮 ---------------- */
+
+.btn{
+  position:relative;
+  display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  min-height:40px; padding:7px 13px;
+  border-radius:12px; cursor:pointer;
+  background:linear-gradient(180deg,#fffdf8,#f8f1e2);
+  border:1px solid var(--line-2);
+  color:var(--ink); font-size:13px; font-weight:700; letter-spacing:.2px;
+  box-shadow:0 2px 0 rgba(160,130,90,.14), 0 4px 10px rgba(120,95,60,.06);
+  transition:transform .12s, box-shadow .12s, background .12s, opacity .12s;
+}
+.btn small{ font-size:10.5px; font-weight:600; color:var(--ink-3); }
+.btn:hover:not(:disabled){ transform:translateY(-1px); box-shadow:0 4px 0 rgba(160,130,90,.14), 0 10px 18px rgba(120,95,60,.12); background:linear-gradient(180deg,#fff,#fdf7ea); }
+.btn:active:not(:disabled){ transform:translateY(1px); box-shadow:0 1px 0 rgba(160,130,90,.14); }
+.btn:disabled{ opacity:.45; cursor:not-allowed; filter:grayscale(.4); }
+.btn.wide{ width:100%; }
+.btn.mini{ min-height:26px; padding:3px 9px; font-size:11.5px; border-radius:8px; box-shadow:none; background:#fffdf7; }
+.btn.primary{
+  background:linear-gradient(180deg,#6cbf7b,#4f9c5f);
+  border-color:#3f8350; color:#fff;
+  box-shadow:0 3px 0 #3a7748, 0 8px 16px rgba(60,120,70,.22);
+  text-shadow:0 1px 1px rgba(0,0,0,.15);
+}
+.btn.primary small{ color:rgba(255,255,255,.85); }
+.btn.primary:hover:not(:disabled){ background:linear-gradient(180deg,#78cb87,#57a768); }
+.btn.big{ min-height:48px; font-size:14.5px; border-radius:14px; }
+.btn.gold{
+  background:linear-gradient(180deg,#f6ce6b,#dfa52e); border-color:#c08c1f; color:#4a3310;
+  box-shadow:0 3px 0 #b8871c, 0 8px 16px rgba(200,150,50,.24);
+}
+.btn.danger{ color:var(--red); border-color:rgba(201,85,74,.35); }
+
+.action-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(126px,1fr)); gap:9px; }
+
+/* ---------------- 钓鱼 ---------------- */
+
+.fish-meta{ margin-left:auto; font-size:11.5px; color:var(--ink-3); font-weight:600; }
+
+.bait-row{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.bait{
+  display:flex; align-items:center; gap:7px;
+  padding:6px 11px; border-radius:11px; cursor:pointer;
+  background:#fffdf7; border:1px solid var(--line);
+  font-size:12.5px; font-weight:700; color:var(--ink-2);
+  transition:.14s;
+}
+.bait .bn{ color:var(--ink); }
+.bait .bc{ font-size:11px; color:var(--ink-3); font-weight:700; }
+.bait:hover{ border-color:var(--line-2); transform:translateY(-1px); }
+.bait.sel{
+  background:linear-gradient(180deg,#eaf7ec,#d7efdb);
+  border-color:rgba(79,156,95,.5); color:var(--green-d);
+  box-shadow:0 0 0 2px rgba(79,156,95,.12);
+}
+.bait.off{ opacity:.4; cursor:not-allowed; }
+
+.fish-row{ display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+
+.catch-area{ margin-top:12px; min-height:94px; }
+.catch-empty{
+  display:grid; place-items:center; min-height:94px;
+  border:1.5px dashed var(--line-2); border-radius:14px;
+  color:var(--ink-3); font-size:12.5px; font-weight:600;
+  background:rgba(255,255,255,.4);
+}
+.catch-card{
+  display:flex; align-items:center; gap:13px;
+  padding:11px 14px; border-radius:14px;
+  background:linear-gradient(180deg,#fffdf7,#fdf6e6);
+  border:1px solid var(--line);
+  box-shadow:0 4px 14px rgba(120,95,60,.1);
+  animation:popIn .3s cubic-bezier(.2,1.2,.4,1);
+}
+@keyframes popIn{ from{ transform:scale(.94); opacity:0; } to{ transform:scale(1); opacity:1; } }
+.catch-card .ce{ font-size:34px; filter:drop-shadow(0 3px 5px rgba(90,65,35,.2)); }
+.catch-card .cname{ font-size:14.5px; font-weight:800; }
+.catch-card .cq{ font-size:12px; font-weight:800; margin-top:2px; }
+.catch-card .cprice{ margin-left:auto; font-size:19px; font-weight:900; color:var(--gold); font-variant-numeric:tabular-nums; }
+
+/* ---------------- 仓库 ---------------- */
+
+.store-list{ display:flex; flex-direction:column; gap:7px; }
+.store-row{
+  display:flex; align-items:center; gap:9px;
+  padding:7px 9px; border-radius:11px;
+  background:#fffdf7; border:1px solid var(--line);
+}
+.store-row .se{ font-size:20px; }
+.store-row .sn{ font-size:12.5px; font-weight:800; }
+.store-row .sv{ font-size:11px; color:var(--ink-3); font-weight:700; }
+.store-row .sp{ margin-left:auto; font-size:12.5px; font-weight:800; color:var(--gold); }
+.store-empty{ font-size:12px; color:var(--ink-3); font-weight:600; padding:8px 2px; }
+
+.seed-box{
+  margin-top:10px; padding-top:10px; border-top:1px dashed var(--line-2);
+  font-size:11.5px; color:var(--ink-2); font-weight:600;
+  display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+}
+.seed-box .tag{
+  background:#eef7ec; color:var(--green-d); border:1px solid rgba(79,156,95,.28);
+  padding:2px 8px; border-radius:7px; font-weight:800; font-size:11px;
+}
+
+/* ---------------- 账本 ---------------- */
+
+.ledger{
+  max-height:230px; overflow-y:auto;
+  display:flex; flex-direction:column; gap:3px;
+  font-size:11.5px;
+  padding-right:4px;
+}
+.led-row{ display:flex; align-items:center; gap:6px; padding:3px 2px; border-bottom:1px dotted rgba(122,96,60,.13); }
+.led-day{ color:var(--ink-3); font-weight:800; min-width:40px; font-size:10.5px; }
+.led-label{ flex:1; color:var(--ink-2); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.led-val{ font-weight:800; font-variant-numeric:tabular-nums; }
+.led-val.up{ color:var(--green-d); }
+.led-val.down{ color:var(--red); }
+.led-bal{ color:var(--ink-3); font-weight:700; min-width:38px; text-align:right; font-variant-numeric:tabular-nums; }
+
+/* ---------------- 钓鱼记录 ---------------- */
+
+.book-stats{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:9px; }
+.bstat{
+  flex:1 1 auto; min-width:96px;
+  background:#fffdf7; border:1px solid var(--line); border-radius:11px;
+  padding:7px 9px;
+}
+.bstat .bl{ font-size:10.5px; color:var(--ink-3); font-weight:700; }
+.bstat .bv{ font-size:12.5px; font-weight:800; margin-top:2px; }
+
+.book-list{ max-height:190px; overflow-y:auto; display:flex; flex-direction:column; gap:3px; padding-right:4px; }
+.book-row{ display:flex; align-items:center; gap:7px; font-size:11.5px; padding:3px 2px; border-bottom:1px dotted rgba(122,96,60,.13); }
+.book-row .be{ font-size:14px; }
+.book-row .bn2{ font-weight:700; color:var(--ink-2); }
+.book-row .bq{ font-size:10.5px; font-weight:800; margin-left:auto; }
+.book-row .bp{ font-weight:800; color:var(--gold); min-width:36px; text-align:right; font-variant-numeric:tabular-nums; }
+
+/* ---------------- 日志 ---------------- */
+
+.log{ max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:5px; padding-right:4px; }
+.log-row{
+  display:flex; gap:7px; font-size:11.8px; line-height:1.45;
+  padding:5px 8px; border-radius:9px;
+  background:rgba(255,255,255,.55);
+  border-left:3px solid var(--line-2);
+  color:var(--ink-2);
+  animation:slideIn .25s ease;
+}
+@keyframes slideIn{ from{ opacity:0; transform:translateX(-6px); } to{ opacity:1; transform:none; } }
+.log-row .ld{ font-size:10px; font-weight:800; color:var(--ink-3); flex:none; }
+.log-row.good{ border-left-color:var(--green); background:rgba(232,246,235,.7); }
+.log-row.warn{ border-left-color:var(--gold); background:rgba(253,244,222,.8); }
+.log-row.bad{ border-left-color:var(--red); background:rgba(251,235,233,.8); }
+.log-row.sys{ border-left-color:var(--blue); background:rgba(235,242,251,.7); }
+
+/* ---------------- 弹窗 ---------------- */
+
+.modal-root{ position:fixed; inset:0; z-index:200; display:none; }
+.modal-root.on{ display:block; }
+.modal-mask{
+  position:absolute; inset:0; background:rgba(60,45,25,.42);
+  backdrop-filter:blur(3px); animation:fadeIn .18s ease;
+}
+@keyframes fadeIn{ from{ opacity:0; } to{ opacity:1; } }
+.modal{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:min(620px, calc(100vw - 32px)); max-height:calc(100vh - 60px);
+  display:flex; flex-direction:column;
+  background:#fffdf8; border-radius:20px;
+  border:1px solid rgba(255,255,255,.7);
+  box-shadow:0 30px 70px rgba(60,40,15,.3);
+  animation:modalIn .24s cubic-bezier(.2,1.1,.35,1);
+  overflow:hidden;
+}
+@keyframes modalIn{ from{ opacity:0; transform:translate(-50%,-46%) scale(.96); } to{ opacity:1; transform:translate(-50%,-50%) scale(1); } }
+.modal-head{
+  display:flex; align-items:center; gap:10px;
+  padding:15px 18px 12px; border-bottom:1px solid var(--line);
+}
+.modal-head h3{ margin:0; font-size:15.5px; }
+.modal-head .x{
+  margin-left:auto; width:30px; height:30px; border-radius:9px; cursor:pointer;
+  border:1px solid var(--line); background:#fff; font-size:14px; color:var(--ink-2);
+}
+.modal-head .x:hover{ background:#f5eee0; }
+.modal-body{ padding:14px 18px 18px; overflow-y:auto; }
+.modal-foot{ padding:12px 18px 16px; border-top:1px solid var(--line); display:flex; gap:9px; }
+.modal-foot .btn{ flex:1; }
+
+.crop-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(116px,1fr)); gap:9px; }
+.crop-card{
+  text-align:center; padding:10px 8px 9px; border-radius:13px; cursor:pointer;
+  background:#fffdf7; border:1px solid var(--line);
+  box-shadow:0 2px 8px rgba(120,95,60,.06);
+  transition:.14s;
+}
+.crop-card:hover:not(:disabled){ transform:translateY(-2px); box-shadow:0 10px 20px rgba(120,95,60,.14); border-color:rgba(79,156,95,.4); }
+.crop-card:disabled{ opacity:.42; cursor:not-allowed; filter:grayscale(.5); }
+.crop-card .ce{ font-size:27px; }
+.crop-card .cn{ font-weight:800; font-size:12.5px; margin-top:3px; }
+.crop-card .cs{ font-size:10.5px; color:var(--ink-3); font-weight:700; margin-top:2px; }
+.crop-card .cm{ font-size:10.5px; color:var(--ink-2); font-weight:600; margin-top:3px; line-height:1.35; }
+.crop-card .cp{ font-size:10.5px; font-weight:800; color:var(--green-d); margin-top:3px; }
+
+.kv{ display:grid; grid-template-columns:auto 1fr; gap:7px 14px; font-size:12.5px; margin-bottom:12px; }
+.kv dt{ color:var(--ink-3); font-weight:700; }
+.kv dd{ margin:0; font-weight:700; color:var(--ink); }
+
+.rule-table{ width:100%; border-collapse:collapse; font-size:11.8px; margin:6px 0 14px; }
+.rule-table th,.rule-table td{ padding:5px 8px; text-align:left; border-bottom:1px solid var(--line); }
+.rule-table th{ color:var(--ink-3); font-weight:800; font-size:11px; }
+.rule-table tr:hover td{ background:rgba(255,250,235,.8); }
+
+/* ---------------- Toast ---------------- */
+
+.toast-root{
+  position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+  z-index:300; display:flex; flex-direction:column; gap:7px; align-items:center;
+  pointer-events:none;
+}
+.toast{
+  padding:9px 18px; border-radius:999px; font-size:13px; font-weight:700;
+  background:rgba(48,37,20,.9); color:#fff;
+  box-shadow:0 10px 26px rgba(50,35,10,.3);
+  animation:toastIn .28s cubic-bezier(.2,1.2,.4,1);
+}
+.toast.good{ background:linear-gradient(180deg,#5cb06d,#3f8b4f); }
+.toast.warn{ background:linear-gradient(180deg,#e2b04a,#c48e26); color:#3a2800; }
+.toast.bad{ background:linear-gradient(180deg,#d76a5e,#b8443a); }
+@keyframes toastIn{ from{ opacity:0; transform:translateY(12px) scale(.96); } to{ opacity:1; transform:none; } }
+.toast.out{ animation:toastOut .3s ease forwards; }
+@keyframes toastOut{ to{ opacity:0; transform:translateY(-8px); } }
+
+/* ---------------- 飘字 ---------------- */
+
+.fx{ position:fixed; inset:0; pointer-events:none; z-index:250; overflow:hidden; }
+.float{
+  position:absolute; font-size:15px; font-weight:900;
+  color:var(--gold); text-shadow:0 2px 6px rgba(0,0,0,.18);
+  animation:floatUp 1.05s ease-out forwards;
+  white-space:nowrap;
+}
+.float.green{ color:#2f8c4a; }
+.float.red{ color:#c9554a; }
+.float.water{ color:#3f7fc4; }
+@keyframes floatUp{
+  0%{ opacity:0; transform:translate(-50%,6px) scale(.85); }
+  22%{ opacity:1; transform:translate(-50%,-6px) scale(1.06); }
+  100%{ opacity:0; transform:translate(-50%,-50px) scale(1); }
+}
+
+/* ---------------- 滚动条 ---------------- */
+
+::-webkit-scrollbar{ width:8px; height:8px; }
+::-webkit-scrollbar-track{ background:transparent; }
+::-webkit-scrollbar-thumb{ background:rgba(150,120,85,.28); border-radius:99px; border:2px solid transparent; background-clip:padding-box; }
+::-webkit-scrollbar-thumb:hover{ background:rgba(150,120,85,.45); background-clip:padding-box; }
+
+/* ---------------- 响应式 ---------------- */
+
+@media (max-width:1180px){
+  .layout{ grid-template-columns:minmax(0,1fr) 330px; }
+}
+@media (max-width:980px){
+  .layout{ grid-template-columns:1fr; }
+  .hud{ order:3; width:100%; }
+  .topbar{ flex-wrap:wrap; }
+  .top-actions{ margin-left:auto; }
+}
+@media (max-width:560px){
+  .layout{ padding:12px 12px 30px; gap:12px; }
+  .plot-grid{ grid-template-columns:repeat(auto-fill, minmax(108px,1fr)); }
+  .plot{ min-height:118px; }
+  .plot-art{ font-size:30px; }
+  .brand-txt h1{ font-size:15px; }
+  .chip{ height:30px; font-size:12px; padding:0 10px; }
+}
+
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">🌾</div>
+    <div class="brand-txt">
+      <h1>我的小农场</h1>
+      <p id="season">春 · 第 1 天</p>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="chip coins" id="hud-coins" title="金币">💰 <b>50</b></div>
+    <div class="chip energy" title="体力">
+      <span>🔋</span>
+      <div class="ebar"><i id="hud-ebar"></i></div>
+      <b id="hud-etxt">10/10</b>
+    </div>
+    <div class="chip weather" id="hud-weather">☀️ 晴天</div>
+    <div class="chip" id="hud-fee" title="每天睡觉扣一次">🍖 3 金/天</div>
+    <div class="chip" id="hud-plots">🏞️ 4 块</div>
+  </div>
+
+  <div class="top-actions">
+    <button class="icon-btn" id="btn-help" title="规则说明">📖</button>
+    <button class="icon-btn" id="btn-sound" title="音效开关">🔊</button>
+    <button class="icon-btn" id="btn-reset" title="重新开始">🔄</button>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- 左列 -->
+  <section class="col-main">
+
+    <div class="panel farm">
+      <div class="panel-head">
+        <h2>🧑‍🌾 农田</h2>
+        <div class="legend">
+          <span>💧 今日已浇</span>
+          <span>🧪 已施肥</span>
+          <span class="ripe-hint">✨ 发光 = 可收获</span>
+        </div>
+      </div>
+      <div class="plot-grid" id="plot-grid"></div>
+      <div class="farm-foot">
+        <button class="btn wide" data-act="waterAll">💧 全部浇水</button>
+        <button class="btn wide" data-act="harvestAll">🧺 全部收获</button>
+        <button class="btn wide primary" data-act="sleep">🌙 睡觉</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>🔧 干活</h2></div>
+      <div class="action-grid">
+        <button class="btn" data-act="dig">🪱 挖蚯蚓<small>3 体力</small></button>
+        <button class="btn" data-act="tea">🍵 下午茶<small>3 金 · +5 体力</small></button>
+        <button class="btn" data-act="work-half">🕐 半天零工<small id="work-half-txt"></small></button>
+        <button class="btn" data-act="work-full">🕑 全天零工<small id="work-full-txt"></small></button>
+        <button class="btn" data-act="expand">🏞️ 扩张土地<small id="expand-txt"></small></button>
+        <button class="btn" data-act="upgrade">💪 强化体力<small id="upgrade-txt"></small></button>
+        <button class="btn" data-act="shop">🛒 渔具店</button>
+      </div>
+    </div>
+
+    <div class="panel fishing">
+      <div class="panel-head">
+        <h2>🎣 河边</h2>
+        <div class="fish-meta" id="fish-meta"></div>
+      </div>
+      <div class="bait-row" id="bait-row"></div>
+      <div class="fish-row">
+        <button class="btn primary big" data-act="cast">🎣 甩一杆<small>2 体力</small></button>
+        <button class="btn big" data-act="cast5">⚡ 连甩 5 杆</button>
+      </div>
+      <div class="catch-area" id="catch-area">
+        <div class="catch-empty">今天还没开张，甩一杆试试 🌊</div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- 右列 -->
+  <aside class="col-side">
+
+    <div class="panel store">
+      <div class="panel-head">
+        <h2>🧺 仓库</h2>
+        <button class="btn mini" data-act="sellAll">全部卖出</button>
+      </div>
+      <div id="store-list" class="store-list"></div>
+      <div class="seed-box" id="seed-box"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>📒 账本</h2><span class="muted" id="ledger-sum"></span></div>
+      <div class="ledger" id="ledger"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>📔 钓鱼记录</h2></div>
+      <div id="book-stats" class="book-stats"></div>
+      <div id="book-list" class="book-list"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>📜 日志</h2>
+        <button class="btn mini" id="btn-save">💾 存档</button>
+      </div>
+      <div class="log" id="log"></div>
+    </div>
+
+  </aside>
+</main>
+
+<div id="modal-root" class="modal-root"></div>
+<div id="toast-root" class="toast-root"></div>
+<div id="fx" class="fx"></div>
+
+<script>
+/* ============================================================
+ * 我的小农场 · 游戏逻辑层（纯数据，不碰 DOM）
+ * 规则来源：skills/farm-game/SKILL.md
+ * ============================================================ */
+(function (root) {
+  'use strict';
+
+  /* ---------------- 静态数据 ---------------- */
+
+  const CROPS = {
+    carrot:     { name: '萝卜', emoji: '🥕', seed: 5,  days: 2, base: 3, price: 4,  big: false },
+    cabbage:    { name: '白菜', emoji: '🥬', seed: 8,  days: 2, base: 2, price: 8,  big: false },
+    potato:     { name: '土豆', emoji: '🥔', seed: 10, days: 3, base: 3, price: 8,  big: false },
+    corn:       { name: '玉米', emoji: '🌽', seed: 15, days: 3, base: 2, price: 16, big: false },
+    eggplant:   { name: '茄子', emoji: '🍆', seed: 18, days: 4, base: 2, price: 22, big: false },
+    tomato:     { name: '番茄', emoji: '🍅', seed: 20, days: 4, base: 3, price: 16, big: false },
+    pumpkin:    { name: '南瓜', emoji: '🎃', seed: 25, days: 5, base: 1, price: 60, big: true  },
+    watermelon: { name: '西瓜', emoji: '🍉', seed: 30, days: 5, base: 1, price: 76, big: true  },
+    cucumber:   { name: '黄瓜', emoji: '🥒', seed: 12, days: 3, price: 13, multi: true,
+                  firstQty: 2, regrowDays: 2, regrowQty: 2, regrowTimes: 2 },
+    strawberry: { name: '草莓', emoji: '🍓', seed: 22, days: 3, price: 9,  multi: true,
+                  firstQty: 3, regrowDays: 1, regrowQty: 2, regrowTimes: 3 }
+  };
+  Object.keys(CROPS).forEach(function (k) { CROPS[k].id = k; });
+  const CROP_LIST = Object.keys(CROPS).map(function (k) { return CROPS[k]; });
+
+  const FERT = {
+    normal:  { id: 'normal',  name: '普通肥料', emoji: '🧪', cost: 5,  add: 1 },
+    special: { id: 'special', name: '特效肥料', emoji: '💊', cost: 12, add: 2 }
+  };
+
+  const TRASH = [
+    { name: '易拉罐', emoji: '🥫' },
+    { name: '旧靴子', emoji: '👢' },
+    { name: '水草',   emoji: '🌿' }
+  ];
+
+  const QUALITY = [
+    { id: 'bad',    name: '劣质', emoji: '⬜', mul: 0.4, w: 10, color: '#8d939a' },
+    { id: 'common', name: '普通', emoji: '🥉', mul: 0.7, w: 25, color: '#b07a45' },
+    { id: 'std',    name: '标准', emoji: '🥈', mul: 1.0, w: 35, color: '#4a86c8' },
+    { id: 'good',   name: '优良', emoji: '🥇', mul: 1.3, w: 18, color: '#2f9e63' },
+    { id: 'fine',   name: '优质', emoji: '💎', mul: 1.7, w: 8,  color: '#7b5cd6' },
+    { id: 'perfect',name: '完美', emoji: '🌟', mul: 2.2, w: 3,  color: '#d99f2b' },
+    { id: 'legend', name: '传说', emoji: '🏆', mul: 3.0, w: 1,  color: '#d2453a' }
+  ];
+
+  const FISH = [
+    { id: 'trash', name: '垃圾',     emoji: '🗑️', base: 1,  w: 18, trash: true },
+    { id: 'crucian', name: '鲫鱼',   emoji: '🐟', base: 3,  w: 24 },
+    { id: 'carp',  name: '鲤鱼',     emoji: '🐟', base: 6,  w: 20 },
+    { id: 'mandarin', name: '鳜鱼',  emoji: '🐠', base: 10, w: 13 },
+    { id: 'bass',  name: '鲈鱼',     emoji: '🐟', base: 12, w: 10 },
+    { id: 'puffer', name: '河豚',    emoji: '🐡', base: 20, w: 6  },
+    { id: 'koi',   name: '锦鲤',     emoji: '🐉', base: 25, w: 4  },
+    { id: 'chest', name: '宝箱',     emoji: '📦', base: 15, w: 5  }
+  ];
+
+  const WEATHER = {
+    sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 40, fishMul: 0.8, wormMod: -1,
+              note: '钓鱼价值 -20% · 挖蚯蚓 -1 份' },
+    cloudy: { id: 'cloudy', name: '阴天',   emoji: '⛅', w: 30, fishMul: 1.5, wormMod: 1,
+              note: '钓鱼价值 +50% · 挖蚯蚓 +1 份' },
+    rain:   { id: 'rain',   name: '雨天',   emoji: '🌧️', w: 25, fishMul: 1.3, wormMod: 1, autoWater: true,
+              note: '自动浇水 · 钓鱼价值 +30% · 挖蚯蚓 +1 份' },
+    storm:  { id: 'storm',  name: '暴风雨', emoji: '⛈️', w: 5,  fishMul: 0, wormMod: 0, noFish: true, stall: true,
+              note: '禁止钓鱼 · 作物停滞一天' }
+  };
+  const WEATHER_LIST = Object.keys(WEATHER).map(function (k) { return WEATHER[k]; });
+
+  const BAIT = {
+    worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '收获 +30%，品质更好' },
+    dough: { id: 'dough', name: '面团饵', emoji: '🍞', desc: '标准收获' },
+    lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 20 次，容易空军' }
+  };
+
+  /* ---------------- 随机 ---------------- */
+
+  let RNG = Math.random;
+  function setRng(fn) { RNG = fn || Math.random; }
+  function rand() { return RNG(); }
+  function randInt(a, b) { return a + Math.floor(rand() * (b - a + 1)); }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+  function weighted(list, key) {
+    let total = 0;
+    for (let i = 0; i < list.length; i++) total += list[i][key] || 0;
+    let r = rand() * total;
+    for (let i = 0; i < list.length; i++) {
+      r -= (list[i][key] || 0);
+      if (r <= 0) return list[i];
+    }
+    return list[list.length - 1];
+  }
+
+  function rollWeather() { return weighted(WEATHER_LIST, 'w').id; }
+
+  function rollQuality(boost) {
+    function once() { return weighted(QUALITY, 'w'); }
+    if (!boost) return once();
+    const a = QUALITY.indexOf(once());
+    const b = QUALITY.indexOf(once());
+    return QUALITY[Math.max(a, b)];
+  }
+
+  /* ---------------- 状态 ---------------- */
+
+  const SAVE_VERSION = 1;
+
+  function makePlot() {
+    return { crop: null, growth: 0, watered: false, missed: 0, fert: 0,
+             ripeDay: null, hits: 0, phase: 'idle' };
+  }
+
+  function createState() {
+    const s = {
+      v: SAVE_VERSION,
+      day: 1,
+      weather: 'sunny',
+      coins: 50,
+      energy: 10,
+      maxEnergy: 10,
+      plots: [makePlot(), makePlot(), makePlot(), makePlot()],
+      seeds: {},
+      store: {},
+      bait: { worm: 0, dough: 0 },
+      lure: { owned: false, dur: 0 },
+      teaUsed: false,
+      ledger: [{ day: 1, label: '开局金币', income: 50, expense: 0, balance: 50 }],
+      log: [{ day: 1, text: '🌾 欢迎来到我的小农场，第 1 天开始了。', kind: 'sys' }],
+      fishBook: { count: 0, entries: [], best: null, priciest: null },
+      stats: { harvests: 0, casts: 0, dug: 0, planted: 0 }
+    };
+    return s;
+  }
+
+  /* ---------------- 工具 ---------------- */
+
+  function log(s, text, kind) {
+    s.log.unshift({ day: s.day, text: text, kind: kind || 'info' });
+    if (s.log.length > 60) s.log.length = 60;
+  }
+
+  function ledger(s, label, income, expense) {
+    const balance = Math.round((s.coins) * 100) / 100;
+    s.ledger.unshift({ day: s.day, label: label, income: income || 0, expense: expense || 0, balance: balance });
+    if (s.ledger.length > 200) s.ledger.length = 200;
+  }
+
+  function addCoins(s, amount, label) {
+    s.coins += amount;
+    if (amount >= 0) ledger(s, label, amount, 0);
+    else ledger(s, label, 0, -amount);
+  }
+
+  function mealFee(s) { return 3 + (s.maxEnergy - 10) / 5; }
+
+  function expandCost(s) { return 25 + 15 * (s.plots.length - 4); }
+  function upgradeCost(s) { return 30 + 10 * ((s.maxEnergy - 10) / 5); }
+  function workCost(s, mode) { return Math.round(mode === 'half' ? s.maxEnergy / 2 : s.maxEnergy); }
+  function workPay(s, mode) {
+    const c = workCost(s, mode);
+    return Math.round(c * (mode === 'half' ? 1.0 : 1.5));
+  }
+
+  function needOf(p) {
+    const c = CROPS[p.crop];
+    if (!c) return 0;
+    return p.phase === 'regrow' ? c.regrowDays : c.days;
+  }
+
+  function fertBonus(p) {
+    const c = CROPS[p.crop];
+    if (!c || c.big) return 0;
+    return p.fert || 0;
+  }
+
+  function expectedYield(s, p) {
+    const c = CROPS[p.crop];
+    if (!c) return 0;
+    if (c.multi) return p.hits === 0 ? c.firstQty : c.regrowQty;
+    if (c.big) return 1;
+    return Math.max(1, c.base + fertBonus(p) - p.missed);
+  }
+
+  function canHarvest(s, p) {
+    return p.phase === 'ripe' && s.day > p.ripeDay;
+  }
+
+  function stageEmoji(p) {
+    const c = CROPS[p.crop];
+    if (!c) return '🟫';
+    if (p.phase === 'ripe') return c.emoji;
+    const need = needOf(p) || 1;
+    const r = p.growth / need;
+    if (r <= 0) return '🌱';
+    if (r < 0.5) return '🌿';
+    return '🌾';
+  }
+
+  /* ---------------- 操作 ---------------- */
+
+  function grow(p, s) {
+    const need = needOf(p);
+    if (p.growth < need) p.growth++;
+    if (p.growth >= need) {
+      p.phase = 'ripe';
+      p.ripeDay = s.day;
+      return true;
+    }
+    return false;
+  }
+
+  function plant(s, idx, cropId) {
+    const p = s.plots[idx];
+    const c = CROPS[cropId];
+    if (!p) return { ok: false, msg: '没有这块地' };
+    if (!c) return { ok: false, msg: '没有这种作物' };
+    if (p.crop) return { ok: false, msg: '这块地不是空地' };
+    if (s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
+
+    const owned = s.seeds[cropId] || 0;
+    let paid = 0;
+    if (owned > 0) {
+      s.seeds[cropId] = owned - 1;
+      if (s.seeds[cropId] === 0) delete s.seeds[cropId];
+    } else {
+      if (s.coins < c.seed) return { ok: false, msg: '金币不够买种子（' + c.seed + ' 金）' };
+      paid = c.seed;
+      s.coins -= c.seed;
+      ledger(s, '买种子 ' + c.name, 0, c.seed);
+    }
+
+    s.energy -= 1;
+    p.crop = cropId;
+    p.growth = 0;
+    p.watered = false;
+    p.missed = 0;
+    p.fert = 0;
+    p.ripeDay = null;
+    p.hits = 0;
+    p.phase = 'growing';
+    s.stats.planted++;
+    log(s, '🌱 ' + (idx + 1) + ' 号地种下 ' + c.name + (paid ? '（-' + paid + ' 金）' : '（用库存种子）'), 'good');
+    return { ok: true, msg: c.name + ' 种下了' };
+  }
+
+  function water(s, idx) {
+    const p = s.plots[idx];
+    if (!p || !p.crop) return { ok: false, msg: '这块地还没种东西' };
+    if (p.phase === 'ripe') return { ok: false, msg: '已经成熟，快点收获吧' };
+    if (WEATHER[s.weather].stall) return { ok: false, msg: '⛈️ 暴风雨，作物停滞一天' };
+    if (p.watered) return { ok: false, msg: '今天已经浇过水了' };
+    if (s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
+    s.energy -= 1;
+    p.watered = true;
+    const ripe = grow(p, s);
+    log(s, '💧 ' + (idx + 1) + ' 号地浇水 ' + CROPS[p.crop].name +
+            (ripe ? ' → 成熟！明天可收' : '（' + p.growth + '/' + needOf(p) + '）'),
+        ripe ? 'good' : 'info');
+    return { ok: true, msg: ripe ? '成熟了！' : '浇水 +1 天', ripe: ripe };
+  }
+
+  function waterAll(s) {
+    let done = 0, ripened = 0, lack = 0;
+    s.plots.forEach(function (p, i) {
+      if (!p.crop || p.phase === 'ripe' || p.watered) return;
+      if (WEATHER[s.weather].stall) return;
+      const r = water(s, i);
+      if (r.ok) { done++; if (r.ripe) ripened++; } else lack++;
+    });
+    if (!done) return { ok: false, msg: WEATHER[s.weather].stall ? '⛈️ 暴风雨，今天浇不了' : '没有需要浇水的地块' };
+    return { ok: true, msg: '浇了 ' + done + ' 块地' + (ripened ? '，' + ripened + ' 块成熟' : ''), done: done };
+  }
+
+  function harvest(s, idx) {
+    const p = s.plots[idx];
+    if (!p || !p.crop) return { ok: false, msg: '这块地还没种东西' };
+    if (p.phase !== 'ripe') return { ok: false, msg: '还没成熟（' + p.growth + '/' + needOf(p) + ' 天）' };
+    if (s.day <= p.ripeDay) return { ok: false, msg: '刚浇成熟，明天才能收获' };
+    if (s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
+
+    const c = CROPS[p.crop];
+    s.energy -= 1;
+
+    let qty, unit;
+    if (c.multi) {
+      qty = p.hits === 0 ? c.firstQty : c.regrowQty;
+      unit = c.price;
+    } else {
+      unit = c.price;
+      qty = c.big ? 1 : clamp(c.base + randInt(-1, 1) - p.missed + fertBonus(p), 1, 99);
+    }
+    s.store[p.crop] = (s.store[p.crop] || 0) + qty;
+
+    // 多次收获作物：只有最后一次收获才判定留种
+    const willRegrow = !!c.multi && p.hits + 1 < 1 + c.regrowTimes;
+    let extraSeed = false;
+    if (!willRegrow && rand() < 0.3) {
+      s.seeds[p.crop] = (s.seeds[p.crop] || 0) + 1;
+      extraSeed = true;
+    }
+    s.stats.harvests++;
+
+    let regrown = false;
+    if (willRegrow) {
+      p.hits++;
+      p.growth = 0;
+      p.phase = 'regrow';
+      p.watered = false;
+      p.ripeDay = null;
+      p.fert = 0;
+      regrown = true;
+    } else {
+      s.plots[idx] = makePlot();
+    }
+
+    const msg = '收获 ' + c.name + ' ×' + qty + '（值 ' + qty * unit + ' 金）' +
+                (extraSeed ? ' · 留种 +1' : '') +
+                (regrown ? ' · 进入再生期' : '');
+    log(s, '🧺 ' + msg, 'good');
+    return { ok: true, msg: msg, qty: qty, crop: p.crop || c.id, unit: unit, seed: extraSeed, regrown: regrown };
+  }
+
+  function harvestAll(s) {
+    let total = 0, plots = 0, last = null;
+    s.plots.forEach(function (p, i) {
+      if (!p.crop || p.phase !== 'ripe') return;
+      const r = harvest(s, i);
+      if (r.ok) { total += r.qty; plots++; last = r; }
+    });
+    if (!plots) return { ok: false, msg: '没有可收获的作物' };
+    return { ok: true, msg: '收了 ' + plots + ' 块地，共 ' + total + ' 个' };
+  }
+
+  function sellAll(s) {
+    const ids = Object.keys(s.store).filter(function (k) { return s.store[k] > 0; });
+    if (!ids.length) return { ok: false, msg: '仓库里没东西可卖' };
+    let income = 0;
+    const parts = [];
+    ids.forEach(function (id) {
+      const n = s.store[id];
+      const gain = n * CROPS[id].price;
+      income += gain;
+      parts.push(CROPS[id].name + '×' + n + ' = ' + gain + ' 金');
+      delete s.store[id];
+    });
+    addCoins(s, income, '卖作物');
+    log(s, '💰 卖出 ' + parts.join('、') + '，收入 ' + income + ' 金', 'good');
+    return { ok: true, msg: '卖出作物，+' + income + ' 金', income: income };
+  }
+
+  function sellOne(s, id) {
+    const n = s.store[id] || 0;
+    if (!n) return { ok: false, msg: '没有可卖的' };
+    const gain = n * CROPS[id].price;
+    delete s.store[id];
+    addCoins(s, gain, '卖 ' + CROPS[id].name);
+    log(s, '💰 卖出 ' + CROPS[id].name + '×' + n + '，+' + gain + ' 金', 'good');
+    return { ok: true, msg: '+' + gain + ' 金', income: gain };
+  }
+
+  function buyFert(s, idx, kind) {
+    const p = s.plots[idx];
+    const f = FERT[kind];
+    if (!p || !p.crop) return { ok: false, msg: '这块地还没种东西' };
+    if (!f) return { ok: false, msg: '没有这种肥料' };
+    if (CROPS[p.crop].big) return { ok: false, msg: '南瓜、西瓜不吃肥料' };
+    if (p.fert) return { ok: false, msg: '这块地已经施过肥了' };
+    if (p.phase === 'ripe') return { ok: false, msg: '都熟了，别浪费肥料' };
+    if (s.coins < f.cost) return { ok: false, msg: '金币不够（' + f.cost + ' 金）' };
+    if (s.energy < 1) return { ok: false, msg: '体力不够了' };
+    s.coins -= f.cost;
+    ledger(s, '买肥料 ' + f.name, 0, f.cost);
+    s.energy -= 1;
+    p.fert = f.add;
+    log(s, '🧪 ' + (idx + 1) + ' 号地施了' + f.name + '（产量 +' + f.add + '）', 'good');
+    return { ok: true, msg: f.name + ' 施用成功' };
+  }
+
+  function sleep(s) {
+    const fee = mealFee(s);
+    const notes = [];
+    if (s.coins >= fee) {
+      addCoins(s, -fee, '伙食费');
+      notes.push('🍖 伙食费 -' + fee + ' 金');
+      s.energy = s.maxEnergy;
+    } else {
+      s.energy = Math.min(5, s.maxEnergy);
+      notes.push('😵 没钱吃饭，饿着睡了（只恢复 5 体力）');
+    }
+
+    const stormToday = !!WEATHER[s.weather].stall;
+    if (!stormToday) {
+      s.plots.forEach(function (p) {
+        if (p.crop && (p.phase === 'growing' || p.phase === 'regrow') && !p.watered) p.missed++;
+      });
+    }
+    s.plots.forEach(function (p) { p.watered = false; });
+
+    s.day++;
+    s.teaUsed = false;
+    s.weather = rollWeather();
+    const w = WEATHER[s.weather];
+    notes.push(w.emoji + ' 第 ' + s.day + ' 天 · ' + w.name);
+
+    if (w.autoWater) {
+      let n = 0, ripe = 0;
+      s.plots.forEach(function (p) {
+        if (!p.crop || p.phase === 'ripe') return;
+        if (!p.watered) { if (grow(p, s)) ripe++; p.watered = true; n++; }
+      });
+      if (n) notes.push('🌧️ 自动浇水 ' + n + ' 块地' + (ripe ? '，' + ripe + ' 块成熟' : ''));
+    }
+    if (w.stall) notes.push('⛈️ 暴风雨，作物今天停滞');
+
+    log(s, '🌙 睡觉 → 第 ' + s.day + ' 天 · ' + w.name, 'sys');
+    return { ok: true, msg: '新的一天', day: s.day, notes: notes, weather: s.weather };
+  }
+
+  function pickBait(s, prefer) {
+    if (prefer === 'worm' && s.bait.worm > 0) return 'worm';
+    if (prefer === 'dough' && s.bait.dough > 0) return 'dough';
+    if (prefer === 'lure' && s.lure.owned && s.lure.dur > 0) return 'lure';
+    if (s.bait.worm > 0) return 'worm';
+    if (s.bait.dough > 0) return 'dough';
+    if (s.lure.owned && s.lure.dur > 0) return 'lure';
+    return null;
+  }
+
+  function baitCount(s, kind) {
+    if (kind === 'worm') return s.bait.worm;
+    if (kind === 'dough') return s.bait.dough;
+    if (kind === 'lure') return s.lure.owned ? s.lure.dur : 0;
+    return 0;
+  }
+
+  function fish(s, preferBait) {
+    const w = WEATHER[s.weather];
+    if (w.noFish) return { ok: false, msg: '⛈️ 暴风雨，今天钓不了鱼' };
+    if (s.energy < 2) return { ok: false, msg: '体力不够（钓鱼要 2 点）' };
+    const kind = pickBait(s, preferBait);
+    if (!kind) return { ok: false, msg: '没有饵料了，先去挖蚯蚓或买面团饵' };
+
+    s.energy -= 2;
+    if (kind === 'worm') {
+      s.bait.worm--;
+    } else if (kind === 'dough') {
+      s.bait.dough--;
+    } else {
+      s.lure.dur--;
+      if (s.lure.dur <= 0) { s.lure.owned = false; s.lure.dur = 0; }
+    }
+
+    const table = kind === 'lure'
+      ? FISH.map(function (f) { return Object.assign({}, f, { w: f.trash ? f.w * 5 : f.w * 0.7 }); })
+      : FISH;
+    const f = weighted(table, 'w');
+    const q = f.trash ? null : rollQuality(kind === 'worm');
+    const mul = (kind === 'worm' ? 1.3 : 1) * (w.fishMul || 1);
+    const price = f.trash ? 1 : Math.max(1, Math.round(f.base * q.mul * mul));
+
+    let name = f.name, emoji = f.emoji;
+    if (f.trash) {
+      const junk = TRASH[Math.floor(rand() * TRASH.length)] || TRASH[0];
+      name = junk.name;
+      emoji = junk.emoji;
+    }
+
+    addCoins(s, price, '卖鱼');
+    s.stats.casts++;
+
+    const entry = { day: s.day, fish: name, emoji: emoji, quality: q, price: price,
+                    base: f.base, bait: kind, trash: !!f.trash };
+    s.fishBook.count++;
+    s.fishBook.entries.unshift(entry);
+    if (s.fishBook.entries.length > 40) s.fishBook.entries.length = 40;
+    if (!f.trash) {
+      if (!s.fishBook.best || QUALITY.indexOf(q) > QUALITY.indexOf(s.fishBook.best.quality)) {
+        s.fishBook.best = { fish: f.name, quality: q, price: price, day: s.day };
+      }
+      if (!s.fishBook.priciest || price > s.fishBook.priciest.price) {
+        s.fishBook.priciest = { fish: f.name, quality: q, price: price, day: s.day };
+      }
+    }
+    log(s, f.trash
+      ? '🎣 钓上来 ' + emoji + ' ' + name + '（不值钱）· +1 金'
+      : '🎣 钓到 ' + emoji + ' ' + name + ' · ' + q.emoji + q.name + ' · +' + price + ' 金',
+      f.trash ? 'warn' : 'good');
+    return { ok: true, entry: entry, msg: name + ' +' + price + ' 金' };
+  }
+
+  function fishMany(s, times, preferBait) {
+    const results = [];
+    let spent = 0;
+    for (let i = 0; i < times; i++) {
+      const r = fish(s, preferBait);
+      if (!r.ok) { results.push(r); break; }
+      spent += r.entry.price;
+      results.push(r);
+    }
+    const okCount = results.filter(function (r) { return r.ok; }).length;
+    if (!okCount) return results[0] || { ok: false, msg: '钓不了' };
+    return { ok: true, count: okCount, income: spent, results: results, msg: '甩了 ' + okCount + ' 杆，+' + spent + ' 金' };
+  }
+
+  function digWorms(s) {
+    if (s.energy < 3) return { ok: false, msg: '体力不够（挖蚯蚓要 3 点）' };
+    const w = WEATHER[s.weather];
+    const n = clamp(randInt(1, 3) + w.wormMod, 1, 5);
+    s.energy -= 3;
+    s.bait.worm += n;
+    s.stats.dug++;
+    log(s, '🪱 挖到蚯蚓 ×' + n + '（现有 ' + s.bait.worm + '）', 'good');
+    return { ok: true, msg: '挖到蚯蚓 ×' + n, n: n };
+  }
+
+  function buyBait(s, kind, n) {
+    n = n || 1;
+    if (kind === 'dough') {
+      const cost = 1 * n;
+      if (s.coins < cost) return { ok: false, msg: '金币不够' };
+      s.coins -= cost; ledger(s, '买面团饵 ×' + n, 0, cost);
+      s.bait.dough += n;
+      log(s, '🍞 买了面团饵 ×' + n + '（-' + cost + ' 金）', 'info');
+      return { ok: true, msg: '面团饵 ×' + n };
+    }
+    if (kind === 'lure') {
+      if (s.lure.owned) return { ok: false, msg: '假饵一次只能持 1 个' };
+      if (s.coins < 5) return { ok: false, msg: '金币不够（5 金）' };
+      s.coins -= 5; ledger(s, '买假饵', 0, 5);
+      s.lure.owned = true; s.lure.dur = 20;
+      log(s, '🎣 买了一个假饵（耐用 20 次）', 'info');
+      return { ok: true, msg: '假饵到手' };
+    }
+    return { ok: false, msg: '这种饵料买不到' };
+  }
+
+  function tea(s) {
+    if (s.teaUsed) return { ok: false, msg: '今天下午茶已经喝过了' };
+    if (s.coins < 3) return { ok: false, msg: '金币不够（3 金）' };
+    if (s.energy >= s.maxEnergy) return { ok: false, msg: '体力是满的，别浪费' };
+    s.coins -= 3; ledger(s, '下午茶', 0, 3);
+    s.teaUsed = true;
+    s.energy = Math.min(s.maxEnergy, s.energy + 5);
+    log(s, '🍵 喝了下午茶，体力 +5（' + s.energy + '/' + s.maxEnergy + '）', 'good');
+    return { ok: true, msg: '体力 +5' };
+  }
+
+  function work(s, mode) {
+    const cost = workCost(s, mode);
+    if (s.energy < cost) return { ok: false, msg: '体力不足（需要 ' + cost + ' 点）' };
+    const pay = workPay(s, mode);
+    s.energy -= cost;
+    addCoins(s, pay, mode === 'half' ? '半天零工' : '全天零工');
+    log(s, (mode === 'half' ? '🕐' : '🕑') + (mode === 'half' ? '半天' : '全天') +
+            '零工：-' + cost + ' 体力，+' + pay + ' 金', 'good');
+    return { ok: true, msg: '+' + pay + ' 金' };
+  }
+
+  function expand(s) {
+    const cost = expandCost(s);
+    if (s.coins < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
+    s.coins -= cost; ledger(s, '开垦第 ' + (s.plots.length + 1) + ' 块地', 0, cost);
+    s.plots.push(makePlot());
+    log(s, '🏞️ 开垦了第 ' + s.plots.length + ' 块地（-' + cost + ' 金）', 'good');
+    return { ok: true, msg: '现在有 ' + s.plots.length + ' 块地', plots: s.plots.length };
+  }
+
+  function upgrade(s) {
+    const cost = upgradeCost(s);
+    if (s.coins < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
+    s.coins -= cost; ledger(s, '体力上限强化', 0, cost);
+    s.maxEnergy += 5;
+    log(s, '💪 体力上限 → ' + s.maxEnergy + '（伙食费 ' + mealFee(s) + ' 金/天）', 'good');
+    return { ok: true, msg: '体力上限 ' + s.maxEnergy, maxEnergy: s.maxEnergy };
+  }
+
+  /* ---------------- 存读档 ---------------- */
+
+  function serialize(s) { return JSON.stringify(s); }
+
+  function deserialize(json) {
+    const s = typeof json === 'string' ? JSON.parse(json) : json;
+    const base = createState();
+    const merged = Object.assign(base, s);
+    merged.plots = (s.plots || base.plots).map(function (p) { return Object.assign(makePlot(), p); });
+    merged.bait = Object.assign({ worm: 0, dough: 0 }, s.bait || {});
+    merged.lure = Object.assign({ owned: false, dur: 0 }, s.lure || {});
+    merged.fishBook = Object.assign({ count: 0, entries: [], best: null, priciest: null }, s.fishBook || {});
+    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0 }, s.stats || {});
+    merged.seeds = s.seeds || {};
+    merged.store = s.store || {};
+    merged.ledger = s.ledger || base.ledger;
+    merged.log = s.log || base.log;
+    // 旧存档迁移：垃圾不参与品质判定（早期版本会给出「优质垃圾」）
+    if (merged.fishBook.entries) {
+      merged.fishBook.entries.forEach(function (e) { if (e && e.trash) e.quality = null; });
+    }
+    return merged;
+  }
+
+  /* ---------------- 导出 ---------------- */
+
+  const API = {
+    CROPS: CROPS, CROP_LIST: CROP_LIST, FERT: FERT, QUALITY: QUALITY, FISH: FISH,
+    WEATHER: WEATHER, WEATHER_LIST: WEATHER_LIST, BAIT: BAIT, SAVE_VERSION: SAVE_VERSION,
+    setRng: setRng,
+    createState: createState, serialize: serialize, deserialize: deserialize,
+    mealFee: mealFee, expandCost: expandCost, upgradeCost: upgradeCost,
+    workCost: workCost, workPay: workPay, needOf: needOf, expectedYield: expectedYield,
+    canHarvest: canHarvest, stageEmoji: stageEmoji, fertBonus: fertBonus, baitCount: baitCount,
+    plant: plant, water: water, waterAll: waterAll, harvest: harvest, harvestAll: harvestAll,
+    sellAll: sellAll, sellOne: sellOne, buyFert: buyFert, sleep: sleep, fish: fish,
+    fishMany: fishMany, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work,
+    expand: expand, upgrade: upgrade, rollWeather: rollWeather
+  };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+  root.FarmGame = API;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* ============================================================
+ * 我的小农场 · 界面层
+ * ============================================================ */
+(function () {
+  'use strict';
+
+  const G = window.FarmGame;
+  const SAVE_KEY = 'farm-gui-save-v1';
+
+  let state = null;
+  let baitSel = 'worm';
+  let soundOn = true;
+
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.prototype.slice.call(document.querySelectorAll(sel));
+
+  /* ---------------- 存档 ---------------- */
+
+  function save() {
+    try { localStorage.setItem(SAVE_KEY, G.serialize(state)); } catch (e) { /* 忽略 */ }
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (raw) return G.deserialize(raw);
+    } catch (e) { /* 忽略 */ }
+    return null;
+  }
+
+  /* ---------------- 音效 ---------------- */
+
+  let actx = null;
+  function beep(freq, dur, type, gain) {
+    if (!soundOn) return;
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = actx.createOscillator();
+      const g = actx.createGain();
+      o.type = type || 'sine';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, actx.currentTime);
+      g.gain.exponentialRampToValueAtTime(gain || 0.06, actx.currentTime + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + (dur || 0.12));
+      o.connect(g); g.connect(actx.destination);
+      o.start(); o.stop(actx.currentTime + (dur || 0.12) + 0.02);
+    } catch (e) { /* 忽略 */ }
+  }
+  const SFX = {
+    plant: () => beep(330, 0.1, 'triangle', 0.05),
+    water: () => beep(520, 0.08, 'sine', 0.04),
+    coin:  () => { beep(880, 0.09, 'triangle', 0.06); setTimeout(() => beep(1180, 0.1, 'triangle', 0.05), 70); },
+    catch: () => { beep(660, 0.09, 'sine', 0.06); setTimeout(() => beep(990, 0.14, 'sine', 0.05), 80); },
+    good:  () => beep(740, 0.13, 'sine', 0.05),
+    bad:   () => beep(200, 0.16, 'sawtooth', 0.05),
+    sleep: () => { beep(420, 0.14, 'sine', 0.05); setTimeout(() => beep(300, 0.18, 'sine', 0.04), 120); }
+  };
+
+  /* ---------------- Toast / 飘字 ---------------- */
+
+  function toast(msg, kind) {
+    if (!msg) return;
+    const root = $('#toast-root');
+    const el = document.createElement('div');
+    el.className = 'toast ' + (kind || '');
+    el.textContent = msg;
+    root.appendChild(el);
+    setTimeout(function () {
+      el.classList.add('out');
+      setTimeout(function () { el.remove(); }, 320);
+    }, 1900);
+  }
+
+  function floatText(x, y, text, cls) {
+    const el = document.createElement('div');
+    el.className = 'float ' + (cls || '');
+    el.textContent = text;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    $('#fx').appendChild(el);
+    setTimeout(function () { el.remove(); }, 1100);
+  }
+
+  /* ---------------- 弹窗 ---------------- */
+
+  function openModal(title, body, foot, opts) {
+    const root = $('#modal-root');
+    root.innerHTML =
+      '<div class="modal-mask" data-close></div>' +
+      '<div class="modal">' +
+        '<div class="modal-head"><h3>' + title + '</h3>' +
+          '<button class="x" data-close>✕</button></div>' +
+        '<div class="modal-body">' + body + '</div>' +
+        (foot ? '<div class="modal-foot">' + foot + '</div>' : '') +
+      '</div>';
+    root.classList.add('on');
+    if (opts && opts.onMount) opts.onMount(root);
+  }
+
+  function closeModal() {
+    const root = $('#modal-root');
+    root.classList.remove('on');
+    root.innerHTML = '';
+  }
+
+  const modalOpen = () => $('#modal-root').classList.contains('on');
+
+  /* ---------------- HUD ---------------- */
+
+  function renderHud() {
+    const w = G.WEATHER[state.weather];
+    $('#hud-coins').innerHTML = '💰 <b>' + state.coins + '</b>';
+    $('#hud-ebar').style.width = (state.energy / state.maxEnergy * 100) + '%';
+    $('#hud-etxt').textContent = state.energy + '/' + state.maxEnergy;
+    const ec = $('.chip.energy');
+    ec.classList.toggle('low', state.energy / state.maxEnergy <= 0.45 && state.energy > 0);
+    ec.classList.toggle('empty', state.energy <= 0);
+
+    const wc = $('#hud-weather');
+    wc.textContent = w.emoji + ' ' + w.name;
+    wc.dataset.w = w.id;
+    wc.title = w.note;
+
+    $('#hud-fee').textContent = '🍖 ' + G.mealFee(state) + ' 金/天';
+    $('#hud-plots').textContent = '🏞️ ' + state.plots.length + ' 块';
+    $('#season').textContent = '春 · 第 ' + state.day + ' 天';
+  }
+
+  /* ---------------- 农田 ---------------- */
+
+  const PLOT_CLASS = { growing: 'growing', regrow: 'growing', ripe: 'ripe' };
+
+  function renderPlots() {
+    const grid = $('#plot-grid');
+    grid.innerHTML = state.plots.map(function (p, i) {
+      if (!p.crop) {
+        return '<div class="plot empty" data-i="' + i + '">' +
+          '<div class="plot-top"><span class="plot-no">' + (i + 1) + '</span></div>' +
+          '<div class="plot-art soil"><span class="seed-dot">＋</span></div>' +
+          '<div class="plot-name">空地</div>' +
+          '<div class="bar"><i style="width:0%"></i></div>' +
+          '<div class="plot-foot">点击播种</div>' +
+        '</div>';
+      }
+      const c = G.CROPS[p.crop];
+      const need = G.needOf(p);
+      const pct = Math.round(p.growth / need * 100);
+      const can = G.canHarvest(state, p);
+      const cls = PLOT_CLASS[p.phase] || '';
+
+      let badges = '';
+      if (p.watered) badges += '<span title="今日已浇水">💧</span>';
+      if (p.fert) badges += '<span title="已施肥 +' + p.fert + '">🧪</span>';
+
+      let foot;
+      if (p.phase === 'ripe') {
+        foot = can ? '<span style="color:var(--green-d)">✨ 点击收获</span>'
+                   : '明天可收';
+      } else if (p.watered) {
+        foot = '<span style="color:var(--blue)">今日已浇</span>';
+      } else {
+        foot = p.missed > 0 ? '<span class="warn">缺水 ×' + p.missed + '</span>' : '待浇水';
+      }
+
+      const nameExtra = p.phase === 'regrow' ? '再生' : '';
+
+      return '<div class="plot ' + cls + '" data-i="' + i + '">' +
+        '<div class="plot-top"><span class="plot-no">' + (i + 1) + '</span>' +
+          '<div class="plot-badges">' + badges + '</div></div>' +
+        '<div class="plot-art">' + G.stageEmoji(p) + '</div>' +
+        '<div class="plot-name">' + c.name +
+          '<small>' + (nameExtra ? nameExtra + ' ' : '') + p.growth + '/' + need + '天</small></div>' +
+        '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="plot-foot">' + foot + '</div>' +
+      '</div>';
+    }).join('');
+
+    const anyGrow = state.plots.some(function (p) {
+      return p.crop && p.phase !== 'ripe' && !p.watered;
+    });
+    const anyRipe = state.plots.some(function (p) { return p.crop && G.canHarvest(state, p); });
+    $('[data-act="waterAll"]').disabled = !anyGrow || !!G.WEATHER[state.weather].stall;
+    $('[data-act="harvestAll"]').disabled = !anyRipe;
+  }
+
+  /* ---------------- 操作按钮 ---------------- */
+
+  function renderActions() {
+    $('#work-half-txt').textContent = '-' + G.workCost(state, 'half') + ' 体力 · +' + G.workPay(state, 'half') + ' 金';
+    $('#work-full-txt').textContent = '-' + G.workCost(state, 'full') + ' 体力 · +' + G.workPay(state, 'full') + ' 金';
+    $('#expand-txt').textContent = '第 ' + (state.plots.length + 1) + ' 块 · ' + G.expandCost(state) + ' 金';
+    $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + 5) + ' · ' + G.upgradeCost(state) + ' 金';
+
+    const teaBtn = $('[data-act="tea"]');
+    teaBtn.disabled = state.teaUsed;
+    teaBtn.querySelector('small').textContent = state.teaUsed ? '今天喝过了' : '3 金 · +5 体力';
+
+    $('[data-act="dig"]').disabled = state.energy < 3;
+    $('[data-act="work-half"]').disabled = state.energy < G.workCost(state, 'half');
+    $('[data-act="work-full"]').disabled = state.energy < G.workCost(state, 'full');
+    $('[data-act="expand"]').disabled = state.coins < G.expandCost(state);
+    $('[data-act="upgrade"]').disabled = state.coins < G.upgradeCost(state);
+  }
+
+  /* ---------------- 钓鱼 ---------------- */
+
+  function renderBait() {
+    const list = [
+      { id: 'worm', n: state.bait.worm },
+      { id: 'dough', n: state.bait.dough },
+      { id: 'lure', n: state.lure.owned ? state.lure.dur : 0 }
+    ];
+    if (!list.some(function (b) { return b.id === baitSel && b.n > 0; })) {
+      const first = list.filter(function (b) { return b.n > 0; })[0];
+      baitSel = first ? first.id : 'worm';
+    }
+    $('#bait-row').innerHTML = list.map(function (b) {
+      const bd = G.BAIT[b.id];
+      const cnt = b.id === 'lure' ? (b.n ? b.n + '/20' : '无') : '×' + b.n;
+      return '<div class="bait ' + (b.id === baitSel ? 'sel ' : '') + (b.n ? '' : 'off') +
+        '" data-bait="' + b.id + '" title="' + bd.desc + '">' +
+        '<span>' + bd.emoji + '</span><span class="bn">' + bd.name + '</span>' +
+        '<span class="bc">' + cnt + '</span></div>';
+    }).join('');
+
+    const w = G.WEATHER[state.weather];
+    $('#fish-meta').innerHTML = w.noFish
+      ? '⛔ 今天禁钓'
+      : '价值 ×' + (w.fishMul || 1).toFixed(2) + ' · 体力 ' + state.energy;
+    $('[data-act="cast"]').disabled = w.noFish || state.energy < 2;
+    $('[data-act="cast5"]').disabled = w.noFish || state.energy < 2;
+  }
+
+  function catchCard(e) {
+    const col = e.quality ? e.quality.color : '#9a866c';
+    const sub = e.quality ? (e.quality.emoji + ' ' + e.quality.name) : '杂物 · 只能卖 1 金';
+    return '<div class="catch-card" style="border-color:' + col + '44;box-shadow:0 4px 16px ' + col + '22">' +
+      '<div class="ce">' + e.emoji + '</div>' +
+      '<div><div class="cname">' + e.fish + '</div>' +
+      '<div class="cq" style="color:' + col + '">' + sub + '</div></div>' +
+      '<div class="cprice">+' + e.price + ' 金</div></div>';
+  }
+
+  function showCatch(e) {
+    $('#catch-area').innerHTML = catchCard(e);
+  }
+
+  /* ---------------- 仓库 ---------------- */
+
+  function renderStore() {
+    const ids = Object.keys(state.store).filter(function (k) { return state.store[k] > 0; });
+    const box = $('#store-list');
+    if (!ids.length) {
+      box.innerHTML = '<div class="store-empty">仓库空空如也，去收点菜吧 🌱</div>';
+    } else {
+      box.innerHTML = ids.map(function (id) {
+        const c = G.CROPS[id];
+        const n = state.store[id];
+        return '<div class="store-row">' +
+          '<span class="se">' + c.emoji + '</span>' +
+          '<div><div class="sn">' + c.name + ' ×' + n + '</div>' +
+          '<div class="sv">' + c.price + ' 金/个</div></div>' +
+          '<span class="sp">' + n * c.price + ' 金</span>' +
+          '<button class="btn mini" data-sell="' + id + '">卖出</button>' +
+        '</div>';
+      }).join('');
+    }
+
+    const seeds = Object.keys(state.seeds).filter(function (k) { return state.seeds[k] > 0; });
+    $('#seed-box').innerHTML = '🎒 种子：' + (seeds.length
+      ? seeds.map(function (id) {
+          return '<span class="tag">' + G.CROPS[id].emoji + G.CROPS[id].name + ' ×' + state.seeds[id] + '</span>';
+        }).join('')
+      : '<span style="color:var(--ink-3)">无（收获时 30% 概率留种，多收作物仅最后一收）</span>');
+
+    $('[data-act="sellAll"]').disabled = !ids.length;
+  }
+
+  /* ---------------- 账本 ---------------- */
+
+  function renderLedger() {
+    const rows = state.ledger.slice(0, 40);
+    $('#ledger').innerHTML = rows.map(function (r) {
+      const val = r.income > 0 ? '+' + r.income : (r.expense > 0 ? '-' + r.expense : '—');
+      const cls = r.income > 0 ? 'up' : (r.expense > 0 ? 'down' : '');
+      return '<div class="led-row">' +
+        '<span class="led-day">D' + r.day + '</span>' +
+        '<span class="led-label">' + r.label + '</span>' +
+        '<span class="led-val ' + cls + '">' + val + '</span>' +
+        '<span class="led-bal">' + r.balance + '</span>' +
+      '</div>';
+    }).join('') || '<div class="store-empty">还没有账目</div>';
+    $('#ledger-sum').textContent = '余额 ' + state.coins + ' 金';
+  }
+
+  /* ---------------- 钓鱼记录 ---------------- */
+
+  function renderBook() {
+    const b = state.fishBook;
+    $('#book-stats').innerHTML =
+      '<div class="bstat"><div class="bl">累计渔获</div><div class="bv">' + b.count + ' 条</div></div>' +
+      '<div class="bstat"><div class="bl">最高品质</div><div class="bv" style="color:' +
+        (b.best && b.best.quality ? b.best.quality.color : 'var(--ink-3)') + '">' +
+        (b.best && b.best.quality ? b.best.quality.emoji + ' ' + b.best.quality.name + ' · ' + b.best.fish : '—') + '</div></div>' +
+      '<div class="bstat"><div class="bl">最贵一条</div><div class="bv" style="color:var(--gold)">' +
+        (b.priciest ? b.priciest.fish + ' · ' + b.priciest.price + ' 金' : '—') + '</div></div>';
+
+    $('#book-list').innerHTML = b.entries.length
+      ? b.entries.map(function (e) {
+          const col = e.quality ? e.quality.color : 'var(--ink-3)';
+          const qtxt = e.quality ? (e.quality.emoji + e.quality.name) : '—';
+          return '<div class="book-row">' +
+            '<span class="be">' + e.emoji + '</span>' +
+            '<span class="bn2">' + e.fish + '</span>' +
+            '<span class="bq" style="color:' + col + '">' + qtxt + '</span>' +
+            '<span class="bp">' + e.price + '</span></div>';
+        }).join('')
+      : '<div class="store-empty">还没钓过鱼 🎣</div>';
+  }
+
+  /* ---------------- 日志 ---------------- */
+
+  function renderLog() {
+    $('#log').innerHTML = state.log.slice(0, 40).map(function (r) {
+      return '<div class="log-row ' + (r.kind || '') + '">' +
+        '<span class="ld">D' + r.day + '</span><span>' + r.text + '</span></div>';
+    }).join('');
+  }
+
+  /* ---------------- 总渲染 ---------------- */
+
+  function renderAll() {
+    renderHud();
+    renderPlots();
+    renderActions();
+    renderBait();
+    renderStore();
+    renderLedger();
+    renderBook();
+    renderLog();
+  }
+
+  function commit(result) {
+    renderAll();
+    save();
+    if (result && !result.ok && result.msg) toast(result.msg, 'warn');
+    return result;
+  }
+
+  /* ---------------- 农田弹窗 ---------------- */
+
+  function plotModal(i) {
+    const p = state.plots[i];
+    if (!p.crop) return cropPicker(i);
+
+    const c = G.CROPS[p.crop];
+    const need = G.needOf(p);
+    const can = G.canHarvest(state, p);
+    const big = !!c.big;
+
+    let actions = '';
+    if (p.phase === 'ripe') {
+      actions += '<button class="btn primary" data-pact="harvest" data-i="' + i + '">' +
+        (can ? '🧺 收获' : '⏳ 明天才能收') + '<small>1 体力</small></button>';
+    } else {
+      actions += '<button class="btn primary" data-pact="water" data-i="' + i + '"' +
+        (p.watered ? ' disabled' : '') + '>💧 浇水<small>' + (p.watered ? '今天浇过了' : '1 体力 · +1 天') + '</small></button>';
+      if (!big) {
+        actions += '<button class="btn" data-pact="fert-normal" data-i="' + i + '"' + (p.fert ? ' disabled' : '') + '>🧪 普通肥<small>5 金 · +1 产量</small></button>';
+        actions += '<button class="btn" data-pact="fert-special" data-i="' + i + '"' + (p.fert ? ' disabled' : '') + '>💊 特效肥<small>12 金 · +2 产量</small></button>';
+      }
+    }
+
+    const body =
+      '<div style="display:flex;gap:16px;align-items:center;margin-bottom:14px">' +
+        '<div style="font-size:54px;filter:drop-shadow(0 4px 8px rgba(90,65,35,.2))">' + G.stageEmoji(p) + '</div>' +
+        '<div><div style="font-size:17px;font-weight:800">' + c.name +
+          (p.phase === 'regrow' ? ' <span style="font-size:11px;color:var(--ink-3)">（再生期 ' + (p.hits) + '/' + (c.regrowTimes + 1) + ' 次）</span>' : '') +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--ink-2);margin-top:3px">' +
+          '生长 ' + p.growth + '/' + need + ' 天 · 售价 ' + c.price + ' 金/个</div></div>' +
+      '</div>' +
+      '<dl class="kv">' +
+        '<dt>当前状态</dt><dd>' + (p.phase === 'ripe' ? (can ? '✅ 可以收获' : '🌾 刚成熟，明天可收') : '🌱 生长中') + '</dd>' +
+        '<dt>预计产量</dt><dd>' + G.expectedYield(state, p) + ' 个' +
+          (big ? '（大作物固定 1）' : (p.fert ? '（含施肥 +' + p.fert + '）' : '')) + '</dd>' +
+        '<dt>漏浇天数</dt><dd>' + (p.missed ? '<span style="color:#b4771f">' + p.missed + ' 天（产量 -' + p.missed + '）</span>' : '0 天 👍') + '</dd>' +
+        '<dt>施肥</dt><dd>' + (p.fert ? '🧪 +' + p.fert + ' 产量' : (big ? '大作物不吃肥料' : '未施肥')) + '</dd>' +
+      '</dl>' +
+      (c.multi
+        ? '<div style="margin:-2px 0 12px;font-size:11.5px;font-weight:700;color:var(--ink-2);' +
+          'background:#f2f8ee;border:1px solid rgba(79,156,95,.28);border-radius:9px;padding:7px 10px">' +
+          '🌿 多次收获：共 ' + (c.regrowTimes + 1) + ' 收，仅最后一收才判定 30% 留种</div>'
+        : '') +
+      '<div class="action-grid">' + actions + '</div>';
+
+    openModal(c.emoji + ' ' + '第 ' + (i + 1) + ' 号地 · ' + c.name, body,
+      '<button class="btn" data-close>关闭</button>');
+  }
+
+  function cropPicker(i) {
+    const cards = G.CROP_LIST.map(function (c) {
+      const owned = state.seeds[c.id] || 0;
+      const cost = owned > 0 ? 0 : c.seed;
+      const dis = cost > state.coins || state.energy < 1;
+      let profit = '';
+      let lineY = '';
+      let lineP = '';
+      if (c.multi) {
+        const total = c.firstQty + c.regrowTimes * c.regrowQty;
+        lineY = c.days + ' 天 · 共 ' + total + ' 个';
+        lineP = c.price + ' 金/个 · 多次收';
+        profit = '';
+      } else if (c.big) {
+        lineY = c.days + ' 天 · 固定 1 个';
+        lineP = c.price + ' 金/个';
+        profit = '利润 +' + (c.price - c.seed);
+      } else {
+        lineY = c.days + ' 天 · 产 ' + c.base + ' 个';
+        lineP = c.price + ' 金/个';
+        profit = '利润 +' + (c.base * c.price - c.seed) + '~';
+      }
+      return '<button class="crop-card" data-crop="' + c.id + '" data-plot="' + i + '"' + (dis ? ' disabled' : '') + '>' +
+        '<div class="ce">' + c.emoji + '</div>' +
+        '<div class="cn">' + c.name + (owned ? ' <span style="font-size:10px;color:var(--green-d)">×' + owned + '</span>' : '') + '</div>' +
+        '<div class="cs">' + (owned ? '用库存种子' : '种子 ' + c.seed + ' 金') + '</div>' +
+        '<div class="cm">' + lineY + '</div>' +
+        '<div class="cm">' + lineP + '</div>' +
+        '<div class="cp">' + profit + '</div>' +
+      '</button>';
+    }).join('');
+
+    openModal('🌱 第 ' + (i + 1) + ' 号地 · 播种', cards +
+      '<div style="margin-top:12px;font-size:11.5px;color:var(--ink-3);font-weight:600">' +
+      '💡 生长按浇水天数计算，成熟后次日才能收获；漏浇会减产。</div>',
+      '<button class="btn" data-close>取消</button>');
+  }
+
+  /* ---------------- 商店 / 帮助 / 重置 ---------------- */
+
+  function shopModal() {
+    const body =
+      '<dl class="kv"><dt>🍞 面团饵</dt><dd>1 金/份 · 标准收获</dd>' +
+      '<dt>🎣 假饵</dt><dd>5 金/个 · 耐用 20 次 · 持有上限 1</dd>' +
+      '<dt>🪱 蚯蚓</dt><dd>只能自己挖（3 体力 → 1~3 份）</dd></dl>' +
+      '<div class="action-grid">' +
+        '<button class="btn" data-buy="dough" data-n="1">🍞 买 1 份<small>1 金</small></button>' +
+        '<button class="btn" data-buy="dough" data-n="5">🍞 买 5 份<small>5 金</small></button>' +
+        '<button class="btn" data-buy="lure" data-n="1">🎣 买假饵<small>5 金 · 20 次</small></button>' +
+      '</div>';
+    openModal('🛒 渔具店', body, '<button class="btn" data-close>关闭</button>');
+  }
+
+  function helpModal() {
+    const cropRows = G.CROP_LIST.map(function (c) {
+      return '<tr><td>' + c.emoji + ' ' + c.name + '</td><td>' + c.seed + ' 金</td><td>' + c.days + ' 天</td>' +
+        '<td>' + (c.multi ? '首次 ' + c.firstQty + ' 个' : (c.big ? '1 个（固定）' : c.base + ' ±1')) + '</td>' +
+        '<td>' + c.price + ' 金</td></tr>';
+    }).join('');
+
+    const body =
+      '<h4 style="margin:0 0 6px;font-size:12.5px">🌤️ 天气</h4>' +
+      '<table class="rule-table"><tr><th>天气</th><th>概率</th><th>效果</th></tr>' +
+      G.WEATHER_LIST.map(function (w) {
+        return '<tr><td>' + w.emoji + ' ' + w.name + '</td><td>' + w.w + '%</td><td>' + w.note + '</td></tr>';
+      }).join('') + '</table>' +
+
+      '<h4 style="margin:0 0 6px;font-size:12.5px">🌱 作物</h4>' +
+      '<table class="rule-table"><tr><th>作物</th><th>种子</th><th>生长</th><th>产量/块</th><th>单果</th></tr>' +
+      cropRows + '</table>' +
+
+      '<h4 style="margin:0 0 6px;font-size:12.5px">⭐ 鱼获品质</h4>' +
+      '<table class="rule-table"><tr><th>品质</th><th>倍率</th><th>概率</th></tr>' +
+      G.QUALITY.map(function (q) {
+        return '<tr><td>' + q.emoji + ' ' + q.name + '</td><td>×' + q.mul + '</td><td>' + q.w + '%</td></tr>';
+      }).join('') + '</table>' +
+
+      '<div style="font-size:11.5px;color:var(--ink-2);line-height:1.7;font-weight:600">' +
+      '· 睡觉推进 1 天，扣伙食费（' + G.mealFee(state) + ' 金/天），体力回满<br>' +
+      '· 体力耗尽就得睡觉；没钱吃饭只能恢复 5 点<br>' +
+      '· 蚯蚓饵：收获 +30% 且品质取两次较好的<br>' +
+      '· 收获时 30% 概率留种，种子下次可免费种<br>' +
+      '· 多次收获作物（黄瓜/草莓）只有最后一收才判定留种<br>' +
+      '· 进度自动保存在本浏览器（localStorage）</div>';
+
+    openModal('📖 规则速查', body, '<button class="btn" data-close>知道了</button>');
+  }
+
+  function resetModal() {
+    openModal('🔄 重新开始', '<div style="font-size:13px;line-height:1.7">' +
+      '这会清空当前存档，从第 1 天、50 金重新开始。<br>确定吗？</div>',
+      '<button class="btn" data-close>取消</button>' +
+      '<button class="btn danger" id="do-reset">确定重开</button>');
+  }
+
+  /* ---------------- 动作 ---------------- */
+
+  const ACTIONS = {
+    waterAll: function (ev) {
+      const r = G.waterAll(state);
+      commit(r);
+      if (r.ok) { toast(r.msg, 'good'); SFX.water(); floatAt(ev, '💧 ' + r.done, 'water'); }
+    },
+    harvestAll: function (ev) {
+      const r = G.harvestAll(state);
+      commit(r);
+      if (r.ok) { toast(r.msg, 'good'); SFX.good(); floatAt(ev, '🧺 ' + r.msg.split('共 ')[1] || '', 'green'); }
+    },
+    sleep: function () {
+      const r = G.sleep(state);
+      commit(r);
+      SFX.sleep();
+      toast(r.notes[0], 'good');
+      setTimeout(function () { toast(r.notes[1], ''); }, 380);
+      if (r.notes[2]) setTimeout(function () { toast(r.notes[2], ''); }, 760);
+    },
+    dig: function (ev) {
+      const r = G.digWorms(state);
+      commit(r);
+      if (r.ok) { toast(r.msg, 'good'); SFX.plant(); floatAt(ev, '🪱 +' + r.n, 'green'); }
+    },
+    tea: function (ev) {
+      const r = G.tea(state);
+      commit(r);
+      if (r.ok) { toast(r.msg, 'good'); SFX.good(); floatAt(ev, '🔋 +5', 'green'); }
+    },
+    'work-half': function (ev) {
+      const r = G.work(state, 'half');
+      commit(r);
+      if (r.ok) { toast(r.msg, 'good'); SFX.coin(); floatAt(ev, r.msg, ''); }
+    },
+    'work-full': function (ev) {
+      const r = G.work(state, 'full');
+      commit(r);
+      if (r.ok) { toast(r.msg, 'good'); SFX.coin(); floatAt(ev, r.msg, ''); }
+    },
+    expand: function () {
+      const r = G.expand(state);
+      commit(r);
+      if (r.ok) { toast(r.msg, 'good'); SFX.coin(); }
+    },
+    upgrade: function () {
+      const r = G.upgrade(state);
+      commit(r);
+      if (r.ok) { toast(r.msg, 'good'); SFX.good(); }
+    },
+    shop: shopModal,
+    sellAll: function () {
+      const r = G.sellAll(state);
+      commit(r);
+      if (r.ok) { toast(r.msg, 'good'); SFX.coin(); }
+    },
+    cast: function (ev) {
+      const r = G.fish(state, baitSel);
+      commit(r);
+      if (r.ok) {
+        showCatch(r.entry);
+        toast(r.msg, r.entry.trash ? 'warn' : 'good');
+        SFX.catch();
+        floatAt(ev, '+' + r.entry.price + ' 金', '');
+      }
+    },
+    cast5: function () {
+      const r = G.fishMany(state, 5, baitSel);
+      commit(r);
+      if (!r.ok) { toast(r.msg, 'warn'); return; }
+      const best = r.results.filter(function (x) { return x.ok; })
+        .sort(function (a, b) { return b.entry.price - a.entry.price; })[0];
+      if (best) showCatch(best.entry);
+      toast(r.msg, 'good');
+      SFX.catch();
+    }
+  };
+
+  function floatAt(ev, text, cls) {
+    if (!ev || !ev.clientX) return;
+    floatText(ev.clientX, ev.clientY - 10, text, cls);
+  }
+
+  /* ---------------- 事件绑定 ---------------- */
+
+  function bind() {
+    document.addEventListener('click', function (ev) {
+      const t = ev.target;
+
+      // 关闭弹窗
+      const closer = t.closest('[data-close]');
+      if (closer) { closeModal(); return; }
+
+      if (t.closest('#do-reset')) {
+        state = G.createState();
+        closeModal();
+        renderAll();
+        save();
+        toast('新的开始 🌱', 'good');
+        return;
+      }
+
+      // 地块
+      const plot = t.closest('.plot');
+      if (plot) {
+        const i = Number(plot.dataset.i);
+        plotModal(i);
+        return;
+      }
+
+      // 主要动作按钮
+      const actBtn = t.closest('[data-act]');
+      if (actBtn && !actBtn.disabled) {
+        const fn = ACTIONS[actBtn.dataset.act];
+        if (fn) { fn(ev); return; }
+      }
+
+      // 种植
+      const cropCard = t.closest('[data-crop]');
+      if (cropCard) {
+        const idx = Number(cropCard.dataset.plot);
+        const r = G.plant(state, idx, cropCard.dataset.crop);
+        if (r.ok) {
+          closeModal();
+          commit(r);
+          toast(r.msg, 'good');
+          SFX.plant();
+        } else {
+          toast(r.msg, 'bad');
+          SFX.bad();
+        }
+        return;
+      }
+
+      // 地块内动作
+      const pact = t.closest('[data-pact]');
+      if (pact && !pact.disabled) {
+        const i = Number(pact.dataset.i);
+        const kind = pact.dataset.pact;
+        let r;
+        if (kind === 'water') r = G.water(state, i);
+        else if (kind === 'harvest') r = G.harvest(state, i);
+        else if (kind === 'fert-normal') r = G.buyFert(state, i, 'normal');
+        else if (kind === 'fert-special') r = G.buyFert(state, i, 'special');
+        if (r) {
+          if (r.ok) { closeModal(); commit(r); toast(r.msg, 'good'); SFX[r.crop ? 'coin' : 'water'](); }
+          else { toast(r.msg, 'warn'); SFX.bad(); }
+        }
+        return;
+      }
+
+      // 贝壳状：饵料
+      const bait = t.closest('[data-bait]');
+      if (bait) {
+        if (bait.classList.contains('off')) { toast('这个饵料用完了', 'warn'); return; }
+        baitSel = bait.dataset.bait;
+        renderBait();
+        return;
+      }
+
+      // 商店购买
+      const buy = t.closest('[data-buy]');
+      if (buy) {
+        const r = G.buyBait(state, buy.dataset.buy, Number(buy.dataset.n) || 1);
+        commit(r);
+        toast(r.ok ? r.msg : r.msg, r.ok ? 'good' : 'warn');
+        return;
+      }
+
+      // 仓库单卖
+      const sell = t.closest('[data-sell]');
+      if (sell) {
+        const r = G.sellOne(state, sell.dataset.sell);
+        commit(r);
+        toast(r.msg, 'good');
+        SFX.coin();
+        return;
+      }
+    });
+
+    $('#btn-help').addEventListener('click', helpModal);
+    $('#btn-reset').addEventListener('click', resetModal);
+    $('#btn-save').addEventListener('click', function () { save(); toast('已存档 💾', 'good'); });
+    $('#btn-sound').addEventListener('click', function () {
+      soundOn = !soundOn;
+      this.textContent = soundOn ? '🔊' : '🔇';
+      this.classList.toggle('off', !soundOn);
+      if (soundOn) SFX.good();
+    });
+
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && modalOpen()) closeModal();
+    });
+  }
+
+  /* ---------------- 启动 ---------------- */
+
+  function boot() {
+    window.addEventListener('error', function (e) {
+      console.error(e.error || e.message);
+      toast('出错了：' + (e.message || '未知错误'), 'bad');
+    });
+    if (location.hash === '#fresh') {
+      try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* 忽略 */ }
+    }
+    const saved = load();
+    if (saved) {
+      state = saved;
+    } else {
+      state = G.createState();
+    }
+    bind();
+    renderAll();
+    save();
+
+    if (saved) {
+      setTimeout(function () { toast('读取存档：第 ' + state.day + ' 天 · ' + state.coins + ' 金', 'good'); }, 300);
+    } else {
+      setTimeout(function () { toast('🌾 欢迎来到我的小农场！先给空地播种吧', 'good'); }, 300);
+    }
+  }
+
+  boot();
+})();
+
+</script>
+</body>
+</html>
