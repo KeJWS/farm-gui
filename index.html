@@ -34,8 +34,11 @@
   <div class="top-actions">
     <button class="btn primary sleep-btn" data-act="sleep" title="推进到下一天，扣伙食费并恢复体力">🌙 睡觉</button>
     <button class="icon-btn" id="btn-help" title="规则说明">📖</button>
+    <button class="icon-btn" id="btn-export" title="导出存档（.json）">⬇️</button>
+    <button class="icon-btn" id="btn-import" title="导入存档（.json）">⬆️</button>
     <button class="icon-btn" id="btn-sound" title="音效开关">🔊</button>
     <button class="icon-btn" id="btn-reset" title="重新开始">🔄</button>
+    <input type="file" id="file-import" accept=".json,application/json" hidden>
   </div>
 </header>
 
@@ -130,6 +133,7 @@
 
     <div class="panel">
       <div class="panel-head"><h2>📜 日志</h2>
+        <button class="btn mini" id="btn-log">⬇ 导出日志</button>
         <button class="btn mini" id="btn-save">💾 存档</button>
       </div>
       <div class="log" id="log"></div>

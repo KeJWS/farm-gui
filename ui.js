@@ -28,6 +28,67 @@
     return null;
   }
 
+  /* ---------------- 导入 / 导出 ---------------- */
+
+  function stamp() {
+    const d = new Date();
+    const p2 = function (n) { return n < 10 ? '0' + n : '' + n; };
+    return d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '-' +
+           p2(d.getHours()) + p2(d.getMinutes());
+  }
+
+  function download(name, text, mime) {
+    const blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 80);
+  }
+
+  function exportSave() {
+    download('小农场存档-' + stamp() + '.json', G.serialize(state), 'application/json;charset=utf-8');
+    toast('存档已导出 ⬇️', 'good');
+  }
+
+  function exportLog() {
+    const dayWater = '第 ' + state.day + ' 天 · ' + state.coins + ' 金 · 体力 ' +
+      state.energy + '/' + state.maxEnergy + ' · ' + state.plots.length + ' 块地';
+    const lines = state.log.slice().reverse().map(function (r) {
+      return '- **D' + r.day + '** ' + r.text;
+    });
+    const text = '# 我的小农场 · 游戏日志\n\n' +
+      '> 导出时间：' + new Date().toLocaleString('zh-CN') + '\n' +
+      '> 当前进度：' + dayWater + '\n' +
+      '> 累计渔获：' + state.fishBook.count + ' 条\n\n' +
+      lines.join('\n') + '\n';
+    download('小农场日志-' + stamp() + '.md', text, 'text/markdown;charset=utf-8');
+    toast('日志已导出 ⬇️', 'good');
+  }
+
+  function importSave(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function () {
+      try {
+        const raw = JSON.parse(String(reader.result));
+        if (!raw || !Array.isArray(raw.plots) || typeof raw.coins !== 'number') {
+          throw new Error('bad save');
+        }
+        state = G.deserialize(raw);
+        catchLog = (state.fishBook.entries || []).slice(0, 5);
+        save();
+        renderAll();
+        toast('存档已导入：第 ' + state.day + ' 天 · ' + state.coins + ' 金', 'good');
+      } catch (e) {
+        toast('导入失败：不是有效的小农场存档', 'bad');
+      }
+    };
+    reader.readAsText(file);
+  }
+
   /* ---------------- 音效 ---------------- */
 
   let actx = null;
@@ -262,7 +323,7 @@
     }
     const sum = catchLog.reduce(function (n, e) { return n + e.price; }, 0);
     box.innerHTML =
-      '<div class="catch-sum">最近 ' + catchLog.length + ' 条 · 合计 +' + sum + ' 金</div>' +
+      '<div class="catch-sum">最近 ' + catchLog.length + ' 条 · 共值 ' + sum + ' 金（在仓库里卖）</div>' +
       '<div class="catch-list">' + catchLog.map(function (e) {
         const col = e.quality ? e.quality.color : '#9a866c';
         return '<div class="catch-item" style="border-left-color:' + col + '">' +
@@ -270,7 +331,7 @@
           '<span class="cn2">' + e.fish + '</span>' +
           '<span class="cq2" style="color:' + col + '">' +
             (e.quality ? e.quality.emoji + ' ' + e.quality.name : '杂物') + '</span>' +
-          '<span class="cp2">+' + e.price + '</span>' +
+          '<span class="cp2">值 ' + e.price + '</span>' +
         '</div>';
       }).join('') + '</div>';
   }
@@ -290,22 +351,43 @@
 
   function renderStore() {
     const ids = Object.keys(state.store).filter(function (k) { return state.store[k] > 0; });
+    const fish = G.fishGroups(state);
+    const fishCount = fish.reduce(function (n, g) { return n + g.count; }, 0);
     const box = $('#store-list');
-    if (!ids.length) {
-      box.innerHTML = '<div class="store-empty">仓库空空如也，去收点菜吧 🌱</div>';
-    } else {
-      box.innerHTML = ids.map(function (id) {
-        const c = G.CROPS[id];
-        const n = state.store[id];
-        return '<div class="store-row">' +
-          '<span class="se">' + c.emoji + '</span>' +
-          '<div><div class="sn">' + c.name + ' ×' + n + '</div>' +
-          '<div class="sv">' + c.price + ' 金/个</div></div>' +
-          '<span class="sp">' + n * c.price + ' 金</span>' +
-          '<button class="btn mini" data-sell="' + id + '">卖出</button>' +
-        '</div>';
-      }).join('');
-    }
+
+    const cropHtml = ids.length
+      ? ids.map(function (id) {
+          const c = G.CROPS[id];
+          const n = state.store[id];
+          return '<div class="store-row">' +
+            '<span class="se">' + c.emoji + '</span>' +
+            '<div><div class="sn">' + c.name + ' ×' + n + '</div>' +
+            '<div class="sv">' + c.price + ' 金/个</div></div>' +
+            '<span class="sp">' + n * c.price + ' 金</span>' +
+            '<button class="btn mini" data-sell="' + id + '">卖出</button>' +
+          '</div>';
+        }).join('')
+      : '';
+
+    const fishHtml = fishCount
+      ? '<div class="store-sub">🐟 渔获 · ' + fishCount + ' 条</div>' +
+        fish.map(function (g) {
+          const q = G.qualityById(g.q);
+          const col = q ? q.color : 'var(--ink-3)';
+          return '<div class="store-row">' +
+            '<span class="se">' + g.emoji + '</span>' +
+            '<div><div class="sn">' + g.name + ' ×' + g.count + '</div>' +
+            '<div class="sv" style="color:' + col + '">' +
+              (q ? q.emoji + ' ' + q.name : '杂物') + ' · ' + g.v + ' 金/条</div></div>' +
+            '<span class="sp">' + (g.v * g.count) + ' 金</span>' +
+            '<button class="btn mini" data-sellfish="' + g.key + '">卖出</button>' +
+          '</div>';
+        }).join('')
+      : '';
+
+    box.innerHTML = (cropHtml || fishHtml)
+      ? cropHtml + fishHtml
+      : '<div class="store-empty">仓库空空如也，去收点菜 / 钓点鱼吧 🌱</div>';
 
     const seeds = Object.keys(state.seeds).filter(function (k) { return state.seeds[k] > 0; });
     $('#seed-box').innerHTML = '🎒 种子：' + (seeds.length
@@ -316,7 +398,7 @@
       : '<span style="color:var(--ink-3)">无（收获 30% 留种，或去种子店买）</span>' +
         '<button class="btn mini" data-act="seedshop">种子店</button>');
 
-    $('[data-act="sellAll"]').disabled = !ids.length;
+    $('[data-act="sellAll"]').disabled = !ids.length && !fishCount;
   }
 
   /* ---------------- 账本（按天汇总，点开看明细） ---------------- */
@@ -433,6 +515,7 @@
         actions += '<button class="btn" data-pact="fert-special" data-i="' + i + '"' + (p.fert ? ' disabled' : '') + '>💊 特效肥<small>12 金 · +2 产量</small></button>';
       }
     }
+    actions += '<button class="btn danger" data-pact="clear" data-i="' + i + '">🗑️ 铲除<small>不返还种子</small></button>';
 
     const body =
       '<div style="display:flex;gap:16px;align-items:center;margin-bottom:14px">' +
@@ -459,6 +542,17 @@
 
     openModal(c.emoji + ' ' + '第 ' + (i + 1) + ' 号地 · ' + c.name, body,
       '<button class="btn" data-close>关闭</button>');
+  }
+
+  function confirmClear(i) {
+    const p = state.plots[i];
+    if (!p || !p.crop) return;
+    const c = G.CROPS[p.crop];
+    openModal('🗑️ 铲除 ' + c.name,
+      '<div style="font-size:13px;line-height:1.8">第 ' + (i + 1) + ' 号地会变回空地，' +
+      '<b>不返还种子或金币</b>，作物直接消失。<br>确定吗？</div>',
+      '<button class="btn" data-close>取消</button>' +
+      '<button class="btn danger" data-clear="' + i + '">确定铲除</button>');
   }
 
   function cropPicker(i, batch) {
@@ -606,7 +700,8 @@
       '<div style="font-size:11.5px;color:var(--ink-2);line-height:1.7;font-weight:600">' +
       '· 睡觉推进 1 天，扣伙食费（' + G.mealFee(state) + ' 金/天），体力回满<br>' +
       '· 体力耗尽就得睡觉；没钱吃饭只能恢复 5 点<br>' +
-      '· 蚯蚓饵：收获 +30% 且品质取两次较好的<br>' +
+      '· 蚯蚓饵：渔获价值 +30%，且品质取两次较好的<br>' +
+      '· 钓到的鱼先进仓库，卖出才换钱；天气只影响上钩概率（雨天好鱼 ×1.3）<br>' +
       '· 收获时 30% 概率留种，种子下次可免费种<br>' +
       '· 多次收获作物（黄瓜/草莓）只有最后一收才判定留种<br>' +
       '· 种子只能在种子店买，卖回价是买价的一半<br>' +
@@ -614,6 +709,8 @@
       '· 半天零工体力不够时会把剩下的体力全用上，收益仍按 ×1.0<br>' +
       '· 账本按天汇总，点某一天可展开当日明细<br>' +
       '· 全部施肥只作用于进行中的小作物，大作物 / 已施肥 / 已成熟会跳过<br>' +
+      '· 种错了可以在地块详情里「铲除」，不返还种子或金币<br>' +
+      '· 顶栏 ⬇️ 导出存档 / ⬆️ 导入存档，日志面板可导出日志<br>' +
       '· 进度自动保存在本浏览器（localStorage）</div>';
 
     openModal('📖 规则速查', body, '<button class="btn" data-close>知道了</button>');
@@ -771,6 +868,7 @@
       if (pact && !pact.disabled) {
         const i = Number(pact.dataset.i);
         const kind = pact.dataset.pact;
+        if (kind === 'clear') { confirmClear(i); return; }
         let r;
         if (kind === 'water') r = G.water(state, i);
         else if (kind === 'harvest') r = G.harvest(state, i);
@@ -822,6 +920,26 @@
         return;
       }
 
+      // 卖一种鱼
+      const sellFish = t.closest('[data-sellfish]');
+      if (sellFish) {
+        const r = G.sellFishGroup(state, sellFish.dataset.sellfish);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        return;
+      }
+
+      // 铲除确认
+      const doClear = t.closest('[data-clear]');
+      if (doClear) {
+        const r = G.clearPlot(state, Number(doClear.dataset.clear));
+        closeModal();
+        commit(r);
+        toast(r.msg, 'warn');
+        return;
+      }
+
       // 种子店：买种子
       const buySeed = t.closest('[data-buyseed]');
       if (buySeed) {
@@ -857,6 +975,13 @@
     $('#btn-help').addEventListener('click', helpModal);
     $('#btn-reset').addEventListener('click', resetModal);
     $('#btn-save').addEventListener('click', function () { save(); toast('已存档 💾', 'good'); });
+    $('#btn-log').addEventListener('click', exportLog);
+    $('#btn-export').addEventListener('click', exportSave);
+    $('#btn-import').addEventListener('click', function () { $('#file-import').click(); });
+    $('#file-import').addEventListener('change', function () {
+      importSave(this.files && this.files[0]);
+      this.value = '';
+    });
     $('#btn-sound').addEventListener('click', function () {
       soundOn = !soundOn;
       this.textContent = soundOn ? '🔊' : '🔇';
