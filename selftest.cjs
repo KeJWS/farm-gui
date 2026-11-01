@@ -324,12 +324,13 @@ ok(!G.plantAll(s, 'carrot').ok, '没有空地时提示');
 section('全部施肥');
 s = G.createState();
 s.seeds = { carrot: 4 }; s.coins = 100; s.energy = 20;
+s.ferts = { normal: 4, special: 0 };
 G.plantAll(s, 'carrot');
 ok(G.fertTargets(s).length === 4, '4 块地都可施肥', G.fertTargets(s).length);
 
 let rf = G.fertilizeAll(s, 'normal');
-ok(rf.ok && rf.n === 4 && rf.cost === 20 && s.coins === 80 && s.energy === 12,
-   '普通肥 ×4：-20 金、-4 体力', { n: rf.n, coins: s.coins, energy: s.energy });
+ok(rf.ok && rf.n === 4 && s.ferts.normal === 0 && s.energy === 12,
+   '普通肥 ×4：消耗 4 袋、-4 体力', { n: rf.n, ferts: s.ferts.normal, energy: s.energy });
 ok(s.plots.filter(function (p) { return p.crop; }).every(function (p) { return p.fert === 1; }), '每块种了的地 +1 产量');
 ok(G.expectedYield(s, s.plots[0]) === 4, '预计产量含施肥（萝卜 3+1）', G.expectedYield(s, s.plots[0]));
 ok(!G.fertilizeAll(s, 'normal').ok, '已施肥的地块不再重复施');
@@ -340,18 +341,28 @@ G.plantAll(s, 'pumpkin');
 ok(G.fertTargets(s).length === 0, '南瓜 / 西瓜不吃肥料');
 
 s = G.createState();
-s.seeds = { carrot: 4 }; s.coins = 12; s.energy = 20;
+s.seeds = { carrot: 4 }; s.coins = 100; s.energy = 20;
+s.ferts = { normal: 2, special: 0 };
 G.plantAll(s, 'carrot');
 rf = G.fertilizeAll(s, 'normal');
-ok(rf.ok && rf.n === 2 && s.coins === 2 && /金币/.test(rf.stop || ''),
-   '金币只够 2 块时施 2 块后停', rf);
+ok(rf.ok && rf.n === 2 && s.ferts.normal === 0 && /肥料/.test(rf.stop || ''),
+   '肥料只够 2 块时施 2 块后停', rf);
 
 s = G.createState();
 s.seeds = { carrot: 4 }; s.coins = 100; s.energy = 5;
+s.ferts = { normal: 0, special: 3 };
 G.plantAll(s, 'carrot');                       // 播完还剩 1 体力
 rf = G.fertilizeAll(s, 'special');
 ok(rf.ok && rf.n === 1 && s.energy === 0 && /体力/.test(rf.stop || ''),
    '体力只够 1 块时施 1 块后停', rf);
+
+/* 肥料：种子店买、半价卖、入仓库 */
+s = G.createState(); s.coins = 100;
+ok(G.buyFertItem(s, 'normal', 2).ok && s.ferts.normal === 2 && s.coins === 84, '种子店买 2 袋普通肥 = 16 金');
+ok(G.fertSellPrice('normal') === 4 && G.fertSellPrice('special') === 9, '肥料半价回收 4 / 9 金');
+ok(G.sellFert(s, 'normal').ok && s.ferts.normal === 0 && s.coins === 92, '肥料全部卖回 +8 金');
+s.ferts.normal = 0;
+ok(!G.useFert(s, 0, 'normal').ok, '没肥料时施不了肥');
 
 /* ---------- 5e. 铲除 ---------- */
 section('铲除作物');
@@ -402,7 +413,7 @@ ok(!G.workAuto(s).ok, '没有体力时打不了零工');
 section('蚯蚓出售 / 种子平衡');
 s = G.createState(); s.bait.worm = 10; s.coins = 0;
 const rw = G.sellWorms(s);
-ok(G.WORM_VALUE === 2 && rw.ok && s.coins === 20 && s.bait.worm === 0, '蚯蚓 2 金/条，卖 10 条得 20 金', { coins: s.coins });
+ok(G.WORM_VALUE === 3 && rw.ok && s.coins === 30 && s.bait.worm === 0, '蚯蚓 3 金/条，卖 10 条得 30 金', { coins: s.coins });
 ok(!G.sellWorms(s).ok, '没有蚯蚓时卖不了');
 
 function profitPerDay(c) {
@@ -593,6 +604,54 @@ const oldSave = G.deserialize({ plots: [], coins: 10, day: 3 });
 ok(Array.isArray(oldSave.orders) && oldSave.orders.length === 3, '老存档没有委托字段时自动补一份');
 ok(G.orderPool(3).length === 4 && G.orderPool(30).length === 10, '委托池随天数解锁');
 
+/* ---------- 5m. v1.1.0：洒水器 / 零工一天一次 / 委托过滤 / 蚯蚓 ---------- */
+section('v1.1.0 新功能');
+G.setRng(mulberry32(55));
+
+s = G.createState(); s.coins = 400;
+ok(G.buySprinkler(s).ok && s.sprinklers === 1 && s.coins === 250, '洒水器 150 金/个', { c: s.coins });
+s.coins = 100000;
+while (G.buySprinkler(s).ok) { /* 买满 */ }
+ok(s.sprinklers === s.plots.length, '洒水器最多每块地一个', s.sprinklers);
+
+G.setRng(function () { return 0.1; });        // 固定晴天
+s = G.createState(); s.sprinklers = 2; s.seeds = { carrot: 3 }; s.coins = 100;
+G.plantAll(s, 'carrot');
+G.sleep(s);
+ok(s.plots.filter(function (p) { return p.crop && p.growth === 1; }).length === 2,
+   '洒水器每天自动浇 2 块地（不耗体力）',
+   s.plots.map(function (p) { return p.crop ? p.growth : '-'; }).join(''));
+
+s = G.createState(); s.energy = 10; s.coins = 0;
+ok(G.workAuto(s).ok && s.workUsed === true, '打零工后标记当天已用');
+ok(!G.workAuto(s).ok, '同一天打不了第二次零工');
+G.sleep(s);
+ok(s.workUsed === false, '睡一觉后才能再打');
+
+s = G.createState();
+s.fishBag = [
+  { name: '旧靴子', q: null, v: 1, d: 1 },
+  { name: '宝箱', q: 'std', v: 15, d: 1, no: true },
+  { name: '鲫鱼', q: 'std', v: 3, d: 1 }
+];
+ok(G.orderHave(s, { kind: 'fish' }) === 1, '杂物 / 宝箱不算委托进度', G.orderHave(s, { kind: 'fish' }));
+const fishOrder = { id: 't', kind: 'fish', qty: 1, reward: 10, name: '任意鱼', done: false };
+s.orders = [fishOrder];
+ok(G.deliverOrder(s, 't').ok, '只有 1 条有效鱼也能交鱼单');
+ok(s.fishBag.length === 2 && s.fishBag.some(function (e) { return e.name === '宝箱'; }) &&
+   s.fishBag.some(function (e) { return e.name === '旧靴子'; }), '交完只剩杂物和宝箱');
+
+G.setRng(mulberry32(9));
+let minSun = 9, maxSun = 0, minRain = 9, maxRain = 0;
+for (let i = 0; i < 60; i++) {
+  let st = G.createState(); st.weather = 'sunny'; st.energy = 99;
+  let r = G.digWorms(st); minSun = Math.min(minSun, r.n); maxSun = Math.max(maxSun, r.n);
+  st = G.createState(); st.weather = 'rain'; st.energy = 99;
+  r = G.digWorms(st); minRain = Math.min(minRain, r.n); maxRain = Math.max(maxRain, r.n);
+}
+ok(minSun === 1 && maxSun === 2, '晴天挖蚯蚓 1~2 条', minSun + '~' + maxSun);
+ok(minRain === 2 && maxRain === 4, '雨天挖蚯蚓 2~4 条', minRain + '~' + maxRain);
+
 section('存读档');
 s = G.createState();
 s.seeds = { corn: 1 };
@@ -614,7 +673,7 @@ const acts = [
   () => G.sellSeed(s, Object.keys(G.CROPS)[Math.floor(Math.random() * 10)]),
   () => { const ids = Object.keys(G.CROPS); return G.plantAll(s, ids[Math.floor(Math.random() * ids.length)]); },
   () => { const i = Math.floor(Math.random() * s.plots.length); const ids = Object.keys(G.CROPS); return G.plant(s, i, ids[Math.floor(Math.random() * ids.length)]); },
-  () => { const i = Math.floor(Math.random() * s.plots.length); return G.buyFert(s, i, Math.random() < 0.5 ? 'normal' : 'special'); },
+  () => { const i = Math.floor(Math.random() * s.plots.length); return G.useFert(s, i, Math.random() < 0.5 ? 'normal' : 'special'); },
   () => { const i = Math.floor(Math.random() * s.plots.length); return Math.random() < 0.5 ? G.water(s, i) : G.harvest(s, i); }
 ];
 let err = null;

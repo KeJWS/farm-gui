@@ -25,9 +25,11 @@
   const CROP_LIST = Object.keys(CROPS).map(function (k) { return CROPS[k]; });
 
   const FERT = {
-    normal:  { id: 'normal',  name: '普通肥料', emoji: '🧪', cost: 5,  add: 1 },
-    special: { id: 'special', name: '特效肥料', emoji: '💊', cost: 12, add: 2 }
+    normal:  { id: 'normal',  name: '普通肥料', emoji: '🧪', cost: 8,  add: 1 },
+    special: { id: 'special', name: '特效肥料', emoji: '💊', cost: 18, add: 2 }
   };
+  const FERT_SELL_RATE = 0.5;
+  const SPRINKLER_COST = 150;
 
   const TRASH = [
     { name: '易拉罐', emoji: '🥫' },
@@ -53,7 +55,7 @@
     { id: 'bass',  name: '鲈鱼',     emoji: '🐟', base: 12, w: 10 },
     { id: 'puffer', name: '河豚',    emoji: '🐡', base: 20, w: 6  },
     { id: 'koi',   name: '锦鲤',     emoji: '🐉', base: 25, w: 4  },
-    { id: 'chest', name: '宝箱',     emoji: '📦', base: 15, w: 5  }
+    { id: 'chest', name: '宝箱',     emoji: '📦', base: 15, w: 5, noOrder: true }
   ];
 
   const Q_IDS = QUALITY.map(function (q) { return q.id; });
@@ -136,6 +138,9 @@
       seeds: {},
       store: {},
       fishBag: [],
+      ferts: { normal: 0, special: 0 },
+      sprinklers: 0,
+      workUsed: false,
       bait: { worm: 0, dough: 0 },
       lure: { owned: false, dur: 0 },
       teaUsed: false,
@@ -392,7 +397,8 @@
     return { ok: true, msg: '+' + gain + ' 金', income: gain };
   }
 
-  function buyFert(s, idx, kind) {
+  /* 施肥 = 消耗仓库里的肥料（肥料在种子店买，半价卖回） */
+  function useFert(s, idx, kind) {
     const p = s.plots[idx];
     const f = FERT[kind];
     if (!p || !p.crop) return { ok: false, msg: '这块地还没种东西' };
@@ -400,14 +406,55 @@
     if (CROPS[p.crop].big) return { ok: false, msg: '南瓜、西瓜不吃肥料' };
     if (p.fert) return { ok: false, msg: '这块地已经施过肥了' };
     if (p.phase === 'ripe') return { ok: false, msg: '都熟了，别浪费肥料' };
-    if (s.coins < f.cost) return { ok: false, msg: '金币不够（' + f.cost + ' 金）' };
+    if ((s.ferts[kind] || 0) < 1) return { ok: false, msg: '肥料用完了，去种子店买' };
     if (s.energy < 1) return { ok: false, msg: '体力不够了' };
-    s.coins -= f.cost;
-    ledger(s, '买肥料 ' + f.name, 0, f.cost);
+    s.ferts[kind]--;
     s.energy -= 1;
     p.fert = f.add;
-    log(s, '🧪 ' + (idx + 1) + ' 号地施了' + f.name + '（产量 +' + f.add + '）', 'good');
+    log(s, '🧪 ' + (idx + 1) + ' 号地施了' + f.name + '（产量 +' + f.add + '、品质取更优）', 'good');
     return { ok: true, msg: f.name + ' 施用成功' };
+  }
+
+  function fertSellPrice(kind) {
+    const f = FERT[kind];
+    return f ? Math.max(1, Math.floor(f.cost * FERT_SELL_RATE)) : 0;
+  }
+
+  function buyFertItem(s, kind, n) {
+    const f = FERT[kind];
+    if (!f) return { ok: false, msg: '没有这种肥料' };
+    const qty = Math.max(1, Math.floor(n || 1));
+    const cost = f.cost * qty;
+    if (s.coins < cost) return { ok: false, msg: '金币不够（需要 ' + cost + ' 金）' };
+    s.coins -= cost;
+    ledger(s, '买肥料 ' + f.name + '×' + qty, 0, cost);
+    s.ferts[kind] = (s.ferts[kind] || 0) + qty;
+    log(s, '🧪 买了' + f.name + ' ×' + qty + '（-' + cost + ' 金）', 'info');
+    return { ok: true, qty: qty, cost: cost, msg: '买到 ' + f.name + ' ×' + qty };
+  }
+
+  function sellFert(s, kind, n) {
+    const f = FERT[kind];
+    if (!f) return { ok: false, msg: '没有这种肥料' };
+    const have = s.ferts[kind] || 0;
+    if (!have) return { ok: false, msg: '没有' + f.name };
+    const qty = n ? Math.min(n, have) : have;
+    const gain = qty * fertSellPrice(kind);
+    s.ferts[kind] = have - qty;
+    addCoins(s, gain, '卖肥料 ' + f.name);
+    log(s, '💰 卖出' + f.name + ' ×' + qty + '，+' + gain + ' 金', 'good');
+    return { ok: true, qty: qty, income: gain, msg: '卖出 ' + f.name + ' ×' + qty + '，+' + gain + ' 金' };
+  }
+
+  /* 洒水器：每个每天自动浇 1 块地 */
+  function buySprinkler(s) {
+    if (s.coins < SPRINKLER_COST) return { ok: false, msg: '金币不够（' + SPRINKLER_COST + ' 金）' };
+    if (s.sprinklers >= s.plots.length) return { ok: false, msg: '每块地一个就够了（现有 ' + s.plots.length + ' 块地）' };
+    s.coins -= SPRINKLER_COST;
+    ledger(s, '买洒水器', 0, SPRINKLER_COST);
+    s.sprinklers++;
+    log(s, '🚿 买了第 ' + s.sprinklers + ' 个洒水器（每天自动浇 1 块地）', 'good');
+    return { ok: true, msg: '洒水器 ×' + s.sprinklers, sprinklers: s.sprinklers };
   }
 
   /* 这块地能不能施肥（大作物、已施肥、已成熟都不行） */
@@ -433,24 +480,23 @@
     const targets = fertTargets(s);
     if (!targets.length) return { ok: false, msg: '没有可施肥的地块（大作物、已施肥、已成熟都不行）' };
 
-    let n = 0, cost = 0, stop = null;
+    let n = 0, stop = null;
     for (let k = 0; k < targets.length; k++) {
       if (s.energy < 1) { stop = '体力不够了'; break; }
-      if (s.coins < f.cost) { stop = '金币不够了'; break; }
+      if ((s.ferts[kind] || 0) < 1) { stop = '肥料不够了'; break; }
       const p = s.plots[targets[k]];
-      s.coins -= f.cost;
+      s.ferts[kind]--;
       s.energy -= 1;
       p.fert = f.add;
-      n++; cost += f.cost;
+      n++;
     }
     if (!n) return { ok: false, msg: stop || '施肥失败' };
 
-    ledger(s, '施肥 ' + f.name + '×' + n, 0, cost);
-    log(s, '🧪 ' + f.name + ' × ' + n + ' 块地（-' + cost + ' 金，每块 +' + f.add + ' 产量）' +
+    log(s, '🧪 ' + f.name + ' × ' + n + ' 块地（每块 +' + f.add + ' 产量、品质更优）' +
             (stop ? '，' + stop : ''), 'good');
     return {
-      ok: true, n: n, cost: cost, stop: stop,
-      msg: '施了 ' + n + ' 块地，-' + cost + ' 金' + (stop ? '（' + stop + '）' : '')
+      ok: true, n: n, stop: stop,
+      msg: '施了 ' + n + ' 块地' + (stop ? '（' + stop + '）' : '')
     };
   }
 
@@ -474,6 +520,7 @@
 
     s.day++;
     s.teaUsed = false;
+    s.workUsed = false;
     s.weather = rollWeather();
     const w = WEATHER[s.weather];
     notes.push(w.emoji + ' 第 ' + s.day + ' 天 · ' + w.name);
@@ -485,6 +532,17 @@
         if (!p.watered) { if (grow(p, s)) ripe++; p.watered = true; n++; }
       });
       if (n) notes.push('🌧️ 自动浇水 ' + n + ' 块地' + (ripe ? '，' + ripe + ' 块成熟' : ''));
+    } else if (s.sprinklers > 0) {
+      // 洒水器：每天自动浇前 N 块没浇的地，不耗体力
+      let n = 0, ripe = 0;
+      s.plots.forEach(function (p) {
+        if (n >= s.sprinklers) return;
+        if (!p.crop || p.phase === 'ripe' || p.watered) return;
+        if (grow(p, s)) ripe++;
+        p.watered = true;
+        n++;
+      });
+      if (n) notes.push('🚿 洒水器浇了 ' + n + ' 块地' + (ripe ? '，' + ripe + ' 块成熟' : ''));
     }
 
     log(s, '🌙 睡觉 → 第 ' + s.day + ' 天 · ' + w.name, 'sys');
@@ -549,10 +607,11 @@
 
     // 渔获进仓库，卖掉才换钱
     s.fishBag = s.fishBag || [];
-    s.fishBag.push({ name: name, emoji: emoji, q: q ? q.id : null, v: value, d: s.day });
+    const noOrder = !!f.noOrder || !!f.trash;      // 杂物、宝箱不算委托
+    s.fishBag.push({ name: name, emoji: emoji, q: q ? q.id : null, v: value, d: s.day, no: noOrder || undefined });
 
     const entry = { day: s.day, fish: name, emoji: emoji, quality: q, price: value,
-                    base: f.base, bait: kind, trash: !!f.trash };
+                    base: f.base, bait: kind, trash: !!f.trash, noOrder: noOrder };
     s.fishBook.count++;
     s.fishBook.entries.unshift(entry);
     if (s.fishBook.entries.length > 40) s.fishBook.entries.length = 40;
@@ -694,8 +753,8 @@
     return { ok: true, msg: '卖出 ' + n + ' 条鱼，+' + gain + ' 金', income: gain };
   }
 
-  /* 蚯蚓也能卖：2 金/条 */
-  const WORM_VALUE = 2;
+  /* 蚯蚓也能卖：3 金/条（只在渔具店卖） */
+  const WORM_VALUE = 3;
 
   function sellWorms(s, n) {
     const have = s.bait.worm || 0;
@@ -711,7 +770,7 @@
   function digWorms(s) {
     if (s.energy < 3) return { ok: false, msg: '体力不够（挖蚯蚓要 3 点）' };
     const w = WEATHER[s.weather];
-    const n = clamp(randInt(2, 4) + w.wormMod, 1, 6);
+    const n = clamp(randInt(1, 3) + w.wormMod, 1, 5);
     s.energy -= 3;
     s.bait.worm += n;
     s.stats.dug++;
@@ -751,21 +810,23 @@
     return { ok: true, msg: '体力 +5' };
   }
 
-  /* 打零工：体力够就干全天（×1.5），否则干半天（×1.0，体力不足就用光） */
+  /* 打零工：每天只能打一次；体力够就干全天（×2.0），否则半天（×1.2，体力不足就用光） */
   function workAuto(s) {
     const full = workCost(s, 'full');
     return work(s, s.energy >= full ? 'full' : 'half');
   }
 
   function work(s, mode) {
+    if (s.workUsed) return { ok: false, msg: '今天已经打过零工了，明天再来' };
     const cost = workCost(s, mode);
 
-    // 半天零工体力不足时：把剩下的体力全用上，收益仍按 ×1.0 结算
+    // 半天零工体力不足时：把剩下的体力全用上，收益仍按 ×1.2 结算
     if (mode === 'half' && s.energy < cost) {
       const spent = s.energy;
       if (spent <= 0) return { ok: false, msg: '体力已经见底了，先睡觉吧' };
       const pay = Math.round(spent * WORK_RATE_HALF);
       s.energy = 0;
+      s.workUsed = true;
       addCoins(s, pay, '半天零工');
       log(s, '🕐 半天零工（体力不足，全用上）：-' + spent + ' 体力，+' + pay + ' 金', 'good');
       return { ok: true, msg: '+' + pay + ' 金（用掉全部 ' + spent + ' 体力）', pay: pay, spent: spent, partial: true };
@@ -774,6 +835,7 @@
     if (s.energy < cost) return { ok: false, msg: '体力不足（需要 ' + cost + ' 点）' };
     const pay = workPay(s, mode);
     s.energy -= cost;
+    s.workUsed = true;
     addCoins(s, pay, mode === 'half' ? '半天零工' : '全天零工');
     log(s, (mode === 'half' ? '🕐' : '🕑') + (mode === 'half' ? '半天' : '全天') +
             '零工：-' + cost + ' 体力，+' + pay + ' 金', 'good');
@@ -905,9 +967,14 @@
   }
 
   /* 委托进度：作物看仓库，鱼看渔获袋 */
+  /* 杂物、宝箱不算委托的鱼 */
+  function orderFish(s) {
+    return (s.fishBag || []).filter(function (e) { return e && e.q && !e.no; });
+  }
+
   function orderHave(s, o) {
     if (!o) return 0;
-    if (o.kind === 'fish') return (s.fishBag || []).length;
+    if (o.kind === 'fish') return orderFish(s).length;
     return storeCount(s, o.crop);
   }
 
@@ -919,8 +986,8 @@
     if (have < o.qty) return { ok: false, msg: '还差 ' + (o.qty - have) + ' 个' };
 
     if (o.kind === 'fish') {
-      // 交最便宜的鱼，好鱼留着做图鉴
-      const drop = s.fishBag.slice().sort(function (a, b) { return a.v - b.v; }).slice(0, o.qty);
+      // 交最便宜的可交鱼，好鱼和杂物都留着
+      const drop = orderFish(s).sort(function (a, b) { return a.v - b.v; }).slice(0, o.qty);
       s.fishBag = s.fishBag.filter(function (e) { return drop.indexOf(e) < 0; });
     } else {
       takeStore(s, o.crop, o.qty);
@@ -1045,6 +1112,11 @@
       }
     });
     merged.fishBag = Array.isArray(s.fishBag) ? s.fishBag.slice(0, 5000) : [];
+    merged.ferts = Object.assign({ normal: 0, special: 0 }, s.ferts || {});
+    merged.ferts.normal = Math.round(num(merged.ferts.normal, 0, 0, 999));
+    merged.ferts.special = Math.round(num(merged.ferts.special, 0, 0, 999));
+    merged.sprinklers = Math.round(num(s.sprinklers, 0, 0, 40));
+    merged.workUsed = !!s.workUsed;
     merged.ledger = Array.isArray(s.ledger) ? s.ledger : base.ledger;
     merged.log = Array.isArray(s.log) ? s.log.slice(0, 400) : base.log;
     // 旧存档迁移：垃圾不参与品质判定（早期版本会给出「优质垃圾」）
@@ -1077,7 +1149,9 @@
     qualityById: qualityById,
     buySeed: buySeed, seedBuyPrice: seedBuyPrice, seedSellPrice: seedSellPrice,
     SEED_SELL_RATE: SEED_SELL_RATE,
-    buyFert: buyFert, fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
+    useFert: useFert, buyFertItem: buyFertItem, sellFert: sellFert, fertSellPrice: fertSellPrice,
+    FERT_SELL_RATE: FERT_SELL_RATE, buySprinkler: buySprinkler, SPRINKLER_COST: SPRINKLER_COST,
+    fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
     fishMany: fishMany, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather
   };
