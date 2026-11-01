@@ -594,11 +594,12 @@ ok(s.fishBag.length === 3 - fo.qty && s.fishBag.some(function (e) { return e.nam
 
 s = G.createState();
 const day1Orders = s.orders.map(function (o) { return o.id; }).join();
+ok(!G.refreshOrders(s).ok, '开局当天已经刷新过，要等到明天');
 s.coins = 100;
 G.sleep(s);
-ok(s.orders.length === 3 && s.orders.every(function (o) { return !o.done; }) &&
-   s.orders.map(function (o) { return o.id; }).join() !== day1Orders,
-   '睡一觉刷新当天委托', s.orders.length);
+ok(s.orders.map(function (o) { return o.id; }).join() === day1Orders, '睡觉不会自动刷新委托');
+ok(G.refreshOrders(s).ok && s.orders[0].id.indexOf('d' + s.day + '-') === 0, '手动刷新换一批委托');
+ok(!G.refreshOrders(s).ok, '同一天只能刷新一次');
 
 const oldSave = G.deserialize({ plots: [], coins: 10, day: 3 });
 ok(Array.isArray(oldSave.orders) && oldSave.orders.length === 3, '老存档没有委托字段时自动补一份');
@@ -651,6 +652,42 @@ for (let i = 0; i < 60; i++) {
 }
 ok(minSun === 1 && maxSun === 2, '晴天挖蚯蚓 1~2 条', minSun + '~' + maxSun);
 ok(minRain === 2 && maxRain === 4, '雨天挖蚯蚓 2~4 条', minRain + '~' + maxRain);
+
+/* ---------- 5n. v1.2.0：自动收获器 / 没钱恢复 / 仓库总价 ---------- */
+section('v1.2.0 新功能');
+G.setRng(mulberry32(33));
+
+s = G.createState(); s.coins = 500;
+ok(G.buyHarvester(s).ok && s.harvester === true && s.coins === 200, '自动收获器 300 金');
+ok(!G.buyHarvester(s).ok, '只能装一个');
+
+G.setRng(function () { return 0.1; });          // 晴天
+s = G.createState();
+s.harvester = true; s.coins = 1000; s.energy = 0;
+s.plots[0] = { crop: 'carrot', growth: 2, watered: false, missed: 0, fert: 0, ripeDay: 0, hits: 0, phase: 'ripe' };
+const storeBefore = G.storeCount(s, 'carrot');
+G.sleep(s);
+ok(G.storeCount(s, 'carrot') > storeBefore && s.plots[0].crop === null,
+   '睡觉时自动收走成熟作物（不耗体力）', { n: G.storeCount(s, 'carrot') });
+
+// 没钱吃饭：只恢复到上限的 30%，至少 5 点
+s = G.createState(); s.maxEnergy = 40; s.coins = 0; s.energy = 0;
+G.sleep(s);
+ok(s.energy === 12, '没钱时恢复到上限 30%（40 → 12）', s.energy);
+s = G.createState(); s.maxEnergy = 10; s.coins = 0; s.energy = 0;
+G.sleep(s);
+ok(s.energy === 5, '上限低时保底 5 点', s.energy);
+s = G.createState(); s.maxEnergy = 40; s.coins = 0; s.energy = 20;
+G.sleep(s);
+ok(s.energy === 20, '没钱也不会扣掉已有的体力', s.energy);
+
+// 仓库总价 = 作物 + 鱼 + 蚯蚓 + 肥料（半价）
+s = G.createState();
+G.addStore(s, 'carrot', 'std', 2);              // 2 × 4 = 8
+s.fishBag = [{ name: '鲫鱼', q: 'std', v: 5, d: 1 }];
+s.bait.worm = 2;                                // 6
+s.ferts = { normal: 1, special: 0 };            // +4
+ok(G.storeTotal(s) === 8 + 5 + 6 + 4, '仓库总价把作物/鱼/蚯蚓/肥料都算上', G.storeTotal(s));
 
 section('存读档');
 s = G.createState();

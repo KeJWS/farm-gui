@@ -33,11 +33,8 @@
 
   <div class="top-actions">
     <button class="btn primary sleep-btn" data-act="sleep" title="推进到下一天，扣伙食费并恢复体力">🌙 睡觉</button>
-    <button class="icon-btn" id="btn-help" title="规则说明">📖</button>
-    <button class="icon-btn" id="btn-export" title="导出存档（.json）">⬇️</button>
-    <button class="icon-btn" id="btn-import" title="导入存档（.json）">⬆️</button>
-    <button class="icon-btn" id="btn-sound" title="音效开关">🔊</button>
-    <button class="icon-btn" id="btn-reset" title="重新开始">🔄</button>
+    <button class="icon-btn" id="btn-status" title="查看状态">📊</button>
+    <button class="icon-btn" id="btn-settings" title="设置">⚙️</button>
     <input type="file" id="file-import" accept=".json,application/json" hidden>
   </div>
 </header>
@@ -81,6 +78,7 @@
     <div class="panel store">
       <div class="panel-head">
         <h2>🧺 仓库</h2>
+        <span class="muted" id="store-sum"></span>
         <button class="btn mini" data-act="sellAll">全部卖出</button>
       </div>
       <div id="store-list" class="store-list"></div>
@@ -107,6 +105,7 @@
         <button class="btn" data-act="expand">🏞️ 扩张土地<small id="expand-txt"></small></button>
         <button class="btn" data-act="upgrade">💪 强化体力<small id="upgrade-txt"></small></button>
         <button class="btn" data-act="sprinkler">🚿 洒水器<small id="sprinkler-txt"></small></button>
+        <button class="btn" data-act="harvester">🤖 自动收获器<small id="harvester-txt"></small></button>
       </div>
     </div>
 
@@ -119,7 +118,10 @@
     </div>
 
     <div class="panel">
-      <div class="panel-head"><h2>📋 今日委托</h2><span class="muted" id="orders-sum"></span></div>
+      <div class="panel-head"><h2>📋 今日委托</h2>
+        <span class="muted" id="orders-sum"></span>
+        <button class="btn mini" id="btn-refresh-orders">🔄 刷新</button>
+      </div>
       <div id="order-list" class="order-list"></div>
     </div>
 

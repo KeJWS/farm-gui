@@ -140,6 +140,8 @@
       fishBag: [],
       ferts: { normal: 0, special: 0 },
       sprinklers: 0,
+      harvester: false,
+      orderRefreshDay: 1,
       workUsed: false,
       bait: { worm: 0, dough: 0 },
       lure: { owned: false, dur: 0 },
@@ -292,15 +294,15 @@
     return { ok: true, msg: '浇了 ' + done + ' 块地' + (ripened ? '，' + ripened + ' 块成熟' : ''), done: done };
   }
 
-  function harvest(s, idx) {
+  function harvest(s, idx, free) {
     const p = s.plots[idx];
     if (!p || !p.crop) return { ok: false, msg: '这块地还没种东西' };
     if (p.phase !== 'ripe') return { ok: false, msg: '还没成熟（' + p.growth + '/' + needOf(p) + ' 天）' };
     if (s.day <= p.ripeDay) return { ok: false, msg: '刚浇成熟，明天才能收获' };
-    if (s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
+    if (!free && s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
 
     const c = CROPS[p.crop];
-    s.energy -= 1;
+    if (!free) s.energy -= 1;
 
     let qty;
     if (c.multi) qty = p.hits === 0 ? c.firstQty : c.regrowQty;
@@ -508,9 +510,21 @@
       notes.push('🍖 伙食费 -' + fee + ' 金');
       s.energy = s.maxEnergy;
     } else {
-      // 没饭吃只回 5 点，但别把本来更高的体力扣掉
-      s.energy = Math.max(s.energy, Math.min(5, s.maxEnergy));
-      notes.push('😵 没钱吃饭，饿着睡了（只恢复 5 体力）');
+      // 没钱只恢复到「上限的 30%，至少 5 点」，但不会扣掉已有的体力
+      const floor = Math.max(5, Math.round(s.maxEnergy * 0.3));
+      s.energy = Math.max(s.energy, Math.min(floor, s.maxEnergy));
+      notes.push('😵 没钱吃饭，只恢复到 ' + floor + ' 点体力');
+    }
+
+    // 自动收获器：睡觉时把能收的地块收掉，不耗体力
+    if (s.harvester) {
+      let hn = 0, hval = 0;
+      s.plots.forEach(function (p, i) {
+        if (!p.crop || !canHarvest(s, p)) return;
+        const hr = harvest(s, i, true);
+        if (hr.ok) { hn++; hval += hr.qty * hr.unit; }
+      });
+      if (hn) notes.push('🤖 自动收获器收了 ' + hn + ' 块地（值 ' + hval + ' 金）');
     }
 
     s.plots.forEach(function (p) {
@@ -546,8 +560,6 @@
     }
 
     log(s, '🌙 睡觉 → 第 ' + s.day + ' 天 · ' + w.name, 'sys');
-    s.orders = makeOrders(s);
-    notes.push('📋 今日委托已刷新：' + s.orders.length + ' 单');
     return { ok: true, msg: '新的一天', day: s.day, notes: notes, weather: s.weather };
   }
 
@@ -842,6 +854,38 @@
     return { ok: true, msg: '+' + pay + ' 金', pay: pay, spent: cost };
   }
 
+  /* 自动收获器：睡觉时免费收成熟作物 */
+  const HARVESTER_COST = 300;
+  function buyHarvester(s) {
+    if (s.harvester) return { ok: false, msg: '已经有自动收获器了' };
+    if (s.coins < HARVESTER_COST) return { ok: false, msg: '金币不够（' + HARVESTER_COST + ' 金）' };
+    s.coins -= HARVESTER_COST;
+    ledger(s, '买自动收获器', 0, HARVESTER_COST);
+    s.harvester = true;
+    log(s, '🤖 买了自动收获器（每天睡觉时自动收获成熟作物，不耗体力）', 'good');
+    return { ok: true, msg: '自动收获器已安装' };
+  }
+
+  /* 委托手动刷新：每天一次 */
+  function refreshOrders(s) {
+    if (s.orderRefreshDay === s.day) return { ok: false, msg: '今天的委托已经刷新过了，明天再来' };
+    s.orders = makeOrders(s);
+    s.orderRefreshDay = s.day;
+    log(s, '📋 刷新了今日委托：' + s.orders.length + ' 单', 'info');
+    return { ok: true, msg: '刷新了 ' + s.orders.length + ' 个委托', orders: s.orders };
+  }
+
+  /* 仓库总价：作物（按品质）+ 渔获 + 蚯蚓 + 肥料（半价） */
+  function storeTotal(s) {
+    let v = 0;
+    Object.keys(s.store).forEach(function (id) { v += storeValue(s, id); });
+    (s.fishBag || []).forEach(function (e) { v += e.v || 0; });
+    v += (s.bait.worm || 0) * WORM_VALUE;
+    v += (s.ferts.normal || 0) * fertSellPrice('normal');
+    v += (s.ferts.special || 0) * fertSellPrice('special');
+    return v;
+  }
+
   /* ---------------- 种子店 ---------------- */
 
   const SEED_SELL_RATE = 0.5;          // 回收价 = 售价的一半
@@ -1116,6 +1160,8 @@
     merged.ferts.normal = Math.round(num(merged.ferts.normal, 0, 0, 999));
     merged.ferts.special = Math.round(num(merged.ferts.special, 0, 0, 999));
     merged.sprinklers = Math.round(num(s.sprinklers, 0, 0, 40));
+    merged.harvester = !!s.harvester;
+    merged.orderRefreshDay = Math.round(num(s.orderRefreshDay, s.day || 1, 0, 100000));
     merged.workUsed = !!s.workUsed;
     merged.ledger = Array.isArray(s.ledger) ? s.ledger : base.ledger;
     merged.log = Array.isArray(s.log) ? s.log.slice(0, 400) : base.log;
@@ -1151,6 +1197,8 @@
     SEED_SELL_RATE: SEED_SELL_RATE,
     useFert: useFert, buyFertItem: buyFertItem, sellFert: sellFert, fertSellPrice: fertSellPrice,
     FERT_SELL_RATE: FERT_SELL_RATE, buySprinkler: buySprinkler, SPRINKLER_COST: SPRINKLER_COST,
+    buyHarvester: buyHarvester, HARVESTER_COST: HARVESTER_COST, refreshOrders: refreshOrders,
+    storeTotal: storeTotal,
     fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
     fishMany: fishMany, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather

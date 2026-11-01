@@ -307,6 +307,9 @@
     $('#expand-txt').textContent = '第 ' + (state.plots.length + 1) + ' 块 · ' + G.expandCost(state) + ' 金';
     $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + 5) + ' · ' + G.upgradeCost(state) + ' 金';
     $('#sprinkler-txt').textContent = '已有 ' + state.sprinklers + ' 个 · ' + G.SPRINKLER_COST + ' 金/个';
+    $('#harvester-txt').textContent = state.harvester
+      ? '已安装 · 睡觉时自动收'
+      : G.HARVESTER_COST + ' 金 · 睡觉时自动收';
 
     const teaBtn = $('[data-act="tea"]');
     teaBtn.disabled = state.teaUsed || state.energy >= state.maxEnergy;
@@ -319,6 +322,7 @@
     $('[data-act="expand"]').disabled = state.coins < G.expandCost(state);
     $('[data-act="upgrade"]').disabled = state.coins < G.upgradeCost(state);
     $('[data-act="sprinkler"]').disabled = state.coins < G.SPRINKLER_COST || state.sprinklers >= state.plots.length;
+    $('[data-act="harvester"]').disabled = state.harvester || state.coins < G.HARVESTER_COST;
   }
 
   /* ---------------- 钓鱼 ---------------- */
@@ -428,19 +432,18 @@
 
     const wormN = state.bait.worm || 0;
     const wormHtml = wormN
-      ? '<div class="store-sub">🪱 蚯蚓 · ' + wormN + ' 条（去渔具店卖）</div>' +
+      ? '<div class="store-sub">🪱 蚯蚓 · ' + wormN + ' 条（渔具店回收）</div>' +
         '<div class="store-row">' +
           '<span class="se">🪱</span>' +
           '<div><div class="sn">蚯蚓 ×' + wormN + '</div>' +
           '<div class="sv">' + G.WORM_VALUE + ' 金/条 · 也可当饵用</div></div>' +
           '<span class="sp">' + (wormN * G.WORM_VALUE) + ' 金</span>' +
-          '<button class="btn mini" data-act="shop">去渔具店</button>' +
         '</div>'
       : '';
 
     const fertRows = ['normal', 'special'].filter(function (k) { return (state.ferts[k] || 0) > 0; });
     const fertHtml = fertRows.length
-      ? '<div class="store-sub">🧪 肥料 · 种子店购买</div>' +
+      ? '<div class="store-sub">🧪 肥料 · 种子店买 / 卖</div>' +
         fertRows.map(function (k) {
           const f = G.FERT[k];
           const n = state.ferts[k];
@@ -450,7 +453,6 @@
             '<div><div class="sn">' + f.name + ' ×' + n + '</div>' +
             '<div class="sv">半价回收 ' + sp + ' 金/袋 · +' + f.add + ' 产量</div></div>' +
             '<span class="sp">' + (n * sp) + ' 金</span>' +
-            '<button class="btn mini" data-fertsell="' + k + '">卖出</button>' +
           '</div>';
         }).join('')
       : '';
@@ -467,6 +469,7 @@
       : '<span style="color:var(--ink-3)">无（收获 30% 留种，或去商店买）</span>');
 
     $('[data-act="sellAll"]').disabled = !ids.length && !fishCount;
+    $('#store-sum').textContent = '总价 ' + G.storeTotal(state) + ' 金';
   }
 
   /* ---------------- 配送委托（按天刷新） ---------------- */
@@ -476,6 +479,11 @@
     const box = $('#order-list');
     const doneN = list.filter(function (o) { return o.done; }).length;
     $('#orders-sum').textContent = list.length ? doneN + '/' + list.length + ' 完成' : '';
+    const rb = $('#btn-refresh-orders');
+    if (rb) {
+      rb.disabled = state.orderRefreshDay === state.day;
+      rb.title = rb.disabled ? '今天已经刷新过了，明天再来' : '刷新今日委托（每天一次）';
+    }
     if (!list.length) {
       box.innerHTML = '<div class="store-empty">今天没有委托，睡一觉再来看</div>';
       return;
@@ -878,23 +886,64 @@
         '· 打零工：<b>每天只能打一次</b>，全天 ×2.0 金/体力、半天 ×1.2，不够半天就把剩下的体力用光<br>' +
         '· 强化体力 ' + G.upgradeCost(state) + ' 金（+5 上限，成本每级 ×1.2）· 扩张土地 ' + G.expandCost(state) + ' 金<br>' +
         '· 🚿 洒水器 ' + G.SPRINKLER_COST + ' 金/个：每天自动浇 1 块地，不耗体力（雨天自动浇，不叠加）<br>' +
-        '· 种子 / 肥料都在种子店买，卖回价是买价的一半；蚯蚓只能在渔具店卖（' + G.WORM_VALUE + ' 金/条）</p>' +
+        '· 🤖 自动收获器 ' + G.HARVESTER_COST + ' 金：睡觉时自动收走成熟作物，不耗体力<br>' +
+        '· 没钱吃饭只恢复到体力上限的 30%（至少 5 点），不会扣掉已有的体力<br>' +
+        '· 种子 / 肥料都在种子店买卖（半价回收），肥料也只能在种子店卖；蚯蚓只能在渔具店卖（' + G.WORM_VALUE + ' 金/条）</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
         '<h4>📋 委托</h4>' +
-        '<p>每天 2 个作物单 + 1 个鱼单，睡一觉刷新；报酬高于直接卖约 40%，没交不罚。<br>' +
-        '交委托先扣<b>品质差的</b>，交鱼先交最便宜的；杂物、宝箱不算数。</p>' +
+        '<p>每天 2 个作物单 + 1 个鱼单，<b>手动点「🔄 刷新」</b>换单（每天一次），不刷新就一直留着。<br>' +
+        '报酬高于直接卖约 40%，没交不罚。交委托先扣<b>品质差的</b>，交鱼先交最便宜的；杂物、宝箱不算数。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
         '<h4>⌨️ 操作</h4>' +
         '<p>· 成熟地块<b>左键直接收</b>；右键或 Shift + 点击看详情（可铲除、看产量）<br>' +
+        '· 顶栏 <b>📊 状态</b> 看累计数据，<b>⚙️ 设置</b> 里有规则说明 / 导入导出 / 音效 / 重新开始<br>' +
         '· 地块 / 饵料 / 账本 / 日志都可以 Tab 聚焦、Enter 或空格操作<br>' +
-        '· 顶栏 ⬇️⬆️ 导入导出存档，日志和账本都能导出 .md；进度自动存在本浏览器</p>' +
+        '· 日志和账本都能导出 .md；进度自动存在本浏览器</p>' +
       '</div>';
 
     openModal('📖 规则速查', body, '<button class="btn" data-close>知道了</button>');
+  }
+
+  function settingsModal() {
+    openModal('⚙️ 设置',
+      '<div class="action-grid">' +
+        '<button class="btn" id="set-help">📖 规则说明</button>' +
+        '<button class="btn" id="set-status">📊 查看状态</button>' +
+        '<button class="btn" id="set-export">⬇️ 导出存档<small>.json</small></button>' +
+        '<button class="btn" id="set-import">⬆️ 导入存档<small>.json</small></button>' +
+        '<button class="btn" id="set-sound">' + (soundOn ? '🔊 音效：开' : '🔇 音效：关') + '</button>' +
+        '<button class="btn danger" id="set-reset">🔄 重新开始</button>' +
+      '</div>' +
+      '<div class="shop-tip">进度自动保存在本浏览器（localStorage）；换设备用导出 / 导入。</div>',
+      '<button class="btn" data-close>关闭</button>');
+  }
+
+  function statusModal() {
+    const b = state.fishBook.best, p = state.fishBook.priciest;
+    const rows = [
+      ['进度', '第 ' + state.day + ' 天 · ' + G.seasonOf(state.day) + '季'],
+      ['金币', state.coins + ' 金'],
+      ['体力', state.energy + ' / ' + state.maxEnergy + ' · 伙食 ' + G.mealFee(state) + ' 金/天'],
+      ['土地', state.plots.length + ' 块 · 洒水器 ' + state.sprinklers + ' 个'],
+      ['设备', '自动收获器 ' + (state.harvester ? '✅ 已安装' : '— 未安装')],
+      ['仓库总价', G.storeTotal(state) + ' 金'],
+      ['累计播种', state.stats.planted + ' 次'],
+      ['累计收获', state.stats.harvests + ' 次'],
+      ['累计钓鱼', state.stats.casts + ' 次'],
+      ['挖蚯蚓', state.stats.dug + ' 次'],
+      ['完成委托', (state.stats.orders || 0) + ' 单'],
+      ['最高品质', b && b.quality ? b.quality.emoji + ' ' + b.quality.name + ' · ' + b.fish : '—'],
+      ['最贵一条', p ? p.fish + ' · ' + p.price + ' 金' : '—']
+    ];
+    openModal('📊 当前状态',
+      '<dl class="kv">' + rows.map(function (r) {
+        return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>';
+      }).join('') + '</dl>',
+      '<button class="btn" data-close>关闭</button>');
   }
 
   function resetModal() {
@@ -953,6 +1002,11 @@
     },
     sprinkler: function () {
       const r = G.buySprinkler(state);
+      commit(r);
+      if (r.ok) { toast(r.msg, 'good'); SFX.coin(); }
+    },
+    harvester: function () {
+      const r = G.buyHarvester(state);
       commit(r);
       if (r.ok) { toast(r.msg, 'good'); SFX.coin(); }
     },
@@ -1225,21 +1279,30 @@
       }
     });
 
-    $('#btn-help').addEventListener('click', helpModal);
-    $('#btn-reset').addEventListener('click', resetModal);
+    $('#btn-settings').addEventListener('click', settingsModal);
+    $('#btn-status').addEventListener('click', statusModal);
+    $('#btn-refresh-orders').addEventListener('click', function () {
+      const r = G.refreshOrders(state);
+      commit(r);
+      toast(r.msg, r.ok ? 'good' : 'warn');
+      if (r.ok) SFX.good();
+    });
     $('#btn-log').addEventListener('click', exportLog);
     $('#btn-ledger').addEventListener('click', exportLedger);
-    $('#btn-export').addEventListener('click', exportSave);
-    $('#btn-import').addEventListener('click', function () { $('#file-import').click(); });
     $('#file-import').addEventListener('change', function () {
       importSave(this.files && this.files[0]);
       this.value = '';
     });
-    $('#btn-sound').addEventListener('click', function () {
-      soundOn = !soundOn;
-      this.textContent = soundOn ? '🔊' : '🔇';
-      this.classList.toggle('off', !soundOn);
-      if (soundOn) SFX.good();
+
+    // 设置面板里的按钮（面板每次重绘，用事件委托）
+    document.addEventListener('click', function (ev) {
+      const t = ev.target;
+      if (t.closest('#set-help')) { closeModal(); helpModal(); return; }
+      if (t.closest('#set-status')) { closeModal(); statusModal(); return; }
+      if (t.closest('#set-export')) { exportSave(); return; }
+      if (t.closest('#set-import')) { $('#file-import').click(); return; }
+      if (t.closest('#set-sound')) { soundOn = !soundOn; if (soundOn) SFX.good(); settingsModal(); return; }
+      if (t.closest('#set-reset')) { closeModal(); resetModal(); return; }
     });
 
     // 键盘可操作：这些「可点的 div」按 Enter / 空格 等同点击
