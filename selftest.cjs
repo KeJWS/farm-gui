@@ -689,6 +689,65 @@ s.bait.worm = 2;                                // 6
 s.ferts = { normal: 1, special: 0 };            // +4
 ok(G.storeTotal(s) === 8 + 5 + 6 + 4, '仓库总价把作物/鱼/蚯蚓/肥料都算上', G.storeTotal(s));
 
+/* ---------- 5o. v1.3.0：开关 / 渔网 / 周费 / 扩展 / 图鉴 ---------- */
+section('v1.3.0 新功能');
+G.setRng(mulberry32(88));
+
+s = G.createState(); s.coins = 1000;
+G.buyHarvester(s);
+ok(s.harvester && s.harvesterOn === true, '买到自动收获器默认开启');
+ok(G.toggleHarvester(s).ok && s.harvesterOn === false, '自动收获器可以关闭');
+s.plots[0] = { crop: 'carrot', growth: 2, watered: false, missed: 0, fert: 0, ripeDay: 0, hits: 0, phase: 'ripe' };
+G.setRng(function () { return 0.1; });
+G.sleep(s);
+ok(G.storeCount(s, 'carrot') === 0, '关闭时睡觉不会自动收');
+G.toggleHarvester(s);
+G.sleep(s);
+ok(G.storeCount(s, 'carrot') > 0, '开启后睡觉自动收');
+
+// 渔网
+G.setRng(function () { return 0.1; });
+s = G.createState(); s.coins = 500; s.nets = 2; s.bait.dough = 2;
+G.sleep(s);
+ok(s.bait.dough === 0 && s.fishBag.length === 2, '渔网每天耗面团饵并上鱼', { dough: s.bait.dough, n: s.fishBag.length });
+ok(G.buyNet(s).ok && s.nets === 3, '渔具店能买渔网');
+
+// 5 块之后的周维护费
+s = G.createState();
+s.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
+s.day = 6; s.coins = 100;
+G.sleep(s);
+ok(s.coins === 100 - 3 - 15, '10 块地周末扣 15 金维护费', s.coins);
+
+// 25 块之后扩展费暴涨
+function costAt(n) {
+  const st = G.createState();
+  st.plots = new Array(n).fill(0).map(function () { return G.createState().plots[0]; });
+  return G.expandCost(st);
+}
+ok(costAt(5) === 40 && costAt(24) === 325 && costAt(25) === 325 && costAt(26) === 715 && costAt(27) === 1573,
+   '25 块之后扩展费 ×2.2 暴涨', [costAt(24), costAt(25), costAt(26), costAt(27)].join('/'));
+
+// 春季过后委托需求变大
+G.setRng(mulberry32(5));
+const sumQ = function (os) {
+  return os.filter(function (o) { return o.kind === 'crop'; })
+    .reduce(function (a, o) { return a + o.qty; }, 0);
+};
+ok(sumQ(G.makeOrders({ day: 70 })) > sumQ(G.makeOrders({ day: 10 })) * 1.5,
+   '春季过后委托需求明显变大');
+
+// 图鉴
+s = G.createState(); s.energy = 999; s.bait.dough = 10; s.weather = 'cloudy';
+G.setRng(mulberry32(3));
+for (let i = 0; i < 10; i++) G.fish(s, 'dough');
+const fishN = Object.keys(s.codex.fish).reduce(function (a, k) { return a + s.codex.fish[k].n; }, 0);
+ok(fishN === 10, '图鉴记录钓鱼次数', fishN);
+s.plots[0] = { crop: 'carrot', growth: 2, watered: false, missed: 0, fert: 0, ripeDay: 0, hits: 0, phase: 'ripe' };
+s.day = 9;
+const hh = G.harvest(s, 0);
+ok(s.codex.crops.carrot && s.codex.crops.carrot.n === hh.qty, '图鉴记录作物收获', s.codex.crops.carrot);
+
 section('存读档');
 s = G.createState();
 s.seeds = { corn: 1 };

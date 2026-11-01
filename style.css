@@ -688,3 +688,17 @@ button{ font-family:inherit; }
 .rule-sec{ margin-bottom:14px; }
 .rule-sec h4{ margin:0 0 6px; font-size:13px; font-weight:800; }
 .rule-sec p{ margin:6px 0 0; font-size:11.5px; line-height:1.75; color:var(--ink-2); font-weight:600; }
+
+/* ---------- nets / dark mode ---------- */
+.net-line{ margin-top:8px; font-size:11.5px; font-weight:600; color:var(--ink-3); text-align:center; }
+:root[data-theme="dark"]{
+  --bg:#14161a; --bg2:#191c21; --panel:#1e2228; --panel-2:#23272e;
+  --ink:#e9e5db; --ink-2:#b9b3a6; --ink-3:#8a8578;
+  --line:#2f343c; --line-2:#3a4048;
+  --green:#5fb36f; --green-d:#7ec98d; --gold:#e0b352; --gold-l:#4a3c1f;
+  --red:#e06767; --blue:#6aa6e0; --soil:#2a2622; --soil-d:#1c1916;
+}
+:root[data-theme="dark"] body{ background:var(--bg); color:var(--ink); }
+:root[data-theme="dark"] .store-row,
+:root[data-theme="dark"] .order-row{ background:#242a31; border-color:#333a43; }
+:root[data-theme="dark"] .plot{ background:#20242a; }

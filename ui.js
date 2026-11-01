@@ -307,9 +307,16 @@
     $('#expand-txt').textContent = '第 ' + (state.plots.length + 1) + ' 块 · ' + G.expandCost(state) + ' 金';
     $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + 5) + ' · ' + G.upgradeCost(state) + ' 金';
     $('#sprinkler-txt').textContent = '已有 ' + state.sprinklers + ' 个 · ' + G.SPRINKLER_COST + ' 金/个';
-    $('#harvester-txt').textContent = state.harvester
-      ? '已安装 · 睡觉时自动收'
-      : G.HARVESTER_COST + ' 金 · 睡觉时自动收';
+    $('#harvester-txt').textContent = !state.harvester
+      ? G.HARVESTER_COST + ' 金 · 睡觉时自动收'
+      : (state.harvesterOn ? '已开启 · 点击关闭' : '已关闭 · 点击开启');
+    const netLine = $('#net-line');
+    if (netLine) {
+      netLine.innerHTML = state.nets > 0
+        ? '🕸️ 河边有 <b>' + state.nets + '</b> 张渔网 · 每天耗 ' + state.nets + ' 份面团饵，' +
+          Math.round(G.NET_CHANCE * 100) + '% 概率各上 1 条'
+        : '🕸️ 河边还没放渔网（渔具店 ' + G.NET_COST + ' 金/张，最多 ' + G.NET_MAX + ' 张）';
+    }
 
     const teaBtn = $('[data-act="tea"]');
     teaBtn.disabled = state.teaUsed || state.energy >= state.maxEnergy;
@@ -322,7 +329,7 @@
     $('[data-act="expand"]').disabled = state.coins < G.expandCost(state);
     $('[data-act="upgrade"]').disabled = state.coins < G.upgradeCost(state);
     $('[data-act="sprinkler"]').disabled = state.coins < G.SPRINKLER_COST || state.sprinklers >= state.plots.length;
-    $('[data-act="harvester"]').disabled = state.harvester || state.coins < G.HARVESTER_COST;
+    $('[data-act="harvester"]').disabled = !state.harvester && state.coins < G.HARVESTER_COST;
   }
 
   /* ---------------- 钓鱼 ---------------- */
@@ -827,6 +834,15 @@
         '<div class="sv">' + G.WORM_VALUE + ' 金/条</div></div>' +
         '<span class="sp">' + (worms * G.WORM_VALUE) + ' 金</span>' +
         '<button class="btn mini" data-sellworm' + (worms ? '' : ' disabled') + '>全部卖出</button>' +
+      '</div>' +
+      '<div class="store-sub" style="margin-top:10px">🕸️ 渔网 · 放到河边每天自动抓鱼</div>' +
+      '<div class="store-row">' +
+        '<span class="se">🕸️</span>' +
+        '<div><div class="sn">渔网 ×' + state.nets + ' / ' + G.NET_MAX + '</div>' +
+        '<div class="sv">' + G.NET_COST + ' 金/张 · 每天耗 1 面团饵 · ' +
+        Math.round(G.NET_CHANCE * 100) + '% 概率上 1 条</div></div>' +
+        '<button class="btn mini" data-buynet' +
+        ((state.nets >= G.NET_MAX || state.coins < G.NET_COST) ? ' disabled' : '') + '>放一张</button>' +
       '</div>';
     openModal('🛒 渔具店', body, '<button class="btn" data-close>关闭</button>');
   }
@@ -908,11 +924,49 @@
     openModal('📖 规则速查', body, '<button class="btn" data-close>知道了</button>');
   }
 
+  let theme = 'light';
+  function applyTheme() { document.documentElement.dataset.theme = theme; }
+  function toggleTheme() {
+    theme = theme === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('farm-gui-theme', theme); } catch (e) { /* 忽略 */ }
+    applyTheme();
+  }
+
+  function codexModal() {
+    const fx = state.codex.fish || {}, cx = state.codex.crops || {};
+    const fish = G.FISH.map(function (f) {
+      const c = fx[f.id] || { n: 0, best: null };
+      const q = G.qualityById(c.best);
+      return '<div class="book-row">' +
+        '<span class="be">' + f.emoji + '</span>' +
+        '<span class="bn2">' + f.name + '</span>' +
+        '<span class="bq" style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
+          (q ? q.emoji + ' ' + q.name : (c.n ? '—' : '未捕获')) + '</span>' +
+        '<span class="bp">' + c.n + '</span></div>';
+    }).join('');
+    const crops = G.CROP_LIST.map(function (c) {
+      const v = cx[c.id] || { n: 0, best: null };
+      const q = G.qualityById(v.best);
+      return '<div class="book-row">' +
+        '<span class="be">' + c.emoji + '</span>' +
+        '<span class="bn2">' + c.name + '</span>' +
+        '<span class="bq" style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
+          (q ? q.emoji + ' ' + q.name : (v.n ? '—' : '未收获')) + '</span>' +
+        '<span class="bp">' + v.n + '</span></div>';
+    }).join('');
+    openModal('📖 图鉴',
+      '<div class="store-sub">🐟 鱼类 · 条数 / 最好品质</div>' + fish +
+      '<div class="store-sub" style="margin-top:10px">🌱 作物 · 累计收获 / 最好品质</div>' + crops,
+      '<button class="btn" data-close>关闭</button>');
+  }
+
   function settingsModal() {
     openModal('⚙️ 设置',
       '<div class="action-grid">' +
         '<button class="btn" id="set-help">📖 规则说明</button>' +
         '<button class="btn" id="set-status">📊 查看状态</button>' +
+        '<button class="btn" id="set-codex">📖 图鉴</button>' +
+        '<button class="btn" id="set-theme">' + (theme === 'dark' ? '🌙 黑夜模式：开' : '☀️ 黑夜模式：关') + '</button>' +
         '<button class="btn" id="set-export">⬇️ 导出存档<small>.json</small></button>' +
         '<button class="btn" id="set-import">⬆️ 导入存档<small>.json</small></button>' +
         '<button class="btn" id="set-sound">' + (soundOn ? '🔊 音效：开' : '🔇 音效：关') + '</button>' +
@@ -1006,7 +1060,7 @@
       if (r.ok) { toast(r.msg, 'good'); SFX.coin(); }
     },
     harvester: function () {
-      const r = G.buyHarvester(state);
+      const r = state.harvester ? G.toggleHarvester(state) : G.buyHarvester(state);
       commit(r);
       if (r.ok) { toast(r.msg, 'good'); SFX.coin(); }
     },
@@ -1218,6 +1272,17 @@
         return;
       }
 
+      // 买渔网
+      const buyNet = t.closest('[data-buynet]');
+      if (buyNet && !buyNet.disabled) {
+        const r = G.buyNet(state);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        if (modalOpen()) shopModal();
+        return;
+      }
+
       // 卖蚯蚓
       const sellWorm = t.closest('[data-sellworm]');
       if (sellWorm) {
@@ -1281,6 +1346,7 @@
 
     $('#btn-settings').addEventListener('click', settingsModal);
     $('#btn-status').addEventListener('click', statusModal);
+    $('#btn-codex').addEventListener('click', codexModal);
     $('#btn-refresh-orders').addEventListener('click', function () {
       const r = G.refreshOrders(state);
       commit(r);
@@ -1302,6 +1368,8 @@
       if (t.closest('#set-export')) { exportSave(); return; }
       if (t.closest('#set-import')) { $('#file-import').click(); return; }
       if (t.closest('#set-sound')) { soundOn = !soundOn; if (soundOn) SFX.good(); settingsModal(); return; }
+      if (t.closest('#set-theme')) { toggleTheme(); settingsModal(); return; }
+      if (t.closest('#set-codex')) { closeModal(); codexModal(); return; }
       if (t.closest('#set-reset')) { closeModal(); resetModal(); return; }
     });
 
@@ -1337,6 +1405,8 @@
     if (location.hash === '#fresh') {
       try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* 忽略 */ }
     }
+    try { if (localStorage.getItem('farm-gui-theme') === 'dark') theme = 'dark'; } catch (e) { /* 忽略 */ }
+    applyTheme();
     const saved = load();
     if (saved) {
       state = saved;
