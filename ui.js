@@ -384,8 +384,20 @@
         }).join('')
       : '';
 
-    box.innerHTML = (cropHtml || fishHtml)
-      ? cropHtml + fishHtml
+    const wormN = state.bait.worm || 0;
+    const wormHtml = wormN
+      ? '<div class="store-sub">🪱 蚯蚓 · ' + wormN + ' 条</div>' +
+        '<div class="store-row">' +
+          '<span class="se">🪱</span>' +
+          '<div><div class="sn">蚯蚓 ×' + wormN + '</div>' +
+          '<div class="sv">' + G.WORM_VALUE + ' 金/条 · 也可当饵用</div></div>' +
+          '<span class="sp">' + (wormN * G.WORM_VALUE) + ' 金</span>' +
+          '<button class="btn mini" data-sellworm>卖出</button>' +
+        '</div>'
+      : '';
+
+    box.innerHTML = (cropHtml || fishHtml || wormHtml)
+      ? cropHtml + fishHtml + wormHtml
       : '<div class="store-empty">仓库空空如也，去收点菜 / 钓点鱼吧 🌱</div>';
 
     const seeds = Object.keys(state.seeds).filter(function (k) { return state.seeds[k] > 0; });
@@ -714,7 +726,7 @@
       '<div style="font-size:11.5px;color:var(--ink-2);line-height:1.7;font-weight:600">' +
       '· 睡觉推进 1 天，扣伙食费（' + G.mealFee(state) + ' 金/天），体力回满<br>' +
       '· 体力耗尽就得睡觉；没钱吃饭只能恢复 5 点<br>' +
-      '· 蚯蚓饵：渔获价值 +30%，且品质取两次较好的<br>' +
+      '· 蚯蚓饵：品质取两次较好的、好鱼上钩 ×1.3；不再加成售价，蚯蚓本身也能 2 金/条卖<br>' +
       '· 钓到的鱼先进仓库，卖出才换钱；天气只影响上钩概率（雨天好鱼 ×1.3）<br>' +
       '· 收获时 30% 概率留种，种子下次可免费种<br>' +
       '· 多次收获作物（黄瓜/草莓）只有最后一收才判定留种<br>' +
@@ -933,6 +945,16 @@
       const sellFish = t.closest('[data-sellfish]');
       if (sellFish) {
         const r = G.sellFishGroup(state, sellFish.dataset.sellfish);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        return;
+      }
+
+      // 卖蚯蚓
+      const sellWorm = t.closest('[data-sellworm]');
+      if (sellWorm) {
+        const r = G.sellWorms(state);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();

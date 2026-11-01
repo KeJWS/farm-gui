@@ -183,9 +183,24 @@ const wIds = Object.keys(G.WEATHER);
 ok(wIds.length === 3 && !wIds.includes('storm'), '天气只有 晴/阴/雨 三种', wIds);
 ok(G.WEATHER.sunny.w + G.WEATHER.cloudy.w + G.WEATHER.rain.w === 100, '天气概率合计 100%',
    [G.WEATHER.sunny.w, G.WEATHER.cloudy.w, G.WEATHER.rain.w]);
-ok(G.WEATHER.sunny.biteMul === 1 && G.WEATHER.cloudy.biteMul === 1, '晴/阴上钩概率默认 ×1');
+ok(G.WEATHER.sunny.biteMul === 0.8 && G.WEATHER.cloudy.biteMul === 1, '晴天好鱼上钩 ×0.8、阴天 ×1');
 ok(G.WEATHER.rain.biteMul === 1.3, '雨天好鱼上钩 ×1.3');
 ok(!('fishMul' in G.WEATHER.rain), '天气不再带售价系数');
+
+/* 蚯蚓只影响品质与上钩，不影响售价 */
+const wormEntry = (function () {
+  const st = G.createState();
+  st.bait.worm = 500; st.energy = 1e6; st.maxEnergy = 1e6;
+  G.setRng(mulberry32(31));
+  for (let i = 0; i < 200; i++) {
+    const r = G.fish(st, 'worm');
+    if (r.ok && !r.entry.trash) return r.entry;
+  }
+  return null;
+})();
+ok(!!wormEntry && wormEntry.price === Math.round(
+     G.FISH.filter(function (f) { return f.name === wormEntry.fish; })[0].base * wormEntry.quality.mul),
+   '蚯蚓不再给售价加成（售价 = 基础价 × 品质）', wormEntry && wormEntry.price);
 
 function sampleValues(weather) {
   const st = G.createState();
@@ -265,12 +280,12 @@ ok(wr.ok && s.energy === 0 && s.coins === 5, '刚好够半天：消耗 5、赚 5
 /* ---------- 5c. 种子店：买 / 卖（半价） ---------- */
 section('种子店');
 ok(G.seedBuyPrice(G.CROPS.carrot) === 5 && G.seedSellPrice(G.CROPS.carrot) === 2, '萝卜：买 5 金 / 卖 2 金');
-ok(G.seedSellPrice(G.CROPS.corn) === 7, '玉米买 15 → 卖 7（向下取整）');
-ok(G.seedSellPrice(G.CROPS.watermelon) === 15, '西瓜买 30 → 卖 15');
+ok(G.seedSellPrice(G.CROPS.corn) === 7, '玉米买 14 → 卖 7（向下取整）');
+ok(G.seedSellPrice(G.CROPS.watermelon) === 16, '西瓜买 32 → 卖 16');
 
 s = G.createState();                       // 50 金
 let rb = G.buySeed(s, 'corn', 2);
-ok(rb.ok && s.coins === 20 && s.seeds.corn === 2, '买 2 颗玉米种子：-30 金', { coins: s.coins, seeds: s.seeds });
+ok(rb.ok && s.coins === 22 && s.seeds.corn === 2, '买 2 颗玉米种子：-28 金', { coins: s.coins, seeds: s.seeds });
 ok(!G.buySeed(s, 'watermelon', 1).ok, '金币不够时买不了', s.coins);
 
 s.coins = 0;
@@ -282,8 +297,8 @@ ok(!G.sellSeed(s, 'corn').ok, '没有库存时卖不了');
 
 s.seeds = { carrot: 2, cabbage: 1 }; s.coins = 0;
 let rsa = G.sellAllSeeds(s);
-ok(rsa.ok && rsa.income === 8 && s.coins === 8 && Object.keys(s.seeds).length === 0,
-   '一键卖光：萝卜 2×2 + 白菜 1×4 = 8 金', rsa.income);
+ok(rsa.ok && rsa.income === 7 && s.coins === 7 && Object.keys(s.seeds).length === 0,
+   '一键卖光：萝卜 2×2 + 白菜 1×3 = 7 金', rsa.income);
 
 /* ---------- 5d. 全部播种 ---------- */
 section('全部播种');
@@ -383,7 +398,27 @@ ok(wa.ok && s.energy === 0 && s.coins === 3, '体力不足半天 → 用光全�
 s = G.createState(); s.energy = 0;
 ok(!G.workAuto(s).ok, '没有体力时打不了零工');
 
-/* ---------- 5h. 日志按天折叠 ---------- */
+/* ---------- 5h. 蚯蚓可卖 + 种子价格平衡 ---------- */
+section('蚯蚓出售 / 种子平衡');
+s = G.createState(); s.bait.worm = 10; s.coins = 0;
+const rw = G.sellWorms(s);
+ok(G.WORM_VALUE === 2 && rw.ok && s.coins === 20 && s.bait.worm === 0, '蚯蚓 2 金/条，卖 10 条得 20 金', { coins: s.coins });
+ok(!G.sellWorms(s).ok, '没有蚯蚓时卖不了');
+
+function profitPerDay(c) {
+  const revenue = c.multi
+    ? c.firstQty * c.price + c.regrowTimes * c.regrowQty * c.price
+    : (c.big ? 1 : c.base) * c.price;
+  const days = c.multi ? c.days + c.regrowTimes * c.regrowDays : c.days;
+  return (revenue - c.seed) / days;
+}
+const ppd = G.CROP_LIST.map(function (c) { return { name: c.name, v: profitPerDay(c) }; });
+ok(ppd.every(function (x) { return x.v > 2 && x.v < 10; }),
+   '所有作物利润/天落在 2~10 金', ppd.map(function (x) { return x.name + ' ' + x.v.toFixed(1); }).join(' / '));
+ok(ppd[0].name === '萝卜' && ppd[0].v === Math.min.apply(null, ppd.map(function (x) { return x.v; })),
+   '萝卜仍是最低收益（3.5/天）');
+
+/* ---------- 5i. 日志按天折叠 ---------- */
 section('日志按天折叠');
 s = G.createState();
 s.log = [

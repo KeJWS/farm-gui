@@ -9,16 +9,16 @@
 
   const CROPS = {
     carrot:     { name: '萝卜', emoji: '🥕', seed: 5,  days: 2, base: 3, price: 4,  big: false },
-    cabbage:    { name: '白菜', emoji: '🥬', seed: 8,  days: 2, base: 2, price: 8,  big: false },
-    potato:     { name: '土豆', emoji: '🥔', seed: 10, days: 3, base: 3, price: 8,  big: false },
-    corn:       { name: '玉米', emoji: '🌽', seed: 15, days: 3, base: 2, price: 16, big: false },
-    eggplant:   { name: '茄子', emoji: '🍆', seed: 18, days: 4, base: 2, price: 22, big: false },
-    tomato:     { name: '番茄', emoji: '🍅', seed: 20, days: 4, base: 3, price: 16, big: false },
-    pumpkin:    { name: '南瓜', emoji: '🎃', seed: 25, days: 5, base: 1, price: 60, big: true  },
-    watermelon: { name: '西瓜', emoji: '🍉', seed: 30, days: 5, base: 1, price: 76, big: true  },
-    cucumber:   { name: '黄瓜', emoji: '🥒', seed: 12, days: 3, price: 13, multi: true,
+    cabbage:    { name: '白菜', emoji: '🥬', seed: 7,  days: 2, base: 2, price: 8,  big: false },
+    potato:     { name: '土豆', emoji: '🥔', seed: 9,  days: 3, base: 3, price: 8,  big: false },
+    corn:       { name: '玉米', emoji: '🌽', seed: 14, days: 3, base: 2, price: 16, big: false },
+    eggplant:   { name: '茄子', emoji: '🍆', seed: 17, days: 4, base: 2, price: 22, big: false },
+    tomato:     { name: '番茄', emoji: '🍅', seed: 19, days: 4, base: 3, price: 16, big: false },
+    pumpkin:    { name: '南瓜', emoji: '🎃', seed: 24, days: 5, base: 1, price: 60, big: true  },
+    watermelon: { name: '西瓜', emoji: '🍉', seed: 32, days: 5, base: 1, price: 76, big: true  },
+    cucumber:   { name: '黄瓜', emoji: '🥒', seed: 24, days: 3, price: 13, multi: true,
                   firstQty: 2, regrowDays: 2, regrowQty: 2, regrowTimes: 2 },
-    strawberry: { name: '草莓', emoji: '🍓', seed: 22, days: 3, price: 9,  multi: true,
+    strawberry: { name: '草莓', emoji: '🍓', seed: 30, days: 3, price: 9,  multi: true,
                   firstQty: 3, regrowDays: 1, regrowQty: 2, regrowTimes: 3 }
   };
   Object.keys(CROPS).forEach(function (k) { CROPS[k].id = k; });
@@ -57,8 +57,8 @@
   ];
 
   const WEATHER = {
-    sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 45, biteMul: 1,   wormMod: -1,
-              note: '上钩概率默认 · 挖蚯蚓 -1 份' },
+    sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 45, biteMul: 0.8, wormMod: -1,
+              note: '好鱼上钩 ×0.8 · 挖蚯蚓 -1 份' },
     cloudy: { id: 'cloudy', name: '阴天',   emoji: '⛅', w: 30, biteMul: 1,   wormMod: 1,
               note: '上钩概率默认 · 挖蚯蚓 +1 份' },
     rain:   { id: 'rain',   name: '雨天',   emoji: '🌧️', w: 25, biteMul: 1.3, wormMod: 1, autoWater: true,
@@ -67,7 +67,7 @@
   const WEATHER_LIST = Object.keys(WEATHER).map(function (k) { return WEATHER[k]; });
 
   const BAIT = {
-    worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '收获 +30%，品质更好' },
+    worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '品质取两次较好的 · 好鱼上钩 ×1.3' },
     dough: { id: 'dough', name: '面团饵', emoji: '🍞', desc: '标准收获' },
     lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 20 次，容易空军' }
   };
@@ -500,8 +500,8 @@
       if (s.lure.dur <= 0) { s.lure.owned = false; s.lure.dur = 0; }
     }
 
-    // 天气只影响「上钩概率」，不影响售价
-    const bite = w.biteMul || 1;
+    // 天气与蚯蚓都只影响「上钩概率」，不影响售价
+    const bite = (w.biteMul || 1) * (kind === 'worm' ? 1.3 : 1);
     const table = FISH.map(function (f) {
       let mul = f.trash ? 1 : bite;
       if (kind === 'lure') mul *= (f.trash ? 5 : 0.7);
@@ -509,7 +509,7 @@
     });
     const f = weighted(table, 'w');
     const q = f.trash ? null : rollQuality(kind === 'worm');
-    const value = f.trash ? 1 : Math.max(1, Math.round(f.base * q.mul * (kind === 'worm' ? 1.3 : 1)));
+    const value = f.trash ? 1 : Math.max(1, Math.round(f.base * q.mul));
 
     let name = f.name, emoji = f.emoji;
     if (f.trash) {
@@ -602,6 +602,20 @@
     addCoins(s, gain, '卖鱼');
     log(s, '💰 卖出全部渔获 ' + n + ' 条，+' + gain + ' 金', 'good');
     return { ok: true, msg: '卖出 ' + n + ' 条鱼，+' + gain + ' 金', income: gain };
+  }
+
+  /* 蚯蚓也能卖：2 金/条 */
+  const WORM_VALUE = 2;
+
+  function sellWorms(s, n) {
+    const have = s.bait.worm || 0;
+    if (!have) return { ok: false, msg: '没有蚯蚓可卖' };
+    const qty = n ? Math.min(n, have) : have;
+    const gain = qty * WORM_VALUE;
+    s.bait.worm = have - qty;
+    addCoins(s, gain, '卖蚯蚓');
+    log(s, '💰 卖出蚯蚓 ×' + qty + '，+' + gain + ' 金', 'good');
+    return { ok: true, qty: qty, income: gain, msg: '卖出蚯蚓 ×' + qty + '，+' + gain + ' 金' };
   }
 
   function digWorms(s) {
@@ -831,6 +845,7 @@
     harvest: harvest, harvestAll: harvestAll, clearPlot: clearPlot,
     sellAll: sellAll, sellOne: sellOne, sellSeed: sellSeed, sellAllSeeds: sellAllSeeds,
     fishGroups: fishGroups, fishKey: fishKey, sellFishGroup: sellFishGroup, sellAllFish: sellAllFish,
+    sellWorms: sellWorms, WORM_VALUE: WORM_VALUE,
     qualityById: qualityById,
     buySeed: buySeed, seedBuyPrice: seedBuyPrice, seedSellPrice: seedSellPrice,
     SEED_SELL_RATE: SEED_SELL_RATE,

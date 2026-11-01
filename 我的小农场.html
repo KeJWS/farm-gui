@@ -727,14 +727,6 @@ button{ font-family:inherit; }
       </div>
     </div>
 
-    <div class="panel">
-      <div class="panel-head"><h2>🔧 干活</h2></div>
-      <div class="action-grid">
-        <button class="btn" data-act="dig">🪱 挖蚯蚓<small>3 体力</small></button>
-        <button class="btn" data-act="work">🕐 打零工<small id="work-txt"></small></button>
-      </div>
-    </div>
-
     <div class="panel fishing">
       <div class="panel-head">
         <h2>🎣 河边</h2>
@@ -762,6 +754,14 @@ button{ font-family:inherit; }
 
   <!-- 右列 -->
   <aside class="col-side">
+
+    <div class="panel">
+      <div class="panel-head"><h2>🔧 干活</h2></div>
+      <div class="action-grid">
+        <button class="btn" data-act="dig">🪱 挖蚯蚓<small>3 体力</small></button>
+        <button class="btn" data-act="work">🕐 打零工<small id="work-txt"></small></button>
+      </div>
+    </div>
 
     <div class="panel">
       <div class="panel-head"><h2>🏡 农场</h2></div>
@@ -817,16 +817,16 @@ button{ font-family:inherit; }
 
   const CROPS = {
     carrot:     { name: '萝卜', emoji: '🥕', seed: 5,  days: 2, base: 3, price: 4,  big: false },
-    cabbage:    { name: '白菜', emoji: '🥬', seed: 8,  days: 2, base: 2, price: 8,  big: false },
-    potato:     { name: '土豆', emoji: '🥔', seed: 10, days: 3, base: 3, price: 8,  big: false },
-    corn:       { name: '玉米', emoji: '🌽', seed: 15, days: 3, base: 2, price: 16, big: false },
-    eggplant:   { name: '茄子', emoji: '🍆', seed: 18, days: 4, base: 2, price: 22, big: false },
-    tomato:     { name: '番茄', emoji: '🍅', seed: 20, days: 4, base: 3, price: 16, big: false },
-    pumpkin:    { name: '南瓜', emoji: '🎃', seed: 25, days: 5, base: 1, price: 60, big: true  },
-    watermelon: { name: '西瓜', emoji: '🍉', seed: 30, days: 5, base: 1, price: 76, big: true  },
-    cucumber:   { name: '黄瓜', emoji: '🥒', seed: 12, days: 3, price: 13, multi: true,
+    cabbage:    { name: '白菜', emoji: '🥬', seed: 7,  days: 2, base: 2, price: 8,  big: false },
+    potato:     { name: '土豆', emoji: '🥔', seed: 9,  days: 3, base: 3, price: 8,  big: false },
+    corn:       { name: '玉米', emoji: '🌽', seed: 14, days: 3, base: 2, price: 16, big: false },
+    eggplant:   { name: '茄子', emoji: '🍆', seed: 17, days: 4, base: 2, price: 22, big: false },
+    tomato:     { name: '番茄', emoji: '🍅', seed: 19, days: 4, base: 3, price: 16, big: false },
+    pumpkin:    { name: '南瓜', emoji: '🎃', seed: 24, days: 5, base: 1, price: 60, big: true  },
+    watermelon: { name: '西瓜', emoji: '🍉', seed: 32, days: 5, base: 1, price: 76, big: true  },
+    cucumber:   { name: '黄瓜', emoji: '🥒', seed: 24, days: 3, price: 13, multi: true,
                   firstQty: 2, regrowDays: 2, regrowQty: 2, regrowTimes: 2 },
-    strawberry: { name: '草莓', emoji: '🍓', seed: 22, days: 3, price: 9,  multi: true,
+    strawberry: { name: '草莓', emoji: '🍓', seed: 30, days: 3, price: 9,  multi: true,
                   firstQty: 3, regrowDays: 1, regrowQty: 2, regrowTimes: 3 }
   };
   Object.keys(CROPS).forEach(function (k) { CROPS[k].id = k; });
@@ -865,8 +865,8 @@ button{ font-family:inherit; }
   ];
 
   const WEATHER = {
-    sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 45, biteMul: 1,   wormMod: -1,
-              note: '上钩概率默认 · 挖蚯蚓 -1 份' },
+    sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 45, biteMul: 0.8, wormMod: -1,
+              note: '好鱼上钩 ×0.8 · 挖蚯蚓 -1 份' },
     cloudy: { id: 'cloudy', name: '阴天',   emoji: '⛅', w: 30, biteMul: 1,   wormMod: 1,
               note: '上钩概率默认 · 挖蚯蚓 +1 份' },
     rain:   { id: 'rain',   name: '雨天',   emoji: '🌧️', w: 25, biteMul: 1.3, wormMod: 1, autoWater: true,
@@ -875,7 +875,7 @@ button{ font-family:inherit; }
   const WEATHER_LIST = Object.keys(WEATHER).map(function (k) { return WEATHER[k]; });
 
   const BAIT = {
-    worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '收获 +30%，品质更好' },
+    worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '品质取两次较好的 · 好鱼上钩 ×1.3' },
     dough: { id: 'dough', name: '面团饵', emoji: '🍞', desc: '标准收获' },
     lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 20 次，容易空军' }
   };
@@ -1308,8 +1308,8 @@ button{ font-family:inherit; }
       if (s.lure.dur <= 0) { s.lure.owned = false; s.lure.dur = 0; }
     }
 
-    // 天气只影响「上钩概率」，不影响售价
-    const bite = w.biteMul || 1;
+    // 天气与蚯蚓都只影响「上钩概率」，不影响售价
+    const bite = (w.biteMul || 1) * (kind === 'worm' ? 1.3 : 1);
     const table = FISH.map(function (f) {
       let mul = f.trash ? 1 : bite;
       if (kind === 'lure') mul *= (f.trash ? 5 : 0.7);
@@ -1317,7 +1317,7 @@ button{ font-family:inherit; }
     });
     const f = weighted(table, 'w');
     const q = f.trash ? null : rollQuality(kind === 'worm');
-    const value = f.trash ? 1 : Math.max(1, Math.round(f.base * q.mul * (kind === 'worm' ? 1.3 : 1)));
+    const value = f.trash ? 1 : Math.max(1, Math.round(f.base * q.mul));
 
     let name = f.name, emoji = f.emoji;
     if (f.trash) {
@@ -1410,6 +1410,20 @@ button{ font-family:inherit; }
     addCoins(s, gain, '卖鱼');
     log(s, '💰 卖出全部渔获 ' + n + ' 条，+' + gain + ' 金', 'good');
     return { ok: true, msg: '卖出 ' + n + ' 条鱼，+' + gain + ' 金', income: gain };
+  }
+
+  /* 蚯蚓也能卖：2 金/条 */
+  const WORM_VALUE = 2;
+
+  function sellWorms(s, n) {
+    const have = s.bait.worm || 0;
+    if (!have) return { ok: false, msg: '没有蚯蚓可卖' };
+    const qty = n ? Math.min(n, have) : have;
+    const gain = qty * WORM_VALUE;
+    s.bait.worm = have - qty;
+    addCoins(s, gain, '卖蚯蚓');
+    log(s, '💰 卖出蚯蚓 ×' + qty + '，+' + gain + ' 金', 'good');
+    return { ok: true, qty: qty, income: gain, msg: '卖出蚯蚓 ×' + qty + '，+' + gain + ' 金' };
   }
 
   function digWorms(s) {
@@ -1639,6 +1653,7 @@ button{ font-family:inherit; }
     harvest: harvest, harvestAll: harvestAll, clearPlot: clearPlot,
     sellAll: sellAll, sellOne: sellOne, sellSeed: sellSeed, sellAllSeeds: sellAllSeeds,
     fishGroups: fishGroups, fishKey: fishKey, sellFishGroup: sellFishGroup, sellAllFish: sellAllFish,
+    sellWorms: sellWorms, WORM_VALUE: WORM_VALUE,
     qualityById: qualityById,
     buySeed: buySeed, seedBuyPrice: seedBuyPrice, seedSellPrice: seedSellPrice,
     SEED_SELL_RATE: SEED_SELL_RATE,
@@ -2039,8 +2054,20 @@ button{ font-family:inherit; }
         }).join('')
       : '';
 
-    box.innerHTML = (cropHtml || fishHtml)
-      ? cropHtml + fishHtml
+    const wormN = state.bait.worm || 0;
+    const wormHtml = wormN
+      ? '<div class="store-sub">🪱 蚯蚓 · ' + wormN + ' 条</div>' +
+        '<div class="store-row">' +
+          '<span class="se">🪱</span>' +
+          '<div><div class="sn">蚯蚓 ×' + wormN + '</div>' +
+          '<div class="sv">' + G.WORM_VALUE + ' 金/条 · 也可当饵用</div></div>' +
+          '<span class="sp">' + (wormN * G.WORM_VALUE) + ' 金</span>' +
+          '<button class="btn mini" data-sellworm>卖出</button>' +
+        '</div>'
+      : '';
+
+    box.innerHTML = (cropHtml || fishHtml || wormHtml)
+      ? cropHtml + fishHtml + wormHtml
       : '<div class="store-empty">仓库空空如也，去收点菜 / 钓点鱼吧 🌱</div>';
 
     const seeds = Object.keys(state.seeds).filter(function (k) { return state.seeds[k] > 0; });
@@ -2369,7 +2396,7 @@ button{ font-family:inherit; }
       '<div style="font-size:11.5px;color:var(--ink-2);line-height:1.7;font-weight:600">' +
       '· 睡觉推进 1 天，扣伙食费（' + G.mealFee(state) + ' 金/天），体力回满<br>' +
       '· 体力耗尽就得睡觉；没钱吃饭只能恢复 5 点<br>' +
-      '· 蚯蚓饵：渔获价值 +30%，且品质取两次较好的<br>' +
+      '· 蚯蚓饵：品质取两次较好的、好鱼上钩 ×1.3；不再加成售价，蚯蚓本身也能 2 金/条卖<br>' +
       '· 钓到的鱼先进仓库，卖出才换钱；天气只影响上钩概率（雨天好鱼 ×1.3）<br>' +
       '· 收获时 30% 概率留种，种子下次可免费种<br>' +
       '· 多次收获作物（黄瓜/草莓）只有最后一收才判定留种<br>' +
@@ -2588,6 +2615,16 @@ button{ font-family:inherit; }
       const sellFish = t.closest('[data-sellfish]');
       if (sellFish) {
         const r = G.sellFishGroup(state, sellFish.dataset.sellfish);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        return;
+      }
+
+      // 卖蚯蚓
+      const sellWorm = t.closest('[data-sellworm]');
+      if (sellWorm) {
+        const r = G.sellWorms(state);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();
