@@ -254,13 +254,13 @@ ok(G.expandCost(s) === 55, '第 7 块 55 金');
 ok(G.upgradeCost(s) === 30, '首次强化 30 金');
 G.upgrade(s);
 ok(s.maxEnergy === 15 && G.mealFee(s) === 4, '强化后上限 15、伙食 4 金', { max: s.maxEnergy, fee: G.mealFee(s) });
-ok(G.upgradeCost(s) === 40, '第二次强化 40 金');
-ok(G.workCost(s, 'half') === 8 && G.workPay(s, 'half') === 8, '半天零工：消耗 8、赚 8');
-ok(G.workCost(s, 'full') === 15 && G.workPay(s, 'full') === 23, '全天零工：消耗 15、赚 23（15×1.5 四舍五入）');
+ok(G.upgradeCost(s) === 36, '第二次强化 36 金（每级 ×1.2）');
+ok(G.workCost(s, 'half') === 8 && G.workPay(s, 'half') === 10, '半天零工：消耗 8、赚 10（×1.2）');
+ok(G.workCost(s, 'full') === 15 && G.workPay(s, 'full') === 30, '全天零工：消耗 15、赚 30（×2.0）');
 
 s.energy = 15; const c0 = s.coins;
 G.work(s, 'full');
-ok(s.coins - c0 === 23 && s.energy === 0, '全天零工结算正确', { gain: s.coins - c0, energy: s.energy });
+ok(s.coins - c0 === 30 && s.energy === 0, '全天零工结算正确', { gain: s.coins - c0, energy: s.energy });
 
 /* ---------- 5b. 半天零工：体力不足时全用上，收益仍 ×1.0 ---------- */
 section('半天零工 · 体力不足');
@@ -268,14 +268,14 @@ s = G.createState();                 // 上限 10，半天需要 5
 s.coins = 100; s.energy = 3;
 let wr = G.work(s, 'half');
 ok(wr.ok && wr.partial === true && s.energy === 0, '体力不足时把剩余体力全用上', { energy: s.energy, wr: wr });
-ok(s.coins === 103, '收益仍按消耗 ×1.0 = 3 金', s.coins);
+ok(s.coins === 104, '收益按消耗 ×1.2 结算 = 4 金', s.coins);
 
 s.energy = 0;
 ok(!G.work(s, 'half').ok, '一点体力都没有时干不了零工');
 
 s = G.createState(); s.coins = 0; s.energy = 5;
 wr = G.work(s, 'half');
-ok(wr.ok && s.energy === 0 && s.coins === 5, '刚好够半天：消耗 5、赚 5', { coins: s.coins });
+ok(wr.ok && s.energy === 0 && s.coins === 6, '刚好够半天：消耗 5、赚 6', { coins: s.coins });
 
 /* ---------- 5c. 种子店：买 / 卖（半价） ---------- */
 section('种子店');
@@ -385,15 +385,15 @@ ok(agg[2].day === 1 && agg[2].balance === 50, '最早一天正常汇总', agg[2]
 section('打零工（半天/全天合并）');
 s = G.createState(); s.coins = 0; s.energy = 10;
 let wa = G.workAuto(s);
-ok(wa.ok && s.energy === 0 && s.coins === 15, '体力满 → 全天（-10 体力 +15 金）', { e: s.energy, c: s.coins });
+ok(wa.ok && s.energy === 0 && s.coins === 20, '体力满 → 全天（-10 体力 +20 金）', { e: s.energy, c: s.coins });
 
 s = G.createState(); s.coins = 0; s.energy = 6;
 wa = G.workAuto(s);
-ok(wa.ok && s.energy === 1 && s.coins === 5, '体力 6 → 半天（-5 体力 +5 金）', { e: s.energy, c: s.coins });
+ok(wa.ok && s.energy === 1 && s.coins === 6, '体力 6 → 半天（-5 体力 +6 金）', { e: s.energy, c: s.coins });
 
 s = G.createState(); s.coins = 0; s.energy = 3;
 wa = G.workAuto(s);
-ok(wa.ok && s.energy === 0 && s.coins === 3, '体力不足半天 → 用光全部', { e: s.energy, c: s.coins });
+ok(wa.ok && s.energy === 0 && s.coins === 4, '体力不足半天 → 用光全部', { e: s.energy, c: s.coins });
 
 s = G.createState(); s.energy = 0;
 ok(!G.workAuto(s).ok, '没有体力时打不了零工');
@@ -437,7 +437,65 @@ s.coins = 0; s.energy = 2;
 G.sleep(s);
 ok(s.energy === 5 && s.coins === 0, '没钱吃饭只恢复 5 体力', { e: s.energy, c: s.coins });
 
-/* ---------- 6. 存读档 ---------- */
+/* ---------- 5j. v0.8.0 修复回归 ---------- */
+section('v0.8.0 修复回归');
+
+// 再生期不再残留「缺水 ×N」
+// 再生期不再残留「缺水 ×N」（固定成晴天，否则雨天会自动浇水，漏浇就白测了）
+G.setRng(function () { return 0.1; });        // 0.1 → 晴天
+s = G.createState(); s.seeds = { strawberry: 1 }; s.energy = 99; s.coins = 99;
+G.plant(s, 0, 'strawberry');
+G.water(s, 0); G.sleep(s);
+G.sleep(s);                        // 漏浇一天 → missed +1
+for (let i = 0; i < 5 && s.plots[0].phase !== 'ripe'; i++) { G.water(s, 0); G.sleep(s); }
+ok(s.plots[0].missed === 1, '漏浇会累计 missed', s.plots[0].missed);
+G.sleep(s);
+G.harvest(s, 0);
+ok(s.plots[0].phase === 'regrow' && s.plots[0].missed === 0, '进入再生期后 missed 清零', s.plots[0]);
+
+// 没钱睡觉不再扣掉本来就更高的体力
+s = G.createState(); s.coins = 0; s.energy = 9;
+G.sleep(s);
+ok(s.energy === 9, '没钱睡觉不会把 9 点体力扣成 5', s.energy);
+
+// 强化体力成本逐级上涨（×1.2）
+s = G.createState();
+const upCosts = [];
+for (let i = 0; i < 4; i++) { upCosts.push(G.upgradeCost(s)); s.maxEnergy += 5; }
+ok(upCosts[0] === 30 && upCosts[1] === 36 && upCosts[2] === 43 && upCosts[3] === 52,
+   '强化成本 30/36/43/52', upCosts.join('/'));
+
+// 天气真的影响收益：晴天杂物明显更多
+function trashRate(weather) {
+  const st = G.createState(); st.weather = weather; st.energy = 99999; st.bait.dough = 99999; st.coins = 99999;
+  let junk = 0;
+  for (let i = 0; i < 2000; i++) if (G.fish(st, 'dough').entry.trash) junk++;
+  return junk / 2000;
+}
+const sunnyJunk = trashRate('sunny'), rainJunk = trashRate('rain');
+ok(sunnyJunk > rainJunk + 0.15,
+   '晴天空军/杂物明显多于雨天（' + (sunnyJunk * 100).toFixed(0) + '% vs ' + (rainJunk * 100).toFixed(0) + '%）');
+
+// 季节文案（每 30 天换一季，目前只影响顶栏）
+ok(G.seasonOf(1) === '春' && G.seasonOf(30) === '春' && G.seasonOf(31) === '夏' &&
+   G.seasonOf(61) === '秋' && G.seasonOf(91) === '冬' && G.seasonOf(121) === '春',
+   '季节每 30 天轮换', [1, 31, 61, 91, 121].map(function (d) { return G.seasonOf(d); }).join('/'));
+
+// 日志上限放宽到 400 条
+s = G.createState();
+for (let i = 0; i < 600; i++) G.sleep(s);
+ok(s.log.length === 400, '日志上限 400 条（不再只剩 60 条）', s.log.length);
+
+// 导入存档清洗：空地块数组 / 字符串金币 / 离谱体力上限
+s = G.deserialize({ plots: [], coins: 'abc', maxEnergy: 999, energy: 999, day: 0 });
+ok(s.plots.length === 1 && s.coins === 50 && s.maxEnergy === 100 && s.energy === 100 && s.day === 1,
+   '导入存档会清洗地块数/金币/体力上限', { plots: s.plots.length, coins: s.coins, max: s.maxEnergy, e: s.energy, day: s.day });
+ok(G.expandCost(s) === 25, '地块数为 1 时扩张成本不为负', G.expandCost(s));
+s.coins = 30;
+const ex = G.expand(s);
+ok(ex.ok && s.coins === 5 && s.plots.length === 2, '导入脏档后扩张不会白送金币', { coins: s.coins });
+
+
 section('存读档');
 s = G.createState();
 s.seeds = { corn: 1 };

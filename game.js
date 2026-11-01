@@ -16,9 +16,9 @@
     tomato:     { name: '番茄', emoji: '🍅', seed: 19, days: 4, base: 3, price: 16, big: false },
     pumpkin:    { name: '南瓜', emoji: '🎃', seed: 24, days: 5, base: 1, price: 60, big: true  },
     watermelon: { name: '西瓜', emoji: '🍉', seed: 32, days: 5, base: 1, price: 76, big: true  },
-    cucumber:   { name: '黄瓜', emoji: '🥒', seed: 24, days: 3, price: 13, multi: true,
+    cucumber:   { name: '黄瓜', emoji: '🥒', seed: 19, days: 3, price: 13, multi: true,
                   firstQty: 2, regrowDays: 2, regrowQty: 2, regrowTimes: 2 },
-    strawberry: { name: '草莓', emoji: '🍓', seed: 30, days: 3, price: 9,  multi: true,
+    strawberry: { name: '草莓', emoji: '🍓', seed: 22, days: 3, price: 9,  multi: true,
                   firstQty: 3, regrowDays: 1, regrowQty: 2, regrowTimes: 3 }
   };
   Object.keys(CROPS).forEach(function (k) { CROPS[k].id = k; });
@@ -57,12 +57,12 @@
   ];
 
   const WEATHER = {
-    sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 45, biteMul: 0.8, wormMod: -1,
-              note: '好鱼上钩 ×0.8 · 挖蚯蚓 -1 份' },
-    cloudy: { id: 'cloudy', name: '阴天',   emoji: '⛅', w: 30, biteMul: 1,   wormMod: 1,
+    sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 45, biteMul: 0.8, trashMul: 1.4, wormMod: -1,
+              note: '好鱼上钩 ×0.8、杂物 ×1.4 · 挖蚯蚓 -1 份' },
+    cloudy: { id: 'cloudy', name: '阴天',   emoji: '⛅', w: 30, biteMul: 1,   trashMul: 1,   wormMod: 1,
               note: '上钩概率默认 · 挖蚯蚓 +1 份' },
-    rain:   { id: 'rain',   name: '雨天',   emoji: '🌧️', w: 25, biteMul: 1.3, wormMod: 1, autoWater: true,
-              note: '自动浇水 · 好鱼上钩 ×1.3 · 挖蚯蚓 +1 份' }
+    rain:   { id: 'rain',   name: '雨天',   emoji: '🌧️', w: 25, biteMul: 1.3, trashMul: 0.6, wormMod: 1, autoWater: true,
+              note: '自动浇水 · 好鱼上钩 ×1.3、杂物 ×0.6 · 挖蚯蚓 +1 份' }
   };
   const WEATHER_LIST = Object.keys(WEATHER).map(function (k) { return WEATHER[k]; });
 
@@ -89,6 +89,12 @@
       if (r <= 0) return list[i];
     }
     return list[list.length - 1];
+  }
+
+  /* 季节目前只影响顶栏文案：每 30 天换一季（后续可挂作物限制） */
+  const SEASONS = ['春', '夏', '秋', '冬'];
+  function seasonOf(day) {
+    return SEASONS[Math.floor((Math.max(1, day) - 1) / 30) % 4];
   }
 
   function rollWeather() { return weighted(WEATHER_LIST, 'w').id; }
@@ -137,7 +143,7 @@
 
   function log(s, text, kind) {
     s.log.unshift({ day: s.day, text: text, kind: kind || 'info' });
-    if (s.log.length > 60) s.log.length = 60;
+    if (s.log.length > 400) s.log.length = 400;
   }
 
   function ledger(s, label, income, expense) {
@@ -152,14 +158,22 @@
     else ledger(s, label, 0, -amount);
   }
 
-  function mealFee(s) { return 3 + (s.maxEnergy - 10) / 5; }
+  /* 零工单价：体力 1 点 = 2 金（全天）/ 1.2 金（半天） */
+  const WORK_RATE_FULL = 2.0;
+  const WORK_RATE_HALF = 1.2;
 
-  function expandCost(s) { return 25 + 15 * (s.plots.length - 4); }
-  function upgradeCost(s) { return 30 + 10 * ((s.maxEnergy - 10) / 5); }
+  function mealFee(s) { return Math.max(1, 3 + (s.maxEnergy - 10) / 5); }
+
+  function expandCost(s) { return Math.max(25, 25 + 15 * (s.plots.length - 4)); }
+  /* 强化体力：成本超线性增长（每级 ×1.2），避免「无脑升级」把上限堆到几百 */
+  function upgradeCost(s) {
+    const tier = Math.max(0, (s.maxEnergy - 10) / 5);
+    return Math.round(30 * Math.pow(1.2, tier));
+  }
   function workCost(s, mode) { return Math.round(mode === 'half' ? s.maxEnergy / 2 : s.maxEnergy); }
   function workPay(s, mode) {
     const c = workCost(s, mode);
-    return Math.round(c * (mode === 'half' ? 1.0 : 1.5));
+    return Math.round(c * (mode === 'half' ? WORK_RATE_HALF : WORK_RATE_FULL));
   }
 
   function needOf(p) {
@@ -301,6 +315,7 @@
       p.watered = false;
       p.ripeDay = null;
       p.fert = 0;
+      p.missed = 0;          // 再生期重新计数，不然会一直挂着「缺水 ×N」
       regrown = true;
     } else {
       s.plots[idx] = makePlot();
@@ -439,7 +454,8 @@
       notes.push('🍖 伙食费 -' + fee + ' 金');
       s.energy = s.maxEnergy;
     } else {
-      s.energy = Math.min(5, s.maxEnergy);
+      // 没饭吃只回 5 点，但别把本来更高的体力扣掉
+      s.energy = Math.max(s.energy, Math.min(5, s.maxEnergy));
       notes.push('😵 没钱吃饭，饿着睡了（只恢复 5 体力）');
     }
 
@@ -502,8 +518,9 @@
 
     // 天气与蚯蚓都只影响「上钩概率」，不影响售价
     const bite = (w.biteMul || 1) * (kind === 'worm' ? 1.3 : 1);
+    const trashMul = w.trashMul || 1;
     const table = FISH.map(function (f) {
-      let mul = f.trash ? 1 : bite;
+      let mul = f.trash ? trashMul : bite;
       if (kind === 'lure') mul *= (f.trash ? 5 : 0.7);
       return Object.assign({}, f, { w: f.w * mul });
     });
@@ -621,7 +638,7 @@
   function digWorms(s) {
     if (s.energy < 3) return { ok: false, msg: '体力不够（挖蚯蚓要 3 点）' };
     const w = WEATHER[s.weather];
-    const n = clamp(randInt(1, 3) + w.wormMod, 1, 5);
+    const n = clamp(randInt(2, 4) + w.wormMod, 1, 6);
     s.energy -= 3;
     s.bait.worm += n;
     s.stats.dug++;
@@ -674,7 +691,7 @@
     if (mode === 'half' && s.energy < cost) {
       const spent = s.energy;
       if (spent <= 0) return { ok: false, msg: '体力已经见底了，先睡觉吧' };
-      const pay = Math.round(spent * 1.0);
+      const pay = Math.round(spent * WORK_RATE_HALF);
       s.energy = 0;
       addCoins(s, pay, '半天零工');
       log(s, '🕐 半天零工（体力不足，全用上）：-' + spent + ' 体力，+' + pay + ' 金', 'good');
@@ -809,20 +826,51 @@
     return days;
   }
 
+  function num(v, def, min, max) {
+    const n = Number(v);
+    if (!isFinite(n)) return def;
+    return Math.min(max == null ? Infinity : max,
+                    Math.max(min == null ? -Infinity : min, n));
+  }
+
   function deserialize(json) {
     const s = typeof json === 'string' ? JSON.parse(json) : json;
+    if (!s || typeof s !== 'object') throw new Error('bad save');
     const base = createState();
     const merged = Object.assign(base, s);
-    merged.plots = (s.plots || base.plots).map(function (p) { return Object.assign(makePlot(), p); });
+
+    // 数值清洗：导入的存档不能带 NaN / 负数 / 离谱的地块数
+    merged.maxEnergy = Math.round(num(s.maxEnergy, 10, 5, 100) / 5) * 5;
+    merged.day = Math.round(num(s.day, 1, 1, 100000));
+    merged.coins = Math.round(num(s.coins, 50, 0, 1e9));
+    merged.energy = num(s.energy, merged.maxEnergy, 0, merged.maxEnergy);
+
+    const plots = Array.isArray(s.plots) ? s.plots.slice(0, 40) : [];
+    merged.plots = (plots.length ? plots : [{}]).map(function (p) {
+      const plot = Object.assign(makePlot(), p || {});
+      if (!CROPS[plot.crop]) plot.crop = null;
+      plot.growth = num(plot.growth, 0, 0, 99);
+      plot.missed = num(plot.missed, 0, 0, 99);
+      plot.fert = num(plot.fert, 0, 0, 2);
+      plot.hits = num(plot.hits, 0, 0, 9);
+      if (!plot.crop) return makePlot();
+      if (['growing', 'regrow', 'ripe'].indexOf(plot.phase) < 0) plot.phase = 'growing';
+      return plot;
+    });
+
     merged.bait = Object.assign({ worm: 0, dough: 0 }, s.bait || {});
+    merged.bait.worm = Math.round(num(merged.bait.worm, 0, 0, 9999));
+    merged.bait.dough = Math.round(num(merged.bait.dough, 0, 0, 9999));
     merged.lure = Object.assign({ owned: false, dur: 0 }, s.lure || {});
+    merged.lure.dur = Math.round(num(merged.lure.dur, 0, 0, 20));
+    merged.lure.owned = !!merged.lure.owned && merged.lure.dur > 0;
     merged.fishBook = Object.assign({ count: 0, entries: [], best: null, priciest: null }, s.fishBook || {});
     merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0 }, s.stats || {});
-    merged.seeds = s.seeds || {};
-    merged.store = s.store || {};
-    merged.fishBag = s.fishBag || [];
-    merged.ledger = s.ledger || base.ledger;
-    merged.log = s.log || base.log;
+    merged.seeds = s.seeds && typeof s.seeds === 'object' ? s.seeds : {};
+    merged.store = s.store && typeof s.store === 'object' ? s.store : {};
+    merged.fishBag = Array.isArray(s.fishBag) ? s.fishBag.slice(0, 5000) : [];
+    merged.ledger = Array.isArray(s.ledger) ? s.ledger : base.ledger;
+    merged.log = Array.isArray(s.log) ? s.log.slice(0, 400) : base.log;
     // 旧存档迁移：垃圾不参与品质判定（早期版本会给出「优质垃圾」）
     if (merged.fishBook.entries) {
       merged.fishBook.entries.forEach(function (e) { if (e && e.trash) e.quality = null; });
@@ -835,10 +883,11 @@
   const API = {
     CROPS: CROPS, CROP_LIST: CROP_LIST, FERT: FERT, QUALITY: QUALITY, FISH: FISH,
     WEATHER: WEATHER, WEATHER_LIST: WEATHER_LIST, BAIT: BAIT, SAVE_VERSION: SAVE_VERSION,
-    setRng: setRng,
+    setRng: setRng, seasonOf: seasonOf, SEASONS: SEASONS,
     createState: createState, serialize: serialize, deserialize: deserialize,
     ledgerByDay: ledgerByDay, logByDay: logByDay,
     mealFee: mealFee, expandCost: expandCost, upgradeCost: upgradeCost,
+    WORK_RATE_FULL: WORK_RATE_FULL, WORK_RATE_HALF: WORK_RATE_HALF,
     workCost: workCost, workPay: workPay, needOf: needOf, expectedYield: expectedYield,
     canHarvest: canHarvest, stageEmoji: stageEmoji, fertBonus: fertBonus, baitCount: baitCount,
     plant: plant, plantAll: plantAll, water: water, waterAll: waterAll,

@@ -659,3 +659,14 @@ button{ font-family:inherit; }
   .brand-txt h1{ font-size:15px; }
   .chip{ height:30px; font-size:12px; padding:0 10px; }
 }
+
+/* ---------- 键盘可达性（可点的 div） ---------- */
+.plot:focus-visible,
+.bait:focus-visible,
+.led-row:focus-visible,
+.log-day:focus-visible{
+  outline:2px solid #4f9c5f;
+  outline-offset:2px;
+  border-radius:10px;
+}
+.plot{ cursor:pointer; }

@@ -669,6 +669,17 @@ button{ font-family:inherit; }
   .chip{ height:30px; font-size:12px; padding:0 10px; }
 }
 
+/* ---------- 键盘可达性（可点的 div） ---------- */
+.plot:focus-visible,
+.bait:focus-visible,
+.led-row:focus-visible,
+.log-day:focus-visible{
+  outline:2px solid #4f9c5f;
+  outline-offset:2px;
+  border-radius:10px;
+}
+.plot{ cursor:pointer; }
+
 </style>
 </head>
 <body>
@@ -824,9 +835,9 @@ button{ font-family:inherit; }
     tomato:     { name: '番茄', emoji: '🍅', seed: 19, days: 4, base: 3, price: 16, big: false },
     pumpkin:    { name: '南瓜', emoji: '🎃', seed: 24, days: 5, base: 1, price: 60, big: true  },
     watermelon: { name: '西瓜', emoji: '🍉', seed: 32, days: 5, base: 1, price: 76, big: true  },
-    cucumber:   { name: '黄瓜', emoji: '🥒', seed: 24, days: 3, price: 13, multi: true,
+    cucumber:   { name: '黄瓜', emoji: '🥒', seed: 19, days: 3, price: 13, multi: true,
                   firstQty: 2, regrowDays: 2, regrowQty: 2, regrowTimes: 2 },
-    strawberry: { name: '草莓', emoji: '🍓', seed: 30, days: 3, price: 9,  multi: true,
+    strawberry: { name: '草莓', emoji: '🍓', seed: 22, days: 3, price: 9,  multi: true,
                   firstQty: 3, regrowDays: 1, regrowQty: 2, regrowTimes: 3 }
   };
   Object.keys(CROPS).forEach(function (k) { CROPS[k].id = k; });
@@ -865,12 +876,12 @@ button{ font-family:inherit; }
   ];
 
   const WEATHER = {
-    sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 45, biteMul: 0.8, wormMod: -1,
-              note: '好鱼上钩 ×0.8 · 挖蚯蚓 -1 份' },
-    cloudy: { id: 'cloudy', name: '阴天',   emoji: '⛅', w: 30, biteMul: 1,   wormMod: 1,
+    sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 45, biteMul: 0.8, trashMul: 1.4, wormMod: -1,
+              note: '好鱼上钩 ×0.8、杂物 ×1.4 · 挖蚯蚓 -1 份' },
+    cloudy: { id: 'cloudy', name: '阴天',   emoji: '⛅', w: 30, biteMul: 1,   trashMul: 1,   wormMod: 1,
               note: '上钩概率默认 · 挖蚯蚓 +1 份' },
-    rain:   { id: 'rain',   name: '雨天',   emoji: '🌧️', w: 25, biteMul: 1.3, wormMod: 1, autoWater: true,
-              note: '自动浇水 · 好鱼上钩 ×1.3 · 挖蚯蚓 +1 份' }
+    rain:   { id: 'rain',   name: '雨天',   emoji: '🌧️', w: 25, biteMul: 1.3, trashMul: 0.6, wormMod: 1, autoWater: true,
+              note: '自动浇水 · 好鱼上钩 ×1.3、杂物 ×0.6 · 挖蚯蚓 +1 份' }
   };
   const WEATHER_LIST = Object.keys(WEATHER).map(function (k) { return WEATHER[k]; });
 
@@ -897,6 +908,12 @@ button{ font-family:inherit; }
       if (r <= 0) return list[i];
     }
     return list[list.length - 1];
+  }
+
+  /* 季节目前只影响顶栏文案：每 30 天换一季（后续可挂作物限制） */
+  const SEASONS = ['春', '夏', '秋', '冬'];
+  function seasonOf(day) {
+    return SEASONS[Math.floor((Math.max(1, day) - 1) / 30) % 4];
   }
 
   function rollWeather() { return weighted(WEATHER_LIST, 'w').id; }
@@ -945,7 +962,7 @@ button{ font-family:inherit; }
 
   function log(s, text, kind) {
     s.log.unshift({ day: s.day, text: text, kind: kind || 'info' });
-    if (s.log.length > 60) s.log.length = 60;
+    if (s.log.length > 400) s.log.length = 400;
   }
 
   function ledger(s, label, income, expense) {
@@ -960,14 +977,22 @@ button{ font-family:inherit; }
     else ledger(s, label, 0, -amount);
   }
 
-  function mealFee(s) { return 3 + (s.maxEnergy - 10) / 5; }
+  /* 零工单价：体力 1 点 = 2 金（全天）/ 1.2 金（半天） */
+  const WORK_RATE_FULL = 2.0;
+  const WORK_RATE_HALF = 1.2;
 
-  function expandCost(s) { return 25 + 15 * (s.plots.length - 4); }
-  function upgradeCost(s) { return 30 + 10 * ((s.maxEnergy - 10) / 5); }
+  function mealFee(s) { return Math.max(1, 3 + (s.maxEnergy - 10) / 5); }
+
+  function expandCost(s) { return Math.max(25, 25 + 15 * (s.plots.length - 4)); }
+  /* 强化体力：成本超线性增长（每级 ×1.2），避免「无脑升级」把上限堆到几百 */
+  function upgradeCost(s) {
+    const tier = Math.max(0, (s.maxEnergy - 10) / 5);
+    return Math.round(30 * Math.pow(1.2, tier));
+  }
   function workCost(s, mode) { return Math.round(mode === 'half' ? s.maxEnergy / 2 : s.maxEnergy); }
   function workPay(s, mode) {
     const c = workCost(s, mode);
-    return Math.round(c * (mode === 'half' ? 1.0 : 1.5));
+    return Math.round(c * (mode === 'half' ? WORK_RATE_HALF : WORK_RATE_FULL));
   }
 
   function needOf(p) {
@@ -1109,6 +1134,7 @@ button{ font-family:inherit; }
       p.watered = false;
       p.ripeDay = null;
       p.fert = 0;
+      p.missed = 0;          // 再生期重新计数，不然会一直挂着「缺水 ×N」
       regrown = true;
     } else {
       s.plots[idx] = makePlot();
@@ -1247,7 +1273,8 @@ button{ font-family:inherit; }
       notes.push('🍖 伙食费 -' + fee + ' 金');
       s.energy = s.maxEnergy;
     } else {
-      s.energy = Math.min(5, s.maxEnergy);
+      // 没饭吃只回 5 点，但别把本来更高的体力扣掉
+      s.energy = Math.max(s.energy, Math.min(5, s.maxEnergy));
       notes.push('😵 没钱吃饭，饿着睡了（只恢复 5 体力）');
     }
 
@@ -1310,8 +1337,9 @@ button{ font-family:inherit; }
 
     // 天气与蚯蚓都只影响「上钩概率」，不影响售价
     const bite = (w.biteMul || 1) * (kind === 'worm' ? 1.3 : 1);
+    const trashMul = w.trashMul || 1;
     const table = FISH.map(function (f) {
-      let mul = f.trash ? 1 : bite;
+      let mul = f.trash ? trashMul : bite;
       if (kind === 'lure') mul *= (f.trash ? 5 : 0.7);
       return Object.assign({}, f, { w: f.w * mul });
     });
@@ -1429,7 +1457,7 @@ button{ font-family:inherit; }
   function digWorms(s) {
     if (s.energy < 3) return { ok: false, msg: '体力不够（挖蚯蚓要 3 点）' };
     const w = WEATHER[s.weather];
-    const n = clamp(randInt(1, 3) + w.wormMod, 1, 5);
+    const n = clamp(randInt(2, 4) + w.wormMod, 1, 6);
     s.energy -= 3;
     s.bait.worm += n;
     s.stats.dug++;
@@ -1482,7 +1510,7 @@ button{ font-family:inherit; }
     if (mode === 'half' && s.energy < cost) {
       const spent = s.energy;
       if (spent <= 0) return { ok: false, msg: '体力已经见底了，先睡觉吧' };
-      const pay = Math.round(spent * 1.0);
+      const pay = Math.round(spent * WORK_RATE_HALF);
       s.energy = 0;
       addCoins(s, pay, '半天零工');
       log(s, '🕐 半天零工（体力不足，全用上）：-' + spent + ' 体力，+' + pay + ' 金', 'good');
@@ -1617,20 +1645,51 @@ button{ font-family:inherit; }
     return days;
   }
 
+  function num(v, def, min, max) {
+    const n = Number(v);
+    if (!isFinite(n)) return def;
+    return Math.min(max == null ? Infinity : max,
+                    Math.max(min == null ? -Infinity : min, n));
+  }
+
   function deserialize(json) {
     const s = typeof json === 'string' ? JSON.parse(json) : json;
+    if (!s || typeof s !== 'object') throw new Error('bad save');
     const base = createState();
     const merged = Object.assign(base, s);
-    merged.plots = (s.plots || base.plots).map(function (p) { return Object.assign(makePlot(), p); });
+
+    // 数值清洗：导入的存档不能带 NaN / 负数 / 离谱的地块数
+    merged.maxEnergy = Math.round(num(s.maxEnergy, 10, 5, 100) / 5) * 5;
+    merged.day = Math.round(num(s.day, 1, 1, 100000));
+    merged.coins = Math.round(num(s.coins, 50, 0, 1e9));
+    merged.energy = num(s.energy, merged.maxEnergy, 0, merged.maxEnergy);
+
+    const plots = Array.isArray(s.plots) ? s.plots.slice(0, 40) : [];
+    merged.plots = (plots.length ? plots : [{}]).map(function (p) {
+      const plot = Object.assign(makePlot(), p || {});
+      if (!CROPS[plot.crop]) plot.crop = null;
+      plot.growth = num(plot.growth, 0, 0, 99);
+      plot.missed = num(plot.missed, 0, 0, 99);
+      plot.fert = num(plot.fert, 0, 0, 2);
+      plot.hits = num(plot.hits, 0, 0, 9);
+      if (!plot.crop) return makePlot();
+      if (['growing', 'regrow', 'ripe'].indexOf(plot.phase) < 0) plot.phase = 'growing';
+      return plot;
+    });
+
     merged.bait = Object.assign({ worm: 0, dough: 0 }, s.bait || {});
+    merged.bait.worm = Math.round(num(merged.bait.worm, 0, 0, 9999));
+    merged.bait.dough = Math.round(num(merged.bait.dough, 0, 0, 9999));
     merged.lure = Object.assign({ owned: false, dur: 0 }, s.lure || {});
+    merged.lure.dur = Math.round(num(merged.lure.dur, 0, 0, 20));
+    merged.lure.owned = !!merged.lure.owned && merged.lure.dur > 0;
     merged.fishBook = Object.assign({ count: 0, entries: [], best: null, priciest: null }, s.fishBook || {});
     merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0 }, s.stats || {});
-    merged.seeds = s.seeds || {};
-    merged.store = s.store || {};
-    merged.fishBag = s.fishBag || [];
-    merged.ledger = s.ledger || base.ledger;
-    merged.log = s.log || base.log;
+    merged.seeds = s.seeds && typeof s.seeds === 'object' ? s.seeds : {};
+    merged.store = s.store && typeof s.store === 'object' ? s.store : {};
+    merged.fishBag = Array.isArray(s.fishBag) ? s.fishBag.slice(0, 5000) : [];
+    merged.ledger = Array.isArray(s.ledger) ? s.ledger : base.ledger;
+    merged.log = Array.isArray(s.log) ? s.log.slice(0, 400) : base.log;
     // 旧存档迁移：垃圾不参与品质判定（早期版本会给出「优质垃圾」）
     if (merged.fishBook.entries) {
       merged.fishBook.entries.forEach(function (e) { if (e && e.trash) e.quality = null; });
@@ -1643,10 +1702,11 @@ button{ font-family:inherit; }
   const API = {
     CROPS: CROPS, CROP_LIST: CROP_LIST, FERT: FERT, QUALITY: QUALITY, FISH: FISH,
     WEATHER: WEATHER, WEATHER_LIST: WEATHER_LIST, BAIT: BAIT, SAVE_VERSION: SAVE_VERSION,
-    setRng: setRng,
+    setRng: setRng, seasonOf: seasonOf, SEASONS: SEASONS,
     createState: createState, serialize: serialize, deserialize: deserialize,
     ledgerByDay: ledgerByDay, logByDay: logByDay,
     mealFee: mealFee, expandCost: expandCost, upgradeCost: upgradeCost,
+    WORK_RATE_FULL: WORK_RATE_FULL, WORK_RATE_HALF: WORK_RATE_HALF,
     workCost: workCost, workPay: workPay, needOf: needOf, expectedYield: expectedYield,
     canHarvest: canHarvest, stageEmoji: stageEmoji, fertBonus: fertBonus, baitCount: baitCount,
     plant: plant, plantAll: plantAll, water: water, waterAll: waterAll,
@@ -1854,7 +1914,7 @@ button{ font-family:inherit; }
 
     $('#hud-fee').textContent = '🍖 ' + G.mealFee(state) + ' 金/天';
     $('#hud-plots').textContent = '🏞️ ' + state.plots.length + ' 块';
-    $('#season').textContent = '春 · 第 ' + state.day + ' 天';
+    $('#season').textContent = G.seasonOf(state.day) + ' · 第 ' + state.day + ' 天';
   }
 
   /* ---------------- 农田 ---------------- */
@@ -1863,9 +1923,11 @@ button{ font-family:inherit; }
 
   function renderPlots() {
     const grid = $('#plot-grid');
+    const keepScroll = grid.scrollTop;          // 重绘会重置滚动条，先存下来
     grid.innerHTML = state.plots.map(function (p, i) {
       if (!p.crop) {
-        return '<div class="plot empty" data-i="' + i + '">' +
+        return '<div class="plot empty" data-i="' + i + '" role="button" tabindex="0"' +
+          ' aria-label="第 ' + (i + 1) + ' 块地，空地，点击播种">' +
           '<div class="plot-top"><span class="plot-no">' + (i + 1) + '</span></div>' +
           '<div class="plot-art soil"><span class="seed-dot">＋</span></div>' +
           '<div class="plot-name">空地</div>' +
@@ -1894,8 +1956,11 @@ button{ font-family:inherit; }
       }
 
       const nameExtra = p.phase === 'regrow' ? '再生' : '';
+      const aria = '第 ' + (i + 1) + ' 块地，' + c.name + '，' + p.growth + '/' + need + ' 天，' +
+        (can ? '可以收获' : (p.phase === 'ripe' ? '明天可收' : (p.watered ? '今天已浇水' : '待浇水')));
 
-      return '<div class="plot ' + cls + '" data-i="' + i + '">' +
+      return '<div class="plot ' + cls + '" data-i="' + i + '" role="button" tabindex="0"' +
+        ' aria-label="' + aria + '">' +
         '<div class="plot-top"><span class="plot-no">' + (i + 1) + '</span>' +
           '<div class="plot-badges">' + badges + '</div></div>' +
         '<div class="plot-art">' + G.stageEmoji(p) + '</div>' +
@@ -1905,6 +1970,7 @@ button{ font-family:inherit; }
         '<div class="plot-foot">' + foot + '</div>' +
       '</div>';
     }).join('');
+    grid.scrollTop = keepScroll;
 
     const anyGrow = state.plots.some(function (p) {
       return p.crop && p.phase !== 'ripe' && !p.watered;
@@ -1972,13 +2038,15 @@ button{ font-family:inherit; }
       const bd = G.BAIT[b.id];
       const cnt = b.id === 'lure' ? (b.n ? b.n + '/20' : '无') : '×' + b.n;
       return '<div class="bait ' + (b.id === baitSel ? 'sel ' : '') + (b.n ? '' : 'off') +
-        '" data-bait="' + b.id + '" title="' + bd.desc + '">' +
+        '" data-bait="' + b.id + '" title="' + bd.desc + '"' +
+        ' role="button" tabindex="0" aria-label="' + bd.name + '，' + (b.n ? b.n + ' 个' : '没有') + '"' +
+        ' aria-pressed="' + (b.id === baitSel) + '">' +
         '<span>' + bd.emoji + '</span><span class="bn">' + bd.name + '</span>' +
         '<span class="bc">' + cnt + '</span></div>';
     }).join('');
 
     $('[data-act="cast"]').disabled = state.energy < 2;
-    $('[data-act="cast5"]').disabled = state.energy < 2;
+    $('[data-act="cast5"]').disabled = state.energy < 10;   // 5 杆要 10 体力，不够就别假装能连甩
   }
 
   /* 最近渔获：单杆/连甩都按条列出来，保留最近 5 条 */
@@ -2095,6 +2163,7 @@ button{ font-family:inherit; }
       const head = (inc || exp) ? (inc + sep + exp) : '<span style="color:var(--ink-3)">—</span>';
 
       let html = '<div class="led-row day' + (open ? ' open' : '') + '" data-ledday="' + d.day + '"' +
+        ' role="button" tabindex="0" aria-expanded="' + open + '"' +
         ' title="' + d.items.length + ' 笔，点击' + (open ? '收起' : '展开') + '">' +
         '<span class="led-day">D' + d.day + '</span>' +
         '<span class="led-label">' + (d.items.length > 1 ? d.items.length + ' 笔' : d.items[0].label) + '</span>' +
@@ -2151,6 +2220,7 @@ button{ font-family:inherit; }
       const open = openLogDay === d.day;
       const last = d.items[0] ? d.items[0].text : '';
       let html = '<div class="log-day' + (open ? ' open' : '') + '" data-logday="' + d.day + '"' +
+        ' role="button" tabindex="0" aria-expanded="' + open + '"' +
         ' title="' + d.items.length + ' 条记录，点击' + (open ? '收起' : '展开') + '">' +
         '<span class="ld">D' + d.day + '</span>' +
         '<span class="ld-count">' + d.items.length + ' 条</span>' +
@@ -2268,7 +2338,7 @@ button{ font-family:inherit; }
         const total = c.firstQty + c.regrowTimes * c.regrowQty;
         lineY = c.days + ' 天 · 共 ' + total + ' 个';
         lineP = c.price + ' 金/个 · 多次收';
-        profit = '';
+        profit = '净 +' + (total * c.price - c.seed);
       } else if (c.big) {
         lineY = c.days + ' 天 · 固定 1 个';
         lineP = c.price + ' 金/个';
@@ -2397,12 +2467,13 @@ button{ font-family:inherit; }
       '· 睡觉推进 1 天，扣伙食费（' + G.mealFee(state) + ' 金/天），体力回满<br>' +
       '· 体力耗尽就得睡觉；没钱吃饭只能恢复 5 点<br>' +
       '· 蚯蚓饵：品质取两次较好的、好鱼上钩 ×1.3；不再加成售价，蚯蚓本身也能 2 金/条卖<br>' +
-      '· 钓到的鱼先进仓库，卖出才换钱；天气只影响上钩概率（雨天好鱼 ×1.3）<br>' +
+      '· 钓到的鱼先进仓库，卖出才换钱；天气只影响上钩概率：晴天好鱼 ×0.8、杂物 ×1.4，雨天好鱼 ×1.3、杂物 ×0.6<br>' +
       '· 收获时 30% 概率留种，种子下次可免费种<br>' +
       '· 多次收获作物（黄瓜/草莓）只有最后一收才判定留种<br>' +
       '· 种子只能在种子店买，卖回价是买价的一半<br>' +
       '· 播种只消耗背包里的种子；「全部播种」会按库存把所有空地种满<br>' +
-      '· 打零工：体力满就干全天（×1.5），否则干半天（×1.0）；不够半天就把剩下的体力全用上<br>' +
+      '· 打零工：体力满就干全天（体力 ×2.0 金），否则干半天（×1.2）；不够半天就把剩下的体力全用上<br>' +
+      '· 成熟的地块左键直接收；右键（或 Shift + 点击）打开详情，可铲除 / 看产量<br>' +
       '· 账本按天汇总，点某一天可展开当日明细<br>' +
       '· 全部施肥只作用于进行中的小作物，大作物 / 已施肥 / 已成熟会跳过<br>' +
       '· 种错了可以在地块详情里「铲除」，不返还种子或金币<br>' +
@@ -2430,7 +2501,7 @@ button{ font-family:inherit; }
     harvestAll: function (ev) {
       const r = G.harvestAll(state);
       commit(r);
-      if (r.ok) { toast(r.msg, 'good'); SFX.good(); floatAt(ev, '🧺 ' + r.msg.split('共 ')[1] || '', 'green'); }
+      if (r.ok) { toast(r.msg, 'good'); SFX.good(); floatAt(ev, '🧺 ' + (r.msg.split('共 ')[1] || ''), 'green'); }
     },
     sleep: function () {
       const r = G.sleep(state);
@@ -2520,10 +2591,23 @@ button{ font-family:inherit; }
         return;
       }
 
-      // 地块
+      // 地块：熟了一键收，其余（空地/生长中/按住 Shift）进详情
       const plot = t.closest('.plot');
       if (plot) {
         const i = Number(plot.dataset.i);
+        const p = state.plots[i];
+        if (p && p.crop && G.canHarvest(state, p) && !ev.shiftKey && ev.button !== 2) {
+          const r = G.harvest(state, i);
+          commit(r);
+          if (r.ok) {
+            toast(r.msg, 'good');
+            SFX.good();
+            floatAt(ev, '🧺 +' + r.qty, 'green');
+          } else {
+            toast(r.msg, 'warn');
+          }
+          return;
+        }
         plotModal(i);
         return;
       }
@@ -2696,6 +2780,23 @@ button{ font-family:inherit; }
       this.textContent = soundOn ? '🔊' : '🔇';
       this.classList.toggle('off', !soundOn);
       if (soundOn) SFX.good();
+    });
+
+    // 键盘可操作：这些「可点的 div」按 Enter / 空格 等同点击
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
+      const el = ev.target;
+      if (!el || !el.matches || !el.matches('.plot, .bait, .led-row, .log-day')) return;
+      ev.preventDefault();
+      el.click();
+    });
+
+    // 右键地块 = 打开详情（左键点成熟地块是直接收获）
+    document.addEventListener('contextmenu', function (ev) {
+      const plot = ev.target.closest && ev.target.closest('.plot');
+      if (!plot) return;
+      ev.preventDefault();
+      plotModal(Number(plot.dataset.i));
     });
 
     document.addEventListener('keydown', function (ev) {

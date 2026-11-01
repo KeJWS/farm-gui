@@ -184,7 +184,7 @@
 
     $('#hud-fee').textContent = '🍖 ' + G.mealFee(state) + ' 金/天';
     $('#hud-plots').textContent = '🏞️ ' + state.plots.length + ' 块';
-    $('#season').textContent = '春 · 第 ' + state.day + ' 天';
+    $('#season').textContent = G.seasonOf(state.day) + ' · 第 ' + state.day + ' 天';
   }
 
   /* ---------------- 农田 ---------------- */
@@ -193,9 +193,11 @@
 
   function renderPlots() {
     const grid = $('#plot-grid');
+    const keepScroll = grid.scrollTop;          // 重绘会重置滚动条，先存下来
     grid.innerHTML = state.plots.map(function (p, i) {
       if (!p.crop) {
-        return '<div class="plot empty" data-i="' + i + '">' +
+        return '<div class="plot empty" data-i="' + i + '" role="button" tabindex="0"' +
+          ' aria-label="第 ' + (i + 1) + ' 块地，空地，点击播种">' +
           '<div class="plot-top"><span class="plot-no">' + (i + 1) + '</span></div>' +
           '<div class="plot-art soil"><span class="seed-dot">＋</span></div>' +
           '<div class="plot-name">空地</div>' +
@@ -224,8 +226,11 @@
       }
 
       const nameExtra = p.phase === 'regrow' ? '再生' : '';
+      const aria = '第 ' + (i + 1) + ' 块地，' + c.name + '，' + p.growth + '/' + need + ' 天，' +
+        (can ? '可以收获' : (p.phase === 'ripe' ? '明天可收' : (p.watered ? '今天已浇水' : '待浇水')));
 
-      return '<div class="plot ' + cls + '" data-i="' + i + '">' +
+      return '<div class="plot ' + cls + '" data-i="' + i + '" role="button" tabindex="0"' +
+        ' aria-label="' + aria + '">' +
         '<div class="plot-top"><span class="plot-no">' + (i + 1) + '</span>' +
           '<div class="plot-badges">' + badges + '</div></div>' +
         '<div class="plot-art">' + G.stageEmoji(p) + '</div>' +
@@ -235,6 +240,7 @@
         '<div class="plot-foot">' + foot + '</div>' +
       '</div>';
     }).join('');
+    grid.scrollTop = keepScroll;
 
     const anyGrow = state.plots.some(function (p) {
       return p.crop && p.phase !== 'ripe' && !p.watered;
@@ -302,13 +308,15 @@
       const bd = G.BAIT[b.id];
       const cnt = b.id === 'lure' ? (b.n ? b.n + '/20' : '无') : '×' + b.n;
       return '<div class="bait ' + (b.id === baitSel ? 'sel ' : '') + (b.n ? '' : 'off') +
-        '" data-bait="' + b.id + '" title="' + bd.desc + '">' +
+        '" data-bait="' + b.id + '" title="' + bd.desc + '"' +
+        ' role="button" tabindex="0" aria-label="' + bd.name + '，' + (b.n ? b.n + ' 个' : '没有') + '"' +
+        ' aria-pressed="' + (b.id === baitSel) + '">' +
         '<span>' + bd.emoji + '</span><span class="bn">' + bd.name + '</span>' +
         '<span class="bc">' + cnt + '</span></div>';
     }).join('');
 
     $('[data-act="cast"]').disabled = state.energy < 2;
-    $('[data-act="cast5"]').disabled = state.energy < 2;
+    $('[data-act="cast5"]').disabled = state.energy < 10;   // 5 杆要 10 体力，不够就别假装能连甩
   }
 
   /* 最近渔获：单杆/连甩都按条列出来，保留最近 5 条 */
@@ -425,6 +433,7 @@
       const head = (inc || exp) ? (inc + sep + exp) : '<span style="color:var(--ink-3)">—</span>';
 
       let html = '<div class="led-row day' + (open ? ' open' : '') + '" data-ledday="' + d.day + '"' +
+        ' role="button" tabindex="0" aria-expanded="' + open + '"' +
         ' title="' + d.items.length + ' 笔，点击' + (open ? '收起' : '展开') + '">' +
         '<span class="led-day">D' + d.day + '</span>' +
         '<span class="led-label">' + (d.items.length > 1 ? d.items.length + ' 笔' : d.items[0].label) + '</span>' +
@@ -481,6 +490,7 @@
       const open = openLogDay === d.day;
       const last = d.items[0] ? d.items[0].text : '';
       let html = '<div class="log-day' + (open ? ' open' : '') + '" data-logday="' + d.day + '"' +
+        ' role="button" tabindex="0" aria-expanded="' + open + '"' +
         ' title="' + d.items.length + ' 条记录，点击' + (open ? '收起' : '展开') + '">' +
         '<span class="ld">D' + d.day + '</span>' +
         '<span class="ld-count">' + d.items.length + ' 条</span>' +
@@ -598,7 +608,7 @@
         const total = c.firstQty + c.regrowTimes * c.regrowQty;
         lineY = c.days + ' 天 · 共 ' + total + ' 个';
         lineP = c.price + ' 金/个 · 多次收';
-        profit = '';
+        profit = '净 +' + (total * c.price - c.seed);
       } else if (c.big) {
         lineY = c.days + ' 天 · 固定 1 个';
         lineP = c.price + ' 金/个';
@@ -727,12 +737,13 @@
       '· 睡觉推进 1 天，扣伙食费（' + G.mealFee(state) + ' 金/天），体力回满<br>' +
       '· 体力耗尽就得睡觉；没钱吃饭只能恢复 5 点<br>' +
       '· 蚯蚓饵：品质取两次较好的、好鱼上钩 ×1.3；不再加成售价，蚯蚓本身也能 2 金/条卖<br>' +
-      '· 钓到的鱼先进仓库，卖出才换钱；天气只影响上钩概率（雨天好鱼 ×1.3）<br>' +
+      '· 钓到的鱼先进仓库，卖出才换钱；天气只影响上钩概率：晴天好鱼 ×0.8、杂物 ×1.4，雨天好鱼 ×1.3、杂物 ×0.6<br>' +
       '· 收获时 30% 概率留种，种子下次可免费种<br>' +
       '· 多次收获作物（黄瓜/草莓）只有最后一收才判定留种<br>' +
       '· 种子只能在种子店买，卖回价是买价的一半<br>' +
       '· 播种只消耗背包里的种子；「全部播种」会按库存把所有空地种满<br>' +
-      '· 打零工：体力满就干全天（×1.5），否则干半天（×1.0）；不够半天就把剩下的体力全用上<br>' +
+      '· 打零工：体力满就干全天（体力 ×2.0 金），否则干半天（×1.2）；不够半天就把剩下的体力全用上<br>' +
+      '· 成熟的地块左键直接收；右键（或 Shift + 点击）打开详情，可铲除 / 看产量<br>' +
       '· 账本按天汇总，点某一天可展开当日明细<br>' +
       '· 全部施肥只作用于进行中的小作物，大作物 / 已施肥 / 已成熟会跳过<br>' +
       '· 种错了可以在地块详情里「铲除」，不返还种子或金币<br>' +
@@ -760,7 +771,7 @@
     harvestAll: function (ev) {
       const r = G.harvestAll(state);
       commit(r);
-      if (r.ok) { toast(r.msg, 'good'); SFX.good(); floatAt(ev, '🧺 ' + r.msg.split('共 ')[1] || '', 'green'); }
+      if (r.ok) { toast(r.msg, 'good'); SFX.good(); floatAt(ev, '🧺 ' + (r.msg.split('共 ')[1] || ''), 'green'); }
     },
     sleep: function () {
       const r = G.sleep(state);
@@ -850,10 +861,23 @@
         return;
       }
 
-      // 地块
+      // 地块：熟了一键收，其余（空地/生长中/按住 Shift）进详情
       const plot = t.closest('.plot');
       if (plot) {
         const i = Number(plot.dataset.i);
+        const p = state.plots[i];
+        if (p && p.crop && G.canHarvest(state, p) && !ev.shiftKey && ev.button !== 2) {
+          const r = G.harvest(state, i);
+          commit(r);
+          if (r.ok) {
+            toast(r.msg, 'good');
+            SFX.good();
+            floatAt(ev, '🧺 +' + r.qty, 'green');
+          } else {
+            toast(r.msg, 'warn');
+          }
+          return;
+        }
         plotModal(i);
         return;
       }
@@ -1026,6 +1050,23 @@
       this.textContent = soundOn ? '🔊' : '🔇';
       this.classList.toggle('off', !soundOn);
       if (soundOn) SFX.good();
+    });
+
+    // 键盘可操作：这些「可点的 div」按 Enter / 空格 等同点击
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
+      const el = ev.target;
+      if (!el || !el.matches || !el.matches('.plot, .bait, .led-row, .log-day')) return;
+      ev.preventDefault();
+      el.click();
+    });
+
+    // 右键地块 = 打开详情（左键点成熟地块是直接收获）
+    document.addEventListener('contextmenu', function (ev) {
+      const plot = ev.target.closest && ev.target.closest('.plot');
+      if (!plot) return;
+      ev.preventDefault();
+      plotModal(Number(plot.dataset.i));
     });
 
     document.addEventListener('keydown', function (ev) {
