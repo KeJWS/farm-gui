@@ -872,7 +872,8 @@
 
       '<div class="rule-sec">' +
         '<h4>🎣 钓鱼</h4>' +
-        '<p>2 体力 + 1 份饵甩一杆；蚯蚓品质取两次较好的、好鱼上钩 ×1.3；假饵耐用 20 次但容易空军。<br>' +
+        '<p>2 体力 + 1 份饵甩一杆。<b>先判定咬钩</b>：面团饵 92%、蚯蚓 95%、假饵 72%，晴天 −12%、雨天 +8%。<br>' +
+        '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15。<br>' +
         '渔获先进仓库，卖出才换钱；<b>杂物和宝箱不能交委托</b>。</p>' +
       '</div>' +
 
@@ -934,29 +935,48 @@
 
   function codexModal() {
     const fx = state.codex.fish || {}, cx = state.codex.crops || {};
-    const fish = G.FISH.map(function (f) {
-      const c = fx[f.id] || { n: 0, best: null };
+    const species = G.FISH.filter(function (f) { return !f.trash; });
+    const got = species.filter(function (f) { return fx[f.id] && fx[f.id].n > 0; }).length;
+    const perfect = species.reduce(function (a, f) { return a + ((fx[f.id] && fx[f.id].perfect) || 0); }, 0);
+    const fishValue = Object.keys(fx).reduce(function (a, k) { return a + (fx[k].value || 0); }, 0);
+    const cropValue = Object.keys(cx).reduce(function (a, k) { return a + (cx[k].value || 0); }, 0);
+
+    const stat = '<div class="codex-stat">' +
+      '<div><b>' + got + '/' + species.length + '</b><span>鱼种收集</span></div>' +
+      '<div><b>' + perfect + '</b><span>完美品质</span></div>' +
+      '<div><b>' + fishValue + '</b><span>鱼类总价值</span></div>' +
+      '<div><b>' + cropValue + '</b><span>作物总价值</span></div>' +
+    '</div>';
+
+    const fishRows = G.FISH.map(function (f) {
+      const c = fx[f.id] || { n: 0, best: null, first: null, perfect: 0, value: 0 };
       const q = G.qualityById(c.best);
       return '<div class="book-row">' +
         '<span class="be">' + f.emoji + '</span>' +
         '<span class="bn2">' + f.name + '</span>' +
         '<span class="bq" style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
           (q ? q.emoji + ' ' + q.name : (c.n ? '—' : '未捕获')) + '</span>' +
-        '<span class="bp">' + c.n + '</span></div>';
+        '<span class="bd">' + (c.first ? 'D' + c.first : '—') + '</span>' +
+        '<span class="bp">' + c.n + '</span>' +
+        '<span class="bv">' + (c.value || 0) + '</span></div>';
     }).join('');
-    const crops = G.CROP_LIST.map(function (c) {
-      const v = cx[c.id] || { n: 0, best: null };
+
+    const cropRows = G.CROP_LIST.map(function (c) {
+      const v = cx[c.id] || { n: 0, best: null, first: null, value: 0 };
       const q = G.qualityById(v.best);
       return '<div class="book-row">' +
         '<span class="be">' + c.emoji + '</span>' +
         '<span class="bn2">' + c.name + '</span>' +
         '<span class="bq" style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
           (q ? q.emoji + ' ' + q.name : (v.n ? '—' : '未收获')) + '</span>' +
-        '<span class="bp">' + v.n + '</span></div>';
+        '<span class="bd">' + (v.first ? 'D' + v.first : '—') + '</span>' +
+        '<span class="bp">' + v.n + '</span>' +
+        '<span class="bv">' + (v.value || 0) + '</span></div>';
     }).join('');
-    openModal('📖 图鉴',
-      '<div class="store-sub">🐟 鱼类 · 条数 / 最好品质</div>' + fish +
-      '<div class="store-sub" style="margin-top:10px">🌱 作物 · 累计收获 / 最好品质</div>' + crops,
+
+    openModal('📖 图鉴', stat +
+      '<div class="store-sub">🐟 鱼类 · 首次 / 次数 / 累计价值</div>' + fishRows +
+      '<div class="store-sub" style="margin-top:10px">🌱 作物 · 首次 / 数量 / 累计价值</div>' + cropRows,
       '<button class="btn" data-close>关闭</button>');
   }
 
@@ -965,7 +985,6 @@
       '<div class="action-grid">' +
         '<button class="btn" id="set-help">📖 规则说明</button>' +
         '<button class="btn" id="set-status">📊 查看状态</button>' +
-        '<button class="btn" id="set-codex">📖 图鉴</button>' +
         '<button class="btn" id="set-theme">' + (theme === 'dark' ? '🌙 黑夜模式：开' : '☀️ 黑夜模式：关') + '</button>' +
         '<button class="btn" id="set-export">⬇️ 导出存档<small>.json</small></button>' +
         '<button class="btn" id="set-import">⬆️ 导入存档<small>.json</small></button>' +
@@ -1025,7 +1044,7 @@
       commit(r);
       SFX.sleep();
       // 逐条播报：伙食费 / 天气 / 自动浇水 / 委托刷新
-      r.notes.slice(0, 4).forEach(function (n, i) {
+      r.notes.slice(0, 6).forEach(function (n, i) {
         setTimeout(function () { toast(n, i === 0 ? 'good' : ''); }, i * 380);
       });
     },
@@ -1076,6 +1095,12 @@
     cast: function (ev) {
       const r = G.fish(state, baitSel);
       commit(r);
+      if (r.ok && r.empty) {
+        toast('空竿了，没有鱼咬钩', 'warn');
+        floatAt(ev, '空竿', '');
+        SFX.bad();
+        return;
+      }
       if (r.ok) {
         pushCatch(r.entry);
         toast(r.msg, r.entry.trash ? 'warn' : 'good');
@@ -1087,7 +1112,7 @@
       const r = G.fishMany(state, 5, baitSel);
       commit(r);
       if (!r.ok) { toast(r.msg, 'warn'); return; }
-      const got = r.results.filter(function (x) { return x.ok; }).map(function (x) { return x.entry; });
+      const got = r.results.filter(function (x) { return x.ok && x.entry; }).map(function (x) { return x.entry; });
       setCatchBatch(got);
       toast(r.msg, 'good');
       SFX.catch();
@@ -1369,7 +1394,6 @@
       if (t.closest('#set-import')) { $('#file-import').click(); return; }
       if (t.closest('#set-sound')) { soundOn = !soundOn; if (soundOn) SFX.good(); settingsModal(); return; }
       if (t.closest('#set-theme')) { toggleTheme(); settingsModal(); return; }
-      if (t.closest('#set-codex')) { closeModal(); codexModal(); return; }
       if (t.closest('#set-reset')) { closeModal(); resetModal(); return; }
     });
 

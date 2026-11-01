@@ -735,3 +735,11 @@ button{ color:inherit; font:inherit; }
 :root[data-theme="dark"] .chip.weather[data-w="sunny"]{ background:linear-gradient(160deg,#332c20,#2a2620); }
 :root[data-theme="dark"] .chip.weather[data-w="cloudy"]{ background:linear-gradient(160deg,#2b3037,#242a31); }
 :root[data-theme="dark"] .chip.weather[data-w="rain"]{ background:linear-gradient(160deg,#232b36,#1f2630); }
+
+/* ---------- codex stats ---------- */
+.codex-stat{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; }
+.codex-stat div{ background:var(--card); border:1px solid var(--line); border-radius:11px; padding:8px 6px; text-align:center; }
+.codex-stat b{ display:block; font-size:15px; font-weight:900; }
+.codex-stat span{ font-size:10.5px; font-weight:700; color:var(--ink-3); }
+.book-row .bd{ width:36px; text-align:center; font-size:10.5px; font-weight:700; color:var(--ink-3); flex:none; }
+.book-row .bv{ width:56px; text-align:right; font-size:10.5px; font-weight:800; color:var(--gold); flex:none; }

@@ -29,7 +29,7 @@
     special: { id: 'special', name: '特效肥料', emoji: '💊', cost: 18, add: 2 }
   };
   const FERT_SELL_RATE = 0.5;
-  const SPRINKLER_COST = 150;
+  const SPRINKLER_COST = 60;
 
   const TRASH = [
     { name: '易拉罐', emoji: '🥫' },
@@ -61,20 +61,22 @@
   const Q_IDS = QUALITY.map(function (q) { return q.id; });
 
   const WEATHER = {
-    sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 45, biteMul: 0.8, trashMul: 1.4, wormMod: -1,
-              note: '好鱼上钩 ×0.8、杂物 ×1.4 · 挖蚯蚓 -1 份' },
-    cloudy: { id: 'cloudy', name: '阴天',   emoji: '⛅', w: 30, biteMul: 1,   trashMul: 1,   wormMod: 1,
-              note: '上钩概率默认 · 挖蚯蚓 +1 份' },
-    rain:   { id: 'rain',   name: '雨天',   emoji: '🌧️', w: 25, biteMul: 1.3, trashMul: 0.6, wormMod: 1, autoWater: true,
-              note: '自动浇水 · 好鱼上钩 ×1.3、杂物 ×0.6 · 挖蚯蚓 +1 份' }
+    sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 45, hookMod: -0.12, wormMod: -1,
+              note: '咬钩率 -12% · 挖蚯蚓 -1 份' },
+    cloudy: { id: 'cloudy', name: '阴天',   emoji: '⛅', w: 30, hookMod: 0,     wormMod: 1,
+              note: '咬钩率默认 · 挖蚯蚓 +1 份' },
+    rain:   { id: 'rain',   name: '雨天',   emoji: '🌧️', w: 25, hookMod: 0.08,  wormMod: 1, autoWater: true,
+              note: '自动浇水 · 咬钩率 +8% · 挖蚯蚓 +1 份' }
   };
   const WEATHER_LIST = Object.keys(WEATHER).map(function (k) { return WEATHER[k]; });
 
   const BAIT = {
-    worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '品质取两次较好的 · 好鱼上钩 ×1.3' },
-    dough: { id: 'dough', name: '面团饵', emoji: '🍞', desc: '标准收获' },
-    lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 20 次，容易空军' }
+    worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '好鱼概率 ×1.35 · 品质取两次较好' },
+    dough: { id: 'dough', name: '面团饵', emoji: '🍞', desc: '标准钓鱼体验 · 92% 咬钩' },
+    lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 20 次 · 杂物少好鱼多，但只有 72% 咬钩' }
   };
+  /* 各饵的咬钩基础概率（天气再加减） */
+  const HOOK = { dough: 0.92, worm: 0.95, lure: 0.72 };
 
   /* ---------------- 随机 ---------------- */
 
@@ -186,12 +188,17 @@
   /* 5 块地之后，每周要交土地维护费（每多一块 3 金/周） */
   function plotUpkeep(plots) { return Math.max(0, plots - 5) * 3; }
 
+  /* 设备每周维护费：洒水器 2、渔网 2、自动收获器 4 */
+  function deviceUpkeep(s) {
+    return (s.sprinklers || 0) * 2 + (s.nets || 0) * 2 + (s.harvester ? 4 : 0);
+  }
+
   function expandCost(s) {
     const n = s.plots.length;
     if (n < 25) return Math.max(25, 25 + 15 * (n - 4));
     // 25 块之后每块价格是上一块的 2.2 倍
     let c = 25 + 15 * 20;
-    for (let k = 25; k < n; k++) c = Math.round(c * 2.2);
+    for (let k = 25; k < n; k++) c = Math.round(c * 1.6);
     return c;
   }
   /* 强化体力：成本超线性增长（每级 ×1.2），避免「无脑升级」把上限堆到几百 */
@@ -326,9 +333,12 @@
     const unit = unitValue(p.crop, q.id);
     addStore(s, p.crop, q.id, qty);
 
-    // 图鉴：作物收获次数与最好品质
-    const cc = s.codex.crops[p.crop] || (s.codex.crops[p.crop] = { n: 0, best: null });
+    // 图鉴：作物次数 / 首次 / 累计价值 / 最好品质
+    const cc = s.codex.crops[p.crop] ||
+      (s.codex.crops[p.crop] = { n: 0, best: null, first: s.day, value: 0 });
     cc.n += qty;
+    cc.value = (cc.value || 0) + qty * unit;
+    if (!cc.first) cc.first = s.day;
     if (!cc.best || QUALITY.indexOf(q) > QUALITY.indexOf(qualityById(cc.best))) cc.best = q.id;
 
     // 多次收获作物：只有最后一次收获才判定留种
@@ -584,12 +594,14 @@
     }
 
     // 5 块地之后每周要交土地维护费
-    const up = plotUpkeep(s.plots.length);
+    const landFee = plotUpkeep(s.plots.length);
+    const devFee = deviceUpkeep(s);
+    const up = landFee + devFee;
     if (up > 0 && s.day % 7 === 0) {
       const pay = Math.min(up, s.coins);
       s.coins -= pay;
-      ledger(s, '土地维护费（周）', 0, pay);
-      notes.push('🏞️ 本周土地维护费 -' + pay + ' 金（' + s.plots.length + ' 块地）');
+      ledger(s, '维护费（周）', 0, pay);
+      notes.push('🧾 本周维护费 -' + pay + ' 金（土地 ' + landFee + ' + 设备 ' + devFee + '）');
     }
 
     log(s, '🌙 睡觉 → 第 ' + s.day + ' 天 · ' + w.name, 'sys');
@@ -632,12 +644,20 @@
       }
     }
 
-    // 天气与蚯蚓都只影响「上钩概率」，不影响售价
-    const bite = (w.biteMul || 1) * (kind === 'worm' ? 1.3 : 1);
-    const trashMul = w.trashMul || 1;
+    // 先判定咬钩：天气与饵决定「有没有鱼咬」，鱼种权重不再受天气影响
+    s.stats.casts++;
+    const hook = clamp((HOOK[kind] || 0.9) + (w.hookMod || 0), 0.3, 0.98);
+    if (rand() > hook) {
+      if (!opts.quiet) log(s, '💨 空竿：' + w.name + '，没有鱼咬钩', 'warn');
+      return { ok: true, empty: true, entry: null, msg: '空竿了' };
+    }
+
+    // 鱼种权重只由饵决定：蚯蚓多好鱼、假饵少杂物
     const table = FISH.map(function (f) {
-      let mul = f.trash ? trashMul : bite;
-      if (kind === 'lure') mul *= (f.trash ? 5 : 0.7);
+      let mul = 1;
+      if (f.trash) mul = kind === 'lure' ? 0.3 : 1;
+      else if (kind === 'worm') mul = 1.35;
+      else if (kind === 'lure') mul = 1.15;
       return Object.assign({}, f, { w: f.w * mul });
     });
     const f = weighted(table, 'w');
@@ -651,11 +671,13 @@
       emoji = junk.emoji;
     }
 
-    s.stats.casts++;
-
-    // 图鉴：按鱼种记次数与最好品质
-    const cx = s.codex.fish[f.id] || (s.codex.fish[f.id] = { n: 0, best: null });
+    // 图鉴：次数 / 首次 / 完美 / 累计价值 / 最好品质
+    const cx = s.codex.fish[f.id] ||
+      (s.codex.fish[f.id] = { n: 0, best: null, first: s.day, perfect: 0, value: 0 });
     cx.n++;
+    if (!cx.first) cx.first = s.day;
+    cx.value = (cx.value || 0) + value;
+    if (q && q.id === 'perfect') cx.perfect = (cx.perfect || 0) + 1;
     if (!f.trash && q && (!cx.best || QUALITY.indexOf(q) > QUALITY.indexOf(qualityById(cx.best)))) {
       cx.best = q.id;
     }
@@ -678,26 +700,28 @@
         s.fishBook.priciest = { fish: f.name, quality: q, price: value, day: s.day };
       }
     }
-    log(s, f.trash
-      ? '🎣 钓上来 ' + emoji + ' ' + name + '（不值钱，已入仓库）'
-      : '🎣 钓到 ' + emoji + ' ' + name + ' · ' + q.emoji + q.name + ' · 值 ' + value + ' 金（已入仓库）',
-      f.trash ? 'warn' : 'good');
+    if (!opts.quiet) {
+      log(s, f.trash
+        ? '🎣 钓上来 ' + emoji + ' ' + name + '（不值钱，已入仓库）'
+        : '🎣 钓到 ' + emoji + ' ' + name + ' · ' + q.emoji + q.name + ' · 值 ' + value + ' 金（已入仓库）',
+        f.trash ? 'warn' : 'good');
+    }
     return { ok: true, entry: entry, msg: name + ' 值 ' + value + ' 金' };
   }
 
   function fishMany(s, times, preferBait) {
     const results = [];
-    let value = 0;
+    let value = 0, empty = 0;
     for (let i = 0; i < times; i++) {
       const r = fish(s, preferBait);
       if (!r.ok) { results.push(r); break; }
-      value += r.entry.price;
+      if (r.empty) empty++; else value += r.entry.price;
       results.push(r);
     }
     const okCount = results.filter(function (r) { return r.ok; }).length;
     if (!okCount) return results[0] || { ok: false, msg: '钓不了' };
-    return { ok: true, count: okCount, income: value, results: results,
-             msg: '甩了 ' + okCount + ' 杆，渔获值 ' + value + ' 金' };
+    return { ok: true, count: okCount, empty: empty, income: value, results: results,
+             msg: '甩了 ' + okCount + ' 杆' + (empty ? '（空竿 ' + empty + '）' : '') + '，渔获值 ' + value + ' 金' };
   }
 
   /* ---------------- 卖鱼 ---------------- */
@@ -898,10 +922,10 @@
   }
 
   /* 自动收获器：睡觉时免费收成熟作物 */
-  const HARVESTER_COST = 300;
-  const NET_COST = 120;
+  const HARVESTER_COST = 160;
+  const NET_COST = 70;
   const NET_MAX = 6;
-  const NET_CHANCE = 0.55;
+  const NET_CHANCE = 0.65;
 
   /* 渔网：每天吃 1 份面团饵，有概率网到 1 条鱼 */
   function netCatch(s) {
@@ -911,7 +935,7 @@
       s.bait.dough--;
       used++;
       if (rand() < NET_CHANCE) {
-        const r = fish(s, 'dough', { free: true, noBait: true, forceKind: 'dough' });
+        const r = fish(s, 'dough', { free: true, noBait: true, forceKind: 'dough', quiet: true });
         if (r.ok) got++;
       }
     }
@@ -1075,7 +1099,7 @@
       if (!c) c = pool[i % pool.length];
       used.push(c.id);
       const qty = Math.max(1, Math.round((c.price >= 20 ? randInt(1, 2) : randInt(3, 6)) * mult));
-      const reward = Math.max(6, Math.round(qty * c.price * 1.25) + 3);
+      const reward = Math.max(6, Math.round(qty * c.price * 1.35));
       orders.push({
         id: 'd' + day + '-c' + i, kind: 'crop', crop: c.id, name: c.name, emoji: c.emoji,
         qty: qty, reward: reward, done: false
@@ -1085,7 +1109,7 @@
     const fq = Math.max(2, Math.round(randInt(2, 3) * mult));
     orders.push({
       id: 'd' + day + '-f', kind: 'fish', crop: null, name: '任意鱼', emoji: '🐟',
-      qty: fq, reward: Math.max(12, fq * 10 + 4), done: false
+      qty: fq, reward: Math.max(12, Math.round(fq * 11)), done: false
     });
     return orders;
   }
@@ -1247,6 +1271,30 @@
       fish: (s.codex && s.codex.fish && typeof s.codex.fish === 'object') ? s.codex.fish : {},
       crops: (s.codex && s.codex.crops && typeof s.codex.crops === 'object') ? s.codex.crops : {}
     };
+    Object.keys(merged.codex.fish).forEach(function (k) {
+      const c = merged.codex.fish[k] || {};
+      merged.codex.fish[k] = { n: c.n || 0, best: c.best || null, first: c.first || null,
+                               perfect: c.perfect || 0, value: c.value || 0 };
+    });
+    Object.keys(merged.codex.crops).forEach(function (k) {
+      const c = merged.codex.crops[k] || {};
+      merged.codex.crops[k] = { n: c.n || 0, best: c.best || null, first: c.first || null, value: c.value || 0 };
+    });
+    // 老存档回填：从最近 40 条钓鱼记录里反推图鉴
+    if (!Object.keys(merged.codex.fish).length) {
+      ((merged.fishBook && merged.fishBook.entries) || []).forEach(function (e) {
+        if (!e || e.trash || !e.quality) return;
+        const f = FISH.filter(function (x) { return x.name === e.fish; })[0];
+        if (!f) return;
+        const c = merged.codex.fish[f.id] ||
+          (merged.codex.fish[f.id] = { n: 0, best: null, first: e.day || 1, perfect: 0, value: 0 });
+        c.n++;
+        c.value += e.price || 0;
+        if (!c.first) c.first = e.day || 1;
+        if (e.quality.id === 'perfect') c.perfect++;
+        if (!c.best || QUALITY.indexOf(e.quality) > QUALITY.indexOf(qualityById(c.best))) c.best = e.quality.id;
+      });
+    }
     merged.orderRefreshDay = Math.round(num(s.orderRefreshDay, s.day || 1, 0, 100000));
     merged.workUsed = !!s.workUsed;
     merged.ledger = Array.isArray(s.ledger) ? s.ledger : base.ledger;
@@ -1286,7 +1334,7 @@
     buyHarvester: buyHarvester, HARVESTER_COST: HARVESTER_COST, refreshOrders: refreshOrders,
     toggleHarvester: toggleHarvester, buyNet: buyNet, netCatch: netCatch,
     NET_COST: NET_COST, NET_MAX: NET_MAX, NET_CHANCE: NET_CHANCE, plotUpkeep: plotUpkeep,
-    storeTotal: storeTotal,
+    storeTotal: storeTotal, deviceUpkeep: deviceUpkeep, HOOK: HOOK,
     fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
     fishMany: fishMany, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather

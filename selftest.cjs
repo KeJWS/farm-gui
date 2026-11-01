@@ -127,19 +127,21 @@ G.setRng(mulberry32(99));
 s = G.createState();
 s.bait.worm = 1000; s.energy = 30; s.maxEnergy = 30;
 const coinsAtStart = s.coins;
-let total = 0, casts = 0, trash = 0;
+let total = 0, casts = 0, trash = 0, empties = 0;
 for (let i = 0; i < 200; i++) {
   s.energy = 10;                 // 每杆补满体力，只测钓鱼本身
   const fr = G.fish(s, 'worm');
   if (!fr.ok) break;
-  casts++; total += fr.entry.price;
+  casts++;
+  if (fr.empty) { empties++; continue; }
+  total += fr.entry.price;
   if (fr.entry.trash) trash++;
 }
 ok(casts === 200, '连甩 200 杆全部成功', casts);
 ok(total > 0 && Number.isFinite(total), '渔获总价值为正数', total);
 ok(s.coins === coinsAtStart, '钓鱼不再直接给钱，渔获先入仓库', s.coins);
-ok(s.fishBag.length === 200, '渔获进 fishBag', s.fishBag.length);
-ok(s.fishBook.count === 200, '钓鱼记录本计数正确', s.fishBook.count);
+ok(s.fishBag.length === 200 - empties, '渔获进 fishBag（空竿不算）', s.fishBag.length);
+ok(s.fishBook.count === 200 - empties, '钓鱼记录本计数正确', s.fishBook.count);
 ok(s.fishBook.best && s.fishBook.priciest, '最高品质/最贵鱼已记录');
 ok(trash > 0 && trash < 200, '垃圾与鱼都有（' + trash + ' 条垃圾）');
 ok(s.energy === 0 - 0 || s.energy >= 0, '体力不为负', s.energy);
@@ -160,7 +162,12 @@ ok(soldAll.ok && soldAll.income === total && s.coins === coinsAtStart + total &&
 
 /* 分组出售 */
 s.bait.worm = 100;
-for (let i = 0; i < 12; i++) { s.energy = 10; G.fish(s, 'worm'); }
+let got12 = 0;
+for (let i = 0; i < 60 && got12 < 12; i++) {
+  s.energy = 10;
+  const rr = G.fish(s, 'worm');
+  if (rr.ok && rr.entry) got12++;
+}
 const groups = G.fishGroups(s);
 ok(groups.length >= 1 && groups.reduce((n, g) => n + g.count, 0) === 12, '渔获按鱼种+品质分组', groups.length);
 const g0 = groups[0], coinsBeforeGroup = s.coins;
@@ -183,8 +190,8 @@ const wIds = Object.keys(G.WEATHER);
 ok(wIds.length === 3 && !wIds.includes('storm'), '天气只有 晴/阴/雨 三种', wIds);
 ok(G.WEATHER.sunny.w + G.WEATHER.cloudy.w + G.WEATHER.rain.w === 100, '天气概率合计 100%',
    [G.WEATHER.sunny.w, G.WEATHER.cloudy.w, G.WEATHER.rain.w]);
-ok(G.WEATHER.sunny.biteMul === 0.8 && G.WEATHER.cloudy.biteMul === 1, '晴天好鱼上钩 ×0.8、阴天 ×1');
-ok(G.WEATHER.rain.biteMul === 1.3, '雨天好鱼上钩 ×1.3');
+ok(G.WEATHER.sunny.hookMod === -0.12 && G.WEATHER.cloudy.hookMod === 0 && G.WEATHER.rain.hookMod === 0.08,
+   '天气改成影响咬钩率：晴 -12% / 阴 0 / 雨 +8%');
 ok(!('fishMul' in G.WEATHER.rain), '天气不再带售价系数');
 
 /* 蚯蚓只影响品质与上钩，不影响售价 */
@@ -194,7 +201,7 @@ const wormEntry = (function () {
   G.setRng(mulberry32(31));
   for (let i = 0; i < 200; i++) {
     const r = G.fish(st, 'worm');
-    if (r.ok && !r.entry.trash) return r.entry;
+    if (r.ok && r.entry && !r.entry.trash) return r.entry;
   }
   return null;
 })();
@@ -211,6 +218,7 @@ function sampleValues(weather) {
     st.energy = 1e6;
     const r = G.fish(st, 'worm');
     if (!r.ok) break;
+    if (!r.entry) continue;
     map[r.entry.fish + '|' + (r.entry.quality ? r.entry.quality.id : '-')] = r.entry.price;
   }
   return map;
@@ -223,21 +231,24 @@ const commonKeys = Object.keys(vSun).filter(k => k in vRain);
 ok(commonKeys.length >= 4 && commonKeys.every(k => vSun[k] === vRain[k]),
    '同种鱼同品质在晴天/雨天售价相同', commonKeys.length);
 
-function trashCount(weather) {
+function hookStats(weather) {
   const st = G.createState();
   st.maxEnergy = 1e6; st.bait.worm = 5000; st.weather = weather;
-  let n = 0;
+  let bites = 0, trashN = 0, castsN = 0;
   for (let i = 0; i < 600; i++) {
     st.energy = 1e6;
     const r = G.fish(st, 'worm');
     if (!r.ok) break;
-    if (r.entry.trash) n++;
+    castsN++;
+    if (r.entry) { bites++; if (r.entry.trash) trashN++; }
   }
-  return n;
+  return { bites: bites, casts: castsN, trashRate: bites ? trashN / bites : 0 };
 }
-G.setRng(mulberry32(4242)); const tSun = trashCount('sunny');
-G.setRng(mulberry32(4242)); const tRain = trashCount('rain');
-ok(tRain < tSun, '雨天垃圾更少（好鱼更容易上钩）', [tSun, tRain]);
+G.setRng(mulberry32(4242)); const hSun = hookStats('sunny');
+G.setRng(mulberry32(4242)); const hRain = hookStats('rain');
+ok(hRain.bites > hSun.bites, '雨天咬钩更多（天气影响咬钩率，而不是鱼种）', [hSun.bites, hRain.bites]);
+ok(Math.abs(hSun.trashRate - hRain.trashRate) < 0.08, '垃圾率不再随天气变化（只受饵影响）',
+   [hSun.trashRate.toFixed(3), hRain.trashRate.toFixed(3)]);
 
 /* 无饵料 */
 s.weather = 'sunny'; s.bait = { worm: 0, dough: 0 }; s.lure = { owned: false, dur: 0 };
@@ -476,16 +487,17 @@ for (let i = 0; i < 4; i++) { upCosts.push(G.upgradeCost(s)); s.maxEnergy += 5; 
 ok(upCosts[0] === 30 && upCosts[1] === 36 && upCosts[2] === 43 && upCosts[3] === 52,
    '强化成本 30/36/43/52', upCosts.join('/'));
 
-// 天气真的影响收益：晴天杂物明显更多
-function trashRate(weather) {
+// 天气影响咬钩率：晴天咬钩更少
+function biteRate(weather) {
   const st = G.createState(); st.weather = weather; st.energy = 99999; st.bait.dough = 99999; st.coins = 99999;
-  let junk = 0;
-  for (let i = 0; i < 2000; i++) if (G.fish(st, 'dough').entry.trash) junk++;
-  return junk / 2000;
+  let bites = 0;
+  for (let i = 0; i < 2000; i++) if (G.fish(st, 'dough').entry) bites++;
+  return bites / 2000;
 }
-const sunnyJunk = trashRate('sunny'), rainJunk = trashRate('rain');
-ok(sunnyJunk > rainJunk + 0.15,
-   '晴天空军/杂物明显多于雨天（' + (sunnyJunk * 100).toFixed(0) + '% vs ' + (rainJunk * 100).toFixed(0) + '%）');
+G.setRng(mulberry32(4242)); const sunnyBite = biteRate('sunny');
+G.setRng(mulberry32(4242)); const rainBite = biteRate('rain');
+ok(rainBite > sunnyBite + 0.1,
+   '雨天咬钩率明显高于晴天（' + (sunnyBite * 100).toFixed(0) + '% vs ' + (rainBite * 100).toFixed(0) + '%）');
 
 // 季节文案（每 30 天换一季，目前只影响顶栏）
 ok(G.seasonOf(1) === '春' && G.seasonOf(30) === '春' && G.seasonOf(31) === '夏' &&
@@ -610,7 +622,7 @@ section('v1.1.0 新功能');
 G.setRng(mulberry32(55));
 
 s = G.createState(); s.coins = 400;
-ok(G.buySprinkler(s).ok && s.sprinklers === 1 && s.coins === 250, '洒水器 150 金/个', { c: s.coins });
+ok(G.buySprinkler(s).ok && s.sprinklers === 1 && s.coins === 340, '洒水器 60 金/个', { c: s.coins });
 s.coins = 100000;
 while (G.buySprinkler(s).ok) { /* 买满 */ }
 ok(s.sprinklers === s.plots.length, '洒水器最多每块地一个', s.sprinklers);
@@ -658,7 +670,7 @@ section('v1.2.0 新功能');
 G.setRng(mulberry32(33));
 
 s = G.createState(); s.coins = 500;
-ok(G.buyHarvester(s).ok && s.harvester === true && s.coins === 200, '自动收获器 300 金');
+ok(G.buyHarvester(s).ok && s.harvester === true && s.coins === 340, '自动收获器 160 金');
 ok(!G.buyHarvester(s).ok, '只能装一个');
 
 G.setRng(function () { return 0.1; });          // 晴天
@@ -725,8 +737,8 @@ function costAt(n) {
   st.plots = new Array(n).fill(0).map(function () { return G.createState().plots[0]; });
   return G.expandCost(st);
 }
-ok(costAt(5) === 40 && costAt(24) === 325 && costAt(25) === 325 && costAt(26) === 715 && costAt(27) === 1573,
-   '25 块之后扩展费 ×2.2 暴涨', [costAt(24), costAt(25), costAt(26), costAt(27)].join('/'));
+ok(costAt(5) === 40 && costAt(24) === 325 && costAt(25) === 325 && costAt(26) === 520 && costAt(27) === 832,
+   '25 块之后扩展费每块 ×1.6', [costAt(24), costAt(25), costAt(26), costAt(27)].join('/'));
 
 // 春季过后委托需求变大
 G.setRng(mulberry32(5));
@@ -748,6 +760,71 @@ s.day = 9;
 const hh = G.harvest(s, 0);
 ok(s.codex.crops.carrot && s.codex.crops.carrot.n === hh.qty, '图鉴记录作物收获', s.codex.crops.carrot);
 
+/* ---------- 5p. v1.4.0：空竿 / 饵定位 / 图鉴统计 ---------- */
+section('v1.4.0 钓鱼与图鉴');
+function rates(kind, weather, n) {
+  n = n || 3000;
+  const st = G.createState();
+  st.weather = weather; st.maxEnergy = 1e9; st.coins = 1e9;
+  if (kind === 'worm') st.bait.worm = 1e9;
+  else if (kind === 'dough') st.bait.dough = 1e9;
+  else st.lure = { owned: true, dur: 1e9 };
+  let bites = 0, trash = 0;
+  for (let i = 0; i < n; i++) {
+    st.energy = 1e9;
+    const r = G.fish(st, kind);
+    if (r.ok && r.entry) { bites++; if (r.entry.trash) trash++; }
+  }
+  return { bite: bites / n, trash: bites ? trash / bites : 0 };
+}
+G.setRng(mulberry32(101));
+const rDough = rates('dough', 'cloudy');
+G.setRng(mulberry32(101));
+const rLure = rates('lure', 'cloudy');
+G.setRng(mulberry32(101));
+const rWorm = rates('worm', 'cloudy');
+ok(Math.abs(rDough.bite - 0.92) < 0.03, '面团饵咬钩率约 92%', (rDough.bite * 100).toFixed(1));
+ok(Math.abs(rLure.bite - 0.72) < 0.04, '假饵有真正的空竿（约 72% 咬钩）', (rLure.bite * 100).toFixed(1));
+ok(rLure.trash < rDough.trash * 0.6, '假饵杂物率明显低于面团饵',
+   [(rLure.trash * 100).toFixed(1), (rDough.trash * 100).toFixed(1)]);
+ok(rWorm.bite > rDough.bite - 0.01, '蚯蚓咬钩率不低于面团饵', (rWorm.bite * 100).toFixed(1));
+
+// 图鉴：首次 / 完美 / 累计价值
+s = G.createState(); s.energy = 1e9; s.bait.dough = 200; s.weather = 'cloudy';
+G.setRng(mulberry32(9));
+let caughtN = 0;
+for (let i = 0; i < 60 && caughtN < 10; i++) { if (G.fish(s, 'dough').entry) caughtN++; }
+const someFish = Object.keys(s.codex.fish)[0];
+const fx = s.codex.fish[someFish];
+ok(caughtN === 10 && fx && fx.n > 0 && fx.first >= 1 && fx.value > 0, '图鉴记录首次日期与累计价值', fx);
+ok(typeof fx.perfect === 'number', '图鉴记录完美品质条数');
+
+// 委托溢价稳定 35%
+G.setRng(mulberry32(5));
+const ord = G.makeOrders({ day: 66 }).filter(function (o) { return o.kind === 'crop'; })[0];
+const direct = ord.qty * G.CROPS[ord.crop].price;
+ok(Math.abs(ord.reward - Math.round(direct * 1.35)) <= 1, '委托报酬稳定在直售的 135%',
+   { reward: ord.reward, direct: direct });
+
+// 设备维护费
+s = G.createState(); s.sprinklers = 3; s.nets = 2; s.harvester = true;
+ok(G.deviceUpkeep(s) === 3 * 2 + 2 * 2 + 4, '设备周维护费 = 洒水器 2 + 渔网 2 + 收获器 4', G.deviceUpkeep(s));
+s = G.createState();
+s.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
+s.day = 6; s.coins = 200; s.sprinklers = 3; s.nets = 1;
+G.sleep(s);
+ok(s.coins === 200 - 3 - (15 + 6 + 2), '周末同时扣土地与设备维护费', s.coins);
+
+// 老存档图鉴回填
+const migFish = G.deserialize({
+  plots: [], fishBook: { count: 0, entries: [
+    { day: 4, fish: '鲫鱼', quality: { id: 'good', mul: 1.3 }, price: 7, trash: false }
+  ], best: null, priciest: null }, stats: {}
+});
+ok(migFish.codex.fish.crucian && migFish.codex.fish.crucian.n === 1 && migFish.codex.fish.crucian.first === 4,
+   '老存档从钓鱼记录回填图鉴', migFish.codex.fish.crucian);
+
+/* ---------- 6. 存读档 ---------- */
 section('存读档');
 s = G.createState();
 s.seeds = { corn: 1 };
