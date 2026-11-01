@@ -25,7 +25,13 @@ let s = G.createState();
 ok(s.coins === 50 && s.energy === 10 && s.plots.length === 4, '初始状态 50 金/10 体力/4 块地');
 
 let r = G.plant(s, 0, 'carrot');
-ok(r.ok && s.coins === 45 && s.energy === 9, '种萝卜：扣 5 金 + 1 体力', { coins: s.coins, energy: s.energy });
+ok(!r.ok, '没有种子不能播种', r.msg);
+
+let bsr = G.buySeed(s, 'carrot', 1);
+ok(bsr.ok && s.coins === 45 && s.seeds.carrot === 1, '种子店买 1 颗萝卜种子：-5 金', { coins: s.coins, seeds: s.seeds });
+
+r = G.plant(s, 0, 'carrot');
+ok(r.ok && s.energy === 9 && s.coins === 45 && !s.seeds.carrot, '播种只扣 1 颗种子 + 1 体力，不扣金币', { coins: s.coins, energy: s.energy, seeds: s.seeds });
 
 r = G.water(s, 0);
 ok(r.ok && s.plots[0].growth === 1, '浇水 +1 天');
@@ -57,6 +63,7 @@ ok(s.coins > 42, '卖出后金币增加', s.coins);
 section('漏浇减产');
 G.setRng(mulberry32(11));
 s = G.createState();
+s.seeds = { potato: 1 };
 G.plant(s, 0, 'potato');
 G.sleep(s); // 没浇水 → missed
 s.weather = 'sunny';
@@ -69,6 +76,7 @@ section('黄瓜 / 草莓 多次收获');
 G.setRng(mulberry32(3));
 s = G.createState();
 s.coins = 999;
+s.seeds = { cucumber: 1 };
 G.plant(s, 0, 'cucumber');
 for (let d = 0; d < 3; d++) { s.energy = 10; G.water(s, 0); if (d < 2) { s.weather = 'sunny'; G.sleep(s); } }
 s.plots[0].ripeDay = s.day - 1;
@@ -90,6 +98,7 @@ section('留种规则');
 G.setRng(() => 0.05);                     // 必定触发 30% 留种
 s = G.createState();
 s.coins = 999;
+s.seeds = { cucumber: 1 };
 G.plant(s, 0, 'cucumber');
 const harvestNow = () => {
   s.energy += 1;
@@ -106,6 +115,7 @@ ok(hs.ok && hs.seed === true && s.seeds.cucumber === 1, '黄瓜第 3 收（最�
 
 s = G.createState();
 s.coins = 999;
+s.seeds = { carrot: 1 };
 G.plant(s, 0, 'carrot');
 s.plots[0].growth = 2;
 const rs = harvestNow();
@@ -181,17 +191,48 @@ s = G.createState(); s.coins = 0; s.energy = 5;
 wr = G.work(s, 'half');
 ok(wr.ok && s.energy === 0 && s.coins === 5, '刚好够半天：消耗 5、赚 5', { coins: s.coins });
 
-/* ---------- 5c. 种子出售 ---------- */
-section('种子出售');
+/* ---------- 5c. 种子店：买 / 卖（半价） ---------- */
+section('种子店');
+ok(G.seedBuyPrice(G.CROPS.carrot) === 5 && G.seedSellPrice(G.CROPS.carrot) === 2, '萝卜：买 5 金 / 卖 2 金');
+ok(G.seedSellPrice(G.CROPS.corn) === 7, '玉米买 15 → 卖 7（向下取整）');
+ok(G.seedSellPrice(G.CROPS.watermelon) === 15, '西瓜买 30 → 卖 15');
+
+s = G.createState();                       // 50 金
+let rb = G.buySeed(s, 'corn', 2);
+ok(rb.ok && s.coins === 20 && s.seeds.corn === 2, '买 2 颗玉米种子：-30 金', { coins: s.coins, seeds: s.seeds });
+ok(!G.buySeed(s, 'watermelon', 1).ok, '金币不够时买不了', s.coins);
+
+s.coins = 0;
+let rsp = G.sellSeed(s, 'corn', 1);
+ok(rsp.ok && rsp.income === 7 && s.seeds.corn === 1 && s.coins === 7, '卖 1 颗玉米种子得 7 金', { coins: s.coins, seeds: s.seeds });
+rsp = G.sellSeed(s, 'corn');
+ok(rsp.ok && s.seeds.corn === undefined && s.coins === 14, '卖光后种子从背包移除', { coins: s.coins });
+ok(!G.sellSeed(s, 'corn').ok, '没有库存时卖不了');
+
+s.seeds = { carrot: 2, cabbage: 1 }; s.coins = 0;
+let rsa = G.sellAllSeeds(s);
+ok(rsa.ok && rsa.income === 8 && s.coins === 8 && Object.keys(s.seeds).length === 0,
+   '一键卖光：萝卜 2×2 + 白菜 1×4 = 8 金', rsa.income);
+
+/* ---------- 5d. 全部播种 ---------- */
+section('全部播种');
 s = G.createState();
-s.seeds = { carrot: 3, corn: 1 };
-let ssr = G.sellSeed(s, 'carrot', 2);
-ok(ssr.ok && ssr.income === 2 && s.seeds.carrot === 1, '卖 2 颗种子得 2 金，剩 1 颗', { seeds: s.seeds });
-ssr = G.sellSeed(s, 'carrot');
-ok(ssr.ok && s.seeds.carrot === undefined && s.coins === 53, '卖光后种子从背包移除', { coins: s.coins, seeds: s.seeds });
-ssr = G.sellAllSeeds(s);
-ok(ssr.ok && ssr.income === 1 && Object.keys(s.seeds).length === 0 && s.coins === 54, '一键卖掉全部种子');
-ok(!G.sellAllSeeds(s).ok, '没种子时提示不可卖');
+s.seeds = { carrot: 10 };
+let rp = G.plantAll(s, 'carrot');
+ok(rp.ok && rp.planted === 4 && s.plots.every(function (p) { return p.crop === 'carrot'; }), '4 块空地一次种满', rp);
+ok(s.seeds.carrot === 6 && s.energy === 6, '消耗 4 颗种子 + 4 体力', { seeds: s.seeds, energy: s.energy });
+
+s = G.createState();
+s.seeds = { carrot: 2 };
+rp = G.plantAll(s, 'carrot');
+ok(rp.ok && rp.planted === 2 && s.plots.filter(function (p) { return !p.crop; }).length === 2,
+   '种子不够时种多少算多少', rp);
+ok(/没有/.test(rp.stop || ''), '并给出停止原因', rp.stop);
+
+s = G.createState();
+s.seeds = { carrot: 10 };
+G.plantAll(s, 'carrot');
+ok(!G.plantAll(s, 'carrot').ok, '没有空地时提示');
 
 /* ---------- 5d. 账本按天汇总 ---------- */
 section('账本按天汇总');
@@ -218,6 +259,7 @@ ok(s.energy === 5 && s.coins === 0, '没钱吃饭只恢复 5 体力', { e: s.ene
 /* ---------- 6. 存读档 ---------- */
 section('存读档');
 s = G.createState();
+s.seeds = { corn: 1 };
 G.plant(s, 0, 'corn');
 const round = G.deserialize(G.serialize(s));
 ok(round.plots[0].crop === 'corn' && round.coins === s.coins, '序列化往返一致');
@@ -232,6 +274,9 @@ const acts = [
   () => G.tea(s), () => G.work(s, 'half'), () => G.work(s, 'full'), () => G.fish(s),
   () => G.fishMany(s, 3), () => G.sellAll(s), () => G.expand(s), () => G.upgrade(s),
   () => G.buyBait(s, 'dough', 1), () => G.buyBait(s, 'lure', 1),
+  () => G.buySeed(s, Object.keys(G.CROPS)[Math.floor(Math.random() * 10)], 1 + Math.floor(Math.random() * 3)),
+  () => G.sellSeed(s, Object.keys(G.CROPS)[Math.floor(Math.random() * 10)]),
+  () => { const ids = Object.keys(G.CROPS); return G.plantAll(s, ids[Math.floor(Math.random() * ids.length)]); },
   () => { const i = Math.floor(Math.random() * s.plots.length); const ids = Object.keys(G.CROPS); return G.plant(s, i, ids[Math.floor(Math.random() * ids.length)]); },
   () => { const i = Math.floor(Math.random() * s.plots.length); return G.buyFert(s, i, Math.random() < 0.5 ? 'normal' : 'special'); },
   () => { const i = Math.floor(Math.random() * s.plots.length); return Math.random() < 0.5 ? G.water(s, i) : G.harvest(s, i); }

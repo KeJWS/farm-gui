@@ -219,17 +219,11 @@
     if (p.crop) return { ok: false, msg: '这块地不是空地' };
     if (s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
 
+    // 种子只能从种子店买，播种时只消耗背包里的种子
     const owned = s.seeds[cropId] || 0;
-    let paid = 0;
-    if (owned > 0) {
-      s.seeds[cropId] = owned - 1;
-      if (s.seeds[cropId] === 0) delete s.seeds[cropId];
-    } else {
-      if (s.coins < c.seed) return { ok: false, msg: '金币不够买种子（' + c.seed + ' 金）' };
-      paid = c.seed;
-      s.coins -= c.seed;
-      ledger(s, '买种子 ' + c.name, 0, c.seed);
-    }
+    if (owned <= 0) return { ok: false, msg: '没有 ' + c.name + ' 种子了，先去种子店买' };
+    s.seeds[cropId] = owned - 1;
+    if (s.seeds[cropId] === 0) delete s.seeds[cropId];
 
     s.energy -= 1;
     p.crop = cropId;
@@ -241,7 +235,7 @@
     p.hits = 0;
     p.phase = 'growing';
     s.stats.planted++;
-    log(s, '🌱 ' + (idx + 1) + ' 号地种下 ' + c.name + (paid ? '（-' + paid + ' 金）' : '（用库存种子）'), 'good');
+    log(s, '🌱 ' + (idx + 1) + ' 号地种下 ' + c.name, 'good');
     return { ok: true, msg: c.name + ' 种下了' };
   }
 
@@ -570,18 +564,37 @@
     return { ok: true, msg: '+' + pay + ' 金', pay: pay, spent: cost };
   }
 
-  /* 卖种子：种子统一 1 金/颗 */
-  const SEED_VALUE = 1;
+  /* ---------------- 种子店 ---------------- */
+
+  const SEED_SELL_RATE = 0.5;          // 回收价 = 售价的一半
+
+  function seedBuyPrice(c) { return c.seed; }
+  function seedSellPrice(c) { return Math.max(1, Math.floor(c.seed * SEED_SELL_RATE)); }
+
+  function buySeed(s, id, n) {
+    const c = CROPS[id];
+    if (!c) return { ok: false, msg: '没有这种种子' };
+    const qty = Math.max(1, Math.floor(n || 1));
+    const cost = seedBuyPrice(c) * qty;
+    if (s.coins < cost) return { ok: false, msg: '金币不够（需要 ' + cost + ' 金）' };
+    s.coins -= cost;
+    ledger(s, '买种子 ' + c.name + '×' + qty, 0, cost);
+    s.seeds[id] = (s.seeds[id] || 0) + qty;
+    log(s, '🌰 买了 ' + c.name + '种子 ×' + qty + '（-' + cost + ' 金）', 'info');
+    return { ok: true, msg: '买到 ' + c.name + ' 种子 ×' + qty, qty: qty, cost: cost };
+  }
 
   function sellSeed(s, id, n) {
+    const c = CROPS[id];
+    if (!c) return { ok: false, msg: '没有这种种子' };
     const have = s.seeds[id] || 0;
-    if (!have) return { ok: false, msg: '没有这种种子' };
+    if (!have) return { ok: false, msg: '没有 ' + c.name + ' 种子' };
     const qty = n ? Math.min(n, have) : have;
-    const gain = qty * SEED_VALUE;
+    const gain = qty * seedSellPrice(c);
     const left = have - qty;
     if (left > 0) s.seeds[id] = left; else delete s.seeds[id];
-    addCoins(s, gain, '卖种子 ' + CROPS[id].name);
-    log(s, '💰 卖出 ' + CROPS[id].name + '种子 ×' + qty + '，+' + gain + ' 金', 'good');
+    addCoins(s, gain, '卖种子 ' + c.name);
+    log(s, '💰 卖出 ' + c.name + '种子 ×' + qty + '，+' + gain + ' 金', 'good');
     return { ok: true, msg: '卖出 ' + qty + ' 颗种子，+' + gain + ' 金', qty: qty, income: gain };
   }
 
@@ -589,11 +602,33 @@
     const ids = Object.keys(s.seeds).filter(function (k) { return s.seeds[k] > 0; });
     if (!ids.length) return { ok: false, msg: '没有种子可卖' };
     let total = 0;
-    ids.forEach(function (id) { total += (s.seeds[id] || 0) * SEED_VALUE; });
+    ids.forEach(function (id) { total += (s.seeds[id] || 0) * seedSellPrice(CROPS[id]); });
     s.seeds = {};
     addCoins(s, total, '卖种子');
     log(s, '💰 清空种子，+' + total + ' 金', 'good');
     return { ok: true, msg: '卖出全部种子，+' + total + ' 金', income: total };
+  }
+
+  /* 全部播种：把所有空地都种上同一种作物 */
+  function plantAll(s, cropId) {
+    const c = CROPS[cropId];
+    if (!c) return { ok: false, msg: '没有这种作物' };
+    const targets = [];
+    s.plots.forEach(function (p, i) { if (!p.crop) targets.push(i); });
+    if (!targets.length) return { ok: false, msg: '没有空地了' };
+    if ((s.seeds[cropId] || 0) <= 0) return { ok: false, msg: '没有 ' + c.name + ' 种子了' };
+
+    let n = 0, stop = null;
+    for (let k = 0; k < targets.length; k++) {
+      const r = plant(s, targets[k], cropId);
+      if (!r.ok) { stop = r.msg; break; }
+      n++;
+    }
+    if (!n) return { ok: false, msg: stop || '播种失败' };
+    return {
+      ok: true, planted: n, stop: stop,
+      msg: '种下 ' + c.name + ' ×' + n + (stop ? '（' + stop + '）' : '')
+    };
   }
 
   function expand(s) {
@@ -667,9 +702,11 @@
     mealFee: mealFee, expandCost: expandCost, upgradeCost: upgradeCost,
     workCost: workCost, workPay: workPay, needOf: needOf, expectedYield: expectedYield,
     canHarvest: canHarvest, stageEmoji: stageEmoji, fertBonus: fertBonus, baitCount: baitCount,
-    plant: plant, water: water, waterAll: waterAll, harvest: harvest, harvestAll: harvestAll,
+    plant: plant, plantAll: plantAll, water: water, waterAll: waterAll,
+    harvest: harvest, harvestAll: harvestAll,
     sellAll: sellAll, sellOne: sellOne, sellSeed: sellSeed, sellAllSeeds: sellAllSeeds,
-    SEED_VALUE: SEED_VALUE,
+    buySeed: buySeed, seedBuyPrice: seedBuyPrice, seedSellPrice: seedSellPrice,
+    SEED_SELL_RATE: SEED_SELL_RATE,
     buyFert: buyFert, sleep: sleep, fish: fish,
     fishMany: fishMany, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather

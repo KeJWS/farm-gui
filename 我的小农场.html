@@ -161,7 +161,13 @@ button{ font-family:inherit; }
   display:grid;
   grid-template-columns:repeat(auto-fill, minmax(148px, 1fr));
   gap:11px;
+  max-height:min(62vh, 720px);
+  overflow-y:auto;
+  padding-right:4px;
+  border-radius:12px;
 }
+.plot-grid:focus{ outline:none; }
+.plot-grid:focus-visible{ outline:2px solid rgba(79,156,95,.45); outline-offset:3px; }
 
 .plot{  position:relative;
   border-radius:15px;
@@ -502,6 +508,43 @@ button{ font-family:inherit; }
 .rule-table th{ color:var(--ink-3); font-weight:800; font-size:11px; }
 .rule-table tr:hover td{ background:rgba(255,250,235,.8); }
 
+/* ---------------- 种子店 ---------------- */
+
+.shop-head{
+  font-size:12.5px; font-weight:700; color:var(--ink-2);
+  margin-bottom:10px; padding-bottom:9px; border-bottom:1px dashed var(--line-2);
+}
+.shop-head b{ color:var(--gold); font-size:15px; font-variant-numeric:tabular-nums; }
+
+.shop-list{
+  display:flex; flex-direction:column; gap:6px;
+  max-height:440px; overflow-y:auto; padding-right:4px;
+}
+.shop-row{
+  display:flex; align-items:center; gap:9px;
+  padding:6px 9px; border-radius:11px;
+  background:#fffdf7; border:1px solid var(--line);
+  transition:border-color .12s, background .12s;
+}
+.shop-row:hover{ border-color:rgba(79,156,95,.35); background:#fffef9; }
+.shop-row .se{ font-size:21px; flex:none; }
+.shop-row .sinfo{ flex:1; min-width:0; }
+.shop-row .sn{ font-size:12.5px; font-weight:800; display:flex; align-items:center; gap:6px; }
+.shop-row .own{
+  font-size:10px; font-weight:800; color:var(--green-d);
+  background:#eaf5e8; border-radius:6px; padding:1px 6px;
+}
+.shop-row .sv{ font-size:11px; color:var(--ink-3); font-weight:700; margin-top:1px; }
+.shop-row .btn.mini{ min-width:42px; flex:none; }
+.shop-tip{ margin-top:11px; font-size:11.5px; color:var(--ink-3); font-weight:600; }
+
+/* ---------------- 顶栏的睡觉按钮 ---------------- */
+
+.sleep-btn{
+  flex-direction:row; gap:6px; min-height:36px; height:36px;
+  padding:0 16px; font-size:13.5px; border-radius:11px;
+}
+
 /* ---------------- Toast ---------------- */
 
 .toast-root{
@@ -593,6 +636,7 @@ button{ font-family:inherit; }
   </div>
 
   <div class="top-actions">
+    <button class="btn primary sleep-btn" data-act="sleep" title="推进到下一天，扣伙食费并恢复体力">🌙 睡觉</button>
     <button class="icon-btn" id="btn-help" title="规则说明">📖</button>
     <button class="icon-btn" id="btn-sound" title="音效开关">🔊</button>
     <button class="icon-btn" id="btn-reset" title="重新开始">🔄</button>
@@ -615,9 +659,9 @@ button{ font-family:inherit; }
       </div>
       <div class="plot-grid" id="plot-grid"></div>
       <div class="farm-foot">
+        <button class="btn wide" data-act="plantAll">🌱 全部播种<small id="plantall-txt"></small></button>
         <button class="btn wide" data-act="waterAll">💧 全部浇水</button>
         <button class="btn wide" data-act="harvestAll">🧺 全部收获</button>
-        <button class="btn wide primary" data-act="sleep">🌙 睡觉</button>
       </div>
     </div>
 
@@ -625,11 +669,9 @@ button{ font-family:inherit; }
       <div class="panel-head"><h2>🔧 干活</h2></div>
       <div class="action-grid">
         <button class="btn" data-act="dig">🪱 挖蚯蚓<small>3 体力</small></button>
-        <button class="btn" data-act="tea">🍵 下午茶<small>3 金 · +5 体力</small></button>
         <button class="btn" data-act="work-half">🕐 半天零工<small id="work-half-txt"></small></button>
         <button class="btn" data-act="work-full">🕑 全天零工<small id="work-full-txt"></small></button>
-        <button class="btn" data-act="expand">🏞️ 扩张土地<small id="expand-txt"></small></button>
-        <button class="btn" data-act="upgrade">💪 强化体力<small id="upgrade-txt"></small></button>
+        <button class="btn" data-act="seedshop">🌰 种子店<small>买 / 卖种子</small></button>
         <button class="btn" data-act="shop">🛒 渔具店</button>
       </div>
     </div>
@@ -653,6 +695,15 @@ button{ font-family:inherit; }
 
   <!-- 右列 -->
   <aside class="col-side">
+
+    <div class="panel">
+      <div class="panel-head"><h2>🏡 农场</h2></div>
+      <div class="action-grid farm-actions">
+        <button class="btn" data-act="tea">🍵 下午茶<small id="tea-txt">3 金 · +5 体力</small></button>
+        <button class="btn" data-act="expand">🏞️ 扩张土地<small id="expand-txt"></small></button>
+        <button class="btn" data-act="upgrade">💪 强化体力<small id="upgrade-txt"></small></button>
+      </div>
+    </div>
 
     <div class="panel store">
       <div class="panel-head">
@@ -910,17 +961,11 @@ button{ font-family:inherit; }
     if (p.crop) return { ok: false, msg: '这块地不是空地' };
     if (s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
 
+    // 种子只能从种子店买，播种时只消耗背包里的种子
     const owned = s.seeds[cropId] || 0;
-    let paid = 0;
-    if (owned > 0) {
-      s.seeds[cropId] = owned - 1;
-      if (s.seeds[cropId] === 0) delete s.seeds[cropId];
-    } else {
-      if (s.coins < c.seed) return { ok: false, msg: '金币不够买种子（' + c.seed + ' 金）' };
-      paid = c.seed;
-      s.coins -= c.seed;
-      ledger(s, '买种子 ' + c.name, 0, c.seed);
-    }
+    if (owned <= 0) return { ok: false, msg: '没有 ' + c.name + ' 种子了，先去种子店买' };
+    s.seeds[cropId] = owned - 1;
+    if (s.seeds[cropId] === 0) delete s.seeds[cropId];
 
     s.energy -= 1;
     p.crop = cropId;
@@ -932,7 +977,7 @@ button{ font-family:inherit; }
     p.hits = 0;
     p.phase = 'growing';
     s.stats.planted++;
-    log(s, '🌱 ' + (idx + 1) + ' 号地种下 ' + c.name + (paid ? '（-' + paid + ' 金）' : '（用库存种子）'), 'good');
+    log(s, '🌱 ' + (idx + 1) + ' 号地种下 ' + c.name, 'good');
     return { ok: true, msg: c.name + ' 种下了' };
   }
 
@@ -1261,18 +1306,37 @@ button{ font-family:inherit; }
     return { ok: true, msg: '+' + pay + ' 金', pay: pay, spent: cost };
   }
 
-  /* 卖种子：种子统一 1 金/颗 */
-  const SEED_VALUE = 1;
+  /* ---------------- 种子店 ---------------- */
+
+  const SEED_SELL_RATE = 0.5;          // 回收价 = 售价的一半
+
+  function seedBuyPrice(c) { return c.seed; }
+  function seedSellPrice(c) { return Math.max(1, Math.floor(c.seed * SEED_SELL_RATE)); }
+
+  function buySeed(s, id, n) {
+    const c = CROPS[id];
+    if (!c) return { ok: false, msg: '没有这种种子' };
+    const qty = Math.max(1, Math.floor(n || 1));
+    const cost = seedBuyPrice(c) * qty;
+    if (s.coins < cost) return { ok: false, msg: '金币不够（需要 ' + cost + ' 金）' };
+    s.coins -= cost;
+    ledger(s, '买种子 ' + c.name + '×' + qty, 0, cost);
+    s.seeds[id] = (s.seeds[id] || 0) + qty;
+    log(s, '🌰 买了 ' + c.name + '种子 ×' + qty + '（-' + cost + ' 金）', 'info');
+    return { ok: true, msg: '买到 ' + c.name + ' 种子 ×' + qty, qty: qty, cost: cost };
+  }
 
   function sellSeed(s, id, n) {
+    const c = CROPS[id];
+    if (!c) return { ok: false, msg: '没有这种种子' };
     const have = s.seeds[id] || 0;
-    if (!have) return { ok: false, msg: '没有这种种子' };
+    if (!have) return { ok: false, msg: '没有 ' + c.name + ' 种子' };
     const qty = n ? Math.min(n, have) : have;
-    const gain = qty * SEED_VALUE;
+    const gain = qty * seedSellPrice(c);
     const left = have - qty;
     if (left > 0) s.seeds[id] = left; else delete s.seeds[id];
-    addCoins(s, gain, '卖种子 ' + CROPS[id].name);
-    log(s, '💰 卖出 ' + CROPS[id].name + '种子 ×' + qty + '，+' + gain + ' 金', 'good');
+    addCoins(s, gain, '卖种子 ' + c.name);
+    log(s, '💰 卖出 ' + c.name + '种子 ×' + qty + '，+' + gain + ' 金', 'good');
     return { ok: true, msg: '卖出 ' + qty + ' 颗种子，+' + gain + ' 金', qty: qty, income: gain };
   }
 
@@ -1280,11 +1344,33 @@ button{ font-family:inherit; }
     const ids = Object.keys(s.seeds).filter(function (k) { return s.seeds[k] > 0; });
     if (!ids.length) return { ok: false, msg: '没有种子可卖' };
     let total = 0;
-    ids.forEach(function (id) { total += (s.seeds[id] || 0) * SEED_VALUE; });
+    ids.forEach(function (id) { total += (s.seeds[id] || 0) * seedSellPrice(CROPS[id]); });
     s.seeds = {};
     addCoins(s, total, '卖种子');
     log(s, '💰 清空种子，+' + total + ' 金', 'good');
     return { ok: true, msg: '卖出全部种子，+' + total + ' 金', income: total };
+  }
+
+  /* 全部播种：把所有空地都种上同一种作物 */
+  function plantAll(s, cropId) {
+    const c = CROPS[cropId];
+    if (!c) return { ok: false, msg: '没有这种作物' };
+    const targets = [];
+    s.plots.forEach(function (p, i) { if (!p.crop) targets.push(i); });
+    if (!targets.length) return { ok: false, msg: '没有空地了' };
+    if ((s.seeds[cropId] || 0) <= 0) return { ok: false, msg: '没有 ' + c.name + ' 种子了' };
+
+    let n = 0, stop = null;
+    for (let k = 0; k < targets.length; k++) {
+      const r = plant(s, targets[k], cropId);
+      if (!r.ok) { stop = r.msg; break; }
+      n++;
+    }
+    if (!n) return { ok: false, msg: stop || '播种失败' };
+    return {
+      ok: true, planted: n, stop: stop,
+      msg: '种下 ' + c.name + ' ×' + n + (stop ? '（' + stop + '）' : '')
+    };
   }
 
   function expand(s) {
@@ -1358,9 +1444,11 @@ button{ font-family:inherit; }
     mealFee: mealFee, expandCost: expandCost, upgradeCost: upgradeCost,
     workCost: workCost, workPay: workPay, needOf: needOf, expectedYield: expectedYield,
     canHarvest: canHarvest, stageEmoji: stageEmoji, fertBonus: fertBonus, baitCount: baitCount,
-    plant: plant, water: water, waterAll: waterAll, harvest: harvest, harvestAll: harvestAll,
+    plant: plant, plantAll: plantAll, water: water, waterAll: waterAll,
+    harvest: harvest, harvestAll: harvestAll,
     sellAll: sellAll, sellOne: sellOne, sellSeed: sellSeed, sellAllSeeds: sellAllSeeds,
-    SEED_VALUE: SEED_VALUE,
+    buySeed: buySeed, seedBuyPrice: seedBuyPrice, seedSellPrice: seedSellPrice,
+    SEED_SELL_RATE: SEED_SELL_RATE,
     buyFert: buyFert, sleep: sleep, fish: fish,
     fishMany: fishMany, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather
@@ -1553,8 +1641,16 @@ button{ font-family:inherit; }
       return p.crop && p.phase !== 'ripe' && !p.watered;
     });
     const anyRipe = state.plots.some(function (p) { return p.crop && G.canHarvest(state, p); });
+    const anyEmpty = state.plots.some(function (p) { return !p.crop; });
+    const seedTotal = Object.keys(state.seeds).reduce(function (n, k) { return n + (state.seeds[k] || 0); }, 0);
+
     $('[data-act="waterAll"]').disabled = !anyGrow || !!G.WEATHER[state.weather].stall;
     $('[data-act="harvestAll"]').disabled = !anyRipe;
+    $('[data-act="plantAll"]').disabled = !anyEmpty;
+    $('#plantall-txt').textContent = anyEmpty
+      ? (seedTotal ? '库存 ' + seedTotal + ' 颗 · 空地 ' + state.plots.filter(function (p) { return !p.crop; }).length + ' 块'
+                   : '没种子 · 点这里去种子店')
+      : '没有空地';
   }
 
   /* ---------------- 操作按钮 ---------------- */
@@ -1573,8 +1669,10 @@ button{ font-family:inherit; }
     $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + 5) + ' · ' + G.upgradeCost(state) + ' 金';
 
     const teaBtn = $('[data-act="tea"]');
-    teaBtn.disabled = state.teaUsed;
-    teaBtn.querySelector('small').textContent = state.teaUsed ? '今天喝过了' : '3 金 · +5 体力';
+    teaBtn.disabled = state.teaUsed || state.energy >= state.maxEnergy;
+    $('#tea-txt').textContent = state.teaUsed
+      ? '今天喝过了'
+      : (state.energy >= state.maxEnergy ? '体力已满' : '3 金 · +5 体力');
 
     $('[data-act="dig"]').disabled = state.energy < 3;
     $('[data-act="work-half"]').disabled = state.energy <= 0;
@@ -1648,17 +1746,13 @@ button{ font-family:inherit; }
     }
 
     const seeds = Object.keys(state.seeds).filter(function (k) { return state.seeds[k] > 0; });
-    const sv = G.SEED_VALUE;
     $('#seed-box').innerHTML = '🎒 种子：' + (seeds.length
       ? seeds.map(function (id) {
-          const n = state.seeds[id];
-          return '<button class="tag tag-sell" data-sellseed="' + id + '"' +
-            ' title="卖出全部 ' + n + ' 颗，共 ' + n * sv + ' 金">' +
-            G.CROPS[id].emoji + G.CROPS[id].name + ' ×' + n +
-            ' <b>卖 ' + n * sv + '</b></button>';
+          return '<span class="tag">' + G.CROPS[id].emoji + G.CROPS[id].name + ' ×' + state.seeds[id] + '</span>';
         }).join('') +
-        '<button class="btn mini" data-sellseeds>全部卖掉</button>'
-      : '<span style="color:var(--ink-3)">无（收获时 30% 概率留种，多收作物仅最后一收；种子 ' + sv + ' 金/颗可卖）</span>');
+        '<button class="btn mini" data-act="seedshop">去种子店</button>'
+      : '<span style="color:var(--ink-3)">无（收获 30% 留种，或去种子店买）</span>' +
+        '<button class="btn mini" data-act="seedshop">种子店</button>');
 
     $('[data-act="sellAll"]').disabled = !ids.length;
   }
@@ -1804,11 +1898,16 @@ button{ font-family:inherit; }
       '<button class="btn" data-close>关闭</button>');
   }
 
-  function cropPicker(i) {
+  function cropPicker(i, batch) {
+    const seedTotal = Object.keys(state.seeds).reduce(function (n, k) { return n + (state.seeds[k] || 0); }, 0);
+    if (!seedTotal) {
+      toast('先去种子店买点种子吧 🌰', 'warn');
+      return seedShop();
+    }
+
     const cards = G.CROP_LIST.map(function (c) {
       const owned = state.seeds[c.id] || 0;
-      const cost = owned > 0 ? 0 : c.seed;
-      const dis = cost > state.coins || state.energy < 1;
+      const dis = owned <= 0 || state.energy < 1;
       let profit = '';
       let lineY = '';
       let lineP = '';
@@ -1826,20 +1925,54 @@ button{ font-family:inherit; }
         lineP = c.price + ' 金/个';
         profit = '利润 +' + (c.base * c.price - c.seed) + '~';
       }
-      return '<button class="crop-card" data-crop="' + c.id + '" data-plot="' + i + '"' + (dis ? ' disabled' : '') + '>' +
+      return '<button class="crop-card" data-crop="' + c.id + '" data-plot="' + i + '"' +
+        (batch ? ' data-batch="1"' : '') + (dis ? ' disabled' : '') + '>' +
         '<div class="ce">' + c.emoji + '</div>' +
-        '<div class="cn">' + c.name + (owned ? ' <span style="font-size:10px;color:var(--green-d)">×' + owned + '</span>' : '') + '</div>' +
-        '<div class="cs">' + (owned ? '用库存种子' : '种子 ' + c.seed + ' 金') + '</div>' +
+        '<div class="cn">' + c.name + '</div>' +
+        '<div class="cs">' + (owned ? '库存 ' + owned + ' 颗' : '没有种子') + '</div>' +
         '<div class="cm">' + lineY + '</div>' +
         '<div class="cm">' + lineP + '</div>' +
-        '<div class="cp">' + profit + '</div>' +
+        '<div class="cp">' + (profit || '') + '</div>' +
       '</button>';
     }).join('');
 
-    openModal('🌱 第 ' + (i + 1) + ' 号地 · 播种', cards +
-      '<div style="margin-top:12px;font-size:11.5px;color:var(--ink-3);font-weight:600">' +
-      '💡 生长按浇水天数计算，成熟后次日才能收获；漏浇会减产。</div>',
+    const tip = batch
+      ? '💡 选一种作物，会按库存把所有空地依次种上；种子用完就停。'
+      : '💡 播种只消耗背包里的种子，种子要去种子店买。';
+
+    openModal(batch ? '🌱 全部播种 · 选一种作物' : '🌱 第 ' + (i + 1) + ' 号地 · 播种',
+      cards + '<div style="margin-top:12px;font-size:11.5px;color:var(--ink-3);font-weight:600">' + tip + '</div>',
+      '<button class="btn" data-act="seedshop">🌰 去种子店</button>' +
       '<button class="btn" data-close>取消</button>');
+  }
+
+  /* ---------------- 种子店 ---------------- */
+
+  function seedShop() {
+    const rows = G.CROP_LIST.map(function (c) {
+      const owned = state.seeds[c.id] || 0;
+      const bp = G.seedBuyPrice(c);
+      const sp = G.seedSellPrice(c);
+      return '<div class="shop-row">' +
+        '<span class="se">' + c.emoji + '</span>' +
+        '<div class="sinfo">' +
+          '<div class="sn">' + c.name +
+            (owned ? ' <b class="own">库存 ' + owned + '</b>' : '') + '</div>' +
+          '<div class="sv">买 ' + bp + ' 金 · 卖 ' + sp + ' 金 · ' + c.days + ' 天成熟</div>' +
+        '</div>' +
+        '<button class="btn mini" data-buyseed="' + c.id + '" data-n="1"' + (state.coins < bp ? ' disabled' : '') + '>买1</button>' +
+        '<button class="btn mini" data-buyseed="' + c.id + '" data-n="5"' + (state.coins < bp * 5 ? ' disabled' : '') + '>买5</button>' +
+        '<button class="btn mini" data-sellseed="' + c.id + '"' +
+          (owned <= 0 ? ' disabled' : '') +
+          ' title="' + (owned ? '卖出全部，+' + owned * sp + ' 金' : '没有库存') + '">卖光</button>' +
+      '</div>';
+    }).join('');
+
+    openModal('🌰 种子店',
+      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金 · 卖回价是买价的一半</div>' +
+      '<div class="shop-list">' + rows + '</div>' +
+      '<div class="shop-tip">播种只消耗背包里的种子；留种得到的种子也能在这里卖掉。</div>',
+      '<button class="btn" data-close>关闭</button>');
   }
 
   /* ---------------- 商店 / 帮助 / 重置 ---------------- */
@@ -1887,7 +2020,8 @@ button{ font-family:inherit; }
       '· 蚯蚓饵：收获 +30% 且品质取两次较好的<br>' +
       '· 收获时 30% 概率留种，种子下次可免费种<br>' +
       '· 多次收获作物（黄瓜/草莓）只有最后一收才判定留种<br>' +
-      '· 种子可以卖，' + G.SEED_VALUE + ' 金/颗<br>' +
+      '· 种子只能在种子店买，卖回价是买价的一半<br>' +
+      '· 播种只消耗背包里的种子；「全部播种」会按库存把所有空地种满<br>' +
       '· 半天零工体力不够时会把剩下的体力全用上，收益仍按 ×1.0<br>' +
       '· 账本按天汇总，点某一天可展开当日明细<br>' +
       '· 进度自动保存在本浏览器（localStorage）</div>';
@@ -1954,6 +2088,8 @@ button{ font-family:inherit; }
       if (r.ok) { toast(r.msg, 'good'); SFX.good(); }
     },
     shop: shopModal,
+    seedshop: seedShop,
+    plantAll: function () { cropPicker(0, true); },
     sellAll: function () {
       const r = G.sellAll(state);
       commit(r);
@@ -2020,11 +2156,13 @@ button{ font-family:inherit; }
         if (fn) { fn(ev); return; }
       }
 
-      // 种植
+      // 种植（单块 / 全部播种）
       const cropCard = t.closest('[data-crop]');
       if (cropCard) {
         const idx = Number(cropCard.dataset.plot);
-        const r = G.plant(state, idx, cropCard.dataset.crop);
+        const batch = cropCard.dataset.batch === '1';
+        const id = cropCard.dataset.crop;
+        const r = batch ? G.plantAll(state, id) : G.plant(state, idx, id);
         if (r.ok) {
           closeModal();
           commit(r);
@@ -2082,21 +2220,25 @@ button{ font-family:inherit; }
         return;
       }
 
-      // 卖种子
+      // 种子店：买种子
+      const buySeed = t.closest('[data-buyseed]');
+      if (buySeed) {
+        const r = G.buySeed(state, buySeed.dataset.buyseed, Number(buySeed.dataset.n) || 1);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        if (modalOpen()) seedShop();     // 刷新库存与价格
+        return;
+      }
+
+      // 种子店：卖种子（一口价卖光那种）
       const sellSeed = t.closest('[data-sellseed]');
       if (sellSeed) {
         const r = G.sellSeed(state, sellSeed.dataset.sellseed);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();
-        return;
-      }
-      const sellSeeds = t.closest('[data-sellseeds]');
-      if (sellSeeds) {
-        const r = G.sellAllSeeds(state);
-        commit(r);
-        toast(r.msg, r.ok ? 'good' : 'warn');
-        if (r.ok) SFX.coin();
+        if (modalOpen()) seedShop();
         return;
       }
 

@@ -152,7 +152,13 @@ button{ font-family:inherit; }
   display:grid;
   grid-template-columns:repeat(auto-fill, minmax(148px, 1fr));
   gap:11px;
+  max-height:min(62vh, 720px);
+  overflow-y:auto;
+  padding-right:4px;
+  border-radius:12px;
 }
+.plot-grid:focus{ outline:none; }
+.plot-grid:focus-visible{ outline:2px solid rgba(79,156,95,.45); outline-offset:3px; }
 
 .plot{  position:relative;
   border-radius:15px;
@@ -492,6 +498,43 @@ button{ font-family:inherit; }
 .rule-table th,.rule-table td{ padding:5px 8px; text-align:left; border-bottom:1px solid var(--line); }
 .rule-table th{ color:var(--ink-3); font-weight:800; font-size:11px; }
 .rule-table tr:hover td{ background:rgba(255,250,235,.8); }
+
+/* ---------------- 种子店 ---------------- */
+
+.shop-head{
+  font-size:12.5px; font-weight:700; color:var(--ink-2);
+  margin-bottom:10px; padding-bottom:9px; border-bottom:1px dashed var(--line-2);
+}
+.shop-head b{ color:var(--gold); font-size:15px; font-variant-numeric:tabular-nums; }
+
+.shop-list{
+  display:flex; flex-direction:column; gap:6px;
+  max-height:440px; overflow-y:auto; padding-right:4px;
+}
+.shop-row{
+  display:flex; align-items:center; gap:9px;
+  padding:6px 9px; border-radius:11px;
+  background:#fffdf7; border:1px solid var(--line);
+  transition:border-color .12s, background .12s;
+}
+.shop-row:hover{ border-color:rgba(79,156,95,.35); background:#fffef9; }
+.shop-row .se{ font-size:21px; flex:none; }
+.shop-row .sinfo{ flex:1; min-width:0; }
+.shop-row .sn{ font-size:12.5px; font-weight:800; display:flex; align-items:center; gap:6px; }
+.shop-row .own{
+  font-size:10px; font-weight:800; color:var(--green-d);
+  background:#eaf5e8; border-radius:6px; padding:1px 6px;
+}
+.shop-row .sv{ font-size:11px; color:var(--ink-3); font-weight:700; margin-top:1px; }
+.shop-row .btn.mini{ min-width:42px; flex:none; }
+.shop-tip{ margin-top:11px; font-size:11.5px; color:var(--ink-3); font-weight:600; }
+
+/* ---------------- 顶栏的睡觉按钮 ---------------- */
+
+.sleep-btn{
+  flex-direction:row; gap:6px; min-height:36px; height:36px;
+  padding:0 16px; font-size:13.5px; border-radius:11px;
+}
 
 /* ---------------- Toast ---------------- */
 

@@ -179,8 +179,16 @@
       return p.crop && p.phase !== 'ripe' && !p.watered;
     });
     const anyRipe = state.plots.some(function (p) { return p.crop && G.canHarvest(state, p); });
+    const anyEmpty = state.plots.some(function (p) { return !p.crop; });
+    const seedTotal = Object.keys(state.seeds).reduce(function (n, k) { return n + (state.seeds[k] || 0); }, 0);
+
     $('[data-act="waterAll"]').disabled = !anyGrow || !!G.WEATHER[state.weather].stall;
     $('[data-act="harvestAll"]').disabled = !anyRipe;
+    $('[data-act="plantAll"]').disabled = !anyEmpty;
+    $('#plantall-txt').textContent = anyEmpty
+      ? (seedTotal ? '库存 ' + seedTotal + ' 颗 · 空地 ' + state.plots.filter(function (p) { return !p.crop; }).length + ' 块'
+                   : '没种子 · 点这里去种子店')
+      : '没有空地';
   }
 
   /* ---------------- 操作按钮 ---------------- */
@@ -199,8 +207,10 @@
     $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + 5) + ' · ' + G.upgradeCost(state) + ' 金';
 
     const teaBtn = $('[data-act="tea"]');
-    teaBtn.disabled = state.teaUsed;
-    teaBtn.querySelector('small').textContent = state.teaUsed ? '今天喝过了' : '3 金 · +5 体力';
+    teaBtn.disabled = state.teaUsed || state.energy >= state.maxEnergy;
+    $('#tea-txt').textContent = state.teaUsed
+      ? '今天喝过了'
+      : (state.energy >= state.maxEnergy ? '体力已满' : '3 金 · +5 体力');
 
     $('[data-act="dig"]').disabled = state.energy < 3;
     $('[data-act="work-half"]').disabled = state.energy <= 0;
@@ -274,17 +284,13 @@
     }
 
     const seeds = Object.keys(state.seeds).filter(function (k) { return state.seeds[k] > 0; });
-    const sv = G.SEED_VALUE;
     $('#seed-box').innerHTML = '🎒 种子：' + (seeds.length
       ? seeds.map(function (id) {
-          const n = state.seeds[id];
-          return '<button class="tag tag-sell" data-sellseed="' + id + '"' +
-            ' title="卖出全部 ' + n + ' 颗，共 ' + n * sv + ' 金">' +
-            G.CROPS[id].emoji + G.CROPS[id].name + ' ×' + n +
-            ' <b>卖 ' + n * sv + '</b></button>';
+          return '<span class="tag">' + G.CROPS[id].emoji + G.CROPS[id].name + ' ×' + state.seeds[id] + '</span>';
         }).join('') +
-        '<button class="btn mini" data-sellseeds>全部卖掉</button>'
-      : '<span style="color:var(--ink-3)">无（收获时 30% 概率留种，多收作物仅最后一收；种子 ' + sv + ' 金/颗可卖）</span>');
+        '<button class="btn mini" data-act="seedshop">去种子店</button>'
+      : '<span style="color:var(--ink-3)">无（收获 30% 留种，或去种子店买）</span>' +
+        '<button class="btn mini" data-act="seedshop">种子店</button>');
 
     $('[data-act="sellAll"]').disabled = !ids.length;
   }
@@ -430,11 +436,16 @@
       '<button class="btn" data-close>关闭</button>');
   }
 
-  function cropPicker(i) {
+  function cropPicker(i, batch) {
+    const seedTotal = Object.keys(state.seeds).reduce(function (n, k) { return n + (state.seeds[k] || 0); }, 0);
+    if (!seedTotal) {
+      toast('先去种子店买点种子吧 🌰', 'warn');
+      return seedShop();
+    }
+
     const cards = G.CROP_LIST.map(function (c) {
       const owned = state.seeds[c.id] || 0;
-      const cost = owned > 0 ? 0 : c.seed;
-      const dis = cost > state.coins || state.energy < 1;
+      const dis = owned <= 0 || state.energy < 1;
       let profit = '';
       let lineY = '';
       let lineP = '';
@@ -452,20 +463,54 @@
         lineP = c.price + ' 金/个';
         profit = '利润 +' + (c.base * c.price - c.seed) + '~';
       }
-      return '<button class="crop-card" data-crop="' + c.id + '" data-plot="' + i + '"' + (dis ? ' disabled' : '') + '>' +
+      return '<button class="crop-card" data-crop="' + c.id + '" data-plot="' + i + '"' +
+        (batch ? ' data-batch="1"' : '') + (dis ? ' disabled' : '') + '>' +
         '<div class="ce">' + c.emoji + '</div>' +
-        '<div class="cn">' + c.name + (owned ? ' <span style="font-size:10px;color:var(--green-d)">×' + owned + '</span>' : '') + '</div>' +
-        '<div class="cs">' + (owned ? '用库存种子' : '种子 ' + c.seed + ' 金') + '</div>' +
+        '<div class="cn">' + c.name + '</div>' +
+        '<div class="cs">' + (owned ? '库存 ' + owned + ' 颗' : '没有种子') + '</div>' +
         '<div class="cm">' + lineY + '</div>' +
         '<div class="cm">' + lineP + '</div>' +
-        '<div class="cp">' + profit + '</div>' +
+        '<div class="cp">' + (profit || '') + '</div>' +
       '</button>';
     }).join('');
 
-    openModal('🌱 第 ' + (i + 1) + ' 号地 · 播种', cards +
-      '<div style="margin-top:12px;font-size:11.5px;color:var(--ink-3);font-weight:600">' +
-      '💡 生长按浇水天数计算，成熟后次日才能收获；漏浇会减产。</div>',
+    const tip = batch
+      ? '💡 选一种作物，会按库存把所有空地依次种上；种子用完就停。'
+      : '💡 播种只消耗背包里的种子，种子要去种子店买。';
+
+    openModal(batch ? '🌱 全部播种 · 选一种作物' : '🌱 第 ' + (i + 1) + ' 号地 · 播种',
+      cards + '<div style="margin-top:12px;font-size:11.5px;color:var(--ink-3);font-weight:600">' + tip + '</div>',
+      '<button class="btn" data-act="seedshop">🌰 去种子店</button>' +
       '<button class="btn" data-close>取消</button>');
+  }
+
+  /* ---------------- 种子店 ---------------- */
+
+  function seedShop() {
+    const rows = G.CROP_LIST.map(function (c) {
+      const owned = state.seeds[c.id] || 0;
+      const bp = G.seedBuyPrice(c);
+      const sp = G.seedSellPrice(c);
+      return '<div class="shop-row">' +
+        '<span class="se">' + c.emoji + '</span>' +
+        '<div class="sinfo">' +
+          '<div class="sn">' + c.name +
+            (owned ? ' <b class="own">库存 ' + owned + '</b>' : '') + '</div>' +
+          '<div class="sv">买 ' + bp + ' 金 · 卖 ' + sp + ' 金 · ' + c.days + ' 天成熟</div>' +
+        '</div>' +
+        '<button class="btn mini" data-buyseed="' + c.id + '" data-n="1"' + (state.coins < bp ? ' disabled' : '') + '>买1</button>' +
+        '<button class="btn mini" data-buyseed="' + c.id + '" data-n="5"' + (state.coins < bp * 5 ? ' disabled' : '') + '>买5</button>' +
+        '<button class="btn mini" data-sellseed="' + c.id + '"' +
+          (owned <= 0 ? ' disabled' : '') +
+          ' title="' + (owned ? '卖出全部，+' + owned * sp + ' 金' : '没有库存') + '">卖光</button>' +
+      '</div>';
+    }).join('');
+
+    openModal('🌰 种子店',
+      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金 · 卖回价是买价的一半</div>' +
+      '<div class="shop-list">' + rows + '</div>' +
+      '<div class="shop-tip">播种只消耗背包里的种子；留种得到的种子也能在这里卖掉。</div>',
+      '<button class="btn" data-close>关闭</button>');
   }
 
   /* ---------------- 商店 / 帮助 / 重置 ---------------- */
@@ -513,7 +558,8 @@
       '· 蚯蚓饵：收获 +30% 且品质取两次较好的<br>' +
       '· 收获时 30% 概率留种，种子下次可免费种<br>' +
       '· 多次收获作物（黄瓜/草莓）只有最后一收才判定留种<br>' +
-      '· 种子可以卖，' + G.SEED_VALUE + ' 金/颗<br>' +
+      '· 种子只能在种子店买，卖回价是买价的一半<br>' +
+      '· 播种只消耗背包里的种子；「全部播种」会按库存把所有空地种满<br>' +
       '· 半天零工体力不够时会把剩下的体力全用上，收益仍按 ×1.0<br>' +
       '· 账本按天汇总，点某一天可展开当日明细<br>' +
       '· 进度自动保存在本浏览器（localStorage）</div>';
@@ -580,6 +626,8 @@
       if (r.ok) { toast(r.msg, 'good'); SFX.good(); }
     },
     shop: shopModal,
+    seedshop: seedShop,
+    plantAll: function () { cropPicker(0, true); },
     sellAll: function () {
       const r = G.sellAll(state);
       commit(r);
@@ -646,11 +694,13 @@
         if (fn) { fn(ev); return; }
       }
 
-      // 种植
+      // 种植（单块 / 全部播种）
       const cropCard = t.closest('[data-crop]');
       if (cropCard) {
         const idx = Number(cropCard.dataset.plot);
-        const r = G.plant(state, idx, cropCard.dataset.crop);
+        const batch = cropCard.dataset.batch === '1';
+        const id = cropCard.dataset.crop;
+        const r = batch ? G.plantAll(state, id) : G.plant(state, idx, id);
         if (r.ok) {
           closeModal();
           commit(r);
@@ -708,21 +758,25 @@
         return;
       }
 
-      // 卖种子
+      // 种子店：买种子
+      const buySeed = t.closest('[data-buyseed]');
+      if (buySeed) {
+        const r = G.buySeed(state, buySeed.dataset.buyseed, Number(buySeed.dataset.n) || 1);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        if (modalOpen()) seedShop();     // 刷新库存与价格
+        return;
+      }
+
+      // 种子店：卖种子（一口价卖光那种）
       const sellSeed = t.closest('[data-sellseed]');
       if (sellSeed) {
         const r = G.sellSeed(state, sellSeed.dataset.sellseed);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();
-        return;
-      }
-      const sellSeeds = t.closest('[data-sellseeds]');
-      if (sellSeeds) {
-        const r = G.sellAllSeeds(state);
-        commit(r);
-        toast(r.msg, r.ok ? 'good' : 'warn');
-        if (r.ok) SFX.coin();
+        if (modalOpen()) seedShop();
         return;
       }
 
