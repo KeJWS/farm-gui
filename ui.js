@@ -357,7 +357,7 @@
   /* ---------------- 仓库 ---------------- */
 
   function renderStore() {
-    const ids = Object.keys(state.store).filter(function (k) { return state.store[k] > 0; });
+    const ids = Object.keys(state.store).filter(function (k) { return G.storeCount(state, k) > 0; });
     const fish = G.fishGroups(state);
     const fishCount = fish.reduce(function (n, g) { return n + g.count; }, 0);
     const box = $('#store-list');
@@ -365,12 +365,17 @@
     const cropHtml = ids.length
       ? ids.map(function (id) {
           const c = G.CROPS[id];
-          const n = state.store[id];
+          const n = G.storeCount(state, id);
+          const val = G.storeValue(state, id);
+          const mix = G.storeMix(state, id);
+          const mixTxt = mix.map(function (m) {
+            return '<span style="color:' + m.color + '">' + m.name + ' ' + m.n + '</span>';
+          }).join(' · ');
           return '<div class="store-row">' +
             '<span class="se">' + c.emoji + '</span>' +
             '<div><div class="sn">' + c.name + ' ×' + n + '</div>' +
-            '<div class="sv">' + c.price + ' 金/个</div></div>' +
-            '<span class="sp">' + n * c.price + ' 金</span>' +
+            '<div class="sv">' + mixTxt + ' · 均 ' + (val / n).toFixed(1) + ' 金</div></div>' +
+            '<span class="sp">' + val + ' 金</span>' +
             '<button class="btn mini" data-sell="' + id + '">卖出</button>' +
           '</div>';
         }).join('')
@@ -597,6 +602,10 @@
           (big ? '（大作物固定 1）' : (p.fert ? '（含施肥 +' + p.fert + '）' : '')) + '</dd>' +
         '<dt>漏浇天数</dt><dd>' + (p.missed ? '<span style="color:#b4771f">' + p.missed + ' 天（产量 -' + p.missed + '）</span>' : '0 天 👍') + '</dd>' +
         '<dt>施肥</dt><dd>' + (p.fert ? '🧪 +' + p.fert + ' 产量' : (big ? '大作物不吃肥料' : '未施肥')) + '</dd>' +
+        '<dt>品质</dt><dd>' +
+          (p.phase === 'ripe' ? '收获时揭晓'
+            : (p.fert ? '施肥 ' + p.fert + ' 档 → 收获时取 ' + (p.fert + 1) + ' 次最好'
+                      : '待定（施肥可拉高，最高取 3 次最好）')) + '</dd>' +
       '</dl>' +
       (c.multi
         ? '<div style="margin:-2px 0 12px;font-size:11.5px;font-weight:700;color:var(--ink-2);' +
@@ -766,6 +775,7 @@
       '· 睡觉推进 1 天，扣伙食费（' + G.mealFee(state) + ' 金/天），体力回满<br>' +
       '· 体力耗尽就得睡觉；没钱吃饭只能恢复 5 点<br>' +
       '· 蚯蚓饵：品质取两次较好的、好鱼上钩 ×1.3；不再加成售价，蚯蚓本身也能 2 金/条卖<br>' +
+      '· 作物也有品质（0.4×~3.0×，和鱼同一套档位）：收获时判定，施肥会多滚几次取最好的（普通肥 2 次、特效肥 3 次）<br>' +
       '· 钓到的鱼先进仓库，卖出才换钱；天气只影响上钩概率：晴天好鱼 ×0.8、杂物 ×1.4，雨天好鱼 ×1.3、杂物 ×0.6<br>' +
       '· 收获时 30% 概率留种，种子下次可免费种<br>' +
       '· 多次收获作物（黄瓜/草莓）只有最后一收才判定留种<br>' +

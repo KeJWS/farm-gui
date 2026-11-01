@@ -56,6 +56,8 @@
     { id: 'chest', name: '宝箱',     emoji: '📦', base: 15, w: 5  }
   ];
 
+  const Q_IDS = QUALITY.map(function (q) { return q.id; });
+
   const WEATHER = {
     sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 45, biteMul: 0.8, trashMul: 1.4, wormMod: -1,
               note: '好鱼上钩 ×0.8、杂物 ×1.4 · 挖蚯蚓 -1 份' },
@@ -99,12 +101,18 @@
 
   function rollWeather() { return weighted(WEATHER_LIST, 'w').id; }
 
+  /* 多次取最好：boost = true 滚 2 次（蚯蚓），数字则滚 N 次（施肥） */
   function rollQuality(boost) {
-    function once() { return weighted(QUALITY, 'w'); }
-    if (!boost) return once();
-    const a = QUALITY.indexOf(once());
-    const b = QUALITY.indexOf(once());
-    return QUALITY[Math.max(a, b)];
+    let n = 1;
+    if (boost === true) n = 2;
+    else if (typeof boost === 'number') n = Math.max(1, Math.round(boost));
+    let best = null, bestIdx = -1;
+    for (let i = 0; i < n; i++) {
+      const q = weighted(QUALITY, 'w');
+      const idx = QUALITY.indexOf(q);
+      if (idx > bestIdx) { best = q; bestIdx = idx; }
+    }
+    return best;
   }
 
   /* ---------------- 状态 ---------------- */
@@ -289,15 +297,14 @@
     const c = CROPS[p.crop];
     s.energy -= 1;
 
-    let qty, unit;
-    if (c.multi) {
-      qty = p.hits === 0 ? c.firstQty : c.regrowQty;
-      unit = c.price;
-    } else {
-      unit = c.price;
-      qty = c.big ? 1 : clamp(c.base + randInt(-1, 1) - p.missed + fertBonus(p), 1, 99);
-    }
-    s.store[p.crop] = (s.store[p.crop] || 0) + qty;
+    let qty;
+    if (c.multi) qty = p.hits === 0 ? c.firstQty : c.regrowQty;
+    else qty = c.big ? 1 : clamp(c.base + randInt(-1, 1) - p.missed + fertBonus(p), 1, 99);
+
+    // 作物也有品质：施肥会多滚几次取最好的（普通肥 2 次、特效肥 3 次）
+    const q = rollQuality(1 + p.fert);
+    const unit = unitValue(p.crop, q.id);
+    addStore(s, p.crop, q.id, qty);
 
     // 多次收获作物：只有最后一次收获才判定留种
     const willRegrow = !!c.multi && p.hits + 1 < 1 + c.regrowTimes;
@@ -322,11 +329,11 @@
       s.plots[idx] = makePlot();
     }
 
-    const msg = '收获 ' + c.name + ' ×' + qty + '（值 ' + qty * unit + ' 金）' +
+    const msg = '收获 ' + c.name + ' ×' + qty + ' · ' + q.emoji + q.name + '（值 ' + qty * unit + ' 金）' +
                 (extraSeed ? ' · 留种 +1' : '') +
                 (regrown ? ' · 进入再生期' : '');
     log(s, '🧺 ' + msg, 'good');
-    return { ok: true, msg: msg, qty: qty, crop: p.crop || c.id, unit: unit, seed: extraSeed, regrown: regrown };
+    return { ok: true, msg: msg, qty: qty, crop: p.crop || c.id, unit: unit, quality: q, seed: extraSeed, regrown: regrown };
   }
 
   function harvestAll(s) {
@@ -341,7 +348,7 @@
   }
 
   function sellAll(s) {
-    const ids = Object.keys(s.store).filter(function (k) { return s.store[k] > 0; });
+    const ids = Object.keys(s.store).filter(function (k) { return storeCount(s, k) > 0; });
     const fishTotal = (s.fishBag || []).reduce(function (n, e) { return n + e.v; }, 0);
     const fishCount = (s.fishBag || []).length;
     if (!ids.length && !fishCount) return { ok: false, msg: '仓库里没东西可卖' };
@@ -349,8 +356,8 @@
     let income = 0;
     const parts = [];
     ids.forEach(function (id) {
-      const n = s.store[id];
-      const gain = n * CROPS[id].price;
+      const n = storeCount(s, id);
+      const gain = storeValue(s, id);
       income += gain;
       parts.push(CROPS[id].name + '×' + n + ' = ' + gain + ' 金');
       delete s.store[id];
@@ -376,9 +383,9 @@
   }
 
   function sellOne(s, id) {
-    const n = s.store[id] || 0;
+    const n = storeCount(s, id);
     if (!n) return { ok: false, msg: '没有可卖的' };
-    const gain = n * CROPS[id].price;
+    const gain = storeValue(s, id);
     delete s.store[id];
     addCoins(s, gain, '卖 ' + CROPS[id].name);
     log(s, '💰 卖出 ' + CROPS[id].name + '×' + n + '，+' + gain + ' 金', 'good');
@@ -602,6 +609,69 @@
     for (let i = 0; i < QUALITY.length; i++) if (QUALITY[i].id === id) return QUALITY[i];
     return null;
   };
+
+  /* ---------------- 仓库：作物按品质分桶 ---------------- */
+
+  function emptyBuckets() {
+    const b = {};
+    Q_IDS.forEach(function (id) { b[id] = 0; });
+    return b;
+  }
+
+  function addStore(s, id, qid, n) {
+    if (!CROPS[id] || !n) return;
+    const b = s.store[id] || (s.store[id] = emptyBuckets());
+    b[qid] = (b[qid] || 0) + n;
+  }
+
+  function storeCount(s, id) {
+    const b = s.store[id];
+    if (!b) return 0;
+    let n = 0;
+    Q_IDS.forEach(function (q) { n += b[q] || 0; });
+    return n;
+  }
+
+  /* 单个作物按品质算钱：单价 = 基础价 × 品质倍率（最低 1 金） */
+  function unitValue(id, qid) {
+    const c = CROPS[id];
+    const q = qualityById(qid);
+    if (!c || !q) return 0;
+    return Math.max(1, Math.round(c.price * q.mul));
+  }
+
+  function storeValue(s, id) {
+    const b = s.store[id];
+    if (!b) return 0;
+    let v = 0;
+    Q_IDS.forEach(function (q) { if (b[q]) v += b[q] * unitValue(id, q); });
+    return v;
+  }
+
+  /* 品质构成（好的在前），给界面显示用 */
+  function storeMix(s, id) {
+    const b = s.store[id];
+    if (!b) return [];
+    const out = [];
+    QUALITY.slice().reverse().forEach(function (q) {
+      if (b[q.id]) out.push({ id: q.id, name: q.name, emoji: q.emoji, color: q.color, n: b[q.id] });
+    });
+    return out;
+  }
+
+  /* 交委托时按品质从低到高扣，好东西留给玩家 */
+  function takeStore(s, id, n) {
+    const b = s.store[id];
+    if (!b) return 0;
+    let left = n;
+    for (let i = 0; i < QUALITY.length && left > 0; i++) {
+      const q = QUALITY[i].id;
+      const take = Math.min(left, b[q] || 0);
+      if (take) { b[q] -= take; left -= take; }
+    }
+    if (storeCount(s, id) <= 0) delete s.store[id];
+    return n - left;
+  }
 
   function sellFishGroup(s, key) {
     const g = fishGroups(s).filter(function (x) { return x.key === key; })[0];
@@ -838,7 +908,7 @@
   function orderHave(s, o) {
     if (!o) return 0;
     if (o.kind === 'fish') return (s.fishBag || []).length;
-    return s.store[o.crop] || 0;
+    return storeCount(s, o.crop);
   }
 
   function deliverOrder(s, id) {
@@ -853,8 +923,7 @@
       const drop = s.fishBag.slice().sort(function (a, b) { return a.v - b.v; }).slice(0, o.qty);
       s.fishBag = s.fishBag.filter(function (e) { return drop.indexOf(e) < 0; });
     } else {
-      s.store[o.crop] -= o.qty;
-      if (s.store[o.crop] <= 0) delete s.store[o.crop];
+      takeStore(s, o.crop, o.qty);
     }
     o.done = true;
     s.stats.orders = (s.stats.orders || 0) + 1;
@@ -959,7 +1028,22 @@
     merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0 }, s.stats || {});
     merged.orders = normalizeOrders(s.orders, merged);
     merged.seeds = s.seeds && typeof s.seeds === 'object' ? s.seeds : {};
-    merged.store = s.store && typeof s.store === 'object' ? s.store : {};
+    // 老存档的仓库是「作物: 数量」，这里迁移成「作物: {品质: 数量}」
+    merged.store = {};
+    const rawStore = s.store && typeof s.store === 'object' ? s.store : {};
+    Object.keys(rawStore).forEach(function (id) {
+      if (!CROPS[id]) return;
+      const v = rawStore[id];
+      if (typeof v === 'number') {
+        const n = Math.round(num(v, 0, 0, 9999));
+        if (n > 0) addStore(merged, id, 'std', n);
+      } else if (v && typeof v === 'object') {
+        Q_IDS.forEach(function (q) {
+          const n = Math.round(num(v[q], 0, 0, 9999));
+          if (n > 0) addStore(merged, id, q, n);
+        });
+      }
+    });
     merged.fishBag = Array.isArray(s.fishBag) ? s.fishBag.slice(0, 5000) : [];
     merged.ledger = Array.isArray(s.ledger) ? s.ledger : base.ledger;
     merged.log = Array.isArray(s.log) ? s.log.slice(0, 400) : base.log;
@@ -986,6 +1070,8 @@
     plant: plant, plantAll: plantAll, water: water, waterAll: waterAll,
     harvest: harvest, harvestAll: harvestAll, clearPlot: clearPlot,
     sellAll: sellAll, sellOne: sellOne, sellSeed: sellSeed, sellAllSeeds: sellAllSeeds,
+    addStore: addStore, storeCount: storeCount, storeValue: storeValue, storeMix: storeMix,
+    takeStore: takeStore, unitValue: unitValue,
     fishGroups: fishGroups, fishKey: fishKey, sellFishGroup: sellFishGroup, sellAllFish: sellAllFish,
     sellWorms: sellWorms, WORM_VALUE: WORM_VALUE,
     qualityById: qualityById,

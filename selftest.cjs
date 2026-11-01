@@ -53,10 +53,10 @@ r = G.sleep(s);
 s.weather = 'sunny';
 r = G.harvest(s, 0);
 ok(r.ok && r.qty >= 1, '次日可收获', r);
-ok(s.store.carrot === r.qty, '收获进仓库');
+ok(G.storeCount(s, 'carrot') === r.qty && s.store.carrot[r.quality.id] === r.qty, '收获进仓库（按品质分桶）');
 
 r = G.sellAll(s);
-ok(r.ok && s.store.carrot === undefined, '卖出清空仓库');
+ok(r.ok && G.storeCount(s, 'carrot') === 0, '卖出清空仓库');
 ok(s.coins > 42, '卖出后金币增加', s.coins);
 
 /* ---------- 2. 漏浇减产 ---------- */
@@ -170,7 +170,7 @@ ok(rGroup.ok && s.coins === coinsBeforeGroup + g0.v * g0.count && s.fishBag.leng
 
 /* 全部卖出（作物 + 渔获） */
 s = G.createState();
-s.bait.worm = 20; s.store = { carrot: 2 };
+s.bait.worm = 20; G.addStore(s, 'carrot', 'std', 2);
 for (let i = 0; i < 3; i++) { s.energy = 10; G.fish(s, 'worm'); }
 const beforeAll = s.coins;
 const rAll = G.sellAll(s);
@@ -496,6 +496,60 @@ const ex = G.expand(s);
 ok(ex.ok && s.coins === 5 && s.plots.length === 2, '导入脏档后扩张不会白送金币', { coins: s.coins });
 
 
+/* ---------- 5l. 作物品质 ---------- */
+section('作物品质');
+G.setRng(mulberry32(2026));
+
+function harvestOnce(fert) {
+  const st = G.createState();
+  st.plots[0] = { crop: 'carrot', growth: 2, watered: false, missed: 0, fert: fert,
+                  ripeDay: 0, hits: 0, phase: 'ripe' };
+  st.day = 5;
+  return G.harvest(st, 0);
+}
+
+const h1 = harvestOnce(0);
+ok(!!h1.quality && !!h1.quality.id, '收获会带品质', h1.quality && h1.quality.name);
+ok(G.unitValue('carrot', h1.quality.id) === Math.max(1, Math.round(4 * h1.quality.mul)),
+   '单价 = 基础价 × 品质倍率', G.unitValue('carrot', h1.quality.id));
+
+function avgTier(fert) {
+  let sum = 0;
+  for (let i = 0; i < 300; i++) {
+    const h = harvestOnce(fert);
+    sum += G.QUALITY.findIndex(function (q) { return q.id === h.quality.id; });
+  }
+  return sum / 300;
+}
+const q0 = avgTier(0), q2 = avgTier(2);
+ok(q2 > q0 + 0.3, '施肥会拉高品质', q0.toFixed(2) + ' → ' + q2.toFixed(2));
+
+s = G.createState();
+G.addStore(s, 'carrot', 'bad', 2);
+G.addStore(s, 'carrot', 'legend', 1);
+const vAll = 2 * G.unitValue('carrot', 'bad') + G.unitValue('carrot', 'legend');
+ok(G.storeValue(s, 'carrot') === vAll && G.storeCount(s, 'carrot') === 3, '仓库估值按品质累加', G.storeValue(s, 'carrot'));
+const coinsQ = s.coins;
+ok(G.sellOne(s, 'carrot').ok && s.coins - coinsQ === vAll && !s.store.carrot, '单卖按品质结算');
+ok(G.storeMix(s, 'carrot').length === 0, '卖空后仓库不留空桶');
+
+s = G.createState();
+G.addStore(s, 'carrot', 'bad', 2);
+G.addStore(s, 'carrot', 'legend', 1);
+G.takeStore(s, 'carrot', 2);
+ok(G.storeCount(s, 'carrot') === 1 && s.store.carrot.legend === 1, '交委托先扣品质差的');
+
+s = G.createState();
+G.addStore(s, 'carrot', 'bad', 1);
+G.addStore(s, 'carrot', 'fine', 2);
+const mix = G.storeMix(s, 'carrot');
+ok(mix[0].id === 'fine' && mix[1].id === 'bad', '仓库品质构成按好的在前',
+   mix.map(function (m) { return m.id; }).join(','));
+
+const mig = G.deserialize({ plots: [], store: { carrot: 3, corn: 1 } });
+ok(G.storeCount(mig, 'carrot') === 3 && mig.store.carrot.std === 3 && G.storeCount(mig, 'corn') === 1,
+   '老存档的数字仓库迁移成「标准」品质');
+
 /* ---------- 5k. 每日委托 ---------- */
 section('每日委托');
 G.setRng(mulberry32(77));
@@ -504,11 +558,11 @@ ok(s.orders.length === 3 && s.orders.filter(function (o) { return o.kind === 'cr
    '每天 2 个作物单 + 1 个鱼单', s.orders.map(function (o) { return o.kind; }).join(','));
 
 const co = s.orders[0];
-s.store[co.crop] = co.qty - 1;
+s.store[co.crop] = { std: co.qty - 1 };
 const coinsBefore = s.coins;
 ok(!G.deliverOrder(s, co.id).ok && s.coins === coinsBefore, '仓库不够时交不了');
 
-s.store[co.crop] = co.qty;
+s.store[co.crop] = { std: co.qty };
 const good = G.deliverOrder(s, co.id);
 ok(good.ok && s.coins === coinsBefore + co.reward && !s.store[co.crop] && co.done === true,
    '交单：给报酬、扣库存、标记完成', { coins: s.coins, left: s.store[co.crop], reward: co.reward });
