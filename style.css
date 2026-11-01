@@ -461,6 +461,30 @@ button{ font-family:inherit; }
 /* ---------------- 日志 ---------------- */
 
 .log{ max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:5px; padding-right:4px; }
+
+/* 按天折叠 */
+.log-day{
+  display:flex; align-items:center; gap:8px; cursor:pointer;
+  padding:6px 9px; border-radius:9px;
+  background:rgba(255,255,255,.6);
+  border:1px solid var(--line);
+  font-size:11.8px;
+  transition:background .12s, border-color .12s;
+}
+.log-day:hover{ background:rgba(255,249,232,.95); border-color:var(--line-2); }
+.log-day.open{ background:rgba(246,239,221,.95); }
+.log-day .ld{ font-size:10px; font-weight:800; color:var(--ink-3); flex:none; }
+.log-day .ld-count{
+  font-size:10px; font-weight:800; color:var(--green-d);
+  background:#eaf5e8; border-radius:6px; padding:1px 6px; flex:none;
+}
+.log-day .ld-last{
+  flex:1; color:var(--ink-2); font-weight:600;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.log-day.open .ld-last{ color:var(--ink-3); font-style:italic; }
+.log-day .ld-caret{ color:var(--ink-3); font-size:10px; flex:none; }
+
 .log-row{
   display:flex; gap:7px; font-size:11.8px; line-height:1.45;
   padding:5px 8px; border-radius:9px;

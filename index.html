@@ -53,7 +53,6 @@
         <div class="legend">
           <span>💧 今日已浇</span>
           <span>🧪 已施肥</span>
-          <span class="ripe-hint">✨ 发光 = 可收获</span>
         </div>
       </div>
       <div class="plot-grid" id="plot-grid"></div>
@@ -69,15 +68,13 @@
       <div class="panel-head"><h2>🔧 干活</h2></div>
       <div class="action-grid">
         <button class="btn" data-act="dig">🪱 挖蚯蚓<small>3 体力</small></button>
-        <button class="btn" data-act="work-half">🕐 半天零工<small id="work-half-txt"></small></button>
-        <button class="btn" data-act="work-full">🕑 全天零工<small id="work-full-txt"></small></button>
+        <button class="btn" data-act="work">🕐 打零工<small id="work-txt"></small></button>
       </div>
     </div>
 
     <div class="panel fishing">
       <div class="panel-head">
         <h2>🎣 河边</h2>
-        <div class="fish-meta" id="fish-meta"></div>
       </div>
       <div class="bait-row" id="bait-row"></div>
       <div class="fish-row">
@@ -87,6 +84,15 @@
       <div class="catch-area" id="catch-area">
         <div class="catch-empty">今天还没开张，甩一杆试试 🌊</div>
       </div>
+    </div>
+
+    <div class="panel store">
+      <div class="panel-head">
+        <h2>🧺 仓库</h2>
+        <button class="btn mini" data-act="sellAll">全部卖出</button>
+      </div>
+      <div id="store-list" class="store-list"></div>
+      <div class="seed-box" id="seed-box"></div>
     </div>
 
   </section>
@@ -111,15 +117,6 @@
       </div>
     </div>
 
-    <div class="panel store">
-      <div class="panel-head">
-        <h2>🧺 仓库</h2>
-        <button class="btn mini" data-act="sellAll">全部卖出</button>
-      </div>
-      <div id="store-list" class="store-list"></div>
-      <div class="seed-box" id="seed-box"></div>
-    </div>
-
     <div class="panel">
       <div class="panel-head"><h2>📒 账本</h2><span class="muted" id="ledger-sum"></span></div>
       <div class="ledger" id="ledger"></div>
@@ -134,7 +131,6 @@
     <div class="panel">
       <div class="panel-head"><h2>📜 日志</h2>
         <button class="btn mini" id="btn-log">⬇ 导出日志</button>
-        <button class="btn mini" id="btn-save">💾 存档</button>
       </div>
       <div class="log" id="log"></div>
     </div>

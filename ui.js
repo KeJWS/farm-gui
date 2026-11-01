@@ -260,15 +260,17 @@
   /* ---------------- 操作按钮 ---------------- */
 
   function renderActions() {
+    const fullNeed = G.workCost(state, 'full');
     const halfNeed = G.workCost(state, 'half');
-    if (state.energy < halfNeed) {
-      $('#work-half-txt').textContent = state.energy > 0
-        ? '体力不足 · 用光 ' + state.energy + ' 点 · +' + Math.round(state.energy) + ' 金'
-        : '体力不足 · 先睡觉';
+    if (state.energy >= fullNeed) {
+      $('#work-txt').textContent = '全天 · -' + fullNeed + ' 体力 · +' + G.workPay(state, 'full') + ' 金';
+    } else if (state.energy >= halfNeed) {
+      $('#work-txt').textContent = '半天 · -' + halfNeed + ' 体力 · +' + G.workPay(state, 'half') + ' 金';
+    } else if (state.energy > 0) {
+      $('#work-txt').textContent = '半天 · 用光 ' + state.energy + ' 点 · +' + Math.round(state.energy) + ' 金';
     } else {
-      $('#work-half-txt').textContent = '-' + halfNeed + ' 体力 · +' + G.workPay(state, 'half') + ' 金';
+      $('#work-txt').textContent = '体力不足 · 先睡觉';
     }
-    $('#work-full-txt').textContent = '-' + G.workCost(state, 'full') + ' 体力 · +' + G.workPay(state, 'full') + ' 金';
     $('#expand-txt').textContent = '第 ' + (state.plots.length + 1) + ' 块 · ' + G.expandCost(state) + ' 金';
     $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + 5) + ' · ' + G.upgradeCost(state) + ' 金';
 
@@ -279,8 +281,7 @@
       : (state.energy >= state.maxEnergy ? '体力已满' : '3 金 · +5 体力');
 
     $('[data-act="dig"]').disabled = state.energy < 3;
-    $('[data-act="work-half"]').disabled = state.energy <= 0;
-    $('[data-act="work-full"]').disabled = state.energy < G.workCost(state, 'full');
+    $('[data-act="work"]').disabled = state.energy <= 0;
     $('[data-act="expand"]').disabled = state.coins < G.expandCost(state);
     $('[data-act="upgrade"]').disabled = state.coins < G.upgradeCost(state);
   }
@@ -306,8 +307,6 @@
         '<span class="bc">' + cnt + '</span></div>';
     }).join('');
 
-    const w = G.WEATHER[state.weather];
-    $('#fish-meta').innerHTML = '价值 ×' + (w.fishMul || 1).toFixed(2) + ' · 体力 ' + state.energy;
     $('[data-act="cast"]').disabled = state.energy < 2;
     $('[data-act="cast5"]').disabled = state.energy < 2;
   }
@@ -393,10 +392,8 @@
     $('#seed-box').innerHTML = '🎒 种子：' + (seeds.length
       ? seeds.map(function (id) {
           return '<span class="tag">' + G.CROPS[id].emoji + G.CROPS[id].name + ' ×' + state.seeds[id] + '</span>';
-        }).join('') +
-        '<button class="btn mini" data-act="seedshop">去种子店</button>'
-      : '<span style="color:var(--ink-3)">无（收获 30% 留种，或去种子店买）</span>' +
-        '<button class="btn mini" data-act="seedshop">种子店</button>');
+        }).join('')
+      : '<span style="color:var(--ink-3)">无（收获 30% 留种，或去商店买）</span>');
 
     $('[data-act="sellAll"]').disabled = !ids.length && !fishCount;
   }
@@ -462,13 +459,30 @@
       : '<div class="store-empty">还没钓过鱼 🎣</div>';
   }
 
-  /* ---------------- 日志 ---------------- */
+  /* ---------------- 日志（按天折叠，点开看当天记录） ---------------- */
+
+  let openLogDay = null;
 
   function renderLog() {
-    $('#log').innerHTML = state.log.slice(0, 40).map(function (r) {
-      return '<div class="log-row ' + (r.kind || '') + '">' +
-        '<span class="ld">D' + r.day + '</span><span>' + r.text + '</span></div>';
+    const days = G.logByDay(state);
+    const rows = days.slice(0, 10).map(function (d) {
+      const open = openLogDay === d.day;
+      const last = d.items[0] ? d.items[0].text : '';
+      let html = '<div class="log-day' + (open ? ' open' : '') + '" data-logday="' + d.day + '"' +
+        ' title="' + d.items.length + ' 条记录，点击' + (open ? '收起' : '展开') + '">' +
+        '<span class="ld">D' + d.day + '</span>' +
+        '<span class="ld-count">' + d.items.length + ' 条</span>' +
+        '<span class="ld-last">' + (open ? '（点击收起）' : last) + '</span>' +
+        '<span class="ld-caret">' + (open ? '▾' : '▸') + '</span>' +
+      '</div>';
+      if (open) {
+        html += d.items.map(function (r) {
+          return '<div class="log-row ' + (r.kind || '') + '"><span>' + r.text + '</span></div>';
+        }).join('');
+      }
+      return html;
     }).join('');
+    $('#log').innerHTML = rows || '<div class="store-empty">还没有记录</div>';
   }
 
   /* ---------------- 总渲染 ---------------- */
@@ -706,7 +720,7 @@
       '· 多次收获作物（黄瓜/草莓）只有最后一收才判定留种<br>' +
       '· 种子只能在种子店买，卖回价是买价的一半<br>' +
       '· 播种只消耗背包里的种子；「全部播种」会按库存把所有空地种满<br>' +
-      '· 半天零工体力不够时会把剩下的体力全用上，收益仍按 ×1.0<br>' +
+      '· 打零工：体力满就干全天（×1.5），否则干半天（×1.0）；不够半天就把剩下的体力全用上<br>' +
       '· 账本按天汇总，点某一天可展开当日明细<br>' +
       '· 全部施肥只作用于进行中的小作物，大作物 / 已施肥 / 已成熟会跳过<br>' +
       '· 种错了可以在地块详情里「铲除」，不返还种子或金币<br>' +
@@ -754,13 +768,8 @@
       commit(r);
       if (r.ok) { toast(r.msg, 'good'); SFX.good(); floatAt(ev, '🔋 +5', 'green'); }
     },
-    'work-half': function (ev) {
-      const r = G.work(state, 'half');
-      commit(r);
-      if (r.ok) { toast(r.msg, 'good'); SFX.coin(); floatAt(ev, r.msg, ''); }
-    },
-    'work-full': function (ev) {
-      const r = G.work(state, 'full');
+    work: function (ev) {
+      const r = G.workAuto(state);
       commit(r);
       if (r.ok) { toast(r.msg, 'good'); SFX.coin(); floatAt(ev, r.msg, ''); }
     },
@@ -970,11 +979,19 @@
         renderLedger();
         return;
       }
+
+      // 日志按天展开/收起
+      const logDay = t.closest('[data-logday]');
+      if (logDay) {
+        const d = Number(logDay.dataset.logday);
+        openLogDay = (openLogDay === d) ? null : d;
+        renderLog();
+        return;
+      }
     });
 
     $('#btn-help').addEventListener('click', helpModal);
     $('#btn-reset').addEventListener('click', resetModal);
-    $('#btn-save').addEventListener('click', function () { save(); toast('已存档 💾', 'good'); });
     $('#btn-log').addEventListener('click', exportLog);
     $('#btn-export').addEventListener('click', exportSave);
     $('#btn-import').addEventListener('click', function () { $('#file-import').click(); });

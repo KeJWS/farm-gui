@@ -118,7 +118,7 @@
       coins: 50,
       energy: 10,
       maxEnergy: 10,
-      plots: [makePlot(), makePlot(), makePlot(), makePlot()],
+      plots: [makePlot(), makePlot(), makePlot(), makePlot(), makePlot()],
       seeds: {},
       store: {},
       fishBag: [],
@@ -647,6 +647,12 @@
     return { ok: true, msg: '体力 +5' };
   }
 
+  /* 打零工：体力够就干全天（×1.5），否则干半天（×1.0，体力不足就用光） */
+  function workAuto(s) {
+    const full = workCost(s, 'full');
+    return work(s, s.energy >= full ? 'full' : 'half');
+  }
+
   function work(s, mode) {
     const cost = workCost(s, mode);
 
@@ -777,6 +783,18 @@
     return days;
   }
 
+  /* 日志按天汇总：每天一条，items 里是当天的记录（新→旧） */
+  function logByDay(s) {
+    const days = [];
+    const map = new Map();
+    (s.log || []).forEach(function (r) {
+      let d = map.get(r.day);
+      if (!d) { d = { day: r.day, items: [] }; map.set(r.day, d); days.push(d); }
+      d.items.push(r);
+    });
+    return days;
+  }
+
   function deserialize(json) {
     const s = typeof json === 'string' ? JSON.parse(json) : json;
     const base = createState();
@@ -805,7 +823,7 @@
     WEATHER: WEATHER, WEATHER_LIST: WEATHER_LIST, BAIT: BAIT, SAVE_VERSION: SAVE_VERSION,
     setRng: setRng,
     createState: createState, serialize: serialize, deserialize: deserialize,
-    ledgerByDay: ledgerByDay,
+    ledgerByDay: ledgerByDay, logByDay: logByDay,
     mealFee: mealFee, expandCost: expandCost, upgradeCost: upgradeCost,
     workCost: workCost, workPay: workPay, needOf: needOf, expectedYield: expectedYield,
     canHarvest: canHarvest, stageEmoji: stageEmoji, fertBonus: fertBonus, baitCount: baitCount,
@@ -817,7 +835,7 @@
     buySeed: buySeed, seedBuyPrice: seedBuyPrice, seedSellPrice: seedSellPrice,
     SEED_SELL_RATE: SEED_SELL_RATE,
     buyFert: buyFert, fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
-    fishMany: fishMany, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work,
+    fishMany: fishMany, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather
   };
 

@@ -22,7 +22,7 @@ function mulberry32(a) {
 section('播种 · 浇水 · 次日收获');
 G.setRng(mulberry32(7));
 let s = G.createState();
-ok(s.coins === 50 && s.energy === 10 && s.plots.length === 4, '初始状态 50 金/10 体力/4 块地');
+ok(s.coins === 50 && s.energy === 10 && s.plots.length === 5, '初始状态 50 金/10 体力/5 块地');
 
 let r = G.plant(s, 0, 'carrot');
 ok(!r.ok, '没有种子不能播种', r.msg);
@@ -232,10 +232,10 @@ ok(!G.fish(s).ok, '没有饵料钓不了');
 section('经济系统');
 G.setRng(mulberry32(5));
 s = G.createState();
-ok(G.expandCost(s) === 25, '第 5 块地 25 金');
+ok(G.expandCost(s) === 40, '默认 5 块地，第 6 块 40 金');
 s.coins = 1000;
 G.expand(s);
-ok(G.expandCost(s) === 40, '第 6 块地 40 金');
+ok(G.expandCost(s) === 55, '第 7 块 55 金');
 ok(G.upgradeCost(s) === 30, '首次强化 30 金');
 G.upgrade(s);
 ok(s.maxEnergy === 15 && G.mealFee(s) === 4, '强化后上限 15、伙食 4 金', { max: s.maxEnergy, fee: G.mealFee(s) });
@@ -290,13 +290,13 @@ section('全部播种');
 s = G.createState();
 s.seeds = { carrot: 10 };
 let rp = G.plantAll(s, 'carrot');
-ok(rp.ok && rp.planted === 4 && s.plots.every(function (p) { return p.crop === 'carrot'; }), '4 块空地一次种满', rp);
-ok(s.seeds.carrot === 6 && s.energy === 6, '消耗 4 颗种子 + 4 体力', { seeds: s.seeds, energy: s.energy });
+ok(rp.ok && rp.planted === 5 && s.plots.every(function (p) { return p.crop === 'carrot'; }), '5 块空地一次种满', rp);
+ok(s.seeds.carrot === 5 && s.energy === 5, '消耗 5 颗种子 + 5 体力', { seeds: s.seeds, energy: s.energy });
 
 s = G.createState();
 s.seeds = { carrot: 2 };
 rp = G.plantAll(s, 'carrot');
-ok(rp.ok && rp.planted === 2 && s.plots.filter(function (p) { return !p.crop; }).length === 2,
+ok(rp.ok && rp.planted === 2 && s.plots.filter(function (p) { return !p.crop; }).length === 3,
    '种子不够时种多少算多少', rp);
 ok(/没有/.test(rp.stop || ''), '并给出停止原因', rp.stop);
 
@@ -315,7 +315,7 @@ ok(G.fertTargets(s).length === 4, '4 块地都可施肥', G.fertTargets(s).lengt
 let rf = G.fertilizeAll(s, 'normal');
 ok(rf.ok && rf.n === 4 && rf.cost === 20 && s.coins === 80 && s.energy === 12,
    '普通肥 ×4：-20 金、-4 体力', { n: rf.n, coins: s.coins, energy: s.energy });
-ok(s.plots.every(function (p) { return p.fert === 1; }), '每块地 +1 产量');
+ok(s.plots.filter(function (p) { return p.crop; }).every(function (p) { return p.fert === 1; }), '每块种了的地 +1 产量');
 ok(G.expectedYield(s, s.plots[0]) === 4, '预计产量含施肥（萝卜 3+1）', G.expectedYield(s, s.plots[0]));
 ok(!G.fertilizeAll(s, 'normal').ok, '已施肥的地块不再重复施');
 
@@ -366,6 +366,36 @@ ok(agg[0].day === 3 && agg[0].income === 20 && agg[0].expense === 7, '第 3 天�
 ok(agg[0].balance === 62 && agg[0].items.length === 3, '当天余额取最后一笔，明细 3 条', { b: agg[0].balance, n: agg[0].items.length });
 ok(agg[2].day === 1 && agg[2].balance === 50, '最早一天正常汇总', agg[2]);
 
+/* ---------- 5g. 打零工合并 ---------- */
+section('打零工（半天/全天合并）');
+s = G.createState(); s.coins = 0; s.energy = 10;
+let wa = G.workAuto(s);
+ok(wa.ok && s.energy === 0 && s.coins === 15, '体力满 → 全天（-10 体力 +15 金）', { e: s.energy, c: s.coins });
+
+s = G.createState(); s.coins = 0; s.energy = 6;
+wa = G.workAuto(s);
+ok(wa.ok && s.energy === 1 && s.coins === 5, '体力 6 → 半天（-5 体力 +5 金）', { e: s.energy, c: s.coins });
+
+s = G.createState(); s.coins = 0; s.energy = 3;
+wa = G.workAuto(s);
+ok(wa.ok && s.energy === 0 && s.coins === 3, '体力不足半天 → 用光全部', { e: s.energy, c: s.coins });
+
+s = G.createState(); s.energy = 0;
+ok(!G.workAuto(s).ok, '没有体力时打不了零工');
+
+/* ---------- 5h. 日志按天折叠 ---------- */
+section('日志按天折叠');
+s = G.createState();
+s.log = [
+  { day: 3, text: 'c', kind: 'good' },
+  { day: 3, text: 'b', kind: 'info' },
+  { day: 2, text: 'a', kind: 'sys' }
+];
+const ldays = G.logByDay(s);
+ok(ldays.length === 2 && ldays[0].day === 3 && ldays[0].items.length === 2,
+   '第 3 天 2 条、第 2 天 1 条', ldays.map(function (d) { return [d.day, d.items.length]; }));
+ok(ldays[1].day === 2 && ldays[1].items[0].text === 'a', '组内保留原文与顺序');
+
 /* 没钱吃饭 */
 s = G.createState();
 s.coins = 0; s.energy = 2;
@@ -379,7 +409,7 @@ s.seeds = { corn: 1 };
 G.plant(s, 0, 'corn');
 const round = G.deserialize(G.serialize(s));
 ok(round.plots[0].crop === 'corn' && round.coins === s.coins, '序列化往返一致');
-ok(round.plots.length === 4 && round.fishBook.count === 0, '结构完整');
+ok(round.plots.length === 5 && round.fishBook.count === 0, '结构完整');
 
 /* ---------- 7. 随机压测 ---------- */
 section('随机压测 3000 步');
