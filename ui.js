@@ -181,14 +181,19 @@
     const anyRipe = state.plots.some(function (p) { return p.crop && G.canHarvest(state, p); });
     const anyEmpty = state.plots.some(function (p) { return !p.crop; });
     const seedTotal = Object.keys(state.seeds).reduce(function (n, k) { return n + (state.seeds[k] || 0); }, 0);
+    const fertList = G.fertTargets(state);
 
-    $('[data-act="waterAll"]').disabled = !anyGrow || !!G.WEATHER[state.weather].stall;
+    $('[data-act="waterAll"]').disabled = !anyGrow;
     $('[data-act="harvestAll"]').disabled = !anyRipe;
     $('[data-act="plantAll"]').disabled = !anyEmpty;
+    $('[data-act="fertilizeAll"]').disabled = !fertList.length || state.energy < 1 || state.coins < 5;
     $('#plantall-txt').textContent = anyEmpty
       ? (seedTotal ? '库存 ' + seedTotal + ' 颗 · 空地 ' + state.plots.filter(function (p) { return !p.crop; }).length + ' 块'
                    : '没种子 · 点这里去种子店')
       : '没有空地';
+    $('#fertall-txt').textContent = fertList.length
+      ? '可施 ' + fertList.length + ' 块 · 5 金起'
+      : (anyGrow ? '都施过肥了' : '没有进行中的作物');
   }
 
   /* ---------------- 操作按钮 ---------------- */
@@ -241,25 +246,44 @@
     }).join('');
 
     const w = G.WEATHER[state.weather];
-    $('#fish-meta').innerHTML = w.noFish
-      ? '⛔ 今天禁钓'
-      : '价值 ×' + (w.fishMul || 1).toFixed(2) + ' · 体力 ' + state.energy;
-    $('[data-act="cast"]').disabled = w.noFish || state.energy < 2;
-    $('[data-act="cast5"]').disabled = w.noFish || state.energy < 2;
+    $('#fish-meta').innerHTML = '价值 ×' + (w.fishMul || 1).toFixed(2) + ' · 体力 ' + state.energy;
+    $('[data-act="cast"]').disabled = state.energy < 2;
+    $('[data-act="cast5"]').disabled = state.energy < 2;
   }
 
-  function catchCard(e) {
-    const col = e.quality ? e.quality.color : '#9a866c';
-    const sub = e.quality ? (e.quality.emoji + ' ' + e.quality.name) : '杂物 · 只能卖 1 金';
-    return '<div class="catch-card" style="border-color:' + col + '44;box-shadow:0 4px 16px ' + col + '22">' +
-      '<div class="ce">' + e.emoji + '</div>' +
-      '<div><div class="cname">' + e.fish + '</div>' +
-      '<div class="cq" style="color:' + col + '">' + sub + '</div></div>' +
-      '<div class="cprice">+' + e.price + ' 金</div></div>';
+  /* 最近渔获：单杆/连甩都按条列出来，保留最近 5 条 */
+  let catchLog = [];
+
+  function renderCatch() {
+    const box = $('#catch-area');
+    if (!catchLog.length) {
+      box.innerHTML = '<div class="catch-empty">今天还没开张，甩一杆试试 🌊</div>';
+      return;
+    }
+    const sum = catchLog.reduce(function (n, e) { return n + e.price; }, 0);
+    box.innerHTML =
+      '<div class="catch-sum">最近 ' + catchLog.length + ' 条 · 合计 +' + sum + ' 金</div>' +
+      '<div class="catch-list">' + catchLog.map(function (e) {
+        const col = e.quality ? e.quality.color : '#9a866c';
+        return '<div class="catch-item" style="border-left-color:' + col + '">' +
+          '<span class="ce">' + e.emoji + '</span>' +
+          '<span class="cn2">' + e.fish + '</span>' +
+          '<span class="cq2" style="color:' + col + '">' +
+            (e.quality ? e.quality.emoji + ' ' + e.quality.name : '杂物') + '</span>' +
+          '<span class="cp2">+' + e.price + '</span>' +
+        '</div>';
+      }).join('') + '</div>';
   }
 
-  function showCatch(e) {
-    $('#catch-area').innerHTML = catchCard(e);
+  function pushCatch(entry) {
+    catchLog.unshift(entry);
+    if (catchLog.length > 5) catchLog.length = 5;
+    renderCatch();
+  }
+
+  function setCatchBatch(entries) {
+    catchLog = entries.slice().reverse().slice(0, 5);
+    renderCatch();
   }
 
   /* ---------------- 仓库 ---------------- */
@@ -372,6 +396,7 @@
     renderPlots();
     renderActions();
     renderBait();
+    renderCatch();
     renderStore();
     renderLedger();
     renderBook();
@@ -513,6 +538,32 @@
       '<button class="btn" data-close>关闭</button>');
   }
 
+  /* ---------------- 全部施肥 ---------------- */
+
+  function fertModal() {
+    const list = G.fertTargets(state);
+    if (!list.length) { toast('没有可施肥的地块', 'warn'); return; }
+    if (state.energy < 1) { toast('体力不够，先睡觉吧', 'warn'); return; }
+
+    const rows = ['normal', 'special'].map(function (k) {
+      const f = G.FERT[k];
+      const byMoney = Math.floor(state.coins / f.cost);
+      const n = Math.max(0, Math.min(list.length, byMoney, state.energy));
+      const off = n <= 0;
+      return '<button class="btn" data-fert="' + k + '"' + (off ? ' disabled' : '') + '>' +
+        '<span>' + f.emoji + ' ' + f.name + '</span>' +
+        '<small>' + f.cost + ' 金/块 · +' + f.add + ' 产量</small>' +
+        '<small>' + (off ? '钱或体力不够' : '施 ' + n + ' 块 · 共 ' + (n * f.cost) + ' 金') + '</small>' +
+      '</button>';
+    }).join('');
+
+    openModal('🧪 全部施肥',
+      '<div class="shop-head">可施肥地块 <b>' + list.length + '</b> 块' +
+        '<span style="font-weight:600;color:var(--ink-3)"> · 大作物 / 已施肥 / 已成熟会跳过</span></div>' +
+      '<div class="action-grid">' + rows + '</div>',
+      '<button class="btn" data-close>取消</button>');
+  }
+
   /* ---------------- 商店 / 帮助 / 重置 ---------------- */
 
   function shopModal() {
@@ -562,6 +613,7 @@
       '· 播种只消耗背包里的种子；「全部播种」会按库存把所有空地种满<br>' +
       '· 半天零工体力不够时会把剩下的体力全用上，收益仍按 ×1.0<br>' +
       '· 账本按天汇总，点某一天可展开当日明细<br>' +
+      '· 全部施肥只作用于进行中的小作物，大作物 / 已施肥 / 已成熟会跳过<br>' +
       '· 进度自动保存在本浏览器（localStorage）</div>';
 
     openModal('📖 规则速查', body, '<button class="btn" data-close>知道了</button>');
@@ -628,6 +680,7 @@
     shop: shopModal,
     seedshop: seedShop,
     plantAll: function () { cropPicker(0, true); },
+    fertilizeAll: fertModal,
     sellAll: function () {
       const r = G.sellAll(state);
       commit(r);
@@ -637,7 +690,7 @@
       const r = G.fish(state, baitSel);
       commit(r);
       if (r.ok) {
-        showCatch(r.entry);
+        pushCatch(r.entry);
         toast(r.msg, r.entry.trash ? 'warn' : 'good');
         SFX.catch();
         floatAt(ev, '+' + r.entry.price + ' 金', '');
@@ -647,9 +700,8 @@
       const r = G.fishMany(state, 5, baitSel);
       commit(r);
       if (!r.ok) { toast(r.msg, 'warn'); return; }
-      const best = r.results.filter(function (x) { return x.ok; })
-        .sort(function (a, b) { return b.entry.price - a.entry.price; })[0];
-      if (best) showCatch(best.entry);
+      const got = r.results.filter(function (x) { return x.ok; }).map(function (x) { return x.entry; });
+      setCatchBatch(got);
       toast(r.msg, 'good');
       SFX.catch();
     }
@@ -672,6 +724,7 @@
 
       if (t.closest('#do-reset')) {
         state = G.createState();
+        catchLog = [];
         closeModal();
         renderAll();
         save();
@@ -727,6 +780,17 @@
           if (r.ok) { closeModal(); commit(r); toast(r.msg, 'good'); SFX[r.crop ? 'coin' : 'water'](); }
           else { toast(r.msg, 'warn'); SFX.bad(); }
         }
+        return;
+      }
+
+      // 全部施肥
+      const fertBtn = t.closest('[data-fert]');
+      if (fertBtn && !fertBtn.disabled) {
+        const r = G.fertilizeAll(state, fertBtn.dataset.fert);
+        closeModal();
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.good();
         return;
       }
 
@@ -818,6 +882,8 @@
     const saved = load();
     if (saved) {
       state = saved;
+      // 用钓鱼记录本里的历史把「最近渔获」补上
+      catchLog = (state.fishBook.entries || []).slice(0, 5);
     } else {
       state = G.createState();
     }

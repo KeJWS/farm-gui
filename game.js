@@ -57,14 +57,12 @@
   ];
 
   const WEATHER = {
-    sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 40, fishMul: 0.8, wormMod: -1,
+    sunny:  { id: 'sunny',  name: '晴天',   emoji: '☀️', w: 45, fishMul: 0.8, wormMod: -1,
               note: '钓鱼价值 -20% · 挖蚯蚓 -1 份' },
     cloudy: { id: 'cloudy', name: '阴天',   emoji: '⛅', w: 30, fishMul: 1.5, wormMod: 1,
               note: '钓鱼价值 +50% · 挖蚯蚓 +1 份' },
     rain:   { id: 'rain',   name: '雨天',   emoji: '🌧️', w: 25, fishMul: 1.3, wormMod: 1, autoWater: true,
-              note: '自动浇水 · 钓鱼价值 +30% · 挖蚯蚓 +1 份' },
-    storm:  { id: 'storm',  name: '暴风雨', emoji: '⛈️', w: 5,  fishMul: 0, wormMod: 0, noFish: true, stall: true,
-              note: '禁止钓鱼 · 作物停滞一天' }
+              note: '自动浇水 · 钓鱼价值 +30% · 挖蚯蚓 +1 份' }
   };
   const WEATHER_LIST = Object.keys(WEATHER).map(function (k) { return WEATHER[k]; });
 
@@ -243,7 +241,6 @@
     const p = s.plots[idx];
     if (!p || !p.crop) return { ok: false, msg: '这块地还没种东西' };
     if (p.phase === 'ripe') return { ok: false, msg: '已经成熟，快点收获吧' };
-    if (WEATHER[s.weather].stall) return { ok: false, msg: '⛈️ 暴风雨，作物停滞一天' };
     if (p.watered) return { ok: false, msg: '今天已经浇过水了' };
     if (s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
     s.energy -= 1;
@@ -259,11 +256,10 @@
     let done = 0, ripened = 0, lack = 0;
     s.plots.forEach(function (p, i) {
       if (!p.crop || p.phase === 'ripe' || p.watered) return;
-      if (WEATHER[s.weather].stall) return;
       const r = water(s, i);
       if (r.ok) { done++; if (r.ripe) ripened++; } else lack++;
     });
-    if (!done) return { ok: false, msg: WEATHER[s.weather].stall ? '⛈️ 暴风雨，今天浇不了' : '没有需要浇水的地块' };
+    if (!done) return { ok: false, msg: '没有需要浇水的地块' };
     return { ok: true, msg: '浇了 ' + done + ' 块地' + (ripened ? '，' + ripened + ' 块成熟' : ''), done: done };
   }
 
@@ -372,6 +368,50 @@
     return { ok: true, msg: f.name + ' 施用成功' };
   }
 
+  /* 这块地能不能施肥（大作物、已施肥、已成熟都不行） */
+  function canFert(s, idx) {
+    const p = s.plots[idx];
+    if (!p || !p.crop) return false;
+    if (CROPS[p.crop].big) return false;
+    if (p.fert) return false;
+    if (p.phase === 'ripe') return false;
+    return true;
+  }
+
+  function fertTargets(s) {
+    const list = [];
+    s.plots.forEach(function (p, i) { if (canFert(s, i)) list.push(i); });
+    return list;
+  }
+
+  /* 全部施肥：给所有可施肥的地块灌同一种肥，钱/体力不够就停 */
+  function fertilizeAll(s, kind) {
+    const f = FERT[kind];
+    if (!f) return { ok: false, msg: '没有这种肥料' };
+    const targets = fertTargets(s);
+    if (!targets.length) return { ok: false, msg: '没有可施肥的地块（大作物、已施肥、已成熟都不行）' };
+
+    let n = 0, cost = 0, stop = null;
+    for (let k = 0; k < targets.length; k++) {
+      if (s.energy < 1) { stop = '体力不够了'; break; }
+      if (s.coins < f.cost) { stop = '金币不够了'; break; }
+      const p = s.plots[targets[k]];
+      s.coins -= f.cost;
+      s.energy -= 1;
+      p.fert = f.add;
+      n++; cost += f.cost;
+    }
+    if (!n) return { ok: false, msg: stop || '施肥失败' };
+
+    ledger(s, '施肥 ' + f.name + '×' + n, 0, cost);
+    log(s, '🧪 ' + f.name + ' × ' + n + ' 块地（-' + cost + ' 金，每块 +' + f.add + ' 产量）' +
+            (stop ? '，' + stop : ''), 'good');
+    return {
+      ok: true, n: n, cost: cost, stop: stop,
+      msg: '施了 ' + n + ' 块地，-' + cost + ' 金' + (stop ? '（' + stop + '）' : '')
+    };
+  }
+
   function sleep(s) {
     const fee = mealFee(s);
     const notes = [];
@@ -384,12 +424,9 @@
       notes.push('😵 没钱吃饭，饿着睡了（只恢复 5 体力）');
     }
 
-    const stormToday = !!WEATHER[s.weather].stall;
-    if (!stormToday) {
-      s.plots.forEach(function (p) {
-        if (p.crop && (p.phase === 'growing' || p.phase === 'regrow') && !p.watered) p.missed++;
-      });
-    }
+    s.plots.forEach(function (p) {
+      if (p.crop && (p.phase === 'growing' || p.phase === 'regrow') && !p.watered) p.missed++;
+    });
     s.plots.forEach(function (p) { p.watered = false; });
 
     s.day++;
@@ -406,7 +443,6 @@
       });
       if (n) notes.push('🌧️ 自动浇水 ' + n + ' 块地' + (ripe ? '，' + ripe + ' 块成熟' : ''));
     }
-    if (w.stall) notes.push('⛈️ 暴风雨，作物今天停滞');
 
     log(s, '🌙 睡觉 → 第 ' + s.day + ' 天 · ' + w.name, 'sys');
     return { ok: true, msg: '新的一天', day: s.day, notes: notes, weather: s.weather };
@@ -431,7 +467,6 @@
 
   function fish(s, preferBait) {
     const w = WEATHER[s.weather];
-    if (w.noFish) return { ok: false, msg: '⛈️ 暴风雨，今天钓不了鱼' };
     if (s.energy < 2) return { ok: false, msg: '体力不够（钓鱼要 2 点）' };
     const kind = pickBait(s, preferBait);
     if (!kind) return { ok: false, msg: '没有饵料了，先去挖蚯蚓或买面团饵' };
@@ -707,7 +742,7 @@
     sellAll: sellAll, sellOne: sellOne, sellSeed: sellSeed, sellAllSeeds: sellAllSeeds,
     buySeed: buySeed, seedBuyPrice: seedBuyPrice, seedSellPrice: seedSellPrice,
     SEED_SELL_RATE: SEED_SELL_RATE,
-    buyFert: buyFert, sleep: sleep, fish: fish,
+    buyFert: buyFert, fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
     fishMany: fishMany, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather
   };

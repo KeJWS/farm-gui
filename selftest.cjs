@@ -149,9 +149,11 @@ ok(junkOk, '垃圾无品质、固定 1 金、名字来自三种杂物', junkEntr
 const fishWithoutQuality = s.fishBook.entries.filter(e => !e.trash).every(e => e.quality && e.quality.mul);
 ok(fishWithoutQuality, '非垃圾鱼都带品质');
 
-/* 暴风雨禁钓 */
-s.energy = 10; s.weather = 'storm';
-ok(!G.fish(s).ok, '暴风雨禁止钓鱼');
+/* 天气只剩三种（暴风雨已移除） */
+const wIds = Object.keys(G.WEATHER);
+ok(wIds.length === 3 && !wIds.includes('storm'), '天气只有 晴/阴/雨 三种', wIds);
+ok(G.WEATHER.sunny.w + G.WEATHER.cloudy.w + G.WEATHER.rain.w === 100, '天气概率合计 100%',
+   [G.WEATHER.sunny.w, G.WEATHER.cloudy.w, G.WEATHER.rain.w]);
 
 /* 无饵料 */
 s.weather = 'sunny'; s.bait = { worm: 0, dough: 0 }; s.lure = { owned: false, dur: 0 };
@@ -234,7 +236,40 @@ s.seeds = { carrot: 10 };
 G.plantAll(s, 'carrot');
 ok(!G.plantAll(s, 'carrot').ok, '没有空地时提示');
 
-/* ---------- 5d. 账本按天汇总 ---------- */
+/* ---------- 5d. 全部施肥 ---------- */
+section('全部施肥');
+s = G.createState();
+s.seeds = { carrot: 4 }; s.coins = 100; s.energy = 20;
+G.plantAll(s, 'carrot');
+ok(G.fertTargets(s).length === 4, '4 块地都可施肥', G.fertTargets(s).length);
+
+let rf = G.fertilizeAll(s, 'normal');
+ok(rf.ok && rf.n === 4 && rf.cost === 20 && s.coins === 80 && s.energy === 12,
+   '普通肥 ×4：-20 金、-4 体力', { n: rf.n, coins: s.coins, energy: s.energy });
+ok(s.plots.every(function (p) { return p.fert === 1; }), '每块地 +1 产量');
+ok(G.expectedYield(s, s.plots[0]) === 4, '预计产量含施肥（萝卜 3+1）', G.expectedYield(s, s.plots[0]));
+ok(!G.fertilizeAll(s, 'normal').ok, '已施肥的地块不再重复施');
+
+s = G.createState();
+s.seeds = { pumpkin: 2 }; s.coins = 100;
+G.plantAll(s, 'pumpkin');
+ok(G.fertTargets(s).length === 0, '南瓜 / 西瓜不吃肥料');
+
+s = G.createState();
+s.seeds = { carrot: 4 }; s.coins = 12; s.energy = 20;
+G.plantAll(s, 'carrot');
+rf = G.fertilizeAll(s, 'normal');
+ok(rf.ok && rf.n === 2 && s.coins === 2 && /金币/.test(rf.stop || ''),
+   '金币只够 2 块时施 2 块后停', rf);
+
+s = G.createState();
+s.seeds = { carrot: 4 }; s.coins = 100; s.energy = 5;
+G.plantAll(s, 'carrot');                       // 播完还剩 1 体力
+rf = G.fertilizeAll(s, 'special');
+ok(rf.ok && rf.n === 1 && s.energy === 0 && /体力/.test(rf.stop || ''),
+   '体力只够 1 块时施 1 块后停', rf);
+
+/* ---------- 5e. 账本按天汇总 ---------- */
 section('账本按天汇总');
 s = G.createState();
 s.ledger = [
