@@ -190,7 +190,7 @@
 
   /* 设备每周维护费：洒水器 2、渔网 2、自动收获器 4 */
   function deviceUpkeep(s) {
-    return (s.sprinklers || 0) * 2 + (s.nets || 0) * 2 + (s.harvester ? 4 : 0);
+    return (s.sprinklers || 0) * 3 + (s.nets || 0) * 3 + (s.harvester ? 5 : 0);
   }
 
   function expandCost(s) {
@@ -604,6 +604,15 @@
       notes.push('🧾 本周维护费 -' + pay + ' 金（土地 ' + landFee + ' + 设备 ' + devFee + '）');
     }
 
+    // 月度税金：每 30 天按金币 5% 收
+    if (s.day % 30 === 0) {
+      const tax = taxDue(s);
+      const pay = Math.min(tax, s.coins);
+      s.coins -= pay;
+      ledger(s, '月度税金', 0, pay);
+      notes.push('🏛️ 月度税金 -' + pay + ' 金');
+    }
+
     log(s, '🌙 睡觉 → 第 ' + s.day + ' 天 · ' + w.name, 'sys');
     return { ok: true, msg: '新的一天', day: s.day, notes: notes, weather: s.weather };
   }
@@ -922,10 +931,34 @@
   }
 
   /* 自动收获器：睡觉时免费收成熟作物 */
-  const HARVESTER_COST = 160;
-  const NET_COST = 70;
-  const NET_MAX = 6;
+  const HARVESTER_COST = 200;
+  const NET_COST = 80;
+  const NET_MAX = 9;
   const NET_CHANCE = 0.65;
+
+  /* 月度税金：按金币 5% 收，最低 20 金 */
+  function taxDue(s) { return Math.max(20, Math.round((s.coins || 0) * 0.05)); }
+
+  /* 水产店售价：基础价的 1.8 倍 */
+  function fishBuyPrice(id) {
+    const f = FISH.filter(function (x) { return x.id === id; })[0];
+    return f ? Math.max(3, Math.round(f.base * 1.8)) : 0;
+  }
+
+  function buyFish(s, id, n) {
+    const f = FISH.filter(function (x) { return x.id === id; })[0];
+    if (!f || f.trash) return { ok: false, msg: '这种水产买不到' };
+    const qty = Math.max(1, Math.floor(n || 1));
+    const cost = fishBuyPrice(id) * qty;
+    if (s.coins < cost) return { ok: false, msg: '金币不够' };
+    s.coins -= cost;
+    ledger(s, '买水产 ' + f.name + ' ×' + qty, 0, cost);
+    for (let i = 0; i < qty; i++) {
+      s.fishBag.push({ name: f.name, emoji: f.emoji, q: 'std', v: f.base, d: s.day });
+    }
+    log(s, '🐟 买进 ' + f.emoji + ' ' + f.name + ' ×' + qty + '（-' + cost + ' 金）', 'info');
+    return { ok: true, qty: qty, cost: cost, msg: '买到 ' + f.name + ' ×' + qty };
+  }
 
   /* 渔网：每天吃 1 份面团饵，有概率网到 1 条鱼 */
   function netCatch(s) {
@@ -1334,7 +1367,7 @@
     buyHarvester: buyHarvester, HARVESTER_COST: HARVESTER_COST, refreshOrders: refreshOrders,
     toggleHarvester: toggleHarvester, buyNet: buyNet, netCatch: netCatch,
     NET_COST: NET_COST, NET_MAX: NET_MAX, NET_CHANCE: NET_CHANCE, plotUpkeep: plotUpkeep,
-    storeTotal: storeTotal, deviceUpkeep: deviceUpkeep, HOOK: HOOK,
+    storeTotal: storeTotal, taxDue: taxDue, buyFish: buyFish, fishBuyPrice: fishBuyPrice, deviceUpkeep: deviceUpkeep, HOOK: HOOK,
     fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
     fishMany: fishMany, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather

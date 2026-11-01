@@ -743,3 +743,8 @@ button{ color:inherit; font:inherit; }
 .codex-stat span{ font-size:10.5px; font-weight:700; color:var(--ink-3); }
 .book-row .bd{ width:36px; text-align:center; font-size:10.5px; font-weight:700; color:var(--ink-3); flex:none; }
 .book-row .bv{ width:56px; text-align:right; font-size:10.5px; font-weight:800; color:var(--gold); flex:none; }
+
+/* ---------- v1.5: 3-col shop / stats canvas ---------- */
+.shop-two{ grid-template-columns:repeat(3, minmax(0,1fr)) !important; }
+#stat-canvas{ width:100%; max-width:100%; height:auto; display:block; margin:4px 0 8px; border-radius:10px; background:var(--card); border:1px solid var(--line); }
+@media (max-width:560px){ .shop-two{ grid-template-columns:1fr !important; } }

@@ -670,7 +670,7 @@ section('v1.2.0 新功能');
 G.setRng(mulberry32(33));
 
 s = G.createState(); s.coins = 500;
-ok(G.buyHarvester(s).ok && s.harvester === true && s.coins === 340, '自动收获器 160 金');
+ok(G.buyHarvester(s).ok && s.harvester === true && s.coins === 300, '自动收获器 200 金');
 ok(!G.buyHarvester(s).ok, '只能装一个');
 
 G.setRng(function () { return 0.1; });          // 晴天
@@ -808,12 +808,12 @@ ok(Math.abs(ord.reward - Math.round(direct * 1.35)) <= 1, '委托报酬稳定在
 
 // 设备维护费
 s = G.createState(); s.sprinklers = 3; s.nets = 2; s.harvester = true;
-ok(G.deviceUpkeep(s) === 3 * 2 + 2 * 2 + 4, '设备周维护费 = 洒水器 2 + 渔网 2 + 收获器 4', G.deviceUpkeep(s));
+ok(G.deviceUpkeep(s) === 3 * 3 + 2 * 3 + 5, '设备周维护费 = 洒水器 3 + 渔网 3 + 收获器 5', G.deviceUpkeep(s));
 s = G.createState();
 s.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
 s.day = 6; s.coins = 200; s.sprinklers = 3; s.nets = 1;
 G.sleep(s);
-ok(s.coins === 200 - 3 - (15 + 6 + 2), '周末同时扣土地与设备维护费', s.coins);
+ok(s.coins === 200 - 3 - (15 + 9 + 3), '周末同时扣土地与设备维护费', s.coins);
 
 // 老存档图鉴回填
 const migFish = G.deserialize({
@@ -823,6 +823,30 @@ const migFish = G.deserialize({
 });
 ok(migFish.codex.fish.crucian && migFish.codex.fish.crucian.n === 1 && migFish.codex.fish.crucian.first === 4,
    '老存档从钓鱼记录回填图鉴', migFish.codex.fish.crucian);
+
+/* ---------- 5q. v1.5.0：税金 / 水产店 / 渔网上限 ---------- */
+section('v1.5.0 税金与水产店');
+G.setRng(mulberry32(321));
+
+s = G.createState(); s.coins = 0;
+ok(G.taxDue(s) === 20, '税金最低 20 金', G.taxDue(s));
+s.coins = 1000;
+ok(G.taxDue(s) === 50, '税金 = 金币 5%', G.taxDue(s));
+
+s = G.createState(); s.coins = 1000; s.day = 29;
+G.sleep(s);
+ok(s.day === 30 && s.coins === 1000 - 3 - 50, '第 30 天结算月税（税前 997 → 税 50）', s.coins);
+
+s = G.createState(); s.coins = 100; s.fishBag = [];
+const bp = G.fishBuyPrice('crucian');
+ok(G.buyFish(s, 'crucian', 1).ok && s.coins === 100 - bp && s.fishBag.length === 1 && s.fishBag[0].v === 3,
+   '水产店能买鱼（5 金/条，价值 3）', { coins: s.coins, bag: s.fishBag.length });
+ok(!G.buyFish(s, 'trash', 1).ok, '杂物买不到');
+ok(G.fishBuyPrice('koi') === 45, '锦鲤买价 45 金', G.fishBuyPrice('koi'));
+
+s = G.createState(); s.coins = 1e6;
+while (G.buyNet(s).ok) { /* 买满 */ }
+ok(s.nets === 9 && G.NET_MAX === 9, '渔网最多 9 张', s.nets);
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');
