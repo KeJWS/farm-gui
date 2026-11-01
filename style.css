@@ -47,7 +47,7 @@ button{ font-family:inherit; }
   position:sticky; top:0; z-index:50;
   display:flex; align-items:center; gap:18px;
   padding:12px 20px;
-  background:rgba(255,251,242,.82);
+  background:var(--topbar);
   backdrop-filter:blur(14px) saturate(1.2);
   border-bottom:1px solid var(--line);
   box-shadow:0 6px 20px rgba(120,95,60,.07);
@@ -189,7 +189,7 @@ button{ font-family:inherit; }
 .plot:hover{ transform:translateY(-2px); box-shadow:var(--shadow-hover); border-color:var(--line-2); }
 .plot:active{ transform:translateY(0) scale(.995); }
 
-.plot.empty{ background:linear-gradient(180deg,#faf4e6,#f1e6d1); }
+.plot.empty{ background:linear-gradient(180deg,var(--plot1),var(--plot2)); }
 
 /* 空地：CSS 画的土堆 */
 .plot-art.soil{
@@ -288,7 +288,7 @@ button{ font-family:inherit; }
   transition:transform .12s, box-shadow .12s, background .12s, opacity .12s;
 }
 .btn small{ font-size:10.5px; font-weight:600; color:var(--ink-3); }
-.btn:hover:not(:disabled){ transform:translateY(-1px); box-shadow:0 4px 0 rgba(160,130,90,.14), 0 10px 18px rgba(120,95,60,.12); background:linear-gradient(180deg,#fff,#fdf7ea); }
+.btn:hover:not(:disabled){ transform:translateY(-1px); box-shadow:0 4px 0 rgba(160,130,90,.14), 0 10px 18px rgba(120,95,60,.12); background:linear-gradient(180deg,var(--card-2),var(--card)); }
 .btn:active:not(:disabled){ transform:translateY(1px); box-shadow:0 1px 0 rgba(160,130,90,.14); }
 .btn:disabled{ opacity:.45; cursor:not-allowed; filter:grayscale(.4); }
 .btn.wide{ width:100%; }
@@ -529,7 +529,7 @@ button{ font-family:inherit; }
   margin-left:auto; width:30px; height:30px; border-radius:9px; cursor:pointer;
   border:1px solid var(--line); background:var(--card-solid); font-size:14px; color:var(--ink-2);
 }
-.modal-head .x:hover{ background:#f5eee0; }
+.modal-head .x:hover{ background:var(--hover); }
 .modal-body{ padding:14px 18px 18px; overflow-y:auto; }
 .modal-foot{ padding:12px 18px 16px; border-top:1px solid var(--line); display:flex; gap:9px; }
 .modal-foot .btn{ flex:1; }
@@ -725,3 +725,13 @@ button{ font-family:inherit; }
 :root[data-theme="dark"] .chip.weather[data-w="sunny"]{ color:#f0c46a; }
 :root[data-theme="dark"] .catch-area,
 :root[data-theme="dark"] .modal{ box-shadow:0 18px 40px rgba(0,0,0,.45); }
+/* 表单控件默认不继承文字色，深色模式会把按钮字吃掉 */
+button{ color:inherit; font:inherit; }
+.btn small{ color:var(--ink-3); }
+
+:root[data-theme="dark"] .farm{
+  background:radial-gradient(700px 220px at 50% -40%, rgba(255,255,255,.05), transparent 70%), var(--topbar);
+}
+:root[data-theme="dark"] .chip.weather[data-w="sunny"]{ background:linear-gradient(160deg,#332c20,#2a2620); }
+:root[data-theme="dark"] .chip.weather[data-w="cloudy"]{ background:linear-gradient(160deg,#2b3037,#242a31); }
+:root[data-theme="dark"] .chip.weather[data-w="rain"]{ background:linear-gradient(160deg,#232b36,#1f2630); }
