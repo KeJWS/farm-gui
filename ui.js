@@ -418,6 +418,34 @@
     $('[data-act="sellAll"]').disabled = !ids.length && !fishCount;
   }
 
+  /* ---------------- 配送委托（按天刷新） ---------------- */
+
+  function renderOrders() {
+    const list = state.orders || [];
+    const box = $('#order-list');
+    const doneN = list.filter(function (o) { return o.done; }).length;
+    $('#orders-sum').textContent = list.length ? doneN + '/' + list.length + ' 完成' : '';
+    if (!list.length) {
+      box.innerHTML = '<div class="store-empty">今天没有委托，睡一觉再来看</div>';
+      return;
+    }
+    box.innerHTML = list.map(function (o) {
+      const have = G.orderHave(state, o);
+      const full = have >= o.qty;
+      const thing = o.kind === 'fish' ? '渔获' : '仓库';
+      return '<div class="order-row' + (o.done ? ' done' : '') + '">' +
+        '<span class="oe">' + o.emoji + '</span>' +
+        '<div class="oi">' +
+          '<div class="on">' + o.name + ' ×' + o.qty + ' · 报酬 ' + o.reward + ' 金</div>' +
+          '<div class="os">' + (o.done ? '✅ 已完成' : thing + ' ' + Math.min(have, o.qty) + '/' + o.qty +
+            (o.kind === 'fish' ? '（交最便宜的）' : '')) + '</div>' +
+        '</div>' +
+        (o.done ? '' :
+          '<button class="btn mini" data-order="' + o.id + '"' + (full ? '' : ' disabled') + '>交付</button>') +
+      '</div>';
+    }).join('');
+  }
+
   /* ---------------- 账本（按天汇总，点开看明细） ---------------- */
 
   let openLedgerDay = null;
@@ -516,6 +544,7 @@
     renderBait();
     renderCatch();
     renderStore();
+    renderOrders();
     renderLedger();
     renderBook();
     renderLog();
@@ -777,9 +806,10 @@
       const r = G.sleep(state);
       commit(r);
       SFX.sleep();
-      toast(r.notes[0], 'good');
-      setTimeout(function () { toast(r.notes[1], ''); }, 380);
-      if (r.notes[2]) setTimeout(function () { toast(r.notes[2], ''); }, 760);
+      // 逐条播报：伙食费 / 天气 / 自动浇水 / 委托刷新
+      r.notes.slice(0, 4).forEach(function (n, i) {
+        setTimeout(function () { toast(n, i === 0 ? 'good' : ''); }, i * 380);
+      });
     },
     dig: function (ev) {
       const r = G.digWorms(state);
@@ -969,6 +999,16 @@
       const sellFish = t.closest('[data-sellfish]');
       if (sellFish) {
         const r = G.sellFishGroup(state, sellFish.dataset.sellfish);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        return;
+      }
+
+      // 交付委托
+      const orderBtn = t.closest('[data-order]');
+      if (orderBtn && !orderBtn.disabled) {
+        const r = G.deliverOrder(state, orderBtn.dataset.order);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();

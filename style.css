@@ -670,3 +670,16 @@ button{ font-family:inherit; }
   border-radius:10px;
 }
 .plot{ cursor:pointer; }
+
+/* ---------- 今日委托 ---------- */
+.order-list{ display:flex; flex-direction:column; gap:6px; }
+.order-row{
+  display:flex; align-items:center; gap:9px;
+  padding:7px 9px; border-radius:11px;
+  background:#fffdf7; border:1px solid var(--line);
+}
+.order-row.done{ opacity:.6; background:var(--panel-2); }
+.order-row .oe{ font-size:17px; line-height:1; }
+.order-row .oi{ flex:1; min-width:0; }
+.order-row .on{ font-size:12px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.order-row .os{ font-size:10.5px; font-weight:600; color:var(--ink-3); margin-top:1px; }

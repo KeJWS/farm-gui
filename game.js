@@ -133,8 +133,9 @@
       teaUsed: false,
       ledger: [{ day: 1, label: '开局金币', income: 50, expense: 0, balance: 50 }],
       log: [{ day: 1, text: '🌾 欢迎来到我的小农场，第 1 天开始了。', kind: 'sys' }],
+      orders: makeOrders({ day: 1 }),
       fishBook: { count: 0, entries: [], best: null, priciest: null },
-      stats: { harvests: 0, casts: 0, dug: 0, planted: 0 }
+      stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0 }
     };
     return s;
   }
@@ -480,6 +481,8 @@
     }
 
     log(s, '🌙 睡觉 → 第 ' + s.day + ' 天 · ' + w.name, 'sys');
+    s.orders = makeOrders(s);
+    notes.push('📋 今日委托已刷新：' + s.orders.length + ' 单');
     return { ok: true, msg: '新的一天', day: s.day, notes: notes, weather: s.weather };
   }
 
@@ -792,6 +795,94 @@
     return { ok: true, msg: '体力上限 ' + s.maxEnergy, maxEnergy: s.maxEnergy };
   }
 
+  /* ---------------- 每日委托 ---------------- */
+
+  /* 委托池随天数解锁：头几天只出便宜作物，后期才要贵货 */
+  function orderPool(day) {
+    const sorted = CROP_LIST.slice().sort(function (a, b) { return a.seed - b.seed; });
+    const n = day <= 4 ? 4 : (day <= 9 ? 7 : sorted.length);
+    return sorted.slice(0, n);
+  }
+
+  function makeOrders(s) {
+    const day = (s && s.day) || 1;
+    const pool = orderPool(day);
+    const used = [];
+    const orders = [];
+
+    for (let i = 0; i < 2 && pool.length; i++) {
+      let c = null;
+      for (let t = 0; t < 12; t++) {
+        const cand = pool[Math.floor(rand() * pool.length)];
+        if (used.indexOf(cand.id) < 0) { c = cand; break; }
+      }
+      if (!c) c = pool[i % pool.length];
+      used.push(c.id);
+      const qty = c.price >= 20 ? randInt(1, 2) : randInt(3, 6);
+      const reward = Math.max(6, Math.round(qty * c.price * 1.25) + 3);
+      orders.push({
+        id: 'd' + day + '-c' + i, kind: 'crop', crop: c.id, name: c.name, emoji: c.emoji,
+        qty: qty, reward: reward, done: false
+      });
+    }
+
+    const fq = randInt(2, 3);
+    orders.push({
+      id: 'd' + day + '-f', kind: 'fish', crop: null, name: '任意鱼', emoji: '🐟',
+      qty: fq, reward: Math.max(12, fq * 10 + 4), done: false
+    });
+    return orders;
+  }
+
+  /* 委托进度：作物看仓库，鱼看渔获袋 */
+  function orderHave(s, o) {
+    if (!o) return 0;
+    if (o.kind === 'fish') return (s.fishBag || []).length;
+    return s.store[o.crop] || 0;
+  }
+
+  function deliverOrder(s, id) {
+    const o = (s.orders || []).filter(function (x) { return x.id === id; })[0];
+    if (!o) return { ok: false, msg: '没有这个委托' };
+    if (o.done) return { ok: false, msg: '这单已经交过了' };
+    const have = orderHave(s, o);
+    if (have < o.qty) return { ok: false, msg: '还差 ' + (o.qty - have) + ' 个' };
+
+    if (o.kind === 'fish') {
+      // 交最便宜的鱼，好鱼留着做图鉴
+      const drop = s.fishBag.slice().sort(function (a, b) { return a.v - b.v; }).slice(0, o.qty);
+      s.fishBag = s.fishBag.filter(function (e) { return drop.indexOf(e) < 0; });
+    } else {
+      s.store[o.crop] -= o.qty;
+      if (s.store[o.crop] <= 0) delete s.store[o.crop];
+    }
+    o.done = true;
+    s.stats.orders = (s.stats.orders || 0) + 1;
+    addCoins(s, o.reward, '委托 · ' + o.name + '×' + o.qty);
+    log(s, '📋 完成委托：' + o.emoji + ' ' + o.name + ' ×' + o.qty + '，+' + o.reward + ' 金', 'good');
+    return { ok: true, reward: o.reward, msg: '委托完成，+' + o.reward + ' 金' };
+  }
+
+  function normalizeOrders(list, s) {
+    if (!Array.isArray(list)) return makeOrders(s);
+    const out = [];
+    list.slice(0, 6).forEach(function (o, i) {
+      if (!o || (o.kind !== 'crop' && o.kind !== 'fish')) return;
+      if (o.kind === 'crop' && !CROPS[o.crop]) return;
+      out.push({
+        id: String(o.id || ('x' + i)),
+        kind: o.kind,
+        crop: o.kind === 'crop' ? o.crop : null,
+        name: o.kind === 'crop' ? CROPS[o.crop].name : '任意鱼',
+        emoji: o.kind === 'crop' ? CROPS[o.crop].emoji : '🐟',
+        qty: Math.round(num(o.qty, 1, 1, 99)),
+        reward: Math.round(num(o.reward, 10, 1, 9999)),
+        done: !!o.done
+      });
+    });
+    return out.length ? out : makeOrders(s);
+  }
+
   /* ---------------- 存读档 ---------------- */
 
   function serialize(s) { return JSON.stringify(s); }
@@ -865,7 +956,8 @@
     merged.lure.dur = Math.round(num(merged.lure.dur, 0, 0, 20));
     merged.lure.owned = !!merged.lure.owned && merged.lure.dur > 0;
     merged.fishBook = Object.assign({ count: 0, entries: [], best: null, priciest: null }, s.fishBook || {});
-    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0 }, s.stats || {});
+    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0 }, s.stats || {});
+    merged.orders = normalizeOrders(s.orders, merged);
     merged.seeds = s.seeds && typeof s.seeds === 'object' ? s.seeds : {};
     merged.store = s.store && typeof s.store === 'object' ? s.store : {};
     merged.fishBag = Array.isArray(s.fishBag) ? s.fishBag.slice(0, 5000) : [];
@@ -886,6 +978,7 @@
     setRng: setRng, seasonOf: seasonOf, SEASONS: SEASONS,
     createState: createState, serialize: serialize, deserialize: deserialize,
     ledgerByDay: ledgerByDay, logByDay: logByDay,
+    makeOrders: makeOrders, deliverOrder: deliverOrder, orderHave: orderHave, orderPool: orderPool,
     mealFee: mealFee, expandCost: expandCost, upgradeCost: upgradeCost,
     WORK_RATE_FULL: WORK_RATE_FULL, WORK_RATE_HALF: WORK_RATE_HALF,
     workCost: workCost, workPay: workPay, needOf: needOf, expectedYield: expectedYield,

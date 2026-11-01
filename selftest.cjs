@@ -496,6 +496,49 @@ const ex = G.expand(s);
 ok(ex.ok && s.coins === 5 && s.plots.length === 2, '导入脏档后扩张不会白送金币', { coins: s.coins });
 
 
+/* ---------- 5k. 每日委托 ---------- */
+section('每日委托');
+G.setRng(mulberry32(77));
+s = G.createState();
+ok(s.orders.length === 3 && s.orders.filter(function (o) { return o.kind === 'crop'; }).length === 2,
+   '每天 2 个作物单 + 1 个鱼单', s.orders.map(function (o) { return o.kind; }).join(','));
+
+const co = s.orders[0];
+s.store[co.crop] = co.qty - 1;
+const coinsBefore = s.coins;
+ok(!G.deliverOrder(s, co.id).ok && s.coins === coinsBefore, '仓库不够时交不了');
+
+s.store[co.crop] = co.qty;
+const good = G.deliverOrder(s, co.id);
+ok(good.ok && s.coins === coinsBefore + co.reward && !s.store[co.crop] && co.done === true,
+   '交单：给报酬、扣库存、标记完成', { coins: s.coins, left: s.store[co.crop], reward: co.reward });
+ok(!G.deliverOrder(s, co.id).ok, '同一单不能交两次');
+ok(co.reward > co.qty * G.CROPS[co.crop].price, '委托报酬高于直接卖',
+   co.reward + ' vs ' + co.qty * G.CROPS[co.crop].price);
+
+const fo = s.orders.filter(function (o) { return o.kind === 'fish'; })[0];
+s.fishBag = [
+  { name: '锦鲤', emoji: '🐉', q: 'legend', v: 75, d: 1 },
+  { name: '鲫鱼', emoji: '🐟', q: 'std', v: 3, d: 1 },
+  { name: '鲤鱼', emoji: '🐟', q: 'std', v: 6, d: 1 }
+];
+const c1 = s.coins;
+ok(G.deliverOrder(s, fo.id).ok && s.coins === c1 + fo.reward, '鱼单也能交');
+ok(s.fishBag.length === 3 - fo.qty && s.fishBag.some(function (e) { return e.name === '锦鲤'; }),
+   '交鱼先交最便宜的，锦鲤留着', s.fishBag.map(function (e) { return e.name; }).join('/'));
+
+s = G.createState();
+const day1Orders = s.orders.map(function (o) { return o.id; }).join();
+s.coins = 100;
+G.sleep(s);
+ok(s.orders.length === 3 && s.orders.every(function (o) { return !o.done; }) &&
+   s.orders.map(function (o) { return o.id; }).join() !== day1Orders,
+   '睡一觉刷新当天委托', s.orders.length);
+
+const oldSave = G.deserialize({ plots: [], coins: 10, day: 3 });
+ok(Array.isArray(oldSave.orders) && oldSave.orders.length === 3, '老存档没有委托字段时自动补一份');
+ok(G.orderPool(3).length === 4 && G.orderPool(30).length === 10, '委托池随天数解锁');
+
 section('存读档');
 s = G.createState();
 s.seeds = { corn: 1 };
