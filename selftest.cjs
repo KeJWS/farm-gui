@@ -166,6 +166,49 @@ s.energy = 15; const c0 = s.coins;
 G.work(s, 'full');
 ok(s.coins - c0 === 23 && s.energy === 0, '全天零工结算正确', { gain: s.coins - c0, energy: s.energy });
 
+/* ---------- 5b. 半天零工：体力不足时全用上，收益仍 ×1.0 ---------- */
+section('半天零工 · 体力不足');
+s = G.createState();                 // 上限 10，半天需要 5
+s.coins = 100; s.energy = 3;
+let wr = G.work(s, 'half');
+ok(wr.ok && wr.partial === true && s.energy === 0, '体力不足时把剩余体力全用上', { energy: s.energy, wr: wr });
+ok(s.coins === 103, '收益仍按消耗 ×1.0 = 3 金', s.coins);
+
+s.energy = 0;
+ok(!G.work(s, 'half').ok, '一点体力都没有时干不了零工');
+
+s = G.createState(); s.coins = 0; s.energy = 5;
+wr = G.work(s, 'half');
+ok(wr.ok && s.energy === 0 && s.coins === 5, '刚好够半天：消耗 5、赚 5', { coins: s.coins });
+
+/* ---------- 5c. 种子出售 ---------- */
+section('种子出售');
+s = G.createState();
+s.seeds = { carrot: 3, corn: 1 };
+let ssr = G.sellSeed(s, 'carrot', 2);
+ok(ssr.ok && ssr.income === 2 && s.seeds.carrot === 1, '卖 2 颗种子得 2 金，剩 1 颗', { seeds: s.seeds });
+ssr = G.sellSeed(s, 'carrot');
+ok(ssr.ok && s.seeds.carrot === undefined && s.coins === 53, '卖光后种子从背包移除', { coins: s.coins, seeds: s.seeds });
+ssr = G.sellAllSeeds(s);
+ok(ssr.ok && ssr.income === 1 && Object.keys(s.seeds).length === 0 && s.coins === 54, '一键卖掉全部种子');
+ok(!G.sellAllSeeds(s).ok, '没种子时提示不可卖');
+
+/* ---------- 5d. 账本按天汇总 ---------- */
+section('账本按天汇总');
+s = G.createState();
+s.ledger = [
+  { day: 3, label: '卖鱼', income: 12, expense: 0, balance: 62 },
+  { day: 3, label: '卖鱼', income: 8, expense: 0, balance: 50 },
+  { day: 3, label: '伙食费', income: 0, expense: 7, balance: 42 },
+  { day: 2, label: '卖萝卜', income: 20, expense: 0, balance: 49 },
+  { day: 1, label: '开局金币', income: 50, expense: 0, balance: 50 }
+];
+const agg = G.ledgerByDay(s);
+ok(agg.length === 3, '三天合成 3 条', agg.length);
+ok(agg[0].day === 3 && agg[0].income === 20 && agg[0].expense === 7, '第 3 天收 20 支 7', agg[0]);
+ok(agg[0].balance === 62 && agg[0].items.length === 3, '当天余额取最后一笔，明细 3 条', { b: agg[0].balance, n: agg[0].items.length });
+ok(agg[2].day === 1 && agg[2].balance === 50, '最早一天正常汇总', agg[2]);
+
 /* 没钱吃饭 */
 s = G.createState();
 s.coins = 0; s.energy = 2;

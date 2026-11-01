@@ -186,7 +186,14 @@
   /* ---------------- 操作按钮 ---------------- */
 
   function renderActions() {
-    $('#work-half-txt').textContent = '-' + G.workCost(state, 'half') + ' 体力 · +' + G.workPay(state, 'half') + ' 金';
+    const halfNeed = G.workCost(state, 'half');
+    if (state.energy < halfNeed) {
+      $('#work-half-txt').textContent = state.energy > 0
+        ? '体力不足 · 用光 ' + state.energy + ' 点 · +' + Math.round(state.energy) + ' 金'
+        : '体力不足 · 先睡觉';
+    } else {
+      $('#work-half-txt').textContent = '-' + halfNeed + ' 体力 · +' + G.workPay(state, 'half') + ' 金';
+    }
     $('#work-full-txt').textContent = '-' + G.workCost(state, 'full') + ' 体力 · +' + G.workPay(state, 'full') + ' 金';
     $('#expand-txt').textContent = '第 ' + (state.plots.length + 1) + ' 块 · ' + G.expandCost(state) + ' 金';
     $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + 5) + ' · ' + G.upgradeCost(state) + ' 金';
@@ -196,7 +203,7 @@
     teaBtn.querySelector('small').textContent = state.teaUsed ? '今天喝过了' : '3 金 · +5 体力';
 
     $('[data-act="dig"]').disabled = state.energy < 3;
-    $('[data-act="work-half"]').disabled = state.energy < G.workCost(state, 'half');
+    $('[data-act="work-half"]').disabled = state.energy <= 0;
     $('[data-act="work-full"]').disabled = state.energy < G.workCost(state, 'full');
     $('[data-act="expand"]').disabled = state.coins < G.expandCost(state);
     $('[data-act="upgrade"]').disabled = state.coins < G.upgradeCost(state);
@@ -267,29 +274,54 @@
     }
 
     const seeds = Object.keys(state.seeds).filter(function (k) { return state.seeds[k] > 0; });
+    const sv = G.SEED_VALUE;
     $('#seed-box').innerHTML = '🎒 种子：' + (seeds.length
       ? seeds.map(function (id) {
-          return '<span class="tag">' + G.CROPS[id].emoji + G.CROPS[id].name + ' ×' + state.seeds[id] + '</span>';
-        }).join('')
-      : '<span style="color:var(--ink-3)">无（收获时 30% 概率留种，多收作物仅最后一收）</span>');
+          const n = state.seeds[id];
+          return '<button class="tag tag-sell" data-sellseed="' + id + '"' +
+            ' title="卖出全部 ' + n + ' 颗，共 ' + n * sv + ' 金">' +
+            G.CROPS[id].emoji + G.CROPS[id].name + ' ×' + n +
+            ' <b>卖 ' + n * sv + '</b></button>';
+        }).join('') +
+        '<button class="btn mini" data-sellseeds>全部卖掉</button>'
+      : '<span style="color:var(--ink-3)">无（收获时 30% 概率留种，多收作物仅最后一收；种子 ' + sv + ' 金/颗可卖）</span>');
 
     $('[data-act="sellAll"]').disabled = !ids.length;
   }
 
-  /* ---------------- 账本 ---------------- */
+  /* ---------------- 账本（按天汇总，点开看明细） ---------------- */
+
+  let openLedgerDay = null;
 
   function renderLedger() {
-    const rows = state.ledger.slice(0, 40);
-    $('#ledger').innerHTML = rows.map(function (r) {
-      const val = r.income > 0 ? '+' + r.income : (r.expense > 0 ? '-' + r.expense : '—');
-      const cls = r.income > 0 ? 'up' : (r.expense > 0 ? 'down' : '');
-      return '<div class="led-row">' +
-        '<span class="led-day">D' + r.day + '</span>' +
-        '<span class="led-label">' + r.label + '</span>' +
-        '<span class="led-val ' + cls + '">' + val + '</span>' +
-        '<span class="led-bal">' + r.balance + '</span>' +
+    const days = G.ledgerByDay(state);
+
+    const rows = days.slice(0, 14).map(function (d) {
+      const open = openLedgerDay === d.day;
+      const inc = d.income > 0 ? '<span class="led-inc">+' + d.income + '</span>' : '';
+      const exp = d.expense > 0 ? '<span class="led-exp">-' + d.expense + '</span>' : '';
+      const sep = (inc && exp) ? ' · ' : '';
+      const head = (inc || exp) ? (inc + sep + exp) : '<span style="color:var(--ink-3)">—</span>';
+
+      let html = '<div class="led-row day' + (open ? ' open' : '') + '" data-ledday="' + d.day + '"' +
+        ' title="' + d.items.length + ' 笔，点击' + (open ? '收起' : '展开') + '">' +
+        '<span class="led-day">D' + d.day + '</span>' +
+        '<span class="led-label">' + (d.items.length > 1 ? d.items.length + ' 笔' : d.items[0].label) + '</span>' +
+        '<span class="led-val">' + head + '</span>' +
+        '<span class="led-bal">' + d.balance + '</span>' +
       '</div>';
-    }).join('') || '<div class="store-empty">还没有账目</div>';
+
+      if (open) {
+        html += '<div class="led-detail">' + d.items.map(function (it) {
+          const v = it.income > 0 ? '+' + it.income : (it.expense > 0 ? '-' + it.expense : '—');
+          const cls = it.income > 0 ? 'led-inc' : (it.expense > 0 ? 'led-exp' : '');
+          return '<div class="dline"><span>' + it.label + '</span><b class="' + cls + '">' + v + '</b></div>';
+        }).join('') + '</div>';
+      }
+      return html;
+    }).join('');
+
+    $('#ledger').innerHTML = rows || '<div class="store-empty">还没有账目</div>';
     $('#ledger-sum').textContent = '余额 ' + state.coins + ' 金';
   }
 
@@ -481,6 +513,9 @@
       '· 蚯蚓饵：收获 +30% 且品质取两次较好的<br>' +
       '· 收获时 30% 概率留种，种子下次可免费种<br>' +
       '· 多次收获作物（黄瓜/草莓）只有最后一收才判定留种<br>' +
+      '· 种子可以卖，' + G.SEED_VALUE + ' 金/颗<br>' +
+      '· 半天零工体力不够时会把剩下的体力全用上，收益仍按 ×1.0<br>' +
+      '· 账本按天汇总，点某一天可展开当日明细<br>' +
       '· 进度自动保存在本浏览器（localStorage）</div>';
 
     openModal('📖 规则速查', body, '<button class="btn" data-close>知道了</button>');
@@ -670,6 +705,33 @@
         commit(r);
         toast(r.msg, 'good');
         SFX.coin();
+        return;
+      }
+
+      // 卖种子
+      const sellSeed = t.closest('[data-sellseed]');
+      if (sellSeed) {
+        const r = G.sellSeed(state, sellSeed.dataset.sellseed);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        return;
+      }
+      const sellSeeds = t.closest('[data-sellseeds]');
+      if (sellSeeds) {
+        const r = G.sellAllSeeds(state);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        return;
+      }
+
+      // 账本按天展开/收起
+      const ledDay = t.closest('[data-ledday]');
+      if (ledDay) {
+        const d = Number(ledDay.dataset.ledday);
+        openLedgerDay = (openLedgerDay === d) ? null : d;
+        renderLedger();
         return;
       }
     });

@@ -549,13 +549,51 @@
 
   function work(s, mode) {
     const cost = workCost(s, mode);
+
+    // 半天零工体力不足时：把剩下的体力全用上，收益仍按 ×1.0 结算
+    if (mode === 'half' && s.energy < cost) {
+      const spent = s.energy;
+      if (spent <= 0) return { ok: false, msg: '体力已经见底了，先睡觉吧' };
+      const pay = Math.round(spent * 1.0);
+      s.energy = 0;
+      addCoins(s, pay, '半天零工');
+      log(s, '🕐 半天零工（体力不足，全用上）：-' + spent + ' 体力，+' + pay + ' 金', 'good');
+      return { ok: true, msg: '+' + pay + ' 金（用掉全部 ' + spent + ' 体力）', pay: pay, spent: spent, partial: true };
+    }
+
     if (s.energy < cost) return { ok: false, msg: '体力不足（需要 ' + cost + ' 点）' };
     const pay = workPay(s, mode);
     s.energy -= cost;
     addCoins(s, pay, mode === 'half' ? '半天零工' : '全天零工');
     log(s, (mode === 'half' ? '🕐' : '🕑') + (mode === 'half' ? '半天' : '全天') +
             '零工：-' + cost + ' 体力，+' + pay + ' 金', 'good');
-    return { ok: true, msg: '+' + pay + ' 金' };
+    return { ok: true, msg: '+' + pay + ' 金', pay: pay, spent: cost };
+  }
+
+  /* 卖种子：种子统一 1 金/颗 */
+  const SEED_VALUE = 1;
+
+  function sellSeed(s, id, n) {
+    const have = s.seeds[id] || 0;
+    if (!have) return { ok: false, msg: '没有这种种子' };
+    const qty = n ? Math.min(n, have) : have;
+    const gain = qty * SEED_VALUE;
+    const left = have - qty;
+    if (left > 0) s.seeds[id] = left; else delete s.seeds[id];
+    addCoins(s, gain, '卖种子 ' + CROPS[id].name);
+    log(s, '💰 卖出 ' + CROPS[id].name + '种子 ×' + qty + '，+' + gain + ' 金', 'good');
+    return { ok: true, msg: '卖出 ' + qty + ' 颗种子，+' + gain + ' 金', qty: qty, income: gain };
+  }
+
+  function sellAllSeeds(s) {
+    const ids = Object.keys(s.seeds).filter(function (k) { return s.seeds[k] > 0; });
+    if (!ids.length) return { ok: false, msg: '没有种子可卖' };
+    let total = 0;
+    ids.forEach(function (id) { total += (s.seeds[id] || 0) * SEED_VALUE; });
+    s.seeds = {};
+    addCoins(s, total, '卖种子');
+    log(s, '💰 清空种子，+' + total + ' 金', 'good');
+    return { ok: true, msg: '卖出全部种子，+' + total + ' 金', income: total };
   }
 
   function expand(s) {
@@ -579,6 +617,24 @@
   /* ---------------- 存读档 ---------------- */
 
   function serialize(s) { return JSON.stringify(s); }
+
+  /* 账本按天汇总：每天一条，balance 取当天最后一笔的余额 */
+  function ledgerByDay(s) {
+    const days = [];
+    const map = new Map();
+    (s.ledger || []).forEach(function (r) {
+      let d = map.get(r.day);
+      if (!d) {
+        d = { day: r.day, income: 0, expense: 0, balance: r.balance, items: [] };
+        map.set(r.day, d);
+        days.push(d);
+      }
+      d.income += r.income || 0;
+      d.expense += r.expense || 0;
+      d.items.push(r);
+    });
+    return days;
+  }
 
   function deserialize(json) {
     const s = typeof json === 'string' ? JSON.parse(json) : json;
@@ -607,11 +663,14 @@
     WEATHER: WEATHER, WEATHER_LIST: WEATHER_LIST, BAIT: BAIT, SAVE_VERSION: SAVE_VERSION,
     setRng: setRng,
     createState: createState, serialize: serialize, deserialize: deserialize,
+    ledgerByDay: ledgerByDay,
     mealFee: mealFee, expandCost: expandCost, upgradeCost: upgradeCost,
     workCost: workCost, workPay: workPay, needOf: needOf, expectedYield: expectedYield,
     canHarvest: canHarvest, stageEmoji: stageEmoji, fertBonus: fertBonus, baitCount: baitCount,
     plant: plant, water: water, waterAll: waterAll, harvest: harvest, harvestAll: harvestAll,
-    sellAll: sellAll, sellOne: sellOne, buyFert: buyFert, sleep: sleep, fish: fish,
+    sellAll: sellAll, sellOne: sellOne, sellSeed: sellSeed, sellAllSeeds: sellAllSeeds,
+    SEED_VALUE: SEED_VALUE,
+    buyFert: buyFert, sleep: sleep, fish: fish,
     fishMany: fishMany, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather
   };

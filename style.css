@@ -360,6 +360,16 @@ button{ font-family:inherit; }
   background:#eef7ec; color:var(--green-d); border:1px solid rgba(79,156,95,.28);
   padding:2px 8px; border-radius:7px; font-weight:800; font-size:11px;
 }
+.seed-box .tag-sell{
+  display:inline-flex; align-items:center; gap:5px;
+  font-family:inherit; cursor:pointer;
+  transition:transform .12s, background .12s, border-color .12s;
+}
+.seed-box .tag-sell:hover{
+  background:#e0f2dd; border-color:rgba(79,156,95,.52); transform:translateY(-1px);
+}
+.seed-box .tag-sell b{ font-size:10px; font-weight:800; color:#b4771f; }
+.seed-box .btn.mini{ margin-left:auto; }
 
 /* ---------------- 账本 ---------------- */
 
@@ -370,12 +380,24 @@ button{ font-family:inherit; }
   padding-right:4px;
 }
 .led-row{ display:flex; align-items:center; gap:6px; padding:3px 2px; border-bottom:1px dotted rgba(122,96,60,.13); }
+.led-row.day{ cursor:pointer; border-radius:7px; transition:background .12s; }
+.led-row.day:hover{ background:rgba(255,249,232,.95); }
+.led-row.day.open{ background:rgba(246,239,221,.95); }
 .led-day{ color:var(--ink-3); font-weight:800; min-width:40px; font-size:10.5px; }
 .led-label{ flex:1; color:var(--ink-2); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.led-val{ font-weight:800; font-variant-numeric:tabular-nums; }
+.led-val{ font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .led-val.up{ color:var(--green-d); }
 .led-val.down{ color:var(--red); }
+.led-inc{ color:var(--green-d); font-weight:800; }
+.led-exp{ color:var(--red); font-weight:800; }
 .led-bal{ color:var(--ink-3); font-weight:700; min-width:38px; text-align:right; font-variant-numeric:tabular-nums; }
+.led-detail{
+  display:flex; flex-direction:column; gap:1px;
+  padding:2px 8px 6px 46px; font-size:10.8px; color:var(--ink-3); font-weight:600;
+  animation:slideIn .16s ease;
+}
+.led-detail .dline{ display:flex; justify-content:space-between; gap:10px; padding:1px 0; border-bottom:1px dotted rgba(122,96,60,.1); }
+.led-detail .dline b{ font-weight:800; }
 
 /* ---------------- 钓鱼记录 ---------------- */
 
