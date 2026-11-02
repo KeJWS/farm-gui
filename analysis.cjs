@@ -359,20 +359,45 @@ console.log('\n== 渔网（' + G.NET_COST + ' 金/张，不缴维护费，抓完
     Math.round(G.NET_COST / perNet) + ' 天/张');
 }
 
-/* ---------- 12. 雇佣渔夫 ---------- */
-console.log('\n== 雇佣渔夫（钓鱼 Lv' + G.BALANCE.gate.fisher + ' 解锁）==');
+/* ---------- 12. 雇佣渔夫（有等级） ---------- */
+console.log('\n== 雇佣渔夫（钓鱼 Lv' + G.BALANCE.gate.fisher + ' 解锁，每天 2+等级 杆）==');
 {
   const F = G.BALANCE.fisher;
+
+  /* 锁住等级测一整天：渔夫自己会升级，测的时候把经验压到负数 */
+  function fisherDay(lv, tries) {
+    const st = G.createState();
+    st.fisher = { lv: lv, xp: -1e9 };
+    st.levels.fish = 5;
+    st.weather = 'cloudy'; st.day = 61;
+    G.setRng(mulberry32(11));
+    let got = 0, val = 0, casts = 0;
+    for (let i = 0; i < tries; i++) {
+      st.energy = 0;
+      st.bait.dough = 1e9;
+      const r = G.fisherCatch(st);
+      casts = r.casts; got += r.got; val += r.value;
+    }
+    return { casts: casts, got: got / tries, value: val / tries };
+  }
+
+  console.log('   雇佣费 ' + F.hire + ' 金 · 工资 ' + F.wageBase + ' + ' + F.wageStep +
+    '×(等级−1) · 花钱升级 ' + F.upCost + ' × 等级（满级 ' + F.max + '）');
+  console.log('   ' + pad('Lv', 4) + pad('杆', 5) + pad('工资', 6) + pad('毛/天', 9) + pad('净/天', 9) +
+    pad('累计投入', 10) + '回本');
+  for (let lv = 1; lv <= F.max; lv++) {
+    const d = fisherDay(lv, 1200);
+    const wage = F.wageBase + F.wageStep * (lv - 1);
+    const net = d.value - d.casts * 1 - wage;
+    const cum = F.hire + F.upCost * (lv - 1) * lv / 2;
+    console.log('   ' + pad('Lv' + lv, 4) + pad(d.casts + ' 杆', 5) + pad(wage + ' 金', 6) +
+      pad(d.value.toFixed(1), 9) + pad(net.toFixed(1), 9) + pad(Math.round(cum) + ' 金', 10) +
+      (net > 0 ? Math.round(cum / net) + ' 天' : '—'));
+  }
+  console.log('   升级需要 ' + F.needBase + ' + ' + F.needStep + '×(等级−1) 经验，每钓到 1 条 +1；');
   G.setRng(mulberry32(7));
-  const perCast = evBait('dough', 'cloudy', 5, 4000).ev;       // 渔夫用面团饵
-  const gross = F.casts * perCast;
-  const cost = F.casts * 1 + F.wage;                            // 饵 1 金/份 + 工资
-  const net = gross - cost;
-  console.log('   雇佣费 ' + F.hire + ' 金 · 工资 ' + F.wage + ' 金/天 · 每天甩 ' + F.casts +
-    ' 杆（耗你的面团饵，不耗体力、不给经验）');
-  console.log('   每天毛 ' + gross.toFixed(1) + ' − 饵 ' + F.casts + ' − 工资 ' + F.wage +
-    ' = 净 ' + net.toFixed(1) + ' 金/天');
-  console.log('   回本 ' + Math.round(F.hire / net) + ' 天 · 另外他每天免费重布渔网（省 ' +
-    (9 * G.NET_CHANCE * G.BALANCE.netReset.energy).toFixed(1) + ' 体力 ≈ ' +
-    (9 * G.NET_CHANCE * G.BALANCE.netReset.energy * perCast / 2).toFixed(0) + ' 金）');
+  const perE = (evBait('dough', 'cloudy', 5, 2000).ev - 1) / 2;
+  const resetVal = 9 * G.NET_CHANCE * G.BALANCE.netReset.energy * perE;
+  console.log('   另外他每天免费重布渔网（省 ' + (9 * G.NET_CHANCE).toFixed(1) + ' 体力 ≈ ' +
+    resetVal.toFixed(0) + ' 金），Lv1 算上这个约 ' + (10.5 + resetVal).toFixed(0) + ' 金/天');
 }

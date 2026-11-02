@@ -1707,27 +1707,59 @@ ok(G.expectedYield(v29in, v29in.plots[0]) === G.CROPS.cucumber.firstQty, '当季
 /* 渔网 80% */
 ok(Math.abs(G.NET_CHANCE - 0.8) < 1e-9, '渔网上鱼率 80%', G.NET_CHANCE);
 
-/* 渔夫：等级门槛 / 雇佣 / 代钓 */
+/* 渔夫：等级门槛 / 雇佣 / 等级效果 */
 const v29f = G.createState();
 v29f.coins = 5000; v29f.levels.fish = G.BALANCE.gate.fisher - 1;
 ok(!G.hireFisher(v29f).ok, '钓鱼等级不够雇不到渔夫');
 v29f.levels.fish = G.BALANCE.gate.fisher;
 const v29hire = G.hireFisher(v29f);
-ok(v29hire.ok && v29f.fisher && v29f.coins === 5000 - G.BALANCE.fisher.hire,
-  '够等级就能雇，扣雇佣费', v29f.coins);
+ok(v29hire.ok && !!v29f.fisher && v29f.fisher.lv === 1 && v29f.coins === 5000 - G.BALANCE.fisher.hire,
+  '够等级就能雇，Lv1 上岗', v29f.coins);
+ok(G.fisherCasts(v29f) === 3 && G.fisherWage(v29f) === 8, 'Lv1 每天 3 杆、工资 8 金',
+  [G.fisherCasts(v29f), G.fisherWage(v29f)]);
 ok(!G.hireFisher(v29f).ok, '不能重复雇佣');
-ok(G.fireFisher(v29f).ok && !v29f.fisher, '可以辞退渔夫');
 
+/* 花钱升级：杆数 +1、工资 +5 */
+const v29u = G.createState();
+v29u.coins = 5000; v29u.levels.fish = G.BALANCE.gate.fisher;
+G.hireFisher(v29u);
+const v29cost = G.fisherUpCost(v29u);
+ok(v29cost === G.BALANCE.fisher.upCost, '升级费 = 120 × 等级', v29cost);
+const v29coin0 = v29u.coins;
+ok(G.fisherUp(v29u).ok && G.fisherLv(v29u) === 2 && v29u.coins === v29coin0 - v29cost, '花钱升到 Lv2');
+ok(G.fisherCasts(v29u) === 4 && G.fisherWage(v29u) === 12, 'Lv2 每天 4 杆、工资 12 金',
+  [G.fisherCasts(v29u), G.fisherWage(v29u)]);
+ok(G.fisherHookBonus(v29u) > 0 && G.fisherGoodBonus(v29u) > 1, '渔夫等级提升咬钩与好鱼',
+  [G.fisherHookBonus(v29u), G.fisherGoodBonus(v29u)]);
+
+/* 代钓：耗饵、不耗体力、不给玩家经验、自己涨经验 */
 const v29c = G.createState();
+v29c.fisher = { lv: 1, xp: 0 };
 v29c.levels.fish = 5; v29c.bait.dough = 20; v29c.energy = 0;
 const v29xp0 = v29c.levels.fishXp;
 G.setRng(function () { return 0.1; });
 const v29fc = G.fisherCatch(v29c);
-ok(v29fc.casts === G.BALANCE.fisher.casts && v29c.bait.dough === 20 - G.BALANCE.fisher.casts,
-  '渔夫甩满 8 杆、吃掉 8 份面团饵', [v29fc.casts, v29c.bait.dough]);
+ok(v29fc.casts === 3 && v29c.bait.dough === 17, '渔夫甩 3 杆、吃掉 3 份面团饵',
+  [v29fc.casts, v29c.bait.dough]);
 ok(v29fc.got > 0, '渔夫真的钓到鱼', v29fc.got);
 ok(v29c.energy === 0, '渔夫不耗玩家体力');
-ok(v29c.levels.fishXp === v29xp0 && v29c.levels.fish === 5, '渔夫代钓不给经验');
+ok(v29c.levels.fishXp === v29xp0 && v29c.levels.fish === 5, '渔夫代钓不给玩家经验');
+ok(v29c.fisher.lv > 1 || v29c.fisher.xp > 0, '渔夫自己攒经验', v29c.fisher);
+
+/* 钓得够多会自己升级 */
+const v29l = G.createState();
+v29l.fisher = { lv: 3, xp: 0 };
+v29l.bait.dough = 200; v29l.energy = 0;
+G.setRng(function () { return 0.1; });
+for (let i = 0; i < 5; i++) G.fisherCatch(v29l);
+ok(G.fisherLv(v29l) > 3, '钓多了会自己升级', [G.fisherLv(v29l), v29l.fisher.xp || 0]);
+
+/* 满级封顶 */
+const v29max = G.createState();
+v29max.fisher = { lv: G.BALANCE.fisher.max, xp: 0 };
+v29max.coins = 99999;
+ok(!G.fisherUp(v29max).ok && G.fisherUpCost(v29max) === 0, '满级后不能再升');
+ok(G.fireFisher(v29max).ok && !v29max.fisher, '可以辞退渔夫');
 
 /* 睡觉：扣伙食 + 工资 + 重布渔网 */
 const v29w = G.createState();
@@ -1735,32 +1767,30 @@ v29w.coins = 1000; v29w.day = 2; v29w.levels.fish = G.BALANCE.gate.fisher;
 G.hireFisher(v29w);
 v29w.nets = 2; v29w.netSet = 0; v29w.bait.dough = 0; v29w.energy = 0;
 G.sleep(v29w);
-ok(v29w.coins === 1000 - G.BALANCE.fisher.hire - G.mealFee(v29w) - G.BALANCE.fisher.wage,
-  '睡觉扣伙食 + 渔夫工资', v29w.coins);
+ok(v29w.coins === 1000 - G.BALANCE.fisher.hire - G.mealFee(v29w) - 8,
+  '睡觉扣伙食 + 渔夫工资（Lv1 = 8 金）', v29w.coins);
 ok(v29w.netSet === 2, '渔夫替你把渔网全重布了', v29w.netSet);
 
 /* 发不出工资就罢工 */
 const v29b = G.createState();
-v29b.coins = 10; v29b.fisher = true; v29b.bait.dough = 8;
+v29b.coins = 10; v29b.fisher = { lv: 1, xp: 0 }; v29b.bait.dough = 8;
 G.sleep(v29b);
 ok(v29b.fishBag.length === 0, '发不出工资，渔夫罢工不钓鱼', v29b.coins);
 
 /* 冬天渔夫休息、不发工资 */
 const v29wt = G.createState();
-v29wt.day = 90; v29wt.coins = 500; v29wt.fisher = true; v29wt.bait.dough = 8;
+v29wt.day = 90; v29wt.coins = 500; v29wt.fisher = { lv: 1, xp: 0 }; v29wt.bait.dough = 8;
 G.sleep(v29wt);
 ok(G.isWinter(v29wt.day) && v29wt.coins === 500 - G.mealFee(v29wt) && v29wt.fishBag.length === 0,
   '冬天渔夫休息、不发工资', v29wt.coins);
 
-/* 自动重布：睡觉时自动花体力补网 */
-const v29a = G.createState();
-v29a.day = 2; v29a.nets = 3; v29a.netSet = 0; v29a.bait.dough = 0;
-ok(!v29a.netAuto, '自动重布默认关闭');
-G.toggleNetAuto(v29a);
-ok(v29a.netAuto, '自动重布能打开');
-G.sleep(v29a);
-ok(v29a.netSet === 3 && v29a.energy === v29a.maxEnergy - 3, '睡觉时自动重布、花 3 体力',
-  [v29a.netSet, v29a.energy]);
+/* 老存档 fisher:true 迁移成 Lv1 */
+const v29old = JSON.parse(G.serialize(G.createState()));
+v29old.fisher = true;
+ok(G.fisherLv(G.deserialize(v29old)) === 1, '老存档渔夫迁移成 Lv1');
+
+/* 自动重布已经删掉 */
+ok(!('toggleNetAuto' in G), '自动重布开关已移除');
 
 /* 委托市价溢价：长期订单也吃 */
 const v29L = G.createState();

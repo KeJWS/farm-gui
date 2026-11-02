@@ -101,7 +101,8 @@ const G = require('./game.js');
   st.fishBag.push({ name: '水草', emoji: '🌿', q: null, v: 1, d: 1, no: true, trash: true });
   st.nets = 2;
   st.netSet = 2;
-  st.levels.fish = 2;
+  st.levels.fish = 5;
+  st.fisher = { lv: 3, xp: 4 };
   st.teas.green = 2;
   G.addStore(st, 'cabbage', 'std', 5);
   G.boxPutCrop(st, 'cabbage');                 // 收购箱里放一批，便于测取出
@@ -143,22 +144,19 @@ ok(html('#store-list').indexOf('脆生生') >= 0, '仓库作物显示简述');
      '仓库杂物不显示市价 / 稀缺');
   ok(row.indexOf('原价，不吃市价') >= 0, '杂物行写明不吃市价');
 })();
-/* 河边渔网行：自动重布开关 */
-ok(html('#net-line').indexOf('自动重布') >= 0 && html('#net-line').indexOf('data-netauto') >= 0,
-   '河边有「自动重布」开关');
-ok(html('#net-line').indexOf('不缴维护费') < 0, '河边不再写「不缴维护费」');
-
-/* 真的点一下开关 */
-function clickAttr(sel) {
-  const btn = { dataset: {}, disabled: false };
-  const target = { closest: function (s) { return s === sel ? btn : null; }, classList: classList() };
-  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
-}
-ok(html('#net-line').indexOf('自动重布：关') >= 0, '自动重布默认关闭', html('#net-line').slice(-80));
-clickAttr('[data-netauto]');
-ok(html('#net-line').indexOf('自动重布：开') >= 0, '点一下能打开自动重布', html('#net-line').slice(-80));
-clickAttr('[data-netauto]');
-ok(html('#net-line').indexOf('自动重布：关') >= 0, '再点一下关闭');
+/* 河边用「小队卡」显示渔网 / 渔夫 */
+ok(html('#crew-row').indexOf('渔网') >= 0 && html('#crew-row').indexOf('cc-dots') >= 0,
+   '河边用小队卡显示渔网（带库存圆点）');
+ok(html('#crew-row').indexOf('渔夫') >= 0, '河边显示渔夫卡');
+ok(html('#crew-row').indexOf('Lv3') >= 0 && html('#crew-row').indexOf('经验 4 / 9') >= 0,
+   '渔夫卡显示等级与经验', html('#crew-row').slice(0, 200));
+ok(html('#crew-row').indexOf('每天 5 杆') >= 0 && html('#crew-row').indexOf('工资 16 金') >= 0,
+   '渔夫卡显示每日杆数与工资');
+ok(html('#crew-row').indexOf('自动重布') < 0, '自动重布开关已删除');
+ok(html('#crew-row').indexOf('不缴维护费') < 0, '河边不再写「不缴维护费」');
+/* 有鱼在网里时给「重新布置」按钮 */
+ok(html('#crew-row').indexOf('data-resetnets') >= 0 || html('#crew-row').indexOf('网都在水里') >= 0,
+   '渔网卡有重布入口或「网都在水里」');
 ok(html('#order-list').indexOf('报酬') >= 0 && html('#order-list').indexOf('交付') >= 0, '委托面板渲染出报酬与交付按钮');
 ok(html('#order-list').indexOf('含市价') >= 0, '委托面板标出市价溢价');
 ok(html('#order-list').indexOf('长期') >= 0, '委托面板显示长期订单');
@@ -226,8 +224,8 @@ ok(html('#modal-root').indexOf('耐用 25 次') >= 0, '渔具店显示假饵耐�
 clickAct('shop');
 ok(html('#modal-root').indexOf('渔具店') >= 0 && html('#modal-root').indexOf('渔网') >= 0,
    '渔具店弹窗（含渔网）能打开');
-ok(html('#modal-root').indexOf('渔夫') >= 0 && html('#modal-root').indexOf('data-hirefisher') >= 0,
-   '渔具店有雇佣渔夫入口');
+ok(html('#modal-root').indexOf('渔夫') >= 0 && html('#modal-root').indexOf('data-fisherup') >= 0,
+   '渔具店能花钱升级渔夫');
 ok(html('#modal-root').indexOf('不收维护费') < 0, '渔具店不再写「不收维护费」');
 ok(html('#modal-root').indexOf('data-resetnets') < 0, '渔具店没有「重新布置」按钮');
 clickAct('fertilizeAll');
@@ -254,7 +252,7 @@ clickAct('depart');
 ok(html('#modal-root').indexOf('百货店') >= 0 && html('#modal-root').indexOf('茶叶') >= 0,
    '百货店弹窗能打开');
 ok(html('#modal-root').indexOf('data-buytea="green"') >= 0, '百货店能买茶');
-ok(html('#modal-root').indexOf('钓鱼 Lv4 解锁') >= 0, '铁钥匙按钓鱼等级锁定');
+ok(html('#modal-root').indexOf('钓鱼 Lv7 解锁') >= 0, '金钥匙按钓鱼等级锁定');
 ok(html('#modal-root').indexOf('只收宝箱') >= 0, '百货店只收宝箱、不收杂物');
 ok(html('#modal-root').indexOf('data-openchest') >= 0 && html('#modal-root').indexOf('木制宝箱') >= 0,
    '百货店能开仓里的宝箱');

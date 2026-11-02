@@ -332,39 +332,7 @@
       : (!state.harvester
         ? G.HARVESTER_COST + ' 金 · 睡觉时自动收'
         : (state.harvesterOn ? '已开启 · 点击关闭' : '已关闭 · 点击开启'));
-    const netLine = $('#net-line');
-    if (netLine) {
-      const fisherLine = function () {
-        if (state.fisher) {
-          return '<br>🧑‍🌾 渔夫在岗 · 每天自动甩 ' + G.BALANCE.fisher.casts + ' 杆 + 重布渔网 · 工资 ' +
-            G.BALANCE.fisher.wage + ' 金/天';
-        }
-        return G.fisherUnlocked(state)
-          ? '<br>🧑‍🌾 可以雇个渔夫了（渔具店 ' + G.BALANCE.fisher.hire + ' 金 + 每天 ' +
-            G.BALANCE.fisher.wage + ' 金工资）'
-          : '';
-      };
-      if (!G.netUnlocked(state)) {
-        netLine.innerHTML = '🕸️ 渔网要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b>解锁（渔具店 ' +
-          G.NET_COST + ' 金/张）' + fisherLine();
-      } else if (state.nets > 0) {
-        const setN = G.netSetCount(state), pend = G.netPending(state);
-        const auto = !!state.netAuto;
-        netLine.innerHTML = '🕸️ 已布 <b>' + setN + '</b>/' + state.nets + ' 张 · 每天耗 ' + setN +
-          ' 份面团饵，' + Math.round(G.NET_CHANCE * 100) + '% 概率各上 1 条<br>' +
-          '<span class="net-tools">' +
-            (pend
-              ? '<b class="lock">' + pend + ' 张待重布（' + G.netResetCost(state) + ' 体力）</b>' +
-                '<button class="btn mini" data-resetnets' + (state.energy < 1 ? ' disabled' : '') + '>重新布置</button>'
-              : '<span class="net-ok">全部布好了</span>') +
-            '<button class="btn mini' + (auto ? ' primary' : '') + '" data-netauto title="每天睡觉时自动花体力补网">' +
-              '自动重布：' + (auto ? '开' : '关') + '</button>' +
-          '</span>' + fisherLine();
-      } else {
-        netLine.innerHTML = '🕸️ 河边还没放渔网（渔具店 ' + G.NET_COST + ' 金/张，现在最多 ' +
-          G.netMax(state) + ' 张）' + fisherLine();
-      }
-    }
+    renderCrew();
 
     const teaBtn = $('[data-act="tea"]');
     const teaHave = G.teaStock(state);
@@ -383,6 +351,93 @@
     $('[data-act="sprinkler"]').disabled = sprLock ||
       state.coins < G.SPRINKLER_COST || state.sprinklers >= state.plots.length;
     $('[data-act="harvester"]').disabled = harvLock || (!state.harvester && state.coins < G.HARVESTER_COST);
+  }
+
+  /* ---------------- 河边「渔网 / 渔夫」小队卡 ---------------- */
+
+  function renderCrew() {
+    const box = $('#crew-row');
+    if (!box) return;
+
+    /* --- 渔网卡 --- */
+    let netCard;
+    if (!G.netUnlocked(state)) {
+      netCard = '<div class="crew-card locked">' +
+        '<div class="cc-head"><span class="cc-ic">🕸️</span><span class="cc-t">渔网</span>' +
+          '<span class="cc-tag">未解锁</span></div>' +
+        '<div class="cc-sub">钓鱼 Lv' + G.BALANCE.gate.net + ' 解锁 · 渔具店 ' + G.NET_COST + ' 金/张</div>' +
+      '</div>';
+    } else if (!state.nets) {
+      netCard = '<div class="crew-card empty">' +
+        '<div class="cc-head"><span class="cc-ic">🕸️</span><span class="cc-t">渔网</span>' +
+          '<span class="cc-tag">0 / ' + G.netMax(state) + '</span></div>' +
+        '<div class="cc-sub">河边还没放网 · 渔具店 ' + G.NET_COST + ' 金/张</div>' +
+      '</div>';
+    } else {
+      const setN = G.netSetCount(state), pend = G.netPending(state), cost = G.netResetCost(state);
+      let dots = '';
+      for (let i = 0; i < Math.min(state.nets, 9); i++) {
+        dots += '<i class="' + (i < setN ? 'on' : '') + '"></i>';
+      }
+      netCard = '<div class="crew-card' + (pend ? ' warn' : ' on') + '">' +
+        '<div class="cc-head"><span class="cc-ic">🕸️</span><span class="cc-t">渔网</span>' +
+          '<span class="cc-tag">' + setN + ' / ' + state.nets + ' 已布</span></div>' +
+        '<div class="cc-dots">' + dots + '</div>' +
+        '<div class="cc-sub">' + Math.round(G.NET_CHANCE * 100) + '% 各上 1 条 · 每天 ' + setN +
+          ' 份面团饵</div>' +
+        '<div class="cc-sub2">上限 ' + G.netMax(state) + ' 张 · 重布 ' +
+          G.BALANCE.netReset.energy + ' 体力/张</div>' +
+        '<div class="cc-act">' +
+          (pend
+            ? '<button class="btn mini" data-resetnets' + (state.energy < 1 ? ' disabled' : '') +
+              '>重新布置 ' + pend + ' 张 · ' + cost + ' 体力</button>'
+            : '<span class="cc-ok">网都在水里</span>') +
+        '</div>' +
+      '</div>';
+    }
+
+    /* --- 渔夫卡 --- */
+    let fisherCard;
+    if (!G.fisherUnlocked(state)) {
+      fisherCard = '<div class="crew-card locked">' +
+        '<div class="cc-head"><span class="cc-ic">🧑‍🌾</span><span class="cc-t">渔夫</span>' +
+          '<span class="cc-tag">未解锁</span></div>' +
+        '<div class="cc-sub">钓鱼 Lv' + G.BALANCE.gate.fisher + ' 才招得到人</div>' +
+      '</div>';
+    } else if (!state.fisher) {
+      fisherCard = '<div class="crew-card empty">' +
+        '<div class="cc-head"><span class="cc-ic">🧑‍🌾</span><span class="cc-t">渔夫</span>' +
+          '<span class="cc-tag">待雇</span></div>' +
+        '<div class="cc-sub">雇佣 ' + G.BALANCE.fisher.hire + ' 金 · 重布渔网 + 每天自动钓鱼</div>' +
+        '<div class="cc-act"><button class="btn mini primary" data-hirefisher' +
+          (state.coins < G.BALANCE.fisher.hire ? ' disabled' : '') + '>雇佣</button></div>' +
+      '</div>';
+    } else {
+      const max = G.BALANCE.fisher.max;
+      const lv = G.fisherLv(state);
+      const need = G.fisherNeed(state);
+      const xp = (state.fisher && state.fisher.xp) || 0;
+      const ratio = lv >= max ? 1 : Math.max(0, Math.min(1, xp / Math.max(1, need)));
+      const upCost = G.fisherUpCost(state);
+      fisherCard = '<div class="crew-card on">' +
+        '<div class="cc-head"><span class="cc-ic">🧑‍🌾</span><span class="cc-t">渔夫</span>' +
+          '<span class="cc-tag">Lv' + lv + '</span></div>' +
+        '<div class="cc-bar"><i style="width:' + Math.round(ratio * 100) + '%"></i></div>' +
+        '<div class="cc-sub">' + (lv >= max ? '已满级' : '经验 ' + xp + ' / ' + need) +
+          ' · 每天 ' + G.fisherCasts(state) + ' 杆 · 工资 ' + G.fisherWage(state) + ' 金</div>' +
+        '<div class="cc-sub2">咬钩 +' + (G.fisherHookBonus(state) * 100).toFixed(1) + '% · 好鱼 +' +
+          ((G.fisherGoodBonus(state) - 1) * 100).toFixed(1) + '%</div>' +
+        '<div class="cc-act">' +
+          (lv >= max
+            ? '<span class="cc-ok">满级</span>'
+            : '<button class="btn mini" data-fisherup' + (state.coins < upCost ? ' disabled' : '') +
+              '>升 Lv' + (lv + 1) + ' · ' + upCost + ' 金</button>') +
+          '<button class="btn mini" data-firefisher>辞退</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    box.innerHTML = netCard + fisherCard;
   }
 
   /* ---------------- 钓鱼 ---------------- */
@@ -1002,26 +1057,39 @@
         '<button class="btn mini" data-buynet' +
         ((netLock || state.nets >= netCap || state.coins < G.NET_COST) ? ' disabled' : '') + '>放一张</button>' +
       '</div>' +
-      '<div class="store-sub" style="margin-top:10px">🧑‍🌾 雇个渔夫 · 替你重布渔网 + 每天自动甩杆</div>' +
+      '<div class="store-sub" style="margin-top:10px">🧑‍🌾 雇个渔夫 · 替你重布渔网 + 每天自动钓鱼</div>' +
       '<div class="store-row' + (G.fisherUnlocked(state) ? '' : ' locked') + '">' +
         '<span class="se">🧑‍🌾</span>' +
         '<div><div class="sn">渔夫 ' +
-          (state.fisher ? '<b class="own">在岗</b>' : '<b class="own">待雇</b>') +
+          (state.fisher ? '<b class="own">Lv' + G.fisherLv(state) + '</b>' : '<b class="own">待雇</b>') +
           (G.fisherUnlocked(state) ? '' : ' <b class="lock">需钓鱼 Lv' + G.BALANCE.gate.fisher + '</b>') +
           '</div>' +
         '<div class="sv">' + (G.fisherUnlocked(state)
           ? (state.fisher
-            ? '每天：重布全部渔网（免费）+ 自动甩 ' + G.BALANCE.fisher.casts + ' 杆（耗你的面团饵）· 工资 ' +
-              G.BALANCE.fisher.wage + ' 金/天'
-            : '雇佣费 ' + G.BALANCE.fisher.hire + ' 金 · 之后每天工资 ' + G.BALANCE.fisher.wage +
-              ' 金 · 他每天重布渔网 + 自动甩 ' + G.BALANCE.fisher.casts + ' 杆')
+            ? '每天 ' + G.fisherCasts(state) + ' 杆（耗你的面团饵）+ 重布全部渔网 · 工资 ' +
+              G.fisherWage(state) + ' 金/天 · 经验 ' +
+              (G.fisherLv(state) >= G.BALANCE.fisher.max ? '已满级'
+                : ((state.fisher.xp || 0) + '/' + G.fisherNeed(state)))
+            : '雇佣费 ' + G.BALANCE.fisher.hire + ' 金 · Lv1 每天 ' +
+              (G.BALANCE.fisher.baseCasts + 1) + ' 杆，工资 ' + G.BALANCE.fisher.wageBase + ' 金/天')
           : '钓鱼等级到 Lv' + G.BALANCE.gate.fisher + ' 才招得到人') + '</div></div>' +
         (state.fisher
-          ? '<button class="btn mini" data-firefisher>辞退</button>'
+          ? (G.fisherLv(state) >= G.BALANCE.fisher.max
+            ? '<button class="btn mini" data-firefisher>辞退</button>'
+            : '<button class="btn mini" data-fisherup' +
+              (state.coins < G.fisherUpCost(state) ? ' disabled' : '') + '>升 Lv' +
+              (G.fisherLv(state) + 1) + '<br><small>' + G.fisherUpCost(state) + ' 金</small></button>' +
+              '<button class="btn mini" data-firefisher>辞退</button>')
           : '<button class="btn mini" data-hirefisher' +
             ((!G.fisherUnlocked(state) || state.coins < G.BALANCE.fisher.hire) ? ' disabled' : '') +
             '>雇佣</button>') +
-      '</div>';
+      '</div>' +
+      '<div class="shop-tip" style="margin-top:8px">渔夫每天替你<b>重布全部渔网</b>（不花你的体力），' +
+        '再自动甩 <b>2 + 等级</b> 杆（耗你的面团饵，钓上来的鱼照常进仓库）。<br>' +
+        '他自己会练级：每钓到 1 条 +1 经验，够 <b>' + G.BALANCE.fisher.needBase + ' + ' +
+        G.BALANCE.fisher.needStep + '×(等级−1)</b> 就升一级；也能直接花钱升' +
+        '（' + G.BALANCE.fisher.upCost + ' × 等级 金）。等级影响<b>咬钩、好鱼、每天杆数和工资</b>。<br>' +
+        '发不出工资他会罢工，冬天休息也没工资。</div>';
     openModal('🛒 渔具店', body, '<button class="btn" data-close>关闭</button>');
   }
 
@@ -1083,11 +1151,15 @@
         Math.round(G.NET_CHANCE * 100) + '%</b> 网到 1 条标准及以下的普通鱼，' +
         '<b>不会出杂物和宝箱</b>；要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b> 解锁，上限 = 2 + 钓鱼等级（最多 ' + G.NET_MAX + ' 张）。<br>' +
         '网到鱼就得下水把鱼取下来，<b>这张网要花 ' + G.BALANCE.netReset.energy + ' 体力重新布置</b>（没布置的网当晚不出货）；' +
-        '河边有「重新布置」按钮，也能开<b>自动重布</b>让睡觉时自动补（照样花体力）。<br>' +
+        '河边那张「渔网」卡上有「重新布置」按钮。<br>' +
         '🧑‍🌾 <b>渔夫</b>（钓鱼 Lv' + G.BALANCE.gate.fisher + '）：花 ' + G.BALANCE.fisher.hire +
-        ' 金雇一个，之后每天 <b>' + G.BALANCE.fisher.wage + ' 金</b>工资，他每天替你<b>重布全部渔网</b>' +
-        '（不花你的体力）+ <b>自动甩 ' + G.BALANCE.fisher.casts + ' 杆</b>（耗你的面团饵，不给经验）；' +
-        '没钱发工资就罢工，冬天他也休息。<br>' +
+        ' 金雇一个，每天工资 <b>' + G.BALANCE.fisher.wageBase + ' + ' + G.BALANCE.fisher.wageStep +
+        '×(等级−1)</b> 金；他每天替你<b>重布全部渔网</b>（不花你的体力）+ 自动甩 <b>2 + 等级</b> 杆' +
+        '（耗你的面团饵，不给经验）。<br>' +
+        '渔夫<b>自己会练级</b>：每钓到 1 条 +1 经验，够 <b>' + G.BALANCE.fisher.needBase + ' + ' +
+        G.BALANCE.fisher.needStep + '×(等级−1)</b> 就升一级，也可以花 ' + G.BALANCE.fisher.upCost +
+        ' × 等级 金直接升（满级 ' + G.BALANCE.fisher.max + '）；等级影响<b>咬钩、好鱼、每天杆数和工资</b>。' +
+        '发不出工资就罢工，冬天他也休息。<br>' +
         '渔获先进仓库：<b>鱼</b>去水产店卖或进收购箱；<b>杂物和宝箱</b>水产店不收，去<b>百货店</b>回收或开箱。<br>' +
         '🎁 宝箱按钓鱼等级掉落（木制随便掉、铁制 Lv' + G.BALANCE.chest.ironLv + '、黄金 Lv' +
         G.BALANCE.chest.goldLv + '），开箱奖励见「百货店」。</p>' +
@@ -1796,8 +1868,8 @@
       ['体力', state.energy + ' / ' + state.maxEnergy + ' · 伙食 ' + G.mealFee(state) + ' 金/天'],
       ['土地', state.plots.length + ' 块 · 洒水器 ' + state.sprinklers + ' 个'],
       ['设备', (state.harvester ? '自动收获器 ✅ · ' : '自动收获器 — · ') + '渔网 ' + state.nets +
-        ' 张（已布 ' + G.netSetCount(state) + (state.netAuto ? '，自动重布' : '') + '）' +
-        (state.fisher ? ' · 渔夫 ✅' : '')],
+        ' 张（已布 ' + G.netSetCount(state) + '）' +
+        (state.fisher ? ' · 渔夫 Lv' + G.fisherLv(state) : '')],
       ['种田等级', 'Lv' + lv.farm + (lv.farm >= G.BALANCE.level.max ? '（满级）' :
         '（' + lv.farmXp + '/' + G.levelNeed(lv.farm) + '）') + ' · ' + G.levelEffectText('farm', lv.farm)],
       ['钓鱼等级', 'Lv' + lv.fish + (lv.fish >= G.BALANCE.level.max ? '（满级）' :
@@ -2336,19 +2408,19 @@
         return;
       }
 
-      // 自动重布开关
-      const netAutoBtn = t.closest('[data-netauto]');
-      if (netAutoBtn) {
-        const r = G.toggleNetAuto(state);
-        commit(r);
-        toast(r.msg, 'good');
-        return;
-      }
-
-      // 雇佣 / 辞退渔夫
+      // 雇佣 / 升级 / 辞退渔夫
       const hireBtn = t.closest('[data-hirefisher]');
       if (hireBtn && !hireBtn.disabled) {
         const r = G.hireFisher(state);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        if (modalOpen()) shopModal();
+        return;
+      }
+      const fisherUpBtn = t.closest('[data-fisherup]');
+      if (fisherUpBtn && !fisherUpBtn.disabled) {
+        const r = G.fisherUp(state);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();

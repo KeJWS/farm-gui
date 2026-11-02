@@ -694,10 +694,30 @@ button{ font-family:inherit; }
 .rule-sec p{ margin:6px 0 0; font-size:11.5px; line-height:1.75; color:var(--ink-2); font-weight:600; }
 
 /* ---------- nets / dark mode ---------- */
-.net-line{ margin-top:8px; font-size:11.5px; font-weight:600; color:var(--ink-3); text-align:center; }
-.net-tools{ display:inline-flex; align-items:center; justify-content:center; gap:6px;
-  margin:3px 0; flex-wrap:wrap; }
-.net-ok{ color:var(--green-d); font-weight:700; }
+
+/* ---------- v2.10: 河边「渔网 / 渔夫」小队卡 ---------- */
+.crew-row{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:9px; }
+.crew-card{ padding:9px 10px 8px; border-radius:12px; background:var(--card);
+  border:1px solid var(--line); display:flex; flex-direction:column; gap:4px; min-width:0; }
+.crew-card.locked{ opacity:.55; }
+.crew-card.warn{ border-color:rgba(217,159,43,.5); background:rgba(217,159,43,.07); }
+.crew-card.on{ border-color:rgba(79,156,95,.4); }
+.cc-head{ display:flex; align-items:center; gap:5px; font-size:12px; font-weight:800; }
+.cc-ic{ font-size:15px; line-height:1; }
+.cc-t{ flex:1; min-width:0; }
+.cc-tag{ font-size:10.5px; font-weight:800; color:var(--ink-3); background:var(--track);
+  padding:1px 6px; border-radius:8px; white-space:nowrap; }
+.cc-dots{ display:flex; gap:3px; flex-wrap:wrap; }
+.cc-dots i{ width:8px; height:8px; border-radius:50%; background:var(--track); display:block; }
+.cc-dots i.on{ background:var(--green); }
+.cc-bar{ height:5px; border-radius:4px; background:var(--track); overflow:hidden; }
+.cc-bar i{ display:block; height:100%; border-radius:4px; background:var(--green); transition:width .3s; }
+.cc-sub{ font-size:10.5px; font-weight:700; color:var(--ink-3); line-height:1.45; }
+.cc-sub2{ font-size:10px; font-weight:700; color:var(--green-d); }
+.cc-ok{ font-size:10.5px; font-weight:800; color:var(--green-d); }
+.cc-act{ display:flex; gap:5px; flex-wrap:wrap; margin-top:2px; }
+.cc-act .btn.mini{ flex:none; }
+@media (max-width:720px){ .crew-row{ grid-template-columns:1fr; } }
 :root[data-theme="dark"]{
   --bg:#14161a; --bg2:#191c21; --panel:#1e2228; --panel-2:#23272e;
   --ink:#e9e5db; --ink-2:#b9b3a6; --ink-3:#8a8578;
