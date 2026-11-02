@@ -606,12 +606,12 @@ ok(s.fishBag.length === 3 - fo.qty && s.fishBag.some(function (e) { return e.nam
 
 s = G.createState();
 const day1Orders = s.orders.map(function (o) { return o.id; }).join();
-ok(!G.refreshOrders(s).ok, '开局当天已经刷新过，要等到明天');
+ok(G.refreshOrders(s).ok, '开局就能手动刷新一次');
+ok(!G.refreshOrders(s).ok, '同一天只能手动刷新一次');
 s.coins = 100;
 G.sleep(s);
-ok(s.orders.map(function (o) { return o.id; }).join() === day1Orders, '睡觉不会自动刷新委托');
-ok(G.refreshOrders(s).ok && s.orders[0].id.indexOf('d' + s.day + '-') === 0, '手动刷新换一批委托');
-ok(!G.refreshOrders(s).ok, '同一天只能刷新一次');
+ok(s.orders[0].id.indexOf('d' + s.day + '-') === 0, '睡觉后委托自动换新');
+ok(s.manualRefreshUsed === false && G.refreshOrders(s).ok, '新的一天又有一次手动刷新');
 
 const oldSave = G.deserialize({ plots: [], coins: 10, day: 3 });
 ok(Array.isArray(oldSave.orders) && oldSave.orders.length === 3, '老存档没有委托字段时自动补一份');
@@ -872,7 +872,7 @@ function evBait(kind, weather, n) {
 }
 G.setRng(mulberry32(77)); const evD = evBait('dough', 'cloudy', 4000);
 G.setRng(mulberry32(77)); const evL = evBait('lure', 'cloudy', 4000);
-ok(evL > evD, '假饵期望已高于面团饵', [evD.toFixed(2), evL.toFixed(2)]);
+ok(evL > evD * 0.85 && evL < evD, '假饵期望略低于面团但差距不大', [evD.toFixed(2), evL.toFixed(2)]);
 
 s = G.createState(); s.day = 29; s.coins = 1000;
 const sr = G.sleep(s);
@@ -883,6 +883,34 @@ ok(Array.isArray(sr.notes) && sr.notes.every(function (n) { return n && n.kind &
 
 ok(G.BALANCE && G.BALANCE.tax.rate === 0.04 && G.BALANCE.prices.sprinkler === 80 && G.BALANCE.hook.dough === 0.92,
    '数值表 BALANCE 对外导出');
+
+/* ---------- 5s. v1.5.2: 渔网 / 肥料品质 / 水产店 ---------- */
+section('v1.5.2 渔网与肥料');
+let netCatches = 0, netJunk = 0, netHigh = 0, netUsed = 0;
+for (let i = 0; i < 40; i++) {
+  G.setRng(mulberry32(200 + i));
+  const st = G.createState();
+  st.nets = 9; st.bait.dough = 9; st.weather = 'cloudy';
+  G.sleep(st);
+  netUsed += 9;
+  st.fishBag.forEach(function (e) {
+    netCatches++;
+    if (!e.q) netJunk++;
+    if (e.q && ['good', 'fine', 'perfect', 'legend'].indexOf(e.q) >= 0) netHigh++;
+  });
+}
+ok(netCatches > 0 && netJunk === 0, '渔网不会网到杂物/宝箱', netJunk);
+ok(netHigh === 0, '渔网只出标准及以下品质', netHigh);
+const rate = netCatches / netUsed;
+ok(rate > 0.6 && rate < 0.8, '渔网上鱼率约 70%', (rate * 100).toFixed(0) + '%');
+
+G.setRng(mulberry32(9)); const t1 = avgTier(1);
+G.setRng(mulberry32(9)); const t2 = avgTier(2);
+ok(Math.abs(t1 - t2) < 0.06, '普通肥与特效肥的品质加成一致', [t1.toFixed(2), t2.toFixed(2)]);
+ok(t1 > 0.3, '施肥仍然提升品质', t1.toFixed(2));
+
+s = G.createState(); s.coins = 1000;
+ok(!G.buyFish(s, 'chest', 1).ok, '水产店不卖宝箱');
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');

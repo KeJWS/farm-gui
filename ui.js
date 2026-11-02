@@ -487,8 +487,8 @@
     $('#orders-sum').textContent = list.length ? doneN + '/' + list.length + ' 完成' : '';
     const rb = $('#btn-refresh-orders');
     if (rb) {
-      rb.disabled = state.orderRefreshDay === state.day;
-      rb.title = rb.disabled ? '今天已经刷新过了，明天再来' : '刷新今日委托（每天一次）';
+      rb.disabled = !!state.manualRefreshUsed;
+      rb.title = rb.disabled ? '今天已经手动刷新过了，明天自动换新' : '手动换一批委托（每天一次）';
     }
     if (!list.length) {
       box.innerHTML = '<div class="store-empty">今天没有委托，睡一觉再来看</div>';
@@ -874,7 +874,8 @@
         '<h4>🎣 钓鱼</h4>' +
         '<p>2 体力 + 1 份饵甩一杆。<b>先判定咬钩</b>：面团饵 92%、蚯蚓 95%、假饵 72%，晴天 −12%、雨天 +8%。<br>' +
         '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15。<br>' +
-        '渔获先进仓库，卖出才换钱；<b>杂物和宝箱不能交委托</b>。</p>' +
+        '🕸️ 渔网：每天耗 1 份面团饵，<b>70%</b> 网到 1 条标准及以下的普通鱼，<b>不会出杂物和宝箱</b>。<br>' +
+        '渔获先进仓库，<b>只能去水产店卖</b>；杂物和宝箱不能交委托，水产店也买不到宝箱。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -894,7 +895,8 @@
           return '<tr><td>' + f.emoji + ' ' + f.name + '</td><td>' + f.cost + ' 金</td><td>' +
             G.fertSellPrice(k) + ' 金</td><td>+' + f.add + ' 产量、品质取更优</td></tr>';
         }).join('') + '</table>' +
-        '<p>肥料在<b>种子店</b>购买，买回来进仓库，施肥时消耗；大作物不吃肥，多收作物只提质不加量。</p>' +
+        '<p>肥料在<b>种子店</b>购买，买回来进仓库，施肥时消耗；大作物不吃肥，多收作物只提质不加量。<br>' +
+        '普通肥 +1 产量、特效肥 +2 产量，<b>两者的品质加成完全一致</b>（都是取两次较好）。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -910,7 +912,7 @@
 
       '<div class="rule-sec">' +
         '<h4>📋 委托</h4>' +
-        '<p>每天 2 个作物单 + 1 个鱼单，<b>手动点「🔄 刷新」</b>换单（每天一次），不刷新就一直留着。<br>' +
+        '<p>每天 2 个作物单 + 1 个鱼单，<b>每天自动换新</b>，另外还能<b>手动刷新一次</b>。<br>' +
         '报酬高于直接卖约 40%，没交不罚。交委托先扣<b>品质差的</b>，交鱼先交最便宜的；杂物、宝箱不算数。</p>' +
       '</div>' +
 
@@ -1074,7 +1076,7 @@
       '</div>';
     }).join('') : '<div class="store-empty">还没有渔获，先去河边甩两杆</div>';
 
-    const buyRows = G.FISH.filter(function (f) { return !f.trash; }).map(function (f) {
+    const buyRows = G.FISH.filter(function (f) { return !f.trash && !f.noOrder; }).map(function (f) {
       const bp = G.fishBuyPrice(f.id);
       return '<div class="store-row">' +
         '<span class="se">' + f.emoji + '</span>' +
@@ -1101,7 +1103,6 @@
     openModal('⚙️ 设置',
       '<div class="action-grid">' +
         '<button class="btn" id="set-help">📖 规则说明</button>' +
-        '<button class="btn" id="set-status">📊 查看状态</button>' +
         '<button class="btn" id="set-theme">' + (theme === 'dark' ? '🌙 黑夜模式：开' : '☀️ 黑夜模式：关') + '</button>' +
         '<button class="btn" id="set-export">⬇️ 导出存档<small>.json</small></button>' +
         '<button class="btn" id="set-import">⬆️ 导入存档<small>.json</small></button>' +
@@ -1229,8 +1230,8 @@
     },
     cast5: function () {
       const r = G.fishMany(state, 5, baitSel);
-      commit(r);
-      if (!r.ok) { toast(r.msg, 'warn'); return; }
+      commit(r);                       // commit 已经在失败时提示过一次
+      if (!r.ok) return;
       const got = r.results.filter(function (x) { return x.ok && x.entry; }).map(function (x) { return x.entry; });
       setCatchBatch(got);
       toast(r.msg, 'good');
@@ -1531,7 +1532,6 @@
     document.addEventListener('click', function (ev) {
       const t = ev.target;
       if (t.closest('#set-help')) { closeModal(); helpModal(); return; }
-      if (t.closest('#set-status')) { closeModal(); statusModal(); return; }
       if (t.closest('#set-export')) { exportSave(); return; }
       if (t.closest('#set-import')) { $('#file-import').click(); return; }
       if (t.closest('#set-sound')) { soundOn = !soundOn; if (soundOn) SFX.good(); settingsModal(); return; }

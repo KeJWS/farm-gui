@@ -432,7 +432,7 @@ button{ font-family:inherit; }
 .led-row{ display:flex; align-items:center; gap:6px; padding:3px 2px; border-bottom:1px dotted rgba(122,96,60,.13); }
 .led-row.day{ cursor:pointer; border-radius:7px; transition:background .12s; }
 .led-row.day:hover{ background:var(--hover); }
-.led-row.day.open{ background:rgba(246,239,221,.95); }
+.led-row.day.open{ background:var(--hover); }
 .led-day{ color:var(--ink-3); font-weight:800; min-width:40px; font-size:10.5px; }
 .led-label{ flex:1; color:var(--ink-2); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .led-val{ font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; }
@@ -481,11 +481,11 @@ button{ font-family:inherit; }
   transition:background .12s, border-color .12s;
 }
 .log-day:hover{ background:var(--hover); border-color:var(--line-2); }
-.log-day.open{ background:rgba(246,239,221,.95); }
+.log-day.open{ background:var(--hover); }
 .log-day .ld{ font-size:10px; font-weight:800; color:var(--ink-3); flex:none; }
 .log-day .ld-count{
   font-size:10px; font-weight:800; color:var(--green-d);
-  background:#eaf5e8; border-radius:6px; padding:1px 6px; flex:none;
+  background:rgba(95,179,111,.16); border-radius:6px; padding:1px 6px; flex:none;
 }
 .log-day .ld-last{
   flex:1; color:var(--ink-2); font-weight:600;
@@ -504,10 +504,10 @@ button{ font-family:inherit; }
 }
 @keyframes slideIn{ from{ opacity:0; transform:translateX(-6px); } to{ opacity:1; transform:none; } }
 .log-row .ld{ font-size:10px; font-weight:800; color:var(--ink-3); flex:none; }
-.log-row.good{ border-left-color:var(--green); background:rgba(232,246,235,.7); }
-.log-row.warn{ border-left-color:var(--gold); background:rgba(253,244,222,.8); }
-.log-row.bad{ border-left-color:var(--red); background:rgba(251,235,233,.8); }
-.log-row.sys{ border-left-color:var(--blue); background:rgba(235,242,251,.7); }
+.log-row.good{ border-left-color:var(--green); background:rgba(95,179,111,.14); }
+.log-row.warn{ border-left-color:var(--gold); background:rgba(224,179,82,.14); }
+.log-row.bad{ border-left-color:var(--red); background:rgba(224,103,103,.14); }
+.log-row.sys{ border-left-color:var(--blue); background:rgba(106,166,224,.14); }
 
 /* ---------------- 弹窗 ---------------- */
 
@@ -931,9 +931,9 @@ button{ color:inherit; font:inherit; }
   const BALANCE = {
     hook: { dough: 0.92, worm: 0.95, lure: 0.72 },
     weatherHook: { sunny: -0.12, cloudy: 0, rain: 0.08 },
-    bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.6 },
+    bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.15 },
     prices: { sprinkler: 80, harvester: 200, net: 80, netMax: 9 },
-    netChance: 0.65,
+    netChance: 0.7,
     work: { full: 2.0, half: 1.2 },
     upkeep: { plotPerWeek: 3, free: 5, sprinkle: 3, net: 3, harvester: 5 },
     tax: { rate: 0.04, min: 30, every: 30 },
@@ -1083,7 +1083,7 @@ button{ color:inherit; font:inherit; }
       harvesterOn: true,
       nets: 0,
       codex: { fish: {}, crops: {} },
-      orderRefreshDay: 1,
+      manualRefreshUsed: false,
       workUsed: false,
       bait: { worm: 0, dough: 0 },
       lure: { owned: false, dur: 0 },
@@ -1269,7 +1269,7 @@ button{ color:inherit; font:inherit; }
     else qty = c.big ? 1 : clamp(c.base + randInt(-1, 1) - p.missed + fertBonus(p), 1, 99);
 
     // 作物也有品质：施肥会多滚几次取最好的（普通肥 2 次、特效肥 3 次）
-    const q = rollQuality(1 + p.fert);
+    const q = rollQuality(p.fert > 0 ? 2 : 1);   // 普通/特效肥料品质一致
     const unit = unitValue(p.crop, q.id);
     addStore(s, p.crop, q.id, qty);
 
@@ -1547,6 +1547,11 @@ button{ color:inherit; font:inherit; }
       notes.push({ kind: 'tax', text: '🏛️ 税 -' + pay + '（4%）' });
     }
 
+    // 每天自动换一批委托，同时给一次手动刷新机会
+    s.orders = makeOrders(s);
+    s.manualRefreshUsed = false;
+    notes.push({ kind: 'order', text: '📋 委托已换新' });
+
     const head = '🌙 第 ' + s.day + ' 天 · ' + w.name;
     const body = notes.filter(function (n) { return n.kind !== 'weather'; })
                       .map(function (n) { return n.text; }).join(' · ');
@@ -1608,7 +1613,7 @@ button{ color:inherit; font:inherit; }
       return Object.assign({}, f, { w: f.w * mul });
     });
     const f = weighted(table, 'w');
-    const q = f.trash ? null : rollQuality(kind === 'worm' || kind === 'lure' ? 2 : 1);
+    const q = f.trash ? null : rollQuality(kind === 'worm' ? 2 : 1);
     const value = f.trash ? 1 : Math.max(1, Math.round(f.base * q.mul));
 
     let name = f.name, emoji = f.emoji;
@@ -1888,7 +1893,7 @@ button{ color:inherit; font:inherit; }
 
   function buyFish(s, id, n) {
     const f = FISH.filter(function (x) { return x.id === id; })[0];
-    if (!f || f.trash) return { ok: false, msg: '这种水产买不到' };
+    if (!f || f.trash || f.noOrder) return { ok: false, msg: '这种水产买不到' };
     const qty = Math.max(1, Math.floor(n || 1));
     const cost = fishBuyPrice(id) * qty;
     if (s.coins < cost) return { ok: false, msg: '金币不够' };
@@ -1901,19 +1906,37 @@ button{ color:inherit; font:inherit; }
     return { ok: true, qty: qty, cost: cost, msg: '买到 ' + f.name + ' ×' + qty };
   }
 
-  /* 渔网：每天吃 1 份面团饵，有概率网到 1 条鱼 */
+  /* 渔网：每天吃 1 份面团饵，70% 概率网到 1 条「标准及以下」的普通鱼（不出杂物/宝箱） */
+  const NET_QUALITIES = ['bad', 'common', 'std'];
+
+  function netCatchOne(s) {
+    const pool = FISH.filter(function (f) { return !f.trash && !f.noOrder; });
+    const f = weighted(pool, 'w');
+    const qs = QUALITY.filter(function (q) { return NET_QUALITIES.indexOf(q.id) >= 0; });
+    const q = weighted(qs, 'w');
+    const value = Math.max(1, Math.round(f.base * q.mul));
+    s.fishBag.push({ name: f.name, emoji: f.emoji, q: q.id, v: value, d: s.day });
+    const cx = s.codex.fish[f.id] ||
+      (s.codex.fish[f.id] = { n: 0, best: null, first: s.day, perfect: 0, value: 0 });
+    cx.n++;
+    cx.value = (cx.value || 0) + value;
+    if (!cx.best || QUALITY.indexOf(q) > QUALITY.indexOf(qualityById(cx.best))) cx.best = q.id;
+    s.stats.nets = (s.stats.nets || 0) + 1;
+    return { name: f.name, q: q.id, value: value };
+  }
+
   function netCatch(s) {
-    let got = 0, used = 0;
+    let got = 0, used = 0, value = 0;
     for (let i = 0; i < s.nets; i++) {
       if ((s.bait.dough || 0) < 1) break;
       s.bait.dough--;
       used++;
       if (rand() < NET_CHANCE) {
-        const r = fish(s, 'dough', { free: true, noBait: true, forceKind: 'dough', quiet: true });
-        if (r.ok) got++;
+        const r = netCatchOne(s);
+        got++; value += r.value;
       }
     }
-    return { used: used, got: got };
+    return { used: used, got: got, value: value };
   }
 
   function buyNet(s) {
@@ -1945,9 +1968,9 @@ button{ color:inherit; font:inherit; }
 
   /* 委托手动刷新：每天一次 */
   function refreshOrders(s) {
-    if (s.orderRefreshDay === s.day) return { ok: false, msg: '今天的委托已经刷新过了，明天再来' };
+    if (s.manualRefreshUsed) return { ok: false, msg: '今天已经手动刷新过了，明天再来' };
     s.orders = makeOrders(s);
-    s.orderRefreshDay = s.day;
+    s.manualRefreshUsed = true;
     log(s, '📋 刷新了今日委托：' + s.orders.length + ' 单', 'info');
     return { ok: true, msg: '刷新了 ' + s.orders.length + ' 个委托', orders: s.orders };
   }
@@ -2270,7 +2293,7 @@ button{ color:inherit; font:inherit; }
         if (!c.best || QUALITY.indexOf(e.quality) > QUALITY.indexOf(qualityById(c.best))) c.best = e.quality.id;
       });
     }
-    merged.orderRefreshDay = Math.round(num(s.orderRefreshDay, s.day || 1, 0, 100000));
+    merged.manualRefreshUsed = !!s.manualRefreshUsed;
     merged.workUsed = !!s.workUsed;
     merged.ledger = Array.isArray(s.ledger) ? s.ledger : base.ledger;
     merged.log = Array.isArray(s.log) ? s.log.slice(0, 400) : base.log;
@@ -2810,8 +2833,8 @@ button{ color:inherit; font:inherit; }
     $('#orders-sum').textContent = list.length ? doneN + '/' + list.length + ' 完成' : '';
     const rb = $('#btn-refresh-orders');
     if (rb) {
-      rb.disabled = state.orderRefreshDay === state.day;
-      rb.title = rb.disabled ? '今天已经刷新过了，明天再来' : '刷新今日委托（每天一次）';
+      rb.disabled = !!state.manualRefreshUsed;
+      rb.title = rb.disabled ? '今天已经手动刷新过了，明天自动换新' : '手动换一批委托（每天一次）';
     }
     if (!list.length) {
       box.innerHTML = '<div class="store-empty">今天没有委托，睡一觉再来看</div>';
@@ -3197,7 +3220,8 @@ button{ color:inherit; font:inherit; }
         '<h4>🎣 钓鱼</h4>' +
         '<p>2 体力 + 1 份饵甩一杆。<b>先判定咬钩</b>：面团饵 92%、蚯蚓 95%、假饵 72%，晴天 −12%、雨天 +8%。<br>' +
         '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15。<br>' +
-        '渔获先进仓库，卖出才换钱；<b>杂物和宝箱不能交委托</b>。</p>' +
+        '🕸️ 渔网：每天耗 1 份面团饵，<b>70%</b> 网到 1 条标准及以下的普通鱼，<b>不会出杂物和宝箱</b>。<br>' +
+        '渔获先进仓库，<b>只能去水产店卖</b>；杂物和宝箱不能交委托，水产店也买不到宝箱。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -3217,7 +3241,8 @@ button{ color:inherit; font:inherit; }
           return '<tr><td>' + f.emoji + ' ' + f.name + '</td><td>' + f.cost + ' 金</td><td>' +
             G.fertSellPrice(k) + ' 金</td><td>+' + f.add + ' 产量、品质取更优</td></tr>';
         }).join('') + '</table>' +
-        '<p>肥料在<b>种子店</b>购买，买回来进仓库，施肥时消耗；大作物不吃肥，多收作物只提质不加量。</p>' +
+        '<p>肥料在<b>种子店</b>购买，买回来进仓库，施肥时消耗；大作物不吃肥，多收作物只提质不加量。<br>' +
+        '普通肥 +1 产量、特效肥 +2 产量，<b>两者的品质加成完全一致</b>（都是取两次较好）。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -3233,7 +3258,7 @@ button{ color:inherit; font:inherit; }
 
       '<div class="rule-sec">' +
         '<h4>📋 委托</h4>' +
-        '<p>每天 2 个作物单 + 1 个鱼单，<b>手动点「🔄 刷新」</b>换单（每天一次），不刷新就一直留着。<br>' +
+        '<p>每天 2 个作物单 + 1 个鱼单，<b>每天自动换新</b>，另外还能<b>手动刷新一次</b>。<br>' +
         '报酬高于直接卖约 40%，没交不罚。交委托先扣<b>品质差的</b>，交鱼先交最便宜的；杂物、宝箱不算数。</p>' +
       '</div>' +
 
@@ -3397,7 +3422,7 @@ button{ color:inherit; font:inherit; }
       '</div>';
     }).join('') : '<div class="store-empty">还没有渔获，先去河边甩两杆</div>';
 
-    const buyRows = G.FISH.filter(function (f) { return !f.trash; }).map(function (f) {
+    const buyRows = G.FISH.filter(function (f) { return !f.trash && !f.noOrder; }).map(function (f) {
       const bp = G.fishBuyPrice(f.id);
       return '<div class="store-row">' +
         '<span class="se">' + f.emoji + '</span>' +
@@ -3424,7 +3449,6 @@ button{ color:inherit; font:inherit; }
     openModal('⚙️ 设置',
       '<div class="action-grid">' +
         '<button class="btn" id="set-help">📖 规则说明</button>' +
-        '<button class="btn" id="set-status">📊 查看状态</button>' +
         '<button class="btn" id="set-theme">' + (theme === 'dark' ? '🌙 黑夜模式：开' : '☀️ 黑夜模式：关') + '</button>' +
         '<button class="btn" id="set-export">⬇️ 导出存档<small>.json</small></button>' +
         '<button class="btn" id="set-import">⬆️ 导入存档<small>.json</small></button>' +
@@ -3552,8 +3576,8 @@ button{ color:inherit; font:inherit; }
     },
     cast5: function () {
       const r = G.fishMany(state, 5, baitSel);
-      commit(r);
-      if (!r.ok) { toast(r.msg, 'warn'); return; }
+      commit(r);                       // commit 已经在失败时提示过一次
+      if (!r.ok) return;
       const got = r.results.filter(function (x) { return x.ok && x.entry; }).map(function (x) { return x.entry; });
       setCatchBatch(got);
       toast(r.msg, 'good');
@@ -3854,7 +3878,6 @@ button{ color:inherit; font:inherit; }
     document.addEventListener('click', function (ev) {
       const t = ev.target;
       if (t.closest('#set-help')) { closeModal(); helpModal(); return; }
-      if (t.closest('#set-status')) { closeModal(); statusModal(); return; }
       if (t.closest('#set-export')) { exportSave(); return; }
       if (t.closest('#set-import')) { $('#file-import').click(); return; }
       if (t.closest('#set-sound')) { soundOn = !soundOn; if (soundOn) SFX.good(); settingsModal(); return; }

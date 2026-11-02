@@ -92,7 +92,9 @@ console.log('  买来的鱼能否交单：', canCheat ? '⚠️ 能（有套利�
 if (canCheat) warn.push('买鱼仍能交委托，存在套利');
 
 const lure = evs['lure|cloudy'].ev, dough = evs['dough|cloudy'].ev;
-if (lure <= dough) warn.push('假饵期望 ' + lure.toFixed(2) + ' 低于面团 ' + dough.toFixed(2));
+const doughNet = dough - 1, lureNet = lure - 5 / 20;
+console.log('  每杆净收益：面团', doughNet.toFixed(2), '· 假饵', lureNet.toFixed(2));
+if (lureNet < doughNet * 0.9) warn.push('假饵净收益比面团低 10% 以上');
 
 if (warn.length) {
   console.log('\n⚠️ 需要关注：');

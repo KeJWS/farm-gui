@@ -10,9 +10,9 @@
   const BALANCE = {
     hook: { dough: 0.92, worm: 0.95, lure: 0.72 },
     weatherHook: { sunny: -0.12, cloudy: 0, rain: 0.08 },
-    bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.6 },
+    bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.15 },
     prices: { sprinkler: 80, harvester: 200, net: 80, netMax: 9 },
-    netChance: 0.65,
+    netChance: 0.7,
     work: { full: 2.0, half: 1.2 },
     upkeep: { plotPerWeek: 3, free: 5, sprinkle: 3, net: 3, harvester: 5 },
     tax: { rate: 0.04, min: 30, every: 30 },
@@ -162,7 +162,7 @@
       harvesterOn: true,
       nets: 0,
       codex: { fish: {}, crops: {} },
-      orderRefreshDay: 1,
+      manualRefreshUsed: false,
       workUsed: false,
       bait: { worm: 0, dough: 0 },
       lure: { owned: false, dur: 0 },
@@ -348,7 +348,7 @@
     else qty = c.big ? 1 : clamp(c.base + randInt(-1, 1) - p.missed + fertBonus(p), 1, 99);
 
     // 作物也有品质：施肥会多滚几次取最好的（普通肥 2 次、特效肥 3 次）
-    const q = rollQuality(1 + p.fert);
+    const q = rollQuality(p.fert > 0 ? 2 : 1);   // 普通/特效肥料品质一致
     const unit = unitValue(p.crop, q.id);
     addStore(s, p.crop, q.id, qty);
 
@@ -626,6 +626,11 @@
       notes.push({ kind: 'tax', text: '🏛️ 税 -' + pay + '（4%）' });
     }
 
+    // 每天自动换一批委托，同时给一次手动刷新机会
+    s.orders = makeOrders(s);
+    s.manualRefreshUsed = false;
+    notes.push({ kind: 'order', text: '📋 委托已换新' });
+
     const head = '🌙 第 ' + s.day + ' 天 · ' + w.name;
     const body = notes.filter(function (n) { return n.kind !== 'weather'; })
                       .map(function (n) { return n.text; }).join(' · ');
@@ -687,7 +692,7 @@
       return Object.assign({}, f, { w: f.w * mul });
     });
     const f = weighted(table, 'w');
-    const q = f.trash ? null : rollQuality(kind === 'worm' || kind === 'lure' ? 2 : 1);
+    const q = f.trash ? null : rollQuality(kind === 'worm' ? 2 : 1);
     const value = f.trash ? 1 : Math.max(1, Math.round(f.base * q.mul));
 
     let name = f.name, emoji = f.emoji;
@@ -967,7 +972,7 @@
 
   function buyFish(s, id, n) {
     const f = FISH.filter(function (x) { return x.id === id; })[0];
-    if (!f || f.trash) return { ok: false, msg: '这种水产买不到' };
+    if (!f || f.trash || f.noOrder) return { ok: false, msg: '这种水产买不到' };
     const qty = Math.max(1, Math.floor(n || 1));
     const cost = fishBuyPrice(id) * qty;
     if (s.coins < cost) return { ok: false, msg: '金币不够' };
@@ -980,19 +985,37 @@
     return { ok: true, qty: qty, cost: cost, msg: '买到 ' + f.name + ' ×' + qty };
   }
 
-  /* 渔网：每天吃 1 份面团饵，有概率网到 1 条鱼 */
+  /* 渔网：每天吃 1 份面团饵，70% 概率网到 1 条「标准及以下」的普通鱼（不出杂物/宝箱） */
+  const NET_QUALITIES = ['bad', 'common', 'std'];
+
+  function netCatchOne(s) {
+    const pool = FISH.filter(function (f) { return !f.trash && !f.noOrder; });
+    const f = weighted(pool, 'w');
+    const qs = QUALITY.filter(function (q) { return NET_QUALITIES.indexOf(q.id) >= 0; });
+    const q = weighted(qs, 'w');
+    const value = Math.max(1, Math.round(f.base * q.mul));
+    s.fishBag.push({ name: f.name, emoji: f.emoji, q: q.id, v: value, d: s.day });
+    const cx = s.codex.fish[f.id] ||
+      (s.codex.fish[f.id] = { n: 0, best: null, first: s.day, perfect: 0, value: 0 });
+    cx.n++;
+    cx.value = (cx.value || 0) + value;
+    if (!cx.best || QUALITY.indexOf(q) > QUALITY.indexOf(qualityById(cx.best))) cx.best = q.id;
+    s.stats.nets = (s.stats.nets || 0) + 1;
+    return { name: f.name, q: q.id, value: value };
+  }
+
   function netCatch(s) {
-    let got = 0, used = 0;
+    let got = 0, used = 0, value = 0;
     for (let i = 0; i < s.nets; i++) {
       if ((s.bait.dough || 0) < 1) break;
       s.bait.dough--;
       used++;
       if (rand() < NET_CHANCE) {
-        const r = fish(s, 'dough', { free: true, noBait: true, forceKind: 'dough', quiet: true });
-        if (r.ok) got++;
+        const r = netCatchOne(s);
+        got++; value += r.value;
       }
     }
-    return { used: used, got: got };
+    return { used: used, got: got, value: value };
   }
 
   function buyNet(s) {
@@ -1024,9 +1047,9 @@
 
   /* 委托手动刷新：每天一次 */
   function refreshOrders(s) {
-    if (s.orderRefreshDay === s.day) return { ok: false, msg: '今天的委托已经刷新过了，明天再来' };
+    if (s.manualRefreshUsed) return { ok: false, msg: '今天已经手动刷新过了，明天再来' };
     s.orders = makeOrders(s);
-    s.orderRefreshDay = s.day;
+    s.manualRefreshUsed = true;
     log(s, '📋 刷新了今日委托：' + s.orders.length + ' 单', 'info');
     return { ok: true, msg: '刷新了 ' + s.orders.length + ' 个委托', orders: s.orders };
   }
@@ -1349,7 +1372,7 @@
         if (!c.best || QUALITY.indexOf(e.quality) > QUALITY.indexOf(qualityById(c.best))) c.best = e.quality.id;
       });
     }
-    merged.orderRefreshDay = Math.round(num(s.orderRefreshDay, s.day || 1, 0, 100000));
+    merged.manualRefreshUsed = !!s.manualRefreshUsed;
     merged.workUsed = !!s.workUsed;
     merged.ledger = Array.isArray(s.ledger) ? s.ledger : base.ledger;
     merged.log = Array.isArray(s.log) ? s.log.slice(0, 400) : base.log;
