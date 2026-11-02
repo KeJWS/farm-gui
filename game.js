@@ -1,4 +1,12 @@
 /* ============================================================
+ * 我的小农场 · 游戏逻辑层（自动生成，别直接改这个文件！）
+ * 源码在 src/*.js，改完运行： node build-modules.cjs
+ * 拼装后仍然是一个 IIFE，所有模块共享同一个闭包作用域。
+ * ============================================================ */
+
+/* ==================== src/01-data.js ==================== */
+/* 数值表与静态数据（BALANCE / 作物 / 鱼 / 品质 / 天气 / 宝箱 / 茶） */
+/* ============================================================
  * 我的小农场 · 游戏逻辑层（纯数据，不碰 DOM）
  * 规则来源：skills/farm-game/SKILL.md
  * ============================================================ */
@@ -247,6 +255,8 @@
   /* 各饵的咬钩基础概率（天气再加减） */
   const HOOK = BALANCE.hook;
 
+/* ==================== src/02-ach.js ==================== */
+/* 成就表与判定 */
   /* ---------------- 成就 ---------------- */
 
   function cropSpeciesOwned(s) {
@@ -457,6 +467,8 @@
     });
   }
 
+/* ==================== src/03-core.js ==================== */
+/* 基础工具：随机、季节、等级、等级解锁 */
   /* ---------------- 随机 ---------------- */
 
   let RNG = Math.random;
@@ -592,6 +604,8 @@
     return Math.min(NET_MAX, BALANCE.gate.netBase + fishLv(s));
   }
 
+/* ==================== src/04-state.js ==================== */
+/* 存档状态：createState 与通用工具（log / ledger / addCoins） */
   /* ---------------- 状态 ---------------- */
 
   const SAVE_VERSION = 1;
@@ -653,6 +667,7 @@
       fishBag: [],
       market: {},
       marketF: {},
+      marketHist: {},
       ferts: { normal: 0, special: 0 },
       sprinklers: 0,
       harvester: false,
@@ -681,6 +696,7 @@
       stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0,
                longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0 }
     };
+    snapshotMarket(s);
     return s;
   }
 
@@ -785,6 +801,8 @@
     return '🌾';
   }
 
+/* ==================== src/05-farm.js ==================== */
+/* 农田操作：播种、浇水、收获、肥料、扩张、睡觉、钓鱼主流程 */
   /* ---------------- 操作 ---------------- */
 
   function grow(p, s) {
@@ -1152,6 +1170,7 @@
     s.weather = rollWeather(s.day);
     const w = WEATHER[s.weather];
     notes.push({ kind: 'weather', text: w.emoji + ' ' + w.name });
+    snapshotMarket(s);            // 记一笔今天的市价，攒历史曲线
 
     if (w.autoWater) {
       let n = 0, ripe = 0;
@@ -1398,6 +1417,8 @@
              msg: '甩了 ' + okCount + ' 杆' + (empty ? '（空竿 ' + empty + '）' : '') + '，渔获值 ' + value + ' 金' };
   }
 
+/* ==================== src/06-trade.js ==================== */
+/* 卖鱼与仓库（作物按品质分桶） */
   /* ---------------- 卖鱼 ---------------- */
 
   /* 渔获按「鱼名」分组（不同品质合并成一组，和仓库里的作物一样），杂物 / 宝箱按名字 + 种类 */
@@ -1525,6 +1546,8 @@
     return n - left;
   }
 
+/* ==================== src/07-market.js ==================== */
+/* 市场价格：供需、季节、小镇声望、掉档提示、价格历史 */
   /* ---------------- 市场价格 ----------------
    * 供给：最近卖得越多越便宜（×1.30 稀缺 → ×0.70 过剩，作物每件 -0.02、鱼每条 -0.015）
    * 季节：当季 / 汛期 ×1.00，反季 / 非汛期 ×2.00（物以稀为贵）
@@ -1629,6 +1652,57 @@
     return headroomOf(sold, BALANCE.market.fishStep);
   }
 
+  /* ---------------- 价格历史（市场分析面板 + 曲线） ---------------- */
+  const HIST_DAYS = 30;
+
+  function pushMarketHist(s, key, mul) {
+    s.marketHist = s.marketHist || {};
+    const arr = s.marketHist[key] || (s.marketHist[key] = []);
+    const m = Math.round(mul * 100) / 100;
+    const last = arr[arr.length - 1];
+    if (last && last.d === s.day) { last.m = m; return arr; }
+    arr.push({ d: s.day, m: m });
+    if (arr.length > HIST_DAYS) arr.splice(0, arr.length - HIST_DAYS);
+    return arr;
+  }
+
+  /* 每天睡醒记一次市价，攒出曲线 */
+  function snapshotMarket(s) {
+    CROP_LIST.forEach(function (c) { pushMarketHist(s, c.id, marketMul(s, c.id)); });
+    WILD_LIST.forEach(function (c) { pushMarketHist(s, c.id, marketMul(s, c.id)); });
+    FISH.forEach(function (f) {
+      if (f.trash || f.chest) return;
+      pushMarketHist(s, 'f:' + f.name, fishMarketMul(s, f.name));
+    });
+  }
+
+  /* 画曲线用：历史 + 今天的实时值（当天那个点直接用实时值覆盖） */
+  function marketSeries(s, key, live) {
+    const arr = (s.marketHist && s.marketHist[key]) || [];
+    const out = arr.map(function (p) { return p.m; });
+    if (typeof live === 'number') {
+      if (!out.length) out.push(live);
+      else if (arr[arr.length - 1].d === s.day) out[out.length - 1] = live;
+      else out.push(live);
+    }
+    return out;
+  }
+
+  /* 预计下一季的系数：作物看下季在不在成熟季，鱼看下季在不在汛期 */
+  function nextSeasonIdx(day) { return (seasonIdx(day) + 1) % 4; }
+  function cropNextSeasonMul(s, id) {
+    const c = CROPS[id];
+    const ns = nextSeasonIdx(s.day);
+    const inS = !!(c && c.seasons && c.seasons.indexOf(ns) >= 0);
+    return inS ? 1 : BALANCE.market.offSeason;
+  }
+  function fishNextSeasonMul(s, name) {
+    const f = fishByName(name);
+    const ns = nextSeasonIdx(s.day);
+    const inS = !f || !f.seasons || f.seasons.indexOf(ns) >= 0;
+    return inS ? 1 : BALANCE.market.offSeason;
+  }
+
   /* 从渔获袋里按「品质差的先出」取 n 条同名鱼，返回 parts */
   function takeFishN(s, key, n) {
     const idx = [];
@@ -1683,6 +1757,8 @@
     return { ok: true, msg: '卖出 ' + n + ' 条鱼，+' + gain + ' 金', income: gain };
   }
 
+/* ==================== src/08-box.js ==================== */
+/* 收购箱（隔夜按原价结算） */
   /* ---------------- 收购箱 ---------------- */
 
   function boxCount(s) { return (s.box || []).length; }
@@ -1853,6 +1929,8 @@
     return { ok: true, msg: '挖到蚯蚓 ×' + n, n: n };
   }
 
+/* ==================== src/09-forage.js ==================== */
+/* 采集：按季节捡野货 */
   /* ---------------- 采集：去后山捡当季野货 ---------------- */
 
   function foragePool(day) {
@@ -1874,8 +1952,7 @@
     if (s.energy < cost) return { ok: false, msg: '体力不够（采集要 ' + cost + ' 点），先睡觉吧' };
     s.energy -= cost;
     const w = pool[Math.floor(rand() * pool.length)];
-    const lucky = rand() < BALANCE.forage.double || s.weather === 'rain';
-    const n = 1 + (lucky ? 1 : 0);
+    const n = 1 + (rand() < BALANCE.forage.double ? 1 : 0);
     const q = rollQuality(1);
     addStore(s, w.id, q.id, n);
     s.stats.forages = (s.stats.forages || 0) + 1;
@@ -1942,6 +2019,8 @@
     return { ok: true, msg: t.name + ' · 体力 +' + t.energy, tea: t.id, gain: t.energy };
   }
 
+/* ==================== src/10-depart.js ==================== */
+/* 百货店：茶、钥匙、宝箱回收 */
   /* ---------------- 百货店：茶 / 钥匙 / 收杂物宝箱 ---------------- */
 
   function teaUnlocked(s, t) { return (s.day || 1) >= (t.day || 1); }
@@ -2166,6 +2245,8 @@
     return { ok: true, qty: qty, cost: cost, msg: '买到 ' + f.name + ' ×' + qty };
   }
 
+/* ==================== src/11-shops.js ==================== */
+/* 农产品店 / 渔夫 / 种子店 */
   /* ---------------- 农产品店（作物唯一出售处 + 每日进货） ---------------- */
 
   /* 买价 = 售价 × 1.8 × 作物市价（缺货时更贵），一般品质（标准），转手必亏，只用来应急凑单 */
@@ -2521,6 +2602,8 @@
     return { ok: true, msg: '体力上限 ' + s.maxEnergy, maxEnergy: s.maxEnergy };
   }
 
+/* ==================== src/12-orders.js ==================== */
+/* 每日委托与长期订单 */
   /* ---------------- 每日委托 ---------------- */
 
   /* 委托池：按天数一档档解锁（前期慢一点，后期全开）；同档内按解锁等级 + 种子价排 */
@@ -2701,6 +2784,8 @@
     return out.length ? out : makeOrders(s);
   }
 
+/* ==================== src/13-save.js ==================== */
+/* 存读档与对外导出（FarmGame API） */
   /* ---------------- 存读档 ---------------- */
 
   function serialize(s) { return JSON.stringify(s); }
@@ -2886,6 +2971,21 @@
     // 老存档没有 netSet：默认所有渔网都已布置好
     merged.netSet = Math.round(num(s.netSet == null ? merged.nets : s.netSet, merged.nets, 0, merged.nets));
     merged.townDonated = Math.round(num(s.townDonated, 0, 0, 1e9));
+    // 价格历史：只保留 30 天 / 合法条目；老存档没有就从今天开始记
+    merged.marketHist = {};
+    const rawHist = s.marketHist && typeof s.marketHist === 'object' ? s.marketHist : {};
+    Object.keys(rawHist).forEach(function (k) {
+      if (String(k).length > 24) return;
+      const arr = rawHist[k];
+      if (!Array.isArray(arr)) return;
+      const out = [];
+      arr.slice(-HIST_DAYS).forEach(function (p) {
+        if (!p || typeof p !== 'object') return;
+        out.push({ d: Math.round(num(p.d, 1, 1, 1e6)), m: Math.round(num(p.m, 1, 0.1, 10) * 100) / 100 });
+      });
+      if (out.length) merged.marketHist[k] = out;
+    });
+    if (!Object.keys(merged.marketHist).length) snapshotMarket(merged);
     // 渔夫：老存档是 true（没有等级），补成 Lv1
     merged.fisher = s.fisher
       ? { lv: Math.round(num(s.fisher.lv, 1, 1, BALANCE.fisher.max)),
@@ -3049,6 +3149,9 @@
     forage: forage, foragePool: foragePool, forageSeedPool: forageSeedPool,
     donate: donate, townTier: townTier, townBonus: townBonus, townNext: townNext,
     marketHeadroom: marketHeadroom, fishMarketHeadroom: fishMarketHeadroom,
+    snapshotMarket: snapshotMarket, marketSeries: marketSeries, pushMarketHist: pushMarketHist,
+    cropNextSeasonMul: cropNextSeasonMul, fishNextSeasonMul: fishNextSeasonMul,
+    nextSeasonIdx: nextSeasonIdx, HIST_DAYS: HIST_DAYS,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather,
     TEAS: TEAS, TEA_LIST: TEA_LIST, teaList: teaList, teaStock: teaStock, teaById: teaById,
     teaUnlocked: teaUnlocked, buyTea: buyTea,

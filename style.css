@@ -798,6 +798,11 @@ button{ color:inherit; font:inherit; }
 .tago{ display:inline-block; font-size:10px; font-weight:800; padding:0 5px; border-radius:6px;
   background:rgba(201,85,74,.15); color:var(--red); vertical-align:middle; }
 
+/* ---------- v2.12: 市场分析曲线 ---------- */
+.sparkwrap{ flex:none; display:flex; align-items:center; justify-content:flex-end; }
+.spark{ color:var(--green); display:block; overflow:visible; }
+:root[data-theme="dark"] .spark{ color:#7fc98d; }
+
 .ach-row{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:11px;
   background:var(--card); border:1px solid var(--line); margin-top:6px; }
 .ach-row .ae{ font-size:20px; flex:none; width:26px; text-align:center; }

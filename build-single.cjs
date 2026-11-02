@@ -3,6 +3,10 @@ const fs = require('fs');
 const path = require('path');
 
 const root = __dirname;
+
+// 先把 src/*.js 拼成 game.js，保证单文件用的是最新源码
+require('./build-modules.cjs');
+
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
 
 let html = read('index.html');

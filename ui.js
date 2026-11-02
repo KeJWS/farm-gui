@@ -1182,8 +1182,8 @@
         G.WILD_LIST.map(function (w) {
           return w.emoji + ' ' + w.name + '（' + G.seasonText(w.id) + ' · ' + w.price + ' 金）';
         }).join(' · ') + '。<br>' +
-        '一次 1 件，' + Math.round(G.BALANCE.forage.double * 100) + '% 概率（或雨天）采到 2 件；' +
-        Math.round(G.BALANCE.forage.seedChance * 100) + '% 概率顺手摘到一颗当季作物种子。<br>' +
+        '一次 1 件，' + Math.round(G.BALANCE.forage.double * 100) + '% 概率采到 2 件；' +
+        Math.round(G.BALANCE.forage.seedChance * 100) + '% 概率顺手摘到一颗当季作物种子（<b>和天气无关</b>）。<br>' +
         '野货直接进仓库，和作物一样按品质定价、一样吃<b>市价</b>，可以卖给农产品店或放进收购箱；' +
         '冬天也能采，是封冻期唯一的野外收入。</p>' +
       '</div>' +
@@ -1850,6 +1850,83 @@
         '<b>↳ 那行就是「还能卖多少」</b>：同一种货一天卖太多会掉档，分品种轮着卖最划算。<br>' +
         '反季的菜 / 非汛期的鱼卖价 <b>×' + OFF + '</b>，囤到那时候再出手翻倍 —— 但砸得太狠一样会饱和。<br>' +
         '商店的<b>进价</b>也跟着市价走：缺货时进货更贵，反季进货更贵。</div>',
+      '<button class="btn" data-close>关闭</button>');
+  }
+
+  /* ---------------- 市场分析（价格历史） ---------------- */
+
+  /* 迷你折线：宽 120，高 28，纵轴固定 0.5~2.8，跨品种可比 */
+  function sparkline(vals) {
+    const W = 120, H = 28, PAD = 3, LO = 0.5, HI = 2.8;
+    const n = vals.length;
+    if (!n) return '<svg class="spark" width="' + W + '" height="' + H + '"></svg>';
+    const px = function (i) {
+      return PAD + (W - 2 * PAD) * (n === 1 ? 0.5 : i / (n - 1));
+    };
+    const py = function (v) {
+      const t = Math.max(0, Math.min(1, (v - LO) / (HI - LO)));
+      return H - PAD - (H - 2 * PAD) * t;
+    };
+    const pts = vals.map(function (v, i) { return px(i).toFixed(1) + ',' + py(v).toFixed(1); }).join(' ');
+    return '<svg class="spark" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' +
+      '<polyline points="' + pts + '" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+        'stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="' + px(n - 1).toFixed(1) + '" cy="' + py(vals[n - 1]).toFixed(1) +
+        '" r="2.4" fill="currentColor"/>' +
+    '</svg>';
+  }
+
+  function analysisModal() {
+    const season = G.seasonOf(state.day);
+    const days = G.HIST_DAYS;
+
+    function row(key, item, isFish) {
+      const mk = isFish ? G.fishMarketInfo(state, item.name) : G.marketInfo(state, item.id);
+      const series = G.marketSeries(state, key, mk.total);
+      const nxt = isFish ? G.fishNextSeasonMul(state, item.name) : G.cropNextSeasonMul(state, item.id);
+      const base = isFish ? item.base : item.price;
+      const now = Math.max(1, Math.round(base * mk.total));
+      const next = Math.max(1, Math.round(base * mk.supply * nxt *
+        (1 + G.townBonus(state, 'marketBonus'))));
+      const unit = isFish ? '条' : '个';
+      const wk = series.slice(-7);
+      const head = wk.length > 1
+        ? '7 天 ' + wk[0].toFixed(2) + ' → ' + wk[wk.length - 1].toFixed(2)
+        : '只有今天 ' + (wk[0] || 0).toFixed(2);
+      const tag = isFish
+        ? (mk.inRun ? '<b class="own">汛期</b>' : '<b class="lock">非汛期</b>')
+        : (mk.inSeason ? '<b class="own">当季</b>' : '<b class="lock">反季</b>');
+      return '<div class="store-row">' +
+        '<span class="se">' + (item.emoji || '') + '</span>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div class="sn">' + item.name + ' ' + tag +
+            ' <b class="own">×' + mk.total.toFixed(2) + '</b> · <b>' + now + '</b> 金/' + unit + '</div>' +
+          '<div class="sv">销量 ' + mk.sold.toFixed(0) + ' ' + unit + ' · 供需 ×' +
+            mk.supply.toFixed(2) + ' · 季节 ×' + mk.season.toFixed(2) + ' · ' + head + '</div>' +
+          '<div class="sv">下季 ×' + nxt.toFixed(2) +
+            (nxt > 1 ? '（转' + (isFish ? '非汛期' : '反季') + '）' : '') +
+            ' → 预计 <b>' + next + '</b> 金/' + unit + '</div>' +
+        '</div>' +
+        '<span class="sparkwrap">' + sparkline(series) + '</span>' +
+      '</div>';
+    }
+
+    const cropRows = G.CROP_LIST.map(function (c) { return row(c.id, c, false); }).join('');
+    const wildRows = G.WILD_LIST.map(function (c) { return row(c.id, c, false); }).join('');
+    const fishRows = G.FISH.filter(function (f) { return !f.trash && !f.chest; })
+      .map(function (f) { return row('f:' + f.name, f, true); }).join('');
+
+    const tracked = Object.keys(state.marketHist || {}).length;
+    openModal('📊 市场分析',
+      '<div class="shop-head">现在是 <b>' + season + '季</b> · 已记录 <b>' + days +
+        '</b> 天内最多 <b>' + days + '</b> 个价格点（存了 ' + tracked + ' 种货）</div>' +
+      '<div class="store-sub">🌱 作物</div>' + cropRows +
+      '<div class="store-sub" style="margin-top:10px">🌿 野货（采集）</div>' + wildRows +
+      '<div class="store-sub" style="margin-top:10px">🐟 水产</div>' + fishRows +
+      '<div class="shop-tip">每行三件事：<b>当前价</b>（系数 + 实际单价）、<b>销量 / 供需 / 季节</b>、<b>7 天走势</b>，' +
+        '右边那条线是最近 30 天的市价系数（纵轴固定 0.5~2.8，所以不同货能直接比）。<br>' +
+        '<b>预计下季</b>是「假设一件都不卖」的下季价格：反季 / 非汛期会直接翻倍，' +
+        '看到 ×2 就说明值得囤到那时候再出手。</div>',
       '<button class="btn" data-close>关闭</button>');
   }
 
@@ -2640,6 +2717,8 @@
     if (mktBtn) mktBtn.addEventListener('click', marketModal);
     const townBtn = $('#btn-town');
     if (townBtn) townBtn.addEventListener('click', townModal);
+    const anaBtn = $('#btn-analysis');
+    if (anaBtn) anaBtn.addEventListener('click', analysisModal);
     $('#btn-refresh-orders').addEventListener('click', function () {
       const r = G.refreshOrders(state);
       commit(r);

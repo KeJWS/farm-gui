@@ -109,6 +109,12 @@ const G = require('./game.js');
   st.netSet = 2;
   st.levels.fish = 5;
   st.fisher = { lv: 3, xp: 4 };
+  // 给萝卜造 7 天价格历史，方便测曲线
+  st.marketHist = {
+    carrot: [1.10, 1.15, 1.20, 1.25, 1.30, 1.28, 1.22].map(function (m, i) {
+      return { d: i + 1, m: m };
+    })
+  };
   st.teas.green = 2;
   G.addStore(st, 'cabbage', 'std', 5);
   G.addStore(st, 'mushroom', 'good', 3);
@@ -289,6 +295,22 @@ console.log('\n== 采集 ==');
 ok(document.querySelector('[data-act="forage"]').disabled === false, '采集按钮可用');
 clickAct('forage');
 ok(html('#store-list').indexOf('荠菜') >= 0, '采集把当季野货（春·荠菜）放进仓库');
+
+console.log('\n== 市场分析 ==');
+document.querySelector('#btn-analysis').fire('click', { target: {} });
+ok(html('#modal-root').indexOf('市场分析') >= 0, '市场分析面板能打开');
+ok(html('#modal-root').indexOf('供需 ×') >= 0 && html('#modal-root').indexOf('季节 ×') >= 0,
+   '分析面板列出供需与季节系数');
+ok(html('#modal-root').indexOf('7 天') >= 0, '分析面板显示 7 天走势');
+ok(html('#modal-root').indexOf('下季 ×') >= 0, '分析面板预测下一季');
+ok((html('#modal-root').match(/<svg class="spark"/g) || []).length >= 20, '每种货都有一条价格曲线',
+   (html('#modal-root').match(/<svg class="spark"/g) || []).length);
+(function multiPoint() {
+  const m = html('#modal-root').match(/polyline points="([^"]+)"/);
+  const pts = m ? m[1].trim().split(/\s+/).length : 0;
+  ok(pts >= 3, '价格曲线能画出多个点', pts);
+  ok(html('#modal-root').indexOf('7 天 ') >= 0, '分析面板显示 7 天涨跌');
+})();
 
 console.log('\n== 小镇 ==');
 document.querySelector('#btn-town').fire('click', { target: {} });

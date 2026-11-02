@@ -1871,6 +1871,49 @@ ok(v31h0.toCalm === 8 && v31h0.toFloor === 30, '行情提示：再卖 8 件掉�
 G.addSupply(v31h, 'carrot', 30);
 ok(G.marketHeadroom(v31h, 'carrot').atFloor, '卖到底价时提示已到底');
 
+/* ---------- 5m. v2.12 价格历史 / 采集不受天气影响 ---------- */
+section('v2.12 价格历史');
+
+/* 采集不再吃天气 */
+const v32 = G.createState();
+v32.weather = 'rain'; v32.energy = 50;
+G.setRng(function () { return 0.5; });        // 0.5 命中不了 25% 双份
+const v32r = G.forage(v32);
+ok(v32r.ok && v32r.qty === 1, '雨天采集也不会翻倍（采集不受天气影响）', v32r.qty);
+
+/* 价格历史：开局 1 个点，每天 +1 */
+const v32h = G.createState();
+ok(G.marketSeries(v32h, 'carrot', 1).length === 1, '开局就记了 1 个价格点');
+v32h.coins = 99999;
+for (let i = 0; i < 5; i++) G.sleep(v32h);
+ok(G.marketSeries(v32h, 'carrot', 1).length === 6, '每天睡醒多一个点',
+  G.marketSeries(v32h, 'carrot', 1).length);
+ok(G.marketSeries(v32h, 'f:鲫鱼', 1).length === 6, '鱼也有独立的历史');
+
+/* 同一天不重复记，实时值覆盖当天 */
+const v32l = G.createState();
+const v32s = G.marketSeries(v32l, 'carrot', 2.5);
+ok(v32s.length === 1 && v32s[0] === 2.5, '当天那个点用实时值覆盖', v32s);
+G.sleep(v32l);
+const v32s2 = G.marketSeries(v32l, 'carrot', 1.8);
+ok(v32s2.length === 2 && v32s2[1] === 1.8, '第二天追加新点', v32s2);
+
+/* 上限 30 天 */
+const v32c = G.createState();
+v32c.coins = 1e6;
+for (let i = 0; i < 40; i++) G.sleep(v32c);
+ok(v32c.marketHist.carrot.length === G.HIST_DAYS, '历史最多保留 30 天',
+  v32c.marketHist.carrot.length);
+
+/* 下季系数 */
+const v32n = G.createState();
+ok(G.nextSeasonIdx(1) === 1 && G.nextSeasonIdx(61) === 3, '春季下一季是夏、秋季下一季是冬',
+  [G.nextSeasonIdx(1), G.nextSeasonIdx(61)]);
+ok(G.cropNextSeasonMul(v32n, 'watermelon') === 1, '西瓜下季（夏）是当季');
+ok(G.cropNextSeasonMul(v32n, 'pumpkin') === G.BALANCE.market.offSeason, '南瓜下季转反季',
+  G.cropNextSeasonMul(v32n, 'pumpkin'));
+ok(G.fishNextSeasonMul(v32n, '锦鲤') === G.BALANCE.market.offSeason, '锦鲤下季转非汛期');
+
 /* 委托市价溢价：长期订单也吃 */
 const v29L = G.createState();
 G.setRng(mulberry32(9));
