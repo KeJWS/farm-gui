@@ -39,9 +39,37 @@
     p.ripeDay = null;
     p.hits = 0;
     p.phase = 'growing';
+    p.planted = s.day;
+    p.auto = free ? 1 : 0;      // 机器补种的地当晚不算「漏浇」
     s.stats.planted++;
-    log(s, '🌱 ' + (idx + 1) + ' 号地种下 ' + c.name + (off ? '（反季，长得慢、结果少）' : ''), 'good');
+    if (!(opts && opts.quiet)) {
+      log(s, '🌱 ' + (idx + 1) + ' 号地种下 ' + c.name + (off ? '（反季，长得慢、结果少）' : ''), 'good');
+    }
     return { ok: true, msg: c.name + ' 种下了' + (off ? '（反季）' : ''), off: off };
+  }
+
+  /* ---------------- 自动播种器（按片负责） ----------------
+   * 第 k 台只管第 [5(k-1)+1, 5k] 块地；收完这块地它立刻补种，睡觉时再把空着的补上。
+   */
+  function seederPlateOf(s, idx) {
+    const per = BALANCE.device.seederPlots;
+    const k = Math.floor(idx / per) + 1;
+    return k <= Math.max(0, Math.round(s.seeder || 0)) ? k : 0;
+  }
+
+  /* 这块地能不能被播种器补种：有对应的机器、开着、选了种子、不是冬天、还有种子 */
+  function canAutoSeed(s, idx) {
+    if (!seederPlateOf(s, idx)) return false;
+    if (!s.seederOn || !s.autoSeed || isWinter(s.day)) return false;
+    return (s.seeds[s.autoSeed] || 0) > 0;
+  }
+
+  /* 收完立刻补种，返回种下的作物 id；不满足条件返回 null */
+  function autoReplant(s, idx) {
+    if (!canAutoSeed(s, idx)) return null;
+    const seed = s.autoSeed;
+    const r = plant(s, idx, seed, { free: true, quiet: true });
+    return r.ok ? seed : null;
   }
 
   /* 季节特性：夏天浇水更费体力（2 点），其他季节 1 点 */
@@ -131,9 +159,13 @@
     const msg = '收获 ' + c.name + ' ×' + qty + ' · ' + q.emoji + q.name + '（值 ' + qty * unit + ' 金）' +
                 (extraSeed ? ' · 留种 +1' : '') +
                 (regrown ? ' · 进入再生期' : '');
-    log(s, '🧺 ' + msg, 'good');
-    return { ok: true, msg: msg, qty: qty, crop: p.crop || c.id, unit: unit, quality: q,
-             seed: extraSeed, regrown: regrown, levelUp: levelUp };
+    // 这块地有自动播种器 → 收完立刻补种，不用等睡觉
+    let replanted = null;
+    if (!regrown) replanted = autoReplant(s, idx);
+    const fullMsg = msg + (replanted ? ' · 🌱 已补种 ' + CROPS[replanted].name : '');
+    log(s, '🧺 ' + fullMsg, 'good');
+    return { ok: true, msg: fullMsg, qty: qty, crop: p.crop || c.id, unit: unit, quality: q,
+             seed: extraSeed, regrown: regrown, levelUp: levelUp, replanted: replanted };
   }
 
   function harvestAll(s) {
@@ -330,30 +362,36 @@
 
     // 自动收获器：睡觉时把能收的地块收掉，不耗体力
     if (s.harvester && s.harvesterOn) {
-      let hn = 0, hval = 0;
+      let hn = 0, hval = 0, hrp = 0;
       s.plots.forEach(function (p, i) {
         if (!p.crop || !canHarvest(s, p)) return;
         const hr = harvest(s, i, true);
-        if (hr.ok) { hn++; hval += hr.qty * hr.unit; }
+        if (hr.ok) { hn++; hval += hr.qty * hr.unit; if (hr.replanted) hrp++; }
       });
-      if (hn) notes.push({ kind: 'harvest', text: '🤖 收获 ' + hn + ' 块（值 ' + hval + '）' });
+      if (hn) notes.push({ kind: 'harvest', text: '🤖 收获 ' + hn + ' 块（值 ' + hval + '）' +
+        (hrp ? ' · 补种 ' + hrp + ' 块' : '') });
     }
 
-    // 自动播种器：睡觉时用指定的种子补空地，一台管 5 块，不耗体力
+    // 自动播种器：每台只管自己那 5 块，睡觉时把空着的补上（不耗体力）
     if (s.seeder && s.seederOn && s.autoSeed && !isWinter(s.day)) {
       const seed = s.autoSeed;
+      const per = BALANCE.device.seederPlots;
+      const machines = Math.round(s.seeder || 0);
       let sn = 0;
-      const cap = seederPlots(s);
-      for (let i = 0; i < s.plots.length && sn < cap; i++) {
-        if (s.plots[i].crop) continue;
+      for (let k = 1; k <= machines; k++) {
+        for (let i = (k - 1) * per; i < Math.min(k * per, s.plots.length); i++) {
+          if (s.plots[i].crop) continue;
+          if ((s.seeds[seed] || 0) <= 0) break;
+          if (plant(s, i, seed, { free: true, quiet: true }).ok) sn++;
+        }
         if ((s.seeds[seed] || 0) <= 0) break;
-        if (plant(s, i, seed, { free: true }).ok) sn++;
       }
       if (sn) notes.push({ kind: 'seeder', text: '🌱 自动播种 ' + sn + ' 块 ' + CROPS[seed].name });
     }
 
     s.plots.forEach(function (p) {
-      if (p.crop && (p.phase === 'growing' || p.phase === 'regrow') && !p.watered) p.missed++;
+      if (p.crop && (p.phase === 'growing' || p.phase === 'regrow') && !p.watered &&
+          !(p.auto && p.planted === s.day)) p.missed++;
     });
     s.plots.forEach(function (p) { p.watered = false; });
 

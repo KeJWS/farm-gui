@@ -212,7 +212,7 @@
     $('#season').textContent = (G.isWinter(state.day) ? '❄️ ' : '') +
       G.seasonOf(state.day) + ' · 第 ' + state.day + ' 天';
 
-    const lv = state.levels || { farm: 1, fish: 1, farmXp: 0, fishXp: 0 };
+    const lv = state.levels || { farm: 1, fish: 1, farmXp: 0, fishXp: 0, dig: 1, digXp: 0, forage: 1, forageXp: 0 };
     const farmLvEl = $('#farm-lv'), fishLvEl = $('#fish-lv');
     if (farmLvEl) {
       farmLvEl.textContent = '🌱 Lv' + lv.farm;
@@ -223,6 +223,17 @@
       fishLvEl.textContent = '🎣 Lv' + lv.fish;
       fishLvEl.title = '钓鱼等级：' + G.levelEffectText('fish', lv.fish) +
         ' · 经验 ' + lv.fishXp + '/' + G.levelNeed(lv.fish);
+    }
+    const digLvEl = $('#dig-lv'), forLvEl = $('#forage-lv');
+    if (digLvEl) {
+      digLvEl.textContent = '🪱 Lv' + (lv.dig || 1);
+      digLvEl.title = '挖蚯蚓等级：' + G.levelEffectText('dig', lv.dig || 1) +
+        ' · 经验 ' + (lv.digXp || 0) + '/' + G.levelNeed(lv.dig || 1);
+    }
+    if (forLvEl) {
+      forLvEl.textContent = '🌿 Lv' + (lv.forage || 1);
+      forLvEl.title = '采集等级：' + G.levelEffectText('forage', lv.forage || 1) +
+        ' · 经验 ' + (lv.forageXp || 0) + '/' + G.levelNeed(lv.forage || 1);
     }
   }
 
@@ -345,6 +356,11 @@
               ? (state.seederOn ? ' · ' : '（已关）') + G.CROPS[state.autoSeed].name
               : ' · 没选种子')));
     }
+    const devSum = $('#dev-sum');
+    if (devSum) {
+      const fee = G.deviceUpkeep(state);
+      devSum.textContent = fee ? '维护 ' + fee + ' 金/周' : '';
+    }
     renderCrew();
 
     const teaBtn = $('[data-act="tea"]');
@@ -357,15 +373,19 @@
         (state.energy >= state.maxEnergy ? '体力已满'
           : teaBest.emoji + ' ' + teaBest.name + ' · +' + teaBest.energy + ' 体力'));
 
-    $('[data-act="dig"]').disabled = state.energy < 3;
+    const digCost = G.digCost(state);
+    $('[data-act="dig"]').disabled = state.energy < digCost;
+    const digTxt = $('#dig-txt');
+    if (digTxt) digTxt.textContent = digCost + ' 体力 · 满级省 1';
     const forageBtn = $('[data-act="forage"]');
     if (forageBtn) {
       const fp = G.foragePool(state.day);
-      forageBtn.disabled = state.energy < G.BALANCE.forage.energy || !fp.length;
+      const fCost = G.forageCost(state);
+      forageBtn.disabled = state.energy < fCost || !fp.length;
       const ft = $('#forage-txt');
       if (ft) {
         ft.textContent = fp.length
-          ? G.BALANCE.forage.energy + ' 体力 · ' + fp.map(function (w) { return w.name; }).join('/')
+          ? fCost + ' 体力 · ' + fp.map(function (w) { return w.name; }).join('/')
           : '这个季节没得采';
       }
     }
@@ -1075,13 +1095,37 @@
           '<button class="btn mini" data-autoseed="' + c.id + '">' + (on ? '取消' : '用这个') + '</button>' +
         '</div>';
       }).join('');
+
+    /* 每台机器负责的号段 + 当前状态 */
+    const machineRows = [];
+    for (let k = 1; k <= have; k++) {
+      const rg = G.seederPlateRange(k);
+      const real = Math.min(rg.to, state.plots.length);
+      let stTxt = '播种中';
+      if (!state.seederOn) stTxt = '已关闭';
+      else if (!state.autoSeed) stTxt = '没选种子';
+      else if (!(state.seeds[state.autoSeed] || 0)) stTxt = '种子用完了';
+      else if (G.isWinter(state.day)) stTxt = '冬天停工';
+      const done = state.plots.slice(rg.from - 1, real)
+        .filter(function (p) { return p.crop; }).length;
+      machineRows.push('<div class="store-row">' +
+        '<span class="se">🌱</span>' +
+        '<div><div class="sn">第 ' + k + ' 台 <b class="own">第 ' + rg.from + '–' + real + ' 块</b></div>' +
+        '<div class="sv">' + stTxt + ' · 已占 ' + done + '/' + (real - rg.from + 1) + ' 块 · 维护 ' +
+        upkeep + ' 金/周</div></div>' +
+        '</div>');
+    }
+
     openModal('🌱 自动播种器',
       '<div class="shop-head"><b>' + have + '</b> / ' + max + ' 台 · 每晚自动播 <b>' + cover + '</b> / ' +
         state.plots.length + ' 块 · ' + (state.seederOn ? '已开启' : '已关闭') +
         ' · 维护 ' + G.seederUpkeep(state) + ' 金/周</div>' +
-      '<div class="shop-tip">一台管 <b>' + per + ' 块</b>，买第 ' + (have + 1) + ' 台要 ' + G.SEEDER_COST +
+      '<div class="store-sub">🐣 每台只管自己那 ' + per + ' 块地，收完立刻补种</div>' +
+      '<div class="shop-list">' + machineRows.join('') + '</div>' +
+      '<div class="shop-tip">买第 ' + (have + 1) + ' 台要 ' + G.SEEDER_COST +
         ' 金（维护 +' + upkeep + ' 金/周）。台数上限 = 盖住全部地块所需（' + max + ' 台），想多买先扩地。<br>' +
         '自动播种不耗体力，只消耗种子；冬天不工作。</div>' +
+      '<div class="store-sub" style="margin-top:10px">🌰 用哪种种子</div>' +
       (rows || '<div class="store-empty">背包里没有种子，先去种子店买</div>'),
       (have < max ? buyBtn : '') +
       '<button class="btn" data-toggleseeder>' + (state.seederOn ? '关掉自动播种' : '开启自动播种') + '</button>' +
@@ -1274,7 +1318,9 @@
         '<b>' + Math.round(G.BALANCE.forage.qty3 * 100) + '% 概率再多 1 件</b>（最多 3 件）；' +
         Math.round(G.BALANCE.forage.seedChance * 100) + '% 概率顺手摘到一颗当季作物种子（<b>和天气无关</b>）。<br>' +
         '野货直接进仓库，和作物一样按品质定价、一样吃<b>市价</b>，可以卖给农产品店或放进收购箱；' +
-        '冬天也能采，是封冻期唯一的野外收入。</p>' +
+        '冬天也能采，是封冻期唯一的野外收入。<br>' +
+        '🌿 <b>采集等级</b>：每次采集 +' + G.BALANCE.forage.xp + ' 经验（一次采到 3 件再 +1），' +
+        '满级 Lv' + G.BALANCE.level.max + ' 后<b>采集只花 ' + (G.BALANCE.forage.energy - 1) + ' 体力</b>。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -1353,14 +1399,18 @@
         '<p>· 睡觉推进 1 天，扣伙食费 <b>' + G.mealFee(state) + ' 金</b>，体力回满；没钱只回 5 点（不会扣掉已有的）<br>' +
         '· 开局体力上限 <b>15</b>，强化 +5/级（成本每级 ×1.2）<br>' +
         '· 打零工：<b>每天只能打一次</b>，全天 ×2.0 金/体力、半天 ×1.2，不够半天就把剩下的体力用光<br>' +
+        '· 挖蚯蚓 ' + G.BALANCE.dig.energy + ' 体力一次（挖蚯蚓满级 ' + (G.BALANCE.dig.energy - 1) +
+        ' 体力），晴天 −1 条、阴雨 +1 条，最多 5 条<br>' +
         '· 强化体力 ' + G.upgradeCost(state) + ' 金 · 扩张土地 ' + G.expandCost(state) + ' 金<br>' +
+        '· 🔧 <b>设备</b>都攒在右栏的「设备」面板里<br>' +
         '· 🚿 洒水器 ' + G.SPRINKLER_COST + ' 金/个（需种田 Lv' + G.BALANCE.gate.sprinkler +
         '）：每天自动浇 1 块地，不耗体力（雨天自动浇，不叠加）<br>' +
         '· 🤖 自动收获器 ' + G.HARVESTER_COST + ' 金（需种田 Lv' + G.BALANCE.gate.harvester +
         '）：睡觉时自动收走成熟作物，不耗体力<br>' +
         '· 🌱 自动播种器 ' + G.SEEDER_COST + ' 金/台（需种田 Lv' + G.BALANCE.gate.seeder +
-        '）：<b>一台只管 ' + G.SEEDER_PLOTS + ' 块地</b>，睡觉时自动往空地播 ' + G.SEEDER_PLOTS +
-        ' 块（用你选的种子，不耗体力）；买几台就播几块，每台每周维护 ' + G.BALANCE.upkeep.seeder + ' 金<br>' +
+        '）：<b>一台只管自己的 ' + G.SEEDER_PLOTS + ' 块地</b>（第 1 台管 1–5 块、第 2 台管 6–10 块…），' +
+        '那块地<b>收完立刻补种</b>，睡觉时再把空着的补上；用你选的种子、不耗体力，每台每周维护 ' +
+        G.BALANCE.upkeep.seeder + ' 金<br>' +
         '· 💰 税：每 30 天按（金币 + 仓库价值）<b>累进</b>收一次——前 2000 收 2%、2000~1 万收 4%、1 万以上收 6%，最低 ' +
         G.BALANCE.tax.min + ' 金（当前约 ' + G.taxDue(state) + ' 金）<br>' +
         '· 🧾 维护费：每 7 天收一次，土地 ' + G.plotUpkeep(state.plots.length) + ' 金（6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 ' +
@@ -1386,10 +1436,14 @@
 
       '<div class="rule-sec">' +
         '<h4>⭐ 等级</h4>' +
-        '<p>收获普通作物涨<b>种田经验</b>（大作物也涨），钓到鱼涨<b>钓鱼经验</b>（<b>每 2 杆 1 点</b>，完美品质 +2），每级所需 ' +
-        G.levelNeed(1) + ' + 10×(级−1)，满级 ' + G.BALANCE.level.max + '。<br>' +
-        '种田等级<b>每 4 级 +1 产量</b>（Lv4 / Lv8，大作物不吃）；钓鱼等级每级咬钩 +1.1%、好鱼权重 +2.5%' +
-        '（咬钩最多 +10%、好鱼最多 +22.5%）。<br>' +
+        '<p>四条技能线：<b>种田 / 钓鱼 / 挖蚯蚓 / 采集</b>，各自独立升级，满级 Lv' + G.BALANCE.level.max +
+        '，每级所需 ' + G.levelNeed(1) + ' + 10×(级−1)。<br>' +
+        '· <b>种田</b>：收获作物 +1 经验，每 4 级 +1 产量（Lv4 / Lv8，大作物不吃）<br>' +
+        '· <b>钓鱼</b>：每 2 杆 1 点（完美品质 +2），每级咬钩 +1.1%（≤+10%）、好鱼 +2.5%（≤+22.5%）<br>' +
+        '· <b>挖蚯蚓</b>：每次 +' + G.BALANCE.dig.xp + ' 经验；<b>满级后挖蚯蚓只要 ' +
+        (G.BALANCE.dig.energy - 1) + ' 体力</b><br>' +
+        '· <b>采集</b>：每次 +' + G.BALANCE.forage.xp + ' 经验（采到 3 件 +1）；<b>满级后采集只要 ' +
+        (G.BALANCE.forage.energy - 1) + ' 体力</b><br>' +
         '解锁：洒水器 Lv' + G.BALANCE.gate.sprinkler + ' · 特效肥 Lv' + G.BALANCE.gate.specialFert +
         ' · 自动播种器 Lv' + G.BALANCE.gate.seeder + ' · 自动收获器 Lv' + G.BALANCE.gate.harvester +
         '（均为种田等级）；渔网 钓鱼 Lv' + G.BALANCE.gate.net +
@@ -2174,9 +2228,14 @@
         '（' + lv.farmXp + '/' + G.levelNeed(lv.farm) + '）') + ' · ' + G.levelEffectText('farm', lv.farm)],
       ['钓鱼等级', 'Lv' + lv.fish + (lv.fish >= G.BALANCE.level.max ? '（满级）' :
         '（' + lv.fishXp + '/' + G.levelNeed(lv.fish) + '）') + ' · ' + G.levelEffectText('fish', lv.fish)],
+      ['挖蚯蚓等级', 'Lv' + (lv.dig || 1) + ((lv.dig || 1) >= G.BALANCE.level.max ? '（满级）' :
+        '（' + (lv.digXp || 0) + '/' + G.levelNeed(lv.dig || 1) + '）') + ' · ' +
+        G.levelEffectText('dig', lv.dig || 1)],
+      ['采集等级', 'Lv' + (lv.forage || 1) + ((lv.forage || 1) >= G.BALANCE.level.max ? '（满级）' :
+        '（' + (lv.forageXp || 0) + '/' + G.levelNeed(lv.forage || 1) + '）') + ' · ' +
+        G.levelEffectText('forage', lv.forage || 1)],
       ['维护费', '每周 ' + (G.plotUpkeep(state.plots.length) + G.deviceUpkeep(state)) +
-        ' 金（土地 ' + G.plotUpkeep(state.plots.length) + ' + 设备 ' + G.deviceUpkeep(state) +
-        (G.seederCount(state) ? '，其中自动播种器 ' + G.seederUpkeep(state) : '') + '）'],
+        ' 金（土地 ' + G.plotUpkeep(state.plots.length) + ' + 设备 ' + G.deviceUpkeep(state) + '）'],
       ['税金', '还有 ' + nextTax + ' 天 · 约 ' + G.taxDue(state) + ' 金（累进 2% / 4% / 6%，最低 ' +
         G.BALANCE.tax.min + '）'],
       ['仓库总价', G.storeTotal(state) + ' 金'],
@@ -2193,7 +2252,16 @@
       ['累计播种', state.stats.planted + ' 次'],
       ['累计收获', state.stats.harvests + ' 次'],
       ['累计钓鱼', state.stats.casts + ' 次'],
-      ['挖蚯蚓', state.stats.dug + ' 次'],
+      ['累计挖蚯蚓', state.stats.dug + ' 次'],
+      ['采集记录', (function () {
+        const n = state.stats.forages || 0;
+        if (!n) return '还没去过后山';
+        const w = state.stats.wild || {};
+        const parts = G.WILD_LIST.filter(function (x) { return (w[x.id] || 0) > 0; })
+          .map(function (x) { return x.emoji + x.name + '×' + w[x.id]; });
+        return '共 ' + n + ' 次' + (parts.length ? ' · ' + parts.join(' · ') : '') +
+          (state.stats.forageBest >= 3 ? ' · 单次最多 3 件' : '');
+      })()],
       ['卖出作物', (state.stats.cropsSold || 0) + ' 个'],
       ['完成委托', (state.stats.orders || 0) + ' 单'],
       ['成就', (function () {

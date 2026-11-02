@@ -59,7 +59,10 @@
     return best;
   }
 
-  /* ---------------- 等级（种田 / 钓鱼） ---------------- */
+  /* ---------------- 等级（种田 / 钓鱼 / 挖蚯蚓 / 采集） ---------------- */
+
+  const SKILLS = ['farm', 'fish', 'dig', 'forage'];
+  const SKILL_NAME = { farm: '种田', fish: '钓鱼', dig: '挖蚯蚓', forage: '采集' };
 
   function levelNeed(lv) {
     const L = BALANCE.level;
@@ -67,18 +70,36 @@
   }
 
   function levelEffectText(kind, lv) {
+    const max = BALANCE.level.max;
     if (kind === 'fish') {
       return '咬钩 +' + Math.min(10, (lv - 1) * 1.1).toFixed(1) + '% · 好鱼 +' +
         Math.min(22.5, (lv - 1) * 2.5).toFixed(1) + '%';
     }
+    if (kind === 'dig') {
+      return '挖蚯蚓 ' + digCostByLv(lv) + ' 体力' + (lv >= max ? '（满级已省 1 点）' : '');
+    }
+    if (kind === 'forage') {
+      return '采集 ' + forageCostByLv(lv) + ' 体力' + (lv >= max ? '（满级已省 1 点）' : '');
+    }
     return '收获产量 +' + Math.floor(lv / 4);
   }
 
+  /* 满级奖励：挖蚯蚓 3→2、采集 5→4 */
+  function digCostByLv(lv) {
+    return BALANCE.dig.energy - ((lv >= BALANCE.level.max) ? BALANCE.level.maxEnergySave : 0);
+  }
+  function forageCostByLv(lv) {
+    return BALANCE.forage.energy - ((lv >= BALANCE.level.max) ? BALANCE.level.maxEnergySave : 0);
+  }
+  function digCost(s) { return digCostByLv(skillLv(s, 'dig')); }
+  function forageCost(s) { return forageCostByLv(skillLv(s, 'forage')); }
+
   /* 加经验，返回升了几级 */
   function addLevelXp(s, kind, n) {
-    if (!s.levels) s.levels = { farm: 1, fish: 1, farmXp: 0, fishXp: 0 };
-    const key = kind === 'fish' ? 'fish' : 'farm';
+    if (!s.levels) s.levels = {};
+    const key = SKILLS.indexOf(kind) >= 0 ? kind : 'farm';
     const xpKey = key + 'Xp';
+    if (!s.levels[key]) s.levels[key] = 1;
     // n 省略时默认 +1；显式传 0 就是「这一杆不给经验」
     const gain = (n === undefined || n === null) ? 1 : Math.max(0, Math.round(n));
     s.levels[xpKey] = (s.levels[xpKey] || 0) + gain;
@@ -92,7 +113,7 @@
       s.levels[xpKey] = Math.min(s.levels[xpKey], levelNeed(BALANCE.level.max) - 1);
     }
     if (ups) {
-      log(s, '⭐ ' + (key === 'fish' ? '钓鱼' : '种田') + '等级 → Lv' + s.levels[key] +
+      log(s, '⭐ ' + SKILL_NAME[key] + '等级 → Lv' + s.levels[key] +
         '（' + levelEffectText(key, s.levels[key]) + '）', 'good');
     }
     return ups;
@@ -114,6 +135,9 @@
 
   function farmLv(s) { return (s.levels && s.levels.farm) || 1; }
   function fishLv(s) { return (s.levels && s.levels.fish) || 1; }
+  function digLv(s) { return (s.levels && s.levels.dig) || 1; }
+  function forageLv(s) { return (s.levels && s.levels.forage) || 1; }
+  function skillLv(s, kind) { return (s.levels && s.levels[kind]) || 1; }
 
   /* 种子：高级种子要种田等级 */
   function seedUnlocked(s, id) {

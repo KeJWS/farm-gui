@@ -126,7 +126,7 @@ button{ font-family:inherit; }
   padding:15px 16px 16px;
 }
 .panel-head{
-  display:flex; align-items:center; gap:10px;
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   margin:0 0 12px;
 }
 .panel-head h2{

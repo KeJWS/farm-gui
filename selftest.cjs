@@ -1078,7 +1078,7 @@ let lureS = G.createState(); lureS.coins = 100;
 G.buyBait(lureS, 'lure', 1);
 ok(lureS.lure.dur === 25 && lureS.coins === 95, '假饵 5 金 · 耐用 25 次', lureS.lure.dur);
 
-ok(G.ACH.length === 43, '成就总数 43', G.ACH.length);
+ok(G.ACH.length === 49, '成就总数 49', G.ACH.length);
 
 const retro = G.deserialize({ plots: [], coins: 100, day: 20, stats: { harvests: 100, casts: 300 } });
 ok(retro.levels.farm > 1 && retro.levels.fish > 1, '老存档按历史次数补等级',
@@ -1399,7 +1399,7 @@ ok(!G.fishAll(v23noBait, 'dough').ok, '没饵时全体力钓鱼直接失败');
 /* 新成就 */
 const v23achNew = G.checkAchievements(Object.assign(G.createState(), { stats: { teas: 10, chests: 10 } }));
 ok(v23achNew.some(x => x.id === 'tea10') && v23achNew.some(x => x.id === 'chest10'), '下午茶 / 开箱成就能解锁');
-ok(G.ACH.length === 43, '成就总数 43', G.ACH.length);
+ok(G.ACH.length === 49, '成就总数 49', G.ACH.length);
 
 /* ---------- 5f. v2.4 季节 ---------- */
 section('v2.4 季节');
@@ -1933,7 +1933,15 @@ ok(Math.min.apply(null, q33) === 1 && Math.max.apply(null, q33) === 3, '采集�
   [Math.min.apply(null, q33), Math.max.apply(null, q33)]);
 const avg33 = q33.reduce(function (a, b) { return a + b; }, 0) / q33.length;
 ok(Math.abs(avg33 - 2.1) < 0.15, '采集期望约 2.1 件', avg33.toFixed(2));
-ok(v33.energy === 45, '采集扣 5 体力', v33.energy);
+const v33b = G.createState();
+v33b.energy = 50;
+G.forage(v33b);
+ok(v33b.energy === 45, '采集扣 5 体力', v33b.energy);
+const v33b2 = G.createState();
+v33b2.levels.forage = G.BALANCE.level.max;
+v33b2.energy = 50;
+G.forage(v33b2);
+ok(v33b2.energy === 46, '采集满级只花 4 体力', v33b2.energy);
 
 /* 高级假饵 */
 const v33f = G.createState();
@@ -1998,6 +2006,81 @@ ok(v33s2.seeds.carrot === 10, '两台共耗 10 颗种子', v33s2.seeds.carrot);
 /* 老存档 seeder: true → 1 台 */
 const v33mig = G.deserialize(Object.assign(JSON.parse(G.serialize(G.createState())), { seeder: true }));
 ok(v33mig.seeder === 1, '老存档的布尔播种器迁移成 1 台', v33mig.seeder);
+
+/* v2.15：一台只管自己那 5 块地 */
+const v35 = G.createState();
+v35.coins = 3000; v35.levels.farm = G.BALANCE.gate.seeder;
+v35.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
+v35.seeds = { carrot: 20 };
+G.buySeeder(v35);
+G.setAutoSeed(v35, 'carrot');
+ok(G.seederPlateOf(v35, 4) === 1 && G.seederPlateOf(v35, 5) === 0, '第 1 台只管 1–5 块');
+ok(G.seederPlateRange(2).from === 6 && G.seederPlateRange(2).to === 10, '第 2 台号段 6–10');
+/* 第 1 台没种子时，第 2 台（如果有）也不会替它种 */
+v35.seeds.carrot = 0;
+G.sleep(v35);
+ok(v35.plots.every(function (p) { return !p.crop; }), '没种子时整排都不播');
+
+/* 收完立刻补种（机器管这块地） */
+const v35h = G.createState();
+v35h.coins = 3000; v35h.levels.farm = G.BALANCE.gate.seeder;
+v35h.seeder = 1; v35h.seederOn = true; v35h.autoSeed = 'carrot';
+v35h.seeds = { carrot: 5 };
+v35h.day = 10;
+v35h.plots[0] = { crop: 'carrot', growth: 2, watered: true, missed: 0, fert: 0,
+  ripeDay: 9, hits: 0, phase: 'ripe', planted: 7, auto: 0 };
+const v35hr = G.harvest(v35h, 0);
+ok(v35hr.ok && v35hr.replanted === 'carrot', '收获后播种器立刻补种', v35hr.replanted);
+ok(v35h.plots[0].crop === 'carrot' && v35h.plots[0].phase === 'growing' &&
+  v35h.plots[0].growth === 0, '补种的是同一块地');
+ok(v35h.seeds.carrot === 4, '补种消耗 1 颗种子', v35h.seeds.carrot);
+ok(v35h.energy === v35h.maxEnergy - 1, '补种本身不耗体力（只扣收获那 1 点）', v35h.energy);
+
+/* 没机器的地不补种 */
+const v35n = G.createState();
+v35n.seeds = { carrot: 5 };
+v35n.day = 10;
+v35n.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
+v35n.plots[9] = { crop: 'carrot', growth: 2, watered: true, missed: 0, fert: 0,
+  ripeDay: 9, hits: 0, phase: 'ripe', planted: 7, auto: 0 };
+const v35nr = G.harvest(v35n, 9);
+ok(v35nr.ok && !v35nr.replanted && !v35n.plots[9].crop, '没有播种器的地不补种');
+
+/* 挖蚯蚓等级：每次 +2 经验，满级 2 体力 */
+const v35d = G.createState();
+v35d.energy = 30;
+const v35dig = G.digWorms(v35d);
+ok(v35dig.ok && v35d.energy === 27, '挖蚯蚓扣 3 体力', v35d.energy);
+ok(v35d.levels.digXp === G.BALANCE.dig.xp, '挖一次 +2 经验', v35d.levels.digXp);
+const v35d2 = G.createState();
+v35d2.levels.dig = G.BALANCE.level.max;
+v35d2.energy = 30;
+G.digWorms(v35d2);
+ok(v35d2.energy === 28, '挖蚯蚓满级只花 2 体力', v35d2.energy);
+ok(G.levelEffectText('dig', 10).indexOf('2 体力') >= 0, '满级效果文案写 2 体力',
+  G.levelEffectText('dig', 10));
+
+/* 采集等级 + 采集记录 + 成就 */
+const v35f = G.createState();
+v35f.energy = 50;
+G.setRng(mulberry32(5));
+const v35fr = G.forage(v35f);
+ok(v35fr.ok && v35f.levels.forageXp >= G.BALANCE.forage.xp, '采集给经验', v35f.levels.forageXp);
+ok(v35f.stats.wild[v35fr.wild] === v35fr.qty, '采集记录按野货累计', v35f.stats.wild);
+ok(v35f.stats.forageBest >= 1, '记录单次最多件数', v35f.stats.forageBest);
+ok(G.levelEffectText('forage', 10).indexOf('4 体力') >= 0, '采集满级效果写 4 体力',
+  G.levelEffectText('forage', 10));
+
+const v35ach = G.createState();
+v35ach.stats.forages = 1;
+const v35got = G.checkAchievements(v35ach).map(function (a) { return a.id; });
+ok(v35got.indexOf('forage1') >= 0, '采集成就：第一次进山', v35got.join(','));
+v35ach.stats.wild = { shepherd: 1, berry: 1, mushroom: 1, frozenpear: 1 };
+v35ach.stats.forageBest = 3;
+v35ach.levels.forage = 5;
+const v35got2 = G.checkAchievements(v35ach).map(function (a) { return a.id; });
+ok(v35got2.indexOf('wild4') >= 0 && v35got2.indexOf('forage3') >= 0 &&
+   v35got2.indexOf('forageLv5') >= 0, '四季野味 / 满载而归 / 认得百草都能解锁', v35got2.join(','));
 
 const v33w = G.createState();
 v33w.seeder = 2; v33w.seederOn = true; v33w.autoSeed = 'carrot';

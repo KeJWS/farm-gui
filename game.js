@@ -44,8 +44,10 @@
               offSeason: 1.7, decay: 0.7, scarce: 1.15, glut: 0.9,
               /* 委托的市价溢价封顶，避免一张单顶掉整个农场 */
               orderCap: 1.6 },
-    /* 采集：5 体力一次，100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子 */
-    forage: { energy: 5, qty2: 0.75, qty3: 0.35, seedChance: 0.25 },
+    /* 采集：5 体力一次（采集满级 4），100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子 */
+    forage: { energy: 5, qty2: 0.75, qty3: 0.35, seedChance: 0.25, xp: 2 },
+    /* 挖蚯蚓：3 体力一次（满级 2），最多 5 条 */
+    dig: { energy: 3, xp: 2 },
     /* 小镇捐赠：三档，捐得越多加成越多（金币出口） */
     town: [
       { id: 'stall', name: '村口小摊', emoji: '🏪', need: 2000, orderBonus: 0.05,
@@ -60,8 +62,8 @@
     /* 累进税：0~2000 收 2%、2000~10000 收 4%、10000 以上收 6%，最低 30 金 */
     tax: { min: 30, every: 30,
            bands: [{ upTo: 2000, rate: 0.02 }, { upTo: 10000, rate: 0.04 }, { upTo: null, rate: 0.06 }] },
-    /* 等级：每级所需经验 = 15 + 10×(级-1)，满级 10 */
-    level: { max: 10, xpBase: 15, xpStep: 10 },
+    /* 等级：每级所需经验 = 15 + 10×(级-1)，满级 10；满级时挖蚯蚓 / 采集各少花 1 点体力 */
+    level: { max: 10, xpBase: 15, xpStep: 10, maxEnergySave: 1 },
     /* 等级解锁：商店设备 / 高级种子 / 特效肥 / 渔网 / 渔夫 / 高级假饵 / 自动播种器 */
     gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2, fisher: 5,
             seeder: 4, lure2: 6 },
@@ -390,7 +392,26 @@
     { id: 'chest10',   cat: 'fish', emoji: '🪵', name: '开箱手气',   desc: '累计打开 10 个宝箱',   goal: 10,
       val: function (s) { return s.stats.chests || 0; }, reward: { coins: 120 }, pts: 2 },
     { id: 'chest30',   cat: 'fish', emoji: '👑', name: '宝箱猎人',   desc: '累计打开 30 个宝箱',   goal: 30,
-      val: function (s) { return s.stats.chests || 0; }, reward: { coins: 500, keys: { iron: 2 } }, pts: 4 }
+      val: function (s) { return s.stats.chests || 0; }, reward: { coins: 500, keys: { iron: 2 } }, pts: 4 },
+
+    /* v2.15 追加：采集 */
+    { id: 'forage1',   cat: 'all',  emoji: '🌿', name: '第一次进山', desc: '采集 1 次',             goal: 1,
+      val: function (s) { return s.stats.forages || 0; }, reward: { coins: 15 }, pts: 1 },
+    { id: 'forage30',  cat: 'all',  emoji: '🧺', name: '跑山人',     desc: '累计采集 30 次',       goal: 30,
+      val: function (s) { return s.stats.forages || 0; },
+      reward: { coins: 120, ferts: { normal: 2 } }, pts: 2 },
+    { id: 'forage120', cat: 'all',  emoji: '🏕️', name: '山野行家',   desc: '累计采集 120 次',      goal: 120,
+      val: function (s) { return s.stats.forages || 0; }, reward: { coins: 500 }, pts: 4 },
+    { id: 'forage3',   cat: 'all',  emoji: '🎒', name: '满载而归',   desc: '一次采到 3 件野货',    goal: 3,
+      val: function (s) { return s.stats.forageBest || 0; }, reward: { coins: 100 }, pts: 2 },
+    { id: 'wild4',     cat: 'all',  emoji: '🍄', name: '四季野味',   desc: '荠菜 / 野莓 / 松茸 / 冻梨都采过', goal: 4,
+      val: function (s) {
+        const w = s.stats.wild || {};
+        return WILD_LIST.filter(function (x) { return (w[x.id] || 0) > 0; }).length;
+      }, reward: { coins: 250, ferts: { special: 2 } }, pts: 3 },
+    { id: 'forageLv5', cat: 'all',  emoji: '🧭', name: '认得百草',   desc: '采集等级到 Lv5',       goal: 5,
+      val: function (s) { return (s.levels && s.levels.forage) || 1; },
+      reward: { coins: 200, bait: { dough: 10 } }, pts: 3 }
   ];
 
   const ACH_CATS = { farm: '🌱 种田', fish: '🎣 钓鱼', biz: '💰 经营', all: '🏆 收集' };
@@ -536,7 +557,10 @@
     return best;
   }
 
-  /* ---------------- 等级（种田 / 钓鱼） ---------------- */
+  /* ---------------- 等级（种田 / 钓鱼 / 挖蚯蚓 / 采集） ---------------- */
+
+  const SKILLS = ['farm', 'fish', 'dig', 'forage'];
+  const SKILL_NAME = { farm: '种田', fish: '钓鱼', dig: '挖蚯蚓', forage: '采集' };
 
   function levelNeed(lv) {
     const L = BALANCE.level;
@@ -544,18 +568,36 @@
   }
 
   function levelEffectText(kind, lv) {
+    const max = BALANCE.level.max;
     if (kind === 'fish') {
       return '咬钩 +' + Math.min(10, (lv - 1) * 1.1).toFixed(1) + '% · 好鱼 +' +
         Math.min(22.5, (lv - 1) * 2.5).toFixed(1) + '%';
     }
+    if (kind === 'dig') {
+      return '挖蚯蚓 ' + digCostByLv(lv) + ' 体力' + (lv >= max ? '（满级已省 1 点）' : '');
+    }
+    if (kind === 'forage') {
+      return '采集 ' + forageCostByLv(lv) + ' 体力' + (lv >= max ? '（满级已省 1 点）' : '');
+    }
     return '收获产量 +' + Math.floor(lv / 4);
   }
 
+  /* 满级奖励：挖蚯蚓 3→2、采集 5→4 */
+  function digCostByLv(lv) {
+    return BALANCE.dig.energy - ((lv >= BALANCE.level.max) ? BALANCE.level.maxEnergySave : 0);
+  }
+  function forageCostByLv(lv) {
+    return BALANCE.forage.energy - ((lv >= BALANCE.level.max) ? BALANCE.level.maxEnergySave : 0);
+  }
+  function digCost(s) { return digCostByLv(skillLv(s, 'dig')); }
+  function forageCost(s) { return forageCostByLv(skillLv(s, 'forage')); }
+
   /* 加经验，返回升了几级 */
   function addLevelXp(s, kind, n) {
-    if (!s.levels) s.levels = { farm: 1, fish: 1, farmXp: 0, fishXp: 0 };
-    const key = kind === 'fish' ? 'fish' : 'farm';
+    if (!s.levels) s.levels = {};
+    const key = SKILLS.indexOf(kind) >= 0 ? kind : 'farm';
     const xpKey = key + 'Xp';
+    if (!s.levels[key]) s.levels[key] = 1;
     // n 省略时默认 +1；显式传 0 就是「这一杆不给经验」
     const gain = (n === undefined || n === null) ? 1 : Math.max(0, Math.round(n));
     s.levels[xpKey] = (s.levels[xpKey] || 0) + gain;
@@ -569,7 +611,7 @@
       s.levels[xpKey] = Math.min(s.levels[xpKey], levelNeed(BALANCE.level.max) - 1);
     }
     if (ups) {
-      log(s, '⭐ ' + (key === 'fish' ? '钓鱼' : '种田') + '等级 → Lv' + s.levels[key] +
+      log(s, '⭐ ' + SKILL_NAME[key] + '等级 → Lv' + s.levels[key] +
         '（' + levelEffectText(key, s.levels[key]) + '）', 'good');
     }
     return ups;
@@ -591,6 +633,9 @@
 
   function farmLv(s) { return (s.levels && s.levels.farm) || 1; }
   function fishLv(s) { return (s.levels && s.levels.fish) || 1; }
+  function digLv(s) { return (s.levels && s.levels.dig) || 1; }
+  function forageLv(s) { return (s.levels && s.levels.forage) || 1; }
+  function skillLv(s, kind) { return (s.levels && s.levels[kind]) || 1; }
 
   /* 种子：高级种子要种田等级 */
   function seedUnlocked(s, id) {
@@ -619,7 +664,7 @@
 
   function makePlot() {
     return { crop: null, growth: 0, watered: false, missed: 0, fert: 0,
-             ripeDay: null, hits: 0, phase: 'idle' };
+             ripeDay: null, hits: 0, phase: 'idle', planted: 0, auto: 0 };
   }
 
   /* 水产店每日进货：每种鱼随机一个库存量；高级水产要等中后期 */
@@ -701,11 +746,12 @@
       longOrder: null,
       shop: makeShop(1),
       cropShop: makeCropShop(1),
-      levels: { farm: 1, fish: 1, farmXp: 0, fishXp: 0 },
+      levels: { farm: 1, fish: 1, farmXp: 0, fishXp: 0, dig: 1, digXp: 0, forage: 1, forageXp: 0 },
       ach: {},
       fishBook: { count: 0, entries: [], best: null, priciest: null },
       stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0,
-               longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0 }
+               longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0,
+               wild: {}, forageBest: 0 }
     };
     snapshotMarket(s);
     return s;
@@ -855,9 +901,37 @@
     p.ripeDay = null;
     p.hits = 0;
     p.phase = 'growing';
+    p.planted = s.day;
+    p.auto = free ? 1 : 0;      // 机器补种的地当晚不算「漏浇」
     s.stats.planted++;
-    log(s, '🌱 ' + (idx + 1) + ' 号地种下 ' + c.name + (off ? '（反季，长得慢、结果少）' : ''), 'good');
+    if (!(opts && opts.quiet)) {
+      log(s, '🌱 ' + (idx + 1) + ' 号地种下 ' + c.name + (off ? '（反季，长得慢、结果少）' : ''), 'good');
+    }
     return { ok: true, msg: c.name + ' 种下了' + (off ? '（反季）' : ''), off: off };
+  }
+
+  /* ---------------- 自动播种器（按片负责） ----------------
+   * 第 k 台只管第 [5(k-1)+1, 5k] 块地；收完这块地它立刻补种，睡觉时再把空着的补上。
+   */
+  function seederPlateOf(s, idx) {
+    const per = BALANCE.device.seederPlots;
+    const k = Math.floor(idx / per) + 1;
+    return k <= Math.max(0, Math.round(s.seeder || 0)) ? k : 0;
+  }
+
+  /* 这块地能不能被播种器补种：有对应的机器、开着、选了种子、不是冬天、还有种子 */
+  function canAutoSeed(s, idx) {
+    if (!seederPlateOf(s, idx)) return false;
+    if (!s.seederOn || !s.autoSeed || isWinter(s.day)) return false;
+    return (s.seeds[s.autoSeed] || 0) > 0;
+  }
+
+  /* 收完立刻补种，返回种下的作物 id；不满足条件返回 null */
+  function autoReplant(s, idx) {
+    if (!canAutoSeed(s, idx)) return null;
+    const seed = s.autoSeed;
+    const r = plant(s, idx, seed, { free: true, quiet: true });
+    return r.ok ? seed : null;
   }
 
   /* 季节特性：夏天浇水更费体力（2 点），其他季节 1 点 */
@@ -947,9 +1021,13 @@
     const msg = '收获 ' + c.name + ' ×' + qty + ' · ' + q.emoji + q.name + '（值 ' + qty * unit + ' 金）' +
                 (extraSeed ? ' · 留种 +1' : '') +
                 (regrown ? ' · 进入再生期' : '');
-    log(s, '🧺 ' + msg, 'good');
-    return { ok: true, msg: msg, qty: qty, crop: p.crop || c.id, unit: unit, quality: q,
-             seed: extraSeed, regrown: regrown, levelUp: levelUp };
+    // 这块地有自动播种器 → 收完立刻补种，不用等睡觉
+    let replanted = null;
+    if (!regrown) replanted = autoReplant(s, idx);
+    const fullMsg = msg + (replanted ? ' · 🌱 已补种 ' + CROPS[replanted].name : '');
+    log(s, '🧺 ' + fullMsg, 'good');
+    return { ok: true, msg: fullMsg, qty: qty, crop: p.crop || c.id, unit: unit, quality: q,
+             seed: extraSeed, regrown: regrown, levelUp: levelUp, replanted: replanted };
   }
 
   function harvestAll(s) {
@@ -1146,30 +1224,36 @@
 
     // 自动收获器：睡觉时把能收的地块收掉，不耗体力
     if (s.harvester && s.harvesterOn) {
-      let hn = 0, hval = 0;
+      let hn = 0, hval = 0, hrp = 0;
       s.plots.forEach(function (p, i) {
         if (!p.crop || !canHarvest(s, p)) return;
         const hr = harvest(s, i, true);
-        if (hr.ok) { hn++; hval += hr.qty * hr.unit; }
+        if (hr.ok) { hn++; hval += hr.qty * hr.unit; if (hr.replanted) hrp++; }
       });
-      if (hn) notes.push({ kind: 'harvest', text: '🤖 收获 ' + hn + ' 块（值 ' + hval + '）' });
+      if (hn) notes.push({ kind: 'harvest', text: '🤖 收获 ' + hn + ' 块（值 ' + hval + '）' +
+        (hrp ? ' · 补种 ' + hrp + ' 块' : '') });
     }
 
-    // 自动播种器：睡觉时用指定的种子补空地，一台管 5 块，不耗体力
+    // 自动播种器：每台只管自己那 5 块，睡觉时把空着的补上（不耗体力）
     if (s.seeder && s.seederOn && s.autoSeed && !isWinter(s.day)) {
       const seed = s.autoSeed;
+      const per = BALANCE.device.seederPlots;
+      const machines = Math.round(s.seeder || 0);
       let sn = 0;
-      const cap = seederPlots(s);
-      for (let i = 0; i < s.plots.length && sn < cap; i++) {
-        if (s.plots[i].crop) continue;
+      for (let k = 1; k <= machines; k++) {
+        for (let i = (k - 1) * per; i < Math.min(k * per, s.plots.length); i++) {
+          if (s.plots[i].crop) continue;
+          if ((s.seeds[seed] || 0) <= 0) break;
+          if (plant(s, i, seed, { free: true, quiet: true }).ok) sn++;
+        }
         if ((s.seeds[seed] || 0) <= 0) break;
-        if (plant(s, i, seed, { free: true }).ok) sn++;
       }
       if (sn) notes.push({ kind: 'seeder', text: '🌱 自动播种 ' + sn + ' 块 ' + CROPS[seed].name });
     }
 
     s.plots.forEach(function (p) {
-      if (p.crop && (p.phase === 'growing' || p.phase === 'regrow') && !p.watered) p.missed++;
+      if (p.crop && (p.phase === 'growing' || p.phase === 'regrow') && !p.watered &&
+          !(p.auto && p.planted === s.day)) p.missed++;
     });
     s.plots.forEach(function (p) { p.watered = false; });
 
@@ -1952,14 +2036,17 @@
   }
 
   function digWorms(s) {
-    if (s.energy < 3) return { ok: false, msg: '体力不够（挖蚯蚓要 3 点）' };
+    const cost = digCost(s);
+    if (s.energy < cost) return { ok: false, msg: '体力不够（挖蚯蚓要 ' + cost + ' 点）' };
     const w = WEATHER[s.weather];
     const n = clamp(randInt(1, 3) + w.wormMod, 1, 5);
-    s.energy -= 3;
+    s.energy -= cost;
     s.bait.worm += n;
     s.stats.dug++;
-    log(s, '🪱 挖到蚯蚓 ×' + n + '（现有 ' + s.bait.worm + '）', 'good');
-    return { ok: true, msg: '挖到蚯蚓 ×' + n, n: n };
+    const up = addLevelXp(s, 'dig', BALANCE.dig.xp);
+    log(s, '🪱 挖到蚯蚓 ×' + n + '（现有 ' + s.bait.worm + '）' +
+      (up ? ' · 挖蚯蚓 Lv' + digLv(s) : ''), 'good');
+    return { ok: true, msg: '挖到蚯蚓 ×' + n, n: n, levelUp: up, cost: cost };
   }
 
 /* ==================== src/09-forage.js ==================== */
@@ -1979,7 +2066,7 @@
   }
 
   function forage(s) {
-    const cost = BALANCE.forage.energy;
+    const cost = forageCost(s);
     const pool = foragePool(s.day);
     if (!pool.length) return { ok: false, msg: '这个季节后山没什么可采的' };
     if (s.energy < cost) return { ok: false, msg: '体力不够（采集要 ' + cost + ' 点），先睡觉吧' };
@@ -1992,6 +2079,10 @@
     const q = rollQuality(1);
     addStore(s, w.id, q.id, n);
     s.stats.forages = (s.stats.forages || 0) + 1;
+    s.stats.wild = s.stats.wild || {};
+    s.stats.wild[w.id] = (s.stats.wild[w.id] || 0) + n;
+    s.stats.forageBest = Math.max(s.stats.forageBest || 0, n);
+    const up = addLevelXp(s, 'forage', BALANCE.forage.xp + (n >= 3 ? 1 : 0));
     let seedTxt = '';
     if (rand() < BALANCE.forage.seedChance) {
       const cand = forageSeedPool(s);
@@ -2001,9 +2092,10 @@
         seedTxt = '，顺手摘到 ' + c.name + '种子 ×1';
       }
     }
-    log(s, '🌿 采集：' + w.emoji + ' ' + w.name + ' ×' + n + '（' + q.name + '）' + seedTxt, 'good');
+    log(s, '🌿 采集：' + w.emoji + ' ' + w.name + ' ×' + n + '（' + q.name + '）' + seedTxt +
+      (up ? ' · 采集 Lv' + forageLv(s) : ''), 'good');
     return { ok: true, msg: '采到 ' + w.name + ' ×' + n, wild: w.id, qty: n, q: q.id,
-             seed: seedTxt ? true : false };
+             seed: seedTxt ? true : false, levelUp: up, cost: cost };
   }
 
   function buyBait(s, kind, n) {
@@ -2548,6 +2640,12 @@
   function seederPlots(s) { return Math.min(seederCount(s) * SEEDER_PLOTS, (s.plots || []).length); }
   function seederUpkeep(s) { return seederCount(s) * BALANCE.upkeep.seeder; }
 
+  /* 第 k 台负责的号段（给界面看） */
+  function seederPlateRange(k) {
+    const per = BALANCE.device.seederPlots;
+    return { from: (k - 1) * per + 1, to: k * per };
+  }
+
   function buySeeder(s) {
     if (!seederUnlocked(s)) {
       return { ok: false, msg: '自动播种器要种田 Lv' + BALANCE.gate.seeder + ' 才解锁（现在 Lv' + farmLv(s) + '）' };
@@ -2948,6 +3046,8 @@
       plot.missed = num(plot.missed, 0, 0, 99);
       plot.fert = num(plot.fert, 0, 0, 2);
       plot.hits = num(plot.hits, 0, 0, 9);
+      plot.planted = Math.round(num(plot.planted, 0, 0, 1e6));
+      plot.auto = plot.auto ? 1 : 0;
       plot.off = plot.off ? 1 : 0;
       if (!plot.crop) return makePlot();
       if (['growing', 'regrow', 'ripe'].indexOf(plot.phase) < 0) plot.phase = 'growing';
@@ -2964,7 +3064,15 @@
     merged.lure2.dur = Math.round(num(merged.lure2.dur, 0, 0, BALANCE.lure2.dur));
     merged.lure2.owned = !!merged.lure2.owned && merged.lure2.dur > 0;
     merged.fishBook = Object.assign({ count: 0, entries: [], best: null, priciest: null }, s.fishBook || {});
-    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0 }, s.stats || {});
+    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0, wild: {}, forageBest: 0 }, s.stats || {});
+    merged.stats.wild = Object.assign({}, (s.stats && s.stats.wild) || {});
+    Object.keys(merged.stats.wild).forEach(function (id) {
+      if (!CROPS[id] || !CROPS[id].wild) { delete merged.stats.wild[id]; return; }
+      merged.stats.wild[id] = Math.round(num(merged.stats.wild[id], 0, 0, 999999));
+    });
+    merged.stats.forages = Math.round(num(merged.stats.forages, 0, 0, 999999));
+    merged.stats.forageBest = Math.round(num(merged.stats.forageBest, 0, 0, 3));
+    merged.stats.dug = Math.round(num(merged.stats.dug, 0, 0, 999999));
     merged.teas = Object.assign({ green: 0, black: 0, milk: 0, coffee: 0 }, s.teas || {});
     Object.keys(merged.teas).forEach(function (id) {
       if (!TEAS[id]) { delete merged.teas[id]; return; }
@@ -3163,18 +3271,24 @@
       merged.cropShop = makeCropShop(merged.day);
     }
 
-    // 等级：老存档按已有收获 / 钓鱼次数补等级（新存档从 1 级开始）
+    // 等级：老存档按已有收获 / 钓鱼 / 采集 / 挖蚯蚓次数补等级（新存档从 1 级开始）
     const rawLv = s.levels && typeof s.levels === 'object' ? s.levels : null;
     merged.levels = {
       farm: Math.round(num(rawLv && rawLv.farm, 1, 1, BALANCE.level.max)),
       fish: Math.round(num(rawLv && rawLv.fish, 1, 1, BALANCE.level.max)),
+      dig: Math.round(num(rawLv && rawLv.dig, 1, 1, BALANCE.level.max)),
+      forage: Math.round(num(rawLv && rawLv.forage, 1, 1, BALANCE.level.max)),
       farmXp: Math.round(num(rawLv && rawLv.farmXp, 0, 0, 999999)),
-      fishXp: Math.round(num(rawLv && rawLv.fishXp, 0, 0, 999999))
+      fishXp: Math.round(num(rawLv && rawLv.fishXp, 0, 0, 999999)),
+      digXp: Math.round(num(rawLv && rawLv.digXp, 0, 0, 999999)),
+      forageXp: Math.round(num(rawLv && rawLv.forageXp, 0, 0, 999999))
     };
     if (!rawLv || (merged.levels.farm === 1 && merged.levels.farmXp === 0 &&
                    merged.levels.fish === 1 && merged.levels.fishXp === 0 &&
                    (merged.stats.harvests || 0) + (merged.stats.casts || 0) > 0)) {
-      [['farm', merged.stats.harvests || 0], ['fish', merged.stats.casts || 0]].forEach(function (pair) {
+      [['farm', merged.stats.harvests || 0], ['fish', merged.stats.casts || 0],
+       ['dig', (merged.stats.dug || 0) * BALANCE.dig.xp],
+       ['forage', (merged.stats.forages || 0) * BALANCE.forage.xp]].forEach(function (pair) {
         const key = pair[0];
         merged.levels[key + 'Xp'] = Math.min(1e6, pair[1]);
         while (merged.levels[key] < BALANCE.level.max &&
@@ -3231,6 +3345,7 @@
     seederUnlocked: seederUnlocked, buySeeder: buySeeder, toggleSeeder: toggleSeeder,
     setAutoSeed: setAutoSeed, SEEDER_COST: SEEDER_COST, seederCount: seederCount,
     seederMax: seederMax, seederPlots: seederPlots, seederUpkeep: seederUpkeep,
+    seederPlateRange: seederPlateRange, seederPlateOf: seederPlateOf, canAutoSeed: canAutoSeed,
     SEEDER_PLOTS: SEEDER_PLOTS,
     toggleHarvester: toggleHarvester, buyNet: buyNet, netCatch: netCatch,
     resetNets: resetNets, netSetCount: netSetCount, netPending: netPending, netResetCost: netResetCost,
@@ -3250,6 +3365,8 @@
     rollCropStock: rollCropStock, cropStockCap: cropStockCap, FISH_UNLOCK: FISH_UNLOCK, CROP_UNLOCK: CROP_UNLOCK,
     seedUnlocked: seedUnlocked, fertUnlocked: fertUnlocked,    sprinklerUnlocked: sprinklerUnlocked, harvesterUnlocked: harvesterUnlocked,
     netUnlocked: netUnlocked, netMax: netMax, farmLv: farmLv, fishLv: fishLv,
+    digLv: digLv, forageLv: forageLv, skillLv: skillLv, digCost: digCost, forageCost: forageCost,
+    SKILLS: SKILLS, SKILL_NAME: SKILL_NAME,
     levelNeed: levelNeed, addLevelXp: addLevelXp, levelEffectText: levelEffectText,
     farmYieldBonus: farmYieldBonus, fishHookBonus: fishHookBonus, fishGoodBonus: fishGoodBonus,
     taxBase: taxBase, taxInDays: taxInDays, orderWeight: orderWeight, ORDER_TIERS: ORDER_TIERS,

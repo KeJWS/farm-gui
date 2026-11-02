@@ -5,7 +5,7 @@
 
   function makePlot() {
     return { crop: null, growth: 0, watered: false, missed: 0, fert: 0,
-             ripeDay: null, hits: 0, phase: 'idle' };
+             ripeDay: null, hits: 0, phase: 'idle', planted: 0, auto: 0 };
   }
 
   /* 水产店每日进货：每种鱼随机一个库存量；高级水产要等中后期 */
@@ -87,11 +87,12 @@
       longOrder: null,
       shop: makeShop(1),
       cropShop: makeCropShop(1),
-      levels: { farm: 1, fish: 1, farmXp: 0, fishXp: 0 },
+      levels: { farm: 1, fish: 1, farmXp: 0, fishXp: 0, dig: 1, digXp: 0, forage: 1, forageXp: 0 },
       ach: {},
       fishBook: { count: 0, entries: [], best: null, priciest: null },
       stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0,
-               longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0 }
+               longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0,
+               wild: {}, forageBest: 0 }
     };
     snapshotMarket(s);
     return s;

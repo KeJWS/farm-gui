@@ -37,8 +37,10 @@
               offSeason: 1.7, decay: 0.7, scarce: 1.15, glut: 0.9,
               /* 委托的市价溢价封顶，避免一张单顶掉整个农场 */
               orderCap: 1.6 },
-    /* 采集：5 体力一次，100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子 */
-    forage: { energy: 5, qty2: 0.75, qty3: 0.35, seedChance: 0.25 },
+    /* 采集：5 体力一次（采集满级 4），100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子 */
+    forage: { energy: 5, qty2: 0.75, qty3: 0.35, seedChance: 0.25, xp: 2 },
+    /* 挖蚯蚓：3 体力一次（满级 2），最多 5 条 */
+    dig: { energy: 3, xp: 2 },
     /* 小镇捐赠：三档，捐得越多加成越多（金币出口） */
     town: [
       { id: 'stall', name: '村口小摊', emoji: '🏪', need: 2000, orderBonus: 0.05,
@@ -53,8 +55,8 @@
     /* 累进税：0~2000 收 2%、2000~10000 收 4%、10000 以上收 6%，最低 30 金 */
     tax: { min: 30, every: 30,
            bands: [{ upTo: 2000, rate: 0.02 }, { upTo: 10000, rate: 0.04 }, { upTo: null, rate: 0.06 }] },
-    /* 等级：每级所需经验 = 15 + 10×(级-1)，满级 10 */
-    level: { max: 10, xpBase: 15, xpStep: 10 },
+    /* 等级：每级所需经验 = 15 + 10×(级-1)，满级 10；满级时挖蚯蚓 / 采集各少花 1 点体力 */
+    level: { max: 10, xpBase: 15, xpStep: 10, maxEnergySave: 1 },
     /* 等级解锁：商店设备 / 高级种子 / 特效肥 / 渔网 / 渔夫 / 高级假饵 / 自动播种器 */
     gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2, fisher: 5,
             seeder: 4, lure2: 6 },

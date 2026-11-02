@@ -125,7 +125,26 @@
     { id: 'chest10',   cat: 'fish', emoji: '🪵', name: '开箱手气',   desc: '累计打开 10 个宝箱',   goal: 10,
       val: function (s) { return s.stats.chests || 0; }, reward: { coins: 120 }, pts: 2 },
     { id: 'chest30',   cat: 'fish', emoji: '👑', name: '宝箱猎人',   desc: '累计打开 30 个宝箱',   goal: 30,
-      val: function (s) { return s.stats.chests || 0; }, reward: { coins: 500, keys: { iron: 2 } }, pts: 4 }
+      val: function (s) { return s.stats.chests || 0; }, reward: { coins: 500, keys: { iron: 2 } }, pts: 4 },
+
+    /* v2.15 追加：采集 */
+    { id: 'forage1',   cat: 'all',  emoji: '🌿', name: '第一次进山', desc: '采集 1 次',             goal: 1,
+      val: function (s) { return s.stats.forages || 0; }, reward: { coins: 15 }, pts: 1 },
+    { id: 'forage30',  cat: 'all',  emoji: '🧺', name: '跑山人',     desc: '累计采集 30 次',       goal: 30,
+      val: function (s) { return s.stats.forages || 0; },
+      reward: { coins: 120, ferts: { normal: 2 } }, pts: 2 },
+    { id: 'forage120', cat: 'all',  emoji: '🏕️', name: '山野行家',   desc: '累计采集 120 次',      goal: 120,
+      val: function (s) { return s.stats.forages || 0; }, reward: { coins: 500 }, pts: 4 },
+    { id: 'forage3',   cat: 'all',  emoji: '🎒', name: '满载而归',   desc: '一次采到 3 件野货',    goal: 3,
+      val: function (s) { return s.stats.forageBest || 0; }, reward: { coins: 100 }, pts: 2 },
+    { id: 'wild4',     cat: 'all',  emoji: '🍄', name: '四季野味',   desc: '荠菜 / 野莓 / 松茸 / 冻梨都采过', goal: 4,
+      val: function (s) {
+        const w = s.stats.wild || {};
+        return WILD_LIST.filter(function (x) { return (w[x.id] || 0) > 0; }).length;
+      }, reward: { coins: 250, ferts: { special: 2 } }, pts: 3 },
+    { id: 'forageLv5', cat: 'all',  emoji: '🧭', name: '认得百草',   desc: '采集等级到 Lv5',       goal: 5,
+      val: function (s) { return (s.levels && s.levels.forage) || 1; },
+      reward: { coins: 200, bait: { dough: 10 } }, pts: 3 }
   ];
 
   const ACH_CATS = { farm: '🌱 种田', fish: '🎣 钓鱼', biz: '💰 经营', all: '🏆 收集' };

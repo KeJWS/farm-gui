@@ -14,7 +14,7 @@
   }
 
   function forage(s) {
-    const cost = BALANCE.forage.energy;
+    const cost = forageCost(s);
     const pool = foragePool(s.day);
     if (!pool.length) return { ok: false, msg: '这个季节后山没什么可采的' };
     if (s.energy < cost) return { ok: false, msg: '体力不够（采集要 ' + cost + ' 点），先睡觉吧' };
@@ -27,6 +27,10 @@
     const q = rollQuality(1);
     addStore(s, w.id, q.id, n);
     s.stats.forages = (s.stats.forages || 0) + 1;
+    s.stats.wild = s.stats.wild || {};
+    s.stats.wild[w.id] = (s.stats.wild[w.id] || 0) + n;
+    s.stats.forageBest = Math.max(s.stats.forageBest || 0, n);
+    const up = addLevelXp(s, 'forage', BALANCE.forage.xp + (n >= 3 ? 1 : 0));
     let seedTxt = '';
     if (rand() < BALANCE.forage.seedChance) {
       const cand = forageSeedPool(s);
@@ -36,9 +40,10 @@
         seedTxt = '，顺手摘到 ' + c.name + '种子 ×1';
       }
     }
-    log(s, '🌿 采集：' + w.emoji + ' ' + w.name + ' ×' + n + '（' + q.name + '）' + seedTxt, 'good');
+    log(s, '🌿 采集：' + w.emoji + ' ' + w.name + ' ×' + n + '（' + q.name + '）' + seedTxt +
+      (up ? ' · 采集 Lv' + forageLv(s) : ''), 'good');
     return { ok: true, msg: '采到 ' + w.name + ' ×' + n, wild: w.id, qty: n, q: q.id,
-             seed: seedTxt ? true : false };
+             seed: seedTxt ? true : false, levelUp: up, cost: cost };
   }
 
   function buyBait(s, kind, n) {

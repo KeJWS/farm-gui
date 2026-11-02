@@ -97,9 +97,12 @@
   <aside class="col-side">
 
     <div class="panel">
-      <div class="panel-head"><h2>🔧 干活</h2></div>
+      <div class="panel-head"><h2>🔧 干活</h2>
+        <span class="lv-chip" id="dig-lv">🪱 Lv1</span>
+        <span class="lv-chip" id="forage-lv">🌿 Lv1</span>
+      </div>
       <div class="action-grid">
-        <button class="btn" data-act="dig">🪱 挖蚯蚓<small>3 体力</small></button>
+        <button class="btn" data-act="dig">🪱 挖蚯蚓<small id="dig-txt">3 体力</small></button>
         <button class="btn" data-act="work">🕐 打零工<small id="work-txt"></small></button>
         <button class="btn wide-cell" data-act="forage">🌿 采集<small id="forage-txt"></small></button>
       </div>
@@ -110,7 +113,13 @@
       <div class="action-grid farm-actions">
         <button class="btn" data-act="tea">🍵 下午茶<small id="tea-txt">3 金 · +5 体力</small></button>
         <button class="btn" data-act="expand">🏞️ 扩张土地<small id="expand-txt"></small></button>
-        <button class="btn" data-act="upgrade">💪 强化体力<small id="upgrade-txt"></small></button>
+        <button class="btn wide-cell" data-act="upgrade">💪 强化体力<small id="upgrade-txt"></small></button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>🔧 设备</h2><span class="muted" id="dev-sum"></span></div>
+      <div class="action-grid farm-actions">
         <button class="btn" data-act="sprinkler">🚿 洒水器<small id="sprinkler-txt"></small></button>
         <button class="btn" data-act="harvester">🤖 自动收获器<small id="harvester-txt"></small></button>
         <button class="btn wide-cell" data-act="seeder">🌱 自动播种器<small id="seeder-txt"></small></button>

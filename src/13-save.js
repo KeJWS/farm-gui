@@ -60,6 +60,8 @@
       plot.missed = num(plot.missed, 0, 0, 99);
       plot.fert = num(plot.fert, 0, 0, 2);
       plot.hits = num(plot.hits, 0, 0, 9);
+      plot.planted = Math.round(num(plot.planted, 0, 0, 1e6));
+      plot.auto = plot.auto ? 1 : 0;
       plot.off = plot.off ? 1 : 0;
       if (!plot.crop) return makePlot();
       if (['growing', 'regrow', 'ripe'].indexOf(plot.phase) < 0) plot.phase = 'growing';
@@ -76,7 +78,15 @@
     merged.lure2.dur = Math.round(num(merged.lure2.dur, 0, 0, BALANCE.lure2.dur));
     merged.lure2.owned = !!merged.lure2.owned && merged.lure2.dur > 0;
     merged.fishBook = Object.assign({ count: 0, entries: [], best: null, priciest: null }, s.fishBook || {});
-    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0 }, s.stats || {});
+    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0, wild: {}, forageBest: 0 }, s.stats || {});
+    merged.stats.wild = Object.assign({}, (s.stats && s.stats.wild) || {});
+    Object.keys(merged.stats.wild).forEach(function (id) {
+      if (!CROPS[id] || !CROPS[id].wild) { delete merged.stats.wild[id]; return; }
+      merged.stats.wild[id] = Math.round(num(merged.stats.wild[id], 0, 0, 999999));
+    });
+    merged.stats.forages = Math.round(num(merged.stats.forages, 0, 0, 999999));
+    merged.stats.forageBest = Math.round(num(merged.stats.forageBest, 0, 0, 3));
+    merged.stats.dug = Math.round(num(merged.stats.dug, 0, 0, 999999));
     merged.teas = Object.assign({ green: 0, black: 0, milk: 0, coffee: 0 }, s.teas || {});
     Object.keys(merged.teas).forEach(function (id) {
       if (!TEAS[id]) { delete merged.teas[id]; return; }
@@ -275,18 +285,24 @@
       merged.cropShop = makeCropShop(merged.day);
     }
 
-    // 等级：老存档按已有收获 / 钓鱼次数补等级（新存档从 1 级开始）
+    // 等级：老存档按已有收获 / 钓鱼 / 采集 / 挖蚯蚓次数补等级（新存档从 1 级开始）
     const rawLv = s.levels && typeof s.levels === 'object' ? s.levels : null;
     merged.levels = {
       farm: Math.round(num(rawLv && rawLv.farm, 1, 1, BALANCE.level.max)),
       fish: Math.round(num(rawLv && rawLv.fish, 1, 1, BALANCE.level.max)),
+      dig: Math.round(num(rawLv && rawLv.dig, 1, 1, BALANCE.level.max)),
+      forage: Math.round(num(rawLv && rawLv.forage, 1, 1, BALANCE.level.max)),
       farmXp: Math.round(num(rawLv && rawLv.farmXp, 0, 0, 999999)),
-      fishXp: Math.round(num(rawLv && rawLv.fishXp, 0, 0, 999999))
+      fishXp: Math.round(num(rawLv && rawLv.fishXp, 0, 0, 999999)),
+      digXp: Math.round(num(rawLv && rawLv.digXp, 0, 0, 999999)),
+      forageXp: Math.round(num(rawLv && rawLv.forageXp, 0, 0, 999999))
     };
     if (!rawLv || (merged.levels.farm === 1 && merged.levels.farmXp === 0 &&
                    merged.levels.fish === 1 && merged.levels.fishXp === 0 &&
                    (merged.stats.harvests || 0) + (merged.stats.casts || 0) > 0)) {
-      [['farm', merged.stats.harvests || 0], ['fish', merged.stats.casts || 0]].forEach(function (pair) {
+      [['farm', merged.stats.harvests || 0], ['fish', merged.stats.casts || 0],
+       ['dig', (merged.stats.dug || 0) * BALANCE.dig.xp],
+       ['forage', (merged.stats.forages || 0) * BALANCE.forage.xp]].forEach(function (pair) {
         const key = pair[0];
         merged.levels[key + 'Xp'] = Math.min(1e6, pair[1]);
         while (merged.levels[key] < BALANCE.level.max &&
@@ -343,6 +359,7 @@
     seederUnlocked: seederUnlocked, buySeeder: buySeeder, toggleSeeder: toggleSeeder,
     setAutoSeed: setAutoSeed, SEEDER_COST: SEEDER_COST, seederCount: seederCount,
     seederMax: seederMax, seederPlots: seederPlots, seederUpkeep: seederUpkeep,
+    seederPlateRange: seederPlateRange, seederPlateOf: seederPlateOf, canAutoSeed: canAutoSeed,
     SEEDER_PLOTS: SEEDER_PLOTS,
     toggleHarvester: toggleHarvester, buyNet: buyNet, netCatch: netCatch,
     resetNets: resetNets, netSetCount: netSetCount, netPending: netPending, netResetCost: netResetCost,
@@ -362,6 +379,8 @@
     rollCropStock: rollCropStock, cropStockCap: cropStockCap, FISH_UNLOCK: FISH_UNLOCK, CROP_UNLOCK: CROP_UNLOCK,
     seedUnlocked: seedUnlocked, fertUnlocked: fertUnlocked,    sprinklerUnlocked: sprinklerUnlocked, harvesterUnlocked: harvesterUnlocked,
     netUnlocked: netUnlocked, netMax: netMax, farmLv: farmLv, fishLv: fishLv,
+    digLv: digLv, forageLv: forageLv, skillLv: skillLv, digCost: digCost, forageCost: forageCost,
+    SKILLS: SKILLS, SKILL_NAME: SKILL_NAME,
     levelNeed: levelNeed, addLevelXp: addLevelXp, levelEffectText: levelEffectText,
     farmYieldBonus: farmYieldBonus, fishHookBonus: fishHookBonus, fishGoodBonus: fishGoodBonus,
     taxBase: taxBase, taxInDays: taxInDays, orderWeight: orderWeight, ORDER_TIERS: ORDER_TIERS,

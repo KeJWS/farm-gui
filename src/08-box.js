@@ -159,13 +159,16 @@
   }
 
   function digWorms(s) {
-    if (s.energy < 3) return { ok: false, msg: '体力不够（挖蚯蚓要 3 点）' };
+    const cost = digCost(s);
+    if (s.energy < cost) return { ok: false, msg: '体力不够（挖蚯蚓要 ' + cost + ' 点）' };
     const w = WEATHER[s.weather];
     const n = clamp(randInt(1, 3) + w.wormMod, 1, 5);
-    s.energy -= 3;
+    s.energy -= cost;
     s.bait.worm += n;
     s.stats.dug++;
-    log(s, '🪱 挖到蚯蚓 ×' + n + '（现有 ' + s.bait.worm + '）', 'good');
-    return { ok: true, msg: '挖到蚯蚓 ×' + n, n: n };
+    const up = addLevelXp(s, 'dig', BALANCE.dig.xp);
+    log(s, '🪱 挖到蚯蚓 ×' + n + '（现有 ' + s.bait.worm + '）' +
+      (up ? ' · 挖蚯蚓 Lv' + digLv(s) : ''), 'good');
+    return { ok: true, msg: '挖到蚯蚓 ×' + n, n: n, levelUp: up, cost: cost };
   }
 

@@ -252,6 +252,12 @@
   function seederPlots(s) { return Math.min(seederCount(s) * SEEDER_PLOTS, (s.plots || []).length); }
   function seederUpkeep(s) { return seederCount(s) * BALANCE.upkeep.seeder; }
 
+  /* 第 k 台负责的号段（给界面看） */
+  function seederPlateRange(k) {
+    const per = BALANCE.device.seederPlots;
+    return { from: (k - 1) * per + 1, to: k * per };
+  }
+
   function buySeeder(s) {
     if (!seederUnlocked(s)) {
       return { ok: false, msg: '自动播种器要种田 Lv' + BALANCE.gate.seeder + ' 才解锁（现在 Lv' + farmLv(s) + '）' };

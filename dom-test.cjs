@@ -270,6 +270,8 @@ ok(html('#modal-root').indexOf('已解锁') >= 0 && html('#modal-root').indexOf(
    '成就弹窗含统计与分类');
 ok(html('#modal-root').indexOf('成就点') >= 0 && html('#modal-root').indexOf('售价加成') >= 0,
    '成就弹窗显示成就点与售价加成');
+ok(html('#modal-root').indexOf('跑山人') >= 0 && html('#modal-root').indexOf('四季野味') >= 0,
+   '成就弹窗含采集成就');
 
 console.log('\n== 百货店 ==');
 clickAct('depart');
@@ -356,6 +358,8 @@ ok(html('#modal-root').indexOf('每台每周要交') >= 0 && html('#modal-root')
 })();
 ok(html('#modal-root').indexOf('/ 1 台') >= 0, '买一台后显示台数上限');
 ok(html('#modal-root').indexOf('每晚自动播 <b>5</b>') >= 0, '一台覆盖 5 块');
+ok(html('#modal-root').indexOf('第 1 台') >= 0 && html('#modal-root').indexOf('第 1–5 块') >= 0,
+   '面板列出每台负责的号段');
 ok(html('#modal-root').indexOf('维护 6 金/周') >= 0, '显示当前播种器维护费');
 
 console.log('\n== 规则说明分页 ==');
@@ -382,6 +386,24 @@ ok(html('#modal-root').indexOf('水产店') >= 0 && html('#modal-root').indexOf(
 })();
 ok(html('#modal-root').indexOf('4 / 4') >= 0 && html('#modal-root').indexOf('委托') >= 0,
    '点标签能直接跳到第 4 页（经营）');
+
+console.log('\n== 设备区 / 新等级 / 状态 ==');
+(function devicePanel() {
+  const raw = fs.readFileSync(__dirname + '/index.html', 'utf8');
+  const at = raw.indexOf('🔧 设备');
+  ok(at > 0 && raw.indexOf('id="seeder-txt"') > at && raw.indexOf('id="harvester-txt"') > at &&
+     raw.indexOf('id="sprinkler-txt"') > at, '三件设备挪到「设备」面板');
+  ok(raw.indexOf('id="dig-txt"') > 0 && raw.indexOf('id="dig-lv"') > 0 &&
+     raw.indexOf('id="forage-lv"') > 0, '干活面板有挖蚯蚓体力与两条新等级');
+})();
+ok(text('#dig-lv').indexOf('Lv') >= 0 && text('#forage-lv').indexOf('Lv') >= 0,
+   '显示挖蚯蚓 / 采集等级', [text('#dig-lv'), text('#forage-lv')]);
+ok(text('#dig-txt').indexOf('3 体力') >= 0, '挖蚯蚓按钮显示体力消耗', text('#dig-txt'));
+document.querySelector('#btn-status').fire('click', { target: {} });
+const stHtml = html('#modal-root');
+ok(stHtml.indexOf('采集记录') >= 0, '状态面板新增采集记录');
+ok(stHtml.indexOf('挖蚯蚓等级') >= 0 && stHtml.indexOf('采集等级') >= 0, '状态面板列出两条新等级');
+ok(stHtml.indexOf('其中自动播种器') < 0, '维护费不再带「其中自动播种器」');
 
 setTimeout(function () {
   console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));

@@ -416,21 +416,26 @@ console.log('\n== 采集（' + G.BALANCE.forage.energy + ' 体力一次，按季
 {
   const qe = qEV(1);
   const avgQty = 1 + G.BALANCE.forage.qty2 + G.BALANCE.forage.qty3;
+  const costLv1 = G.forageCost(G.createState());
+  const maxSt = G.createState(); maxSt.levels.forage = G.BALANCE.level.max;
+  const costMax = G.forageCost(maxSt);
   let best = null;
   G.WILD_LIST.forEach(function (w) {
     const per = w.price * qe * avgQty;
-    const perE = per / G.BALANCE.forage.energy;
+    const perE = per / costLv1;
     if (!best || perE > best.perE) best = { perE: perE, name: w.name };
     console.log('   ' + pad(w.name, 4) + pad(G.seasonText(w.id) + '季', 6) +
       pad(w.price + ' 金/件', 10) + '期望 ' + per.toFixed(1) + ' 金/次 · ' +
-      perE.toFixed(2) + ' 金/体力');
+      perE.toFixed(2) + ' 金/体力（满级 ' + (per / costMax).toFixed(2) + '）');
   });
   console.log('   期望件数 ' + avgQty.toFixed(2) + '（保底 1 + ' +
     Math.round(G.BALANCE.forage.qty2 * 100) + '% 再来 1 + ' +
     Math.round(G.BALANCE.forage.qty3 * 100) + '% 再多 1）· 还有 ' +
     Math.round(G.BALANCE.forage.seedChance * 100) + '% 掉一颗当季种子');
+  console.log('   体力：Lv1 ' + costLv1 + ' 点/次，采集满级（Lv' + G.BALANCE.level.max + '）' +
+    costMax + ' 点/次；经验每次 +' + G.BALANCE.forage.xp + '（采到 3 件 +1）');
   console.log('   最好的季节是「' + best.name + '」' + best.perE.toFixed(2) +
-    ' 金/体力 · 面团饵钓鱼（Lv10）约 ' +
+    ' 金/体力（满级 ' + (best.perE * costLv1 / costMax).toFixed(2) + '）· 面团饵钓鱼（Lv10）约 ' +
     ((evBait('dough', 'cloudy', 10, 4000).ev - 1) / 2).toFixed(2) +
     ' 金/体力 → 采集是最强的体力出口（冬天也能用）');
 }
