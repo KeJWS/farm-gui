@@ -21,17 +21,17 @@
     fisher: { hire: 300, baseCasts: 2, wageBase: 8, wageStep: 4,
               needBase: 5, needStep: 2, upCost: 100, max: 10 },
     work: { full: 2.0, half: 1.2 },
-    upkeep: { plotPerWeek: 3, plotMid: 6, plotHigh: 14, free: 5, sprinkle: 3, net: 0, harvester: 5 },
+    upkeep: { plotPerWeek: 3, plotMid: 6, plotHigh: 14, free: 5, sprinkle: 3, net: 0, harvester: 5,
+              seeder: 6 },
     tax: { rate: 0.04, min: 30, every: 30 },
     order: { mult: 1.35, seasonStep: 0.6 },
     expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
-    device: { sprinkler: 80, harvester: 300, net: 50, seeder: 600, seederPlots: 5 },
+    /* 自动播种器：一台只管 5 块地，买几台就播几块（每台每天 5 块），每台每周要交维护费 */
+    device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5, seederMax: 9 },
     lure: { price: 5, dur: 25 },
     /* 高级假饵：钓鱼 Lv6 解锁，20 金 / 100 次；咬钩率跟面团饵一样，好鱼率跟假饵一样 */
     lure2: { price: 20, dur: 100, lv: 6 },
     shop: { priceMul: 1.3, cropPriceMul: 1.3, restock: true, sellRate: 0.8 },
-    /* 茶在百货店买的，可以半价卖回去 */
-    teaSellRate: 0.5,
     /* 市场：供需 1.30（稀缺）→ 0.70（过剩），反季 ×1.7，每天睡觉回落 30% */
     market: { supplyMax: 1.3, supplyMin: 0.7, cropStep: 0.02, fishStep: 0.015,
               offSeason: 1.7, decay: 0.7, scarce: 1.15, glut: 0.9,

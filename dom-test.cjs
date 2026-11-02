@@ -109,6 +109,8 @@ const G = require('./game.js');
   st.nets = 2;
   st.netSet = 2;
   st.levels.fish = 5;
+  st.levels.farm = 4;
+  st.seeder = 0;
   st.fisher = { lv: 3, xp: 4 };
   // 给萝卜造 7 天价格历史，方便测曲线
   st.marketHist = {
@@ -121,7 +123,7 @@ const G = require('./game.js');
   G.addStore(st, 'mushroom', 'good', 3);
   G.boxPutCrop(st, 'cabbage');                 // 收购箱里放一批，便于测取出
   st.longOrder = G.makeLongOrder({ day: 5, levels: { farm: 3 } });
-  st.coins = 500;
+  st.coins = 5000;
   localStorage.setItem('farm-gui-save-v1', G.serialize(st));
 })();
 
@@ -182,8 +184,8 @@ console.log('\n== 弹窗 ==');
 clickAct('seedshop');
 ok(html('#modal-root').indexOf('种子店') >= 0 && html('#modal-root').indexOf('肥料') >= 0,
    '种子店弹窗（含肥料）能打开');
-ok(html('#modal-root').indexOf('需种田 Lv2') >= 0 && html('#modal-root').indexOf('需种田 Lv4') >= 0,
-   '种子店按等级锁定高级种子与特效肥');
+ok(html('#modal-root').indexOf('需种田 Lv5') >= 0 && html('#modal-root').indexOf('需种田 Lv6') >= 0,
+   '种子店按等级锁定高级种子');
 ok(html('#modal-root').indexOf('反季 ×1.8') >= 0, '种子店标明反季种子更贵');
 ok(html('#modal-root').indexOf('反季种子') >= 0, '种子店说明反季也能种');
 clickAct('fishshop');
@@ -274,8 +276,8 @@ clickAct('depart');
 ok(html('#modal-root').indexOf('百货店') >= 0 && html('#modal-root').indexOf('茶叶') >= 0,
    '百货店弹窗能打开');
 ok(html('#modal-root').indexOf('data-buytea="green"') >= 0, '百货店能买茶');
-ok(html('#modal-root').indexOf('data-selltea="green"') >= 0 && html('#modal-root').indexOf('半价回收') >= 0,
-   '茶叶可以半价卖回百货店');
+ok(html('#modal-root').indexOf('data-selltea="green"') < 0 && html('#modal-root').indexOf('半价回收') < 0,
+   '茶叶不能用金币回收（回收已删）');
 ok(html('#modal-root').indexOf('钓鱼 Lv7 解锁') >= 0, '金钥匙按钓鱼等级锁定');
 ok(html('#modal-root').indexOf('只收宝箱') >= 0, '百货店只收宝箱、不收杂物');
 ok(html('#modal-root').indexOf('data-openchest') >= 0 && html('#modal-root').indexOf('木制宝箱') >= 0,
@@ -340,6 +342,46 @@ ok(html('#modal-root').indexOf('下午茶') >= 0 && html('#modal-root').indexOf(
 ok(html('#modal-root').indexOf('data-tea="green"') >= 0, '下午茶列出可喝的茶');
 ok(html('#modal-root').indexOf('体力 +4') >= 0, '下午茶显示每杯回多少体力');
 ok(document.querySelector('[data-act="castAll"]') !== null, '河边有「全部体力」按钮');
+
+console.log('\n== 自动播种器 ==');
+clickAct('seeder');
+ok(html('#modal-root').indexOf('只管 5 块地') >= 0 && html('#modal-root').indexOf('data-buyseeder') >= 0,
+   '自动播种器按台卖，一台只管 5 块');
+ok(html('#modal-root').indexOf('每台每周要交') >= 0 && html('#modal-root').indexOf('维护费') >= 0,
+   '面板写明维护费');
+(function buyOneSeeder() {
+  const btn = { dataset: {}, disabled: false };
+  const target = { closest: function (s) { return s === '[data-buyseeder]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+ok(html('#modal-root').indexOf('/ 1 台') >= 0, '买一台后显示台数上限');
+ok(html('#modal-root').indexOf('每晚自动播 <b>5</b>') >= 0, '一台覆盖 5 块');
+ok(html('#modal-root').indexOf('维护 6 金/周') >= 0, '显示当前播种器维护费');
+
+console.log('\n== 规则说明分页 ==');
+(function openHelp() {
+  const btn = { dataset: {}, disabled: false };
+  const target = { closest: function (s) { return s === '#set-help' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+ok(html('#modal-root').indexOf('rule-tabs') >= 0, '规则说明带分页标签');
+ok((html('#modal-root').match(/data-helppage=/g) || []).length === 4, '规则分成 4 页');
+ok(html('#modal-root').indexOf('1 / 4') >= 0, '第 1 页页码正确');
+(function helpNext() {
+  const btn = { dataset: { helpnav: '1' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-helpnav]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+ok(html('#modal-root').indexOf('2 / 4') >= 0, '能翻到第 2 页');
+ok(html('#modal-root').indexOf('水产店') >= 0 && html('#modal-root').indexOf('采集') >= 0,
+   '第 2 页是钓鱼 / 采集 / 水产店');
+(function helpTab() {
+  const btn = { dataset: { helppage: '3' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-helppage]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+ok(html('#modal-root').indexOf('4 / 4') >= 0 && html('#modal-root').indexOf('委托') >= 0,
+   '点标签能直接跳到第 4 页（经营）');
 
 setTimeout(function () {
   console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));

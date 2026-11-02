@@ -1953,35 +1953,54 @@ G.setRng(function () { return 0.5; });
 const v33cast = G.fish(v33c, 'lure2');
 ok(v33cast.ok && v33c.lure2.dur === 4, '用高级假饵钓一杆扣 1 耐久', v33c.lure2.dur);
 
-/* 茶叶半价回收 */
+/* 茶叶回收已删 */
+ok(!G.sellTea && !G.teaSellPrice, '茶叶回收接口已移除');
 const v33t = G.createState();
 v33t.coins = 100;
 G.buyTea(v33t, 'green', 2);
-const v33coin = v33t.coins;
-const v33sell = G.sellTea(v33t, 'green', 1);
-ok(v33sell.ok && v33sell.income === 6 && v33t.coins === v33coin + 6, '绿茶半价卖回 6 金', v33sell.income);
-ok(G.teaSellPrice(G.TEAS.coffee) === 15, '咖啡半价 15 金');
-ok(G.sellTea(v33t, 'coffee', 1).ok === false, '没有的茶卖不了');
+ok(v33t.coins === 76 && v33t.teas.green === 2, '买茶只出不进（2 杯绿茶 -24）', v33t.coins);
+ok(!Object.prototype.hasOwnProperty.call(v33t, 'teaSell'), '存档里没有茶叶回收字段');
 
-/* 自动播种器 */
+/* 自动播种器：一台只管 5 块，按台数买，每周维护 */
 const v33s = G.createState();
-v33s.coins = 2000; v33s.levels.farm = G.BALANCE.gate.seeder - 1;
+v33s.coins = 3000; v33s.levels.farm = G.BALANCE.gate.seeder - 1;
 ok(!G.buySeeder(v33s).ok, '等级不够买不到自动播种器');
 v33s.levels.farm = G.BALANCE.gate.seeder;
+v33s.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
+ok(G.seederMax(v33s) === 2, '10 块地最多 2 台', G.seederMax(v33s));
 const v33sb = G.buySeeder(v33s);
-ok(v33sb.ok && v33s.seeder && v33s.coins === 2000 - G.SEEDER_COST, '买到自动播种器', v33s.coins);
+ok(v33sb.ok && v33s.seeder === 1 && v33s.coins === 3000 - G.SEEDER_COST, '买到第 1 台自动播种器', v33s.coins);
+ok(G.seederPlots(v33s) === 5, '一台只覆盖 5 块地', G.seederPlots(v33s));
+ok(G.deviceUpkeep(v33s) === G.BALANCE.upkeep.seeder, '播种器每周 6 金维护费', G.deviceUpkeep(v33s));
 ok(!G.setAutoSeed(v33s, 'carrot').ok, '没种子时选不了播种品种');
-v33s.seeds = { carrot: 10 };
+v33s.seeds = { carrot: 20 };
 ok(G.setAutoSeed(v33s, 'carrot').ok && v33s.autoSeed === 'carrot', '选上萝卜种子');
-v33s.plots = new Array(8).fill(0).map(function () { return G.createState().plots[0]; });
-v33s.stats.planted = 0;
 G.sleep(v33s);
-ok(v33s.plots.filter(function (p) { return p.crop; }).length === 5, '睡一觉自动播 5 块',
-  v33s.plots.filter(function (p) { return p.crop; }).length);
-ok(v33s.seeds.carrot === 5 && v33s.stats.planted === 5, '消耗 5 颗种子', v33s.seeds.carrot);
+const v33planted = v33s.plots.filter(function (p) { return p.crop; }).length;
+ok(v33planted === 5, '一台只播 5 块', v33planted);
+ok(v33s.seeds.carrot === 15 && v33s.stats.planted === 5, '消耗 5 颗种子', v33s.seeds.carrot);
+ok(G.buySeeder(v33s).ok && v33s.seeder === 2 && G.seederPlots(v33s) === 10, '买第 2 台后覆盖 10 块');
+ok(!G.buySeeder(v33s).ok, '10 块地只容得下 2 台');
+ok(G.deviceUpkeep(v33s) === G.BALANCE.upkeep.seeder * 2, '两台维护 12 金/周', G.deviceUpkeep(v33s));
+
+/* 两台一起播：一晚补满 10 块 */
+const v33s2 = G.createState();
+v33s2.coins = 3000; v33s2.levels.farm = G.BALANCE.gate.seeder;
+v33s2.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
+v33s2.seeds = { carrot: 20 };
+G.buySeeder(v33s2); G.buySeeder(v33s2);
+G.setAutoSeed(v33s2, 'carrot');
+G.sleep(v33s2);
+ok(v33s2.plots.filter(function (p) { return p.crop; }).length === 10, '两台一晚播满 10 块',
+  v33s2.plots.filter(function (p) { return p.crop; }).length);
+ok(v33s2.seeds.carrot === 10, '两台共耗 10 颗种子', v33s2.seeds.carrot);
+
+/* 老存档 seeder: true → 1 台 */
+const v33mig = G.deserialize(Object.assign(JSON.parse(G.serialize(G.createState())), { seeder: true }));
+ok(v33mig.seeder === 1, '老存档的布尔播种器迁移成 1 台', v33mig.seeder);
 
 const v33w = G.createState();
-v33w.seeder = true; v33w.seederOn = true; v33w.autoSeed = 'carrot';
+v33w.seeder = 2; v33w.seederOn = true; v33w.autoSeed = 'carrot';
 v33w.seeds = { carrot: 10 }; v33w.day = 91; v33w.coins = 1000;
 G.sleep(v33w);
 ok(v33w.plots.every(function (p) { return !p.crop; }), '冬天自动播种器不工作');

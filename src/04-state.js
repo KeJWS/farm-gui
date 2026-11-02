@@ -65,7 +65,7 @@
       sprinklers: 0,
       harvester: false,
       harvesterOn: true,
-      seeder: false,
+      seeder: 0,
       seederOn: true,
       autoSeed: null,
       nets: 0,
@@ -132,10 +132,11 @@
     return fee;
   }
 
-  /* 设备每周维护费：洒水器 3、自动收获器 5（渔网免费） */
+  /* 设备每周维护费：洒水器 3、自动收获器 5、自动播种器 6/台（渔网免费） */
   function deviceUpkeep(s) {
     return (s.sprinklers || 0) * BALANCE.upkeep.sprinkle +
-           (s.harvester ? BALANCE.upkeep.harvester : 0);
+           (s.harvester ? BALANCE.upkeep.harvester : 0) +
+           (s.seeder || 0) * BALANCE.upkeep.seeder;
   }
 
   function expandCost(s) {

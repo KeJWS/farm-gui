@@ -339,11 +339,11 @@
       if (hn) notes.push({ kind: 'harvest', text: '🤖 收获 ' + hn + ' 块（值 ' + hval + '）' });
     }
 
-    // 自动播种器：睡觉时用指定的种子补 5 块空地，不耗体力
+    // 自动播种器：睡觉时用指定的种子补空地，一台管 5 块，不耗体力
     if (s.seeder && s.seederOn && s.autoSeed && !isWinter(s.day)) {
       const seed = s.autoSeed;
       let sn = 0;
-      const cap = BALANCE.device.seederPlots;
+      const cap = seederPlots(s);
       for (let i = 0; i < s.plots.length && sn < cap; i++) {
         if (s.plots[i].crop) continue;
         if ((s.seeds[seed] || 0) <= 0) break;

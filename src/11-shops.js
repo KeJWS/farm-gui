@@ -235,27 +235,44 @@
     return { ok: true, msg: '自动收获器已安装' };
   }
 
-  /* ---------------- 自动播种器 ---------------- */
+  /* ---------------- 自动播种器 ----------------
+   * 一台只管 5 块地：买 N 台，每晚最多补 5N 块空地（不耗体力），每台每周 6 金维护费。
+   * 台数上限 = 需要几台才能盖住全部地块（ceil(地块/5)），最多 9 台。
+   */
   const SEEDER_COST = BALANCE.device.seeder;
+  const SEEDER_PLOTS = BALANCE.device.seederPlots;
 
   function seederUnlocked(s) { return farmLv(s) >= BALANCE.gate.seeder; }
+  function seederCount(s) { return Math.max(0, Math.round(s.seeder || 0)); }
+  function seederMax(s) {
+    return Math.min(BALANCE.device.seederMax,
+      Math.max(1, Math.ceil((s.plots || []).length / SEEDER_PLOTS)));
+  }
+  /* 每晚能自动播几块 */
+  function seederPlots(s) { return Math.min(seederCount(s) * SEEDER_PLOTS, (s.plots || []).length); }
+  function seederUpkeep(s) { return seederCount(s) * BALANCE.upkeep.seeder; }
 
   function buySeeder(s) {
-    if (s.seeder) return { ok: false, msg: '已经有自动播种器了' };
     if (!seederUnlocked(s)) {
       return { ok: false, msg: '自动播种器要种田 Lv' + BALANCE.gate.seeder + ' 才解锁（现在 Lv' + farmLv(s) + '）' };
     }
-    if (s.coins < SEEDER_COST) return { ok: false, msg: '金币不够（' + SEEDER_COST + ' 金）' };
+    const max = seederMax(s);
+    if (seederCount(s) >= max) {
+      return { ok: false, msg: seederCount(s) + ' 台已经够盖住 ' + s.plots.length +
+        ' 块地了（每台 5 块，想再买先扩地）' };
+    }
+    if (s.coins < SEEDER_COST) return { ok: false, msg: '金币不够（' + SEEDER_COST + ' 金/台）' };
     s.coins -= SEEDER_COST;
-    ledger(s, '买自动播种器', 0, SEEDER_COST);
-    s.seeder = true;
+    ledger(s, '买自动播种器 ×1', 0, SEEDER_COST);
+    s.seeder = seederCount(s) + 1;
     s.seederOn = true;
-    log(s, '🌱 买了自动播种器（每天睡觉自动补 ' + BALANCE.device.seederPlots + ' 块空地，记得选种子）', 'good');
-    return { ok: true, msg: '自动播种器已安装' };
+    log(s, '🌱 买了第 ' + s.seeder + ' 台自动播种器（每晚补 ' + SEEDER_PLOTS + ' 块，维护 ' +
+      BALANCE.upkeep.seeder + ' 金/周，记得选种子）', 'good');
+    return { ok: true, msg: '自动播种器 ×' + s.seeder, n: s.seeder, cost: SEEDER_COST };
   }
 
   function toggleSeeder(s) {
-    if (!s.seeder) return { ok: false, msg: '还没买自动播种器' };
+    if (!seederCount(s)) return { ok: false, msg: '还没买自动播种器' };
     s.seederOn = !s.seederOn;
     log(s, '🌱 自动播种器已' + (s.seederOn ? '开启' : '关闭'), 'info');
     return { ok: true, msg: '自动播种器已' + (s.seederOn ? '开启' : '关闭'), on: s.seederOn };
@@ -263,7 +280,7 @@
 
   /* 选自动播种用哪种种子（必须是背包里有的） */
   function setAutoSeed(s, id) {
-    if (!s.seeder) return { ok: false, msg: '要先买自动播种器' };
+    if (!seederCount(s)) return { ok: false, msg: '要先买自动播种器' };
     if (id && !CROPS[id]) return { ok: false, msg: '没有这种作物' };
     if (id && (s.seeds[id] || 0) <= 0) return { ok: false, msg: '背包里没有 ' + CROPS[id].name + ' 种子' };
     s.autoSeed = id || null;

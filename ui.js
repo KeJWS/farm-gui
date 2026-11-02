@@ -335,13 +335,15 @@
     const seedTxt = $('#seeder-txt');
     if (seedTxt) {
       const seedLock = !G.seederUnlocked(state);
+      const sc = G.seederCount(state);
       seedTxt.textContent = seedLock
         ? '需种田 Lv' + G.BALANCE.gate.seeder + ' 解锁'
-        : (!state.seeder
-          ? G.SEEDER_COST + ' 金 · 每天自动播 ' + G.BALANCE.device.seederPlots + ' 块'
-          : (state.autoSeed
-            ? (state.seederOn ? '已开启 · ' : '已关闭 · ') + G.CROPS[state.autoSeed].name
-            : '没选种子 · 点击设置'));
+        : (!sc
+          ? G.SEEDER_COST + ' 金/台 · 一台管 ' + G.SEEDER_PLOTS + ' 块'
+          : (sc + ' 台 · 每晚播 ' + G.seederPlots(state) + ' 块' +
+            (state.autoSeed
+              ? (state.seederOn ? ' · ' : '（已关）') + G.CROPS[state.autoSeed].name
+              : ' · 没选种子')));
     }
     renderCrew();
 
@@ -1040,18 +1042,27 @@
       toast('自动播种器要种田 Lv' + G.BALANCE.gate.seeder + ' 才解锁', 'warn');
       return;
     }
-    const plots = G.BALANCE.device.seederPlots;
-    if (!state.seeder) {
+    const per = G.SEEDER_PLOTS;
+    const have = G.seederCount(state);
+    const max = G.seederMax(state);
+    const cover = G.seederPlots(state);
+    const upkeep = G.BALANCE.upkeep.seeder;
+    const buyBtn = '<button class="btn" data-buyseeder' +
+      (state.coins < G.SEEDER_COST || have >= max ? ' disabled' : '') + '>再买一台（' +
+      G.SEEDER_COST + ' 金）</button>';
+
+    if (!have) {
       openModal('🌱 自动播种器',
-        '<div class="shop-head">💰 <b>' + state.coins + '</b> 金</div>' +
-        '<div class="shop-tip">每天睡前自动往空地里播 <b>' + plots + '</b> 块，<b>不耗体力</b>，' +
-          '但会消耗背包里的种子。买下来之后再选「用哪种种子」。<br>' +
-          '冬天不工作；种子用完就停。</div>',
+        '<div class="shop-head">💰 <b>' + state.coins + '</b> 金 · 现在有 <b>' + state.plots.length + '</b> 块地</div>' +
+        '<div class="shop-tip">一台机器<b>只管 ' + per + ' 块地</b>：每晚睡前自动往空地里播 ' + per +
+          ' 块，<b>不耗体力</b>，只消耗背包里的种子；每台每周要交 <b>' + upkeep + ' 金</b>维护费。<br>' +
+          '你现在的地块需要 <b>' + max + '</b> 台才能全自动；冬天不工作，种子用完就停。</div>',
         '<button class="btn" data-buyseeder' + (state.coins < G.SEEDER_COST ? ' disabled' : '') +
-          '>买下来（' + G.SEEDER_COST + ' 金）</button>' +
+          '>买一台（' + G.SEEDER_COST + ' 金）</button>' +
         '<button class="btn" data-close>取消</button>');
       return;
     }
+
     const rows = G.CROP_LIST.filter(function (c) { return (state.seeds[c.id] || 0) > 0; })
       .map(function (c) {
         const on = state.autoSeed === c.id;
@@ -1065,11 +1076,14 @@
         '</div>';
       }).join('');
     openModal('🌱 自动播种器',
-      '<div class="shop-head">每天自动播 <b>' + plots + '</b> 块空地 · ' +
-        (state.seederOn ? '已开启' : '已关闭') + ' · 种田 Lv' + G.farmLv(state) + '</div>' +
-      (rows || '<div class="store-empty">背包里没有种子，先去种子店买</div>') +
-      '<div class="shop-tip">自动播种不耗体力，只消耗种子；冬天不工作。' +
-        '选好种子后，每次睡觉都会把空着的 <b>' + plots + '</b> 块地补上。</div>',
+      '<div class="shop-head"><b>' + have + '</b> / ' + max + ' 台 · 每晚自动播 <b>' + cover + '</b> / ' +
+        state.plots.length + ' 块 · ' + (state.seederOn ? '已开启' : '已关闭') +
+        ' · 维护 ' + G.seederUpkeep(state) + ' 金/周</div>' +
+      '<div class="shop-tip">一台管 <b>' + per + ' 块</b>，买第 ' + (have + 1) + ' 台要 ' + G.SEEDER_COST +
+        ' 金（维护 +' + upkeep + ' 金/周）。台数上限 = 盖住全部地块所需（' + max + ' 台），想多买先扩地。<br>' +
+        '自动播种不耗体力，只消耗种子；冬天不工作。</div>' +
+      (rows || '<div class="store-empty">背包里没有种子，先去种子店买</div>'),
+      (have < max ? buyBtn : '') +
       '<button class="btn" data-toggleseeder>' + (state.seederOn ? '关掉自动播种' : '开启自动播种') + '</button>' +
       '<button class="btn" data-close>关闭</button>');
   }
@@ -1171,14 +1185,17 @@
     openModal('🛒 渔具店', body, '<button class="btn" data-close>关闭</button>');
   }
 
-  function helpModal() {
+  /* 规则说明分页：种植 / 钓鱼 / 买卖 / 经营 */
+  let helpPage = 0;
+
+  function helpPages() {
     const cropRows = G.CROP_LIST.map(function (c) {
       return '<tr><td>' + c.emoji + ' ' + c.name + '</td><td>' + c.seed + ' 金</td><td>' + c.days + ' 天</td>' +
         '<td>' + (c.multi ? '首次 ' + c.firstQty + ' 个' : (c.big ? '1 个（固定）' : c.base + ' ±1')) + '</td>' +
         '<td>' + c.price + ' 金</td><td>' + G.seasonText(c.id) + '</td><td>Lv' + (c.lv || 1) + '</td></tr>';
     }).join('');
 
-    const body =
+    const P1 =
       '<div class="rule-sec">' +
         '<h4>🌤️ 天气</h4>' +
         '<table class="rule-table"><tr><th>天气</th><th>出现季节</th><th>效果</th></tr>' +
@@ -1216,8 +1233,9 @@
         '<tr><td>🍂 秋</td><td><b>丰收</b>：普通作物每次收获 <b>+1 个</b>（大作物不算）</td></tr>' +
         '<tr><td>❄️ 冬</td><td>会<b>下雪</b>（45%，化雪等于自动浇水）· 不能种也不能钓</td></tr>' +
         '</table>' +
-      '</div>' +
+      '</div>';
 
+    const P2 =
       '<div class="rule-sec">' +
         '<h4>🎣 钓鱼</h4>' +
         '<p>2 体力 + 1 份饵甩一杆（<b>冬天河面结冰，钓不了</b>）。<b>先判定咬钩</b>：面团饵 92%、蚯蚓 95%、假饵 72%，晴天 −12%、雨天 +8%。<br>' +
@@ -1271,8 +1289,9 @@
         '买价 = 基础价 × ' + G.BALANCE.shop.priceMul + ' <b>再乘鱼市价</b>（缺货 / 非汛期更贵），' +
         '买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。<br>' +
         '河豚 <b>D' + G.FISH_UNLOCK.puffer + '</b> 起、锦鲤 <b>D' + G.FISH_UNLOCK.koi + '</b> 起才进货。</p>' +
-      '</div>' +
+      '</div>';
 
+    const P3 =
       '<div class="rule-sec">' +
         '<h4>🧺 农产品店</h4>' +
         '<p>作物在这里直接卖，同样 <b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>，再乘<b>市价系数</b>；仓库不再直接出售任何东西。<br>' +
@@ -1326,8 +1345,9 @@
         '<p>肥料在<b>种子店</b>购买，买回来进仓库，施肥时消耗；多收作物（黄瓜 / 草莓）只提质不加量。<br>' +
         '<b>南瓜 / 西瓜只吃品质加成</b>：数量永远是 1 个，但施肥后品质档位明显更高——这是它们唯一的施肥收益。<br>' +
         '特效肥要<b>种田 Lv' + G.FERT.special.lv + '</b> 才解锁。</p>' +
-      '</div>' +
+      '</div>';
 
+    const P4 =
       '<div class="rule-sec">' +
         '<h4>💰 经济</h4>' +
         '<p>· 睡觉推进 1 天，扣伙食费 <b>' + G.mealFee(state) + ' 金</b>，体力回满；没钱只回 5 点（不会扣掉已有的）<br>' +
@@ -1338,13 +1358,14 @@
         '）：每天自动浇 1 块地，不耗体力（雨天自动浇，不叠加）<br>' +
         '· 🤖 自动收获器 ' + G.HARVESTER_COST + ' 金（需种田 Lv' + G.BALANCE.gate.harvester +
         '）：睡觉时自动收走成熟作物，不耗体力<br>' +
-        '· 🌱 自动播种器 ' + G.SEEDER_COST + ' 金（需种田 Lv' + G.BALANCE.gate.seeder +
-        '）：睡觉时自动往空地播 <b>' + G.BALANCE.device.seederPlots + '</b> 块（用你选的种子，不耗体力）<br>' +
+        '· 🌱 自动播种器 ' + G.SEEDER_COST + ' 金/台（需种田 Lv' + G.BALANCE.gate.seeder +
+        '）：<b>一台只管 ' + G.SEEDER_PLOTS + ' 块地</b>，睡觉时自动往空地播 ' + G.SEEDER_PLOTS +
+        ' 块（用你选的种子，不耗体力）；买几台就播几块，每台每周维护 ' + G.BALANCE.upkeep.seeder + ' 金<br>' +
         '· 💰 税：每 30 天按（金币 + 仓库价值）<b>累进</b>收一次——前 2000 收 2%、2000~1 万收 4%、1 万以上收 6%，最低 ' +
         G.BALANCE.tax.min + ' 金（当前约 ' + G.taxDue(state) + ' 金）<br>' +
         '· 🧾 维护费：每 7 天收一次，土地 ' + G.plotUpkeep(state.plots.length) + ' 金（6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 ' +
-        G.BALANCE.upkeep.plotHigh + ' 金/周） + 设备 ' + G.deviceUpkeep(state) + ' 金（洒水器 3、自动收获器 5，' +
-        '<b>渔网不收维护费</b>）<br>' +
+        G.BALANCE.upkeep.plotHigh + ' 金/周） + 设备 ' + G.deviceUpkeep(state) + ' 金（洒水器 3、自动收获器 5、自动播种器 ' +
+        G.BALANCE.upkeep.seeder + '/台，<b>渔网不收维护费</b>）<br>' +
         '· 没钱吃饭只恢复到体力上限的 30%（至少 5 点），不会扣掉已有的体力<br>' +
         '· 种子 / 肥料都在种子店买卖（半价回收），肥料也只能在种子店卖；蚯蚓只能在渔具店卖（' + G.WORM_VALUE + ' 金/条）</p>' +
       '</div>' +
@@ -1370,8 +1391,10 @@
         '种田等级<b>每 4 级 +1 产量</b>（Lv4 / Lv8，大作物不吃）；钓鱼等级每级咬钩 +1.1%、好鱼权重 +2.5%' +
         '（咬钩最多 +10%、好鱼最多 +22.5%）。<br>' +
         '解锁：洒水器 Lv' + G.BALANCE.gate.sprinkler + ' · 特效肥 Lv' + G.BALANCE.gate.specialFert +
-        ' · 自动收获器 Lv' + G.BALANCE.gate.harvester + '（均为种田等级）；渔网 钓鱼 Lv' + G.BALANCE.gate.net +
-        '，上限随钓鱼等级提高；渔夫 钓鱼 Lv' + G.BALANCE.gate.fisher + '。</p>' +
+        ' · 自动播种器 Lv' + G.BALANCE.gate.seeder + ' · 自动收获器 Lv' + G.BALANCE.gate.harvester +
+        '（均为种田等级）；渔网 钓鱼 Lv' + G.BALANCE.gate.net +
+        '，上限随钓鱼等级提高；渔夫 钓鱼 Lv' + G.BALANCE.gate.fisher +
+        '；高级假饵 钓鱼 Lv' + G.BALANCE.gate.lure2 + '。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -1381,9 +1404,7 @@
         G.TEA_LIST.map(function (t) {
           return t.name + ' ' + t.price + ' 金/+' + t.energy;
         }).join(' · ') + '：D' + G.TEA_LIST.map(function (t) { return t.day; }).join(' / D') +
-        ' 上架，<b>大杯单价更便宜</b>。买多了可以<b>半价卖回</b>（绿 ' +
-        G.teaSellPrice(G.TEAS.green) + ' / 红 ' + G.teaSellPrice(G.TEAS.black) + ' / 奶 ' +
-        G.teaSellPrice(G.TEAS.milk) + ' / 咖 ' + G.teaSellPrice(G.TEAS.coffee) + ' 金）。<br>' +
+        ' 上架，<b>大杯单价更便宜</b>。<br>' +
         '🎁 <b>宝箱</b>：木制（直接开，10–26 金）· 铁制（钓鱼 Lv' + G.BALANCE.chest.ironLv +
         '，铁钥匙 ' + G.KEYS.iron.price + ' 金，一包物资约 80 金）· 黄金（Lv' + G.BALANCE.chest.goldLv +
         '，金钥匙 ' + G.KEYS.gold.price + ' 金，200–320 金 + 一件高级物品）。<br>' +
@@ -1400,12 +1421,37 @@
       '<div class="rule-sec">' +
         '<h4>⌨️ 操作</h4>' +
         '<p>· 成熟地块<b>左键直接收</b>；右键或 Shift + 点击看详情（可铲除、看产量）<br>' +
-        '· 顶栏 <b>📊 状态</b> 看累计数据，<b>⚙️ 设置</b> 里有规则说明 / 导入导出 / 音效 / 重新开始<br>' +
+        '· 顶栏 <b>📊 状态</b> 看累计数据，<b>⚙️ 设置</b> 里有规则说明（分 4 页）/ 导入导出 / 音效 / 重新开始<br>' +
         '· 地块 / 饵料 / 账本 / 日志都可以 Tab 聚焦、Enter 或空格操作<br>' +
         '· 日志和账本都能导出 .md；进度自动存在本浏览器</p>' +
       '</div>';
 
-    openModal('📖 规则速查', body, '<button class="btn" data-close>知道了</button>');
+    return [
+      { emoji: '🌱', name: '种植', desc: '天气 · 作物 · 季节', html: P1 },
+      { emoji: '🎣', name: '钓鱼', desc: '钓鱼 · 采集 · 水产店', html: P2 },
+      { emoji: '🧺', name: '买卖', desc: '农产品店 · 小镇 · 收购箱 · 品质 · 肥料', html: P3 },
+      { emoji: '💰', name: '经营', desc: '经济 · 委托 · 等级 · 百货店 · 成就 · 操作', html: P4 }
+    ];
+  }
+
+  function helpModal() {
+    const pages = helpPages();
+    if (helpPage >= pages.length) helpPage = 0;
+    const p = pages[helpPage];
+    const tabs = pages.map(function (pg, i) {
+      return '<button class="rule-tab' + (i === helpPage ? ' on' : '') + '" data-helppage="' + i + '">' +
+        pg.emoji + ' ' + pg.name + '</button>';
+    }).join('');
+    const body = '<div class="rule-tabs">' + tabs + '</div>' +
+      '<div class="rule-crumb">' + (helpPage + 1) + ' / ' + pages.length + ' · ' + p.desc + '</div>' +
+      '<div class="rule-page">' + p.html + '</div>';
+    const nav = helpPage > 0
+      ? '<button class="btn" data-helpnav="-1">← 上一页</button>'
+      : '<button class="btn" disabled>← 上一页</button>';
+    const nav2 = helpPage < pages.length - 1
+      ? '<button class="btn" data-helpnav="1">下一页 →</button>'
+      : '<button class="btn" disabled>下一页 →</button>';
+    openModal('📖 规则速查', body, nav + nav2 + '<button class="btn" data-close>关闭</button>');
   }
 
   let theme = 'light';
@@ -2037,19 +2083,15 @@
     const teaRows = G.TEA_LIST.map(function (t) {
       const open = state.day >= t.day;
       const have = (state.teas && state.teas[t.id]) || 0;
-      const back = G.teaSellPrice(t);
       return '<div class="store-row' + (open ? '' : ' locked') + '">' +
         '<span class="se">' + t.emoji + '</span>' +
         '<div><div class="sn">' + t.name +
           (open ? ' <b class="own">库存 ' + have + '</b>' : ' <b class="lock">第 ' + t.day + ' 天起</b>') +
-          '</div><div class="sv">' + t.price + ' 金 · 体力 +' + t.energy + ' · 半价回收 ' + back +
-            ' 金 · ' + t.desc + '</div></div>' +
+          '</div><div class="sv">' + t.price + ' 金 · 体力 +' + t.energy + ' · ' + t.desc + '</div></div>' +
         '<button class="btn mini" data-buytea="' + t.id + '"' +
           (!open || state.coins < t.price ? ' disabled' : '') + '>买1</button>' +
         (open ? '<button class="btn mini" data-buytea="' + t.id + '" data-n="3"' +
           (state.coins < t.price * 3 ? ' disabled' : '') + '>买3</button>' : '') +
-        (have ? '<button class="btn mini" data-selltea="' + t.id + '">卖1</button>' +
-          '<button class="btn mini" data-selltean="' + t.id + '">全卖</button>' : '') +
         '</div>';
     }).join('');
 
@@ -2125,15 +2167,16 @@
       ['体力', state.energy + ' / ' + state.maxEnergy + ' · 伙食 ' + G.mealFee(state) + ' 金/天'],
       ['土地', state.plots.length + ' 块 · 洒水器 ' + state.sprinklers + ' 个'],
       ['设备', (state.harvester ? '自动收获器 ✅ · ' : '自动收获器 — · ') +
-        (state.seeder ? '自动播种器 ✅ · ' : '自动播种器 — · ') + '渔网 ' + state.nets +
-        ' 张（已布 ' + G.netSetCount(state) + '）' +
+        '自动播种器 ×' + G.seederCount(state) + (G.seederCount(state) ? '（每晚 ' + G.seederPlots(state) + ' 块）' : '') +
+        ' · 渔网 ' + state.nets + ' 张（已布 ' + G.netSetCount(state) + '）' +
         (state.fisher ? ' · 渔夫 Lv' + G.fisherLv(state) : '')],
       ['种田等级', 'Lv' + lv.farm + (lv.farm >= G.BALANCE.level.max ? '（满级）' :
         '（' + lv.farmXp + '/' + G.levelNeed(lv.farm) + '）') + ' · ' + G.levelEffectText('farm', lv.farm)],
       ['钓鱼等级', 'Lv' + lv.fish + (lv.fish >= G.BALANCE.level.max ? '（满级）' :
         '（' + lv.fishXp + '/' + G.levelNeed(lv.fish) + '）') + ' · ' + G.levelEffectText('fish', lv.fish)],
       ['维护费', '每周 ' + (G.plotUpkeep(state.plots.length) + G.deviceUpkeep(state)) +
-        ' 金（土地 ' + G.plotUpkeep(state.plots.length) + ' + 设备 ' + G.deviceUpkeep(state) + '）'],
+        ' 金（土地 ' + G.plotUpkeep(state.plots.length) + ' + 设备 ' + G.deviceUpkeep(state) +
+        (G.seederCount(state) ? '，其中自动播种器 ' + G.seederUpkeep(state) : '') + '）'],
       ['税金', '还有 ' + nextTax + ' 天 · 约 ' + G.taxDue(state) + ' 金（累进 2% / 4% / 6%，最低 ' +
         G.BALANCE.tax.min + '）'],
       ['仓库总价', G.storeTotal(state) + ' 金'],
@@ -2304,6 +2347,21 @@
         renderAll();
         save();
         toast('新的开始 🌱', 'good');
+        return;
+      }
+
+      // 规则说明翻页
+      const helpTab = t.closest('[data-helppage]');
+      if (helpTab) {
+        helpPage = Number(helpTab.dataset.helppage) || 0;
+        helpModal();
+        return;
+      }
+      const helpNav = t.closest('[data-helpnav]');
+      if (helpNav && !helpNav.disabled) {
+        helpPage = Math.max(0, Math.min(helpPages().length - 1,
+          helpPage + Number(helpNav.dataset.helpnav)));
+        helpModal();
         return;
       }
 
@@ -2575,24 +2633,6 @@
       const buyTea = t.closest('[data-buytea]');
       if (buyTea && !buyTea.disabled) {
         const r = G.buyTea(state, buyTea.dataset.buytea, Number(buyTea.dataset.n) || 1);
-        commit(r);
-        toast(r.msg, r.ok ? 'good' : 'warn');
-        if (r.ok) SFX.coin();
-        if (modalOpen()) departModal();
-        return;
-      }
-      const sellTeaBtn = t.closest('[data-selltea]');
-      if (sellTeaBtn) {
-        const r = G.sellTea(state, sellTeaBtn.dataset.selltea, 1);
-        commit(r);
-        toast(r.msg, r.ok ? 'good' : 'warn');
-        if (r.ok) SFX.coin();
-        if (modalOpen()) departModal();
-        return;
-      }
-      const sellTeaAll = t.closest('[data-selltean]');
-      if (sellTeaAll) {
-        const r = G.sellTea(state, sellTeaAll.dataset.selltean, 0);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();

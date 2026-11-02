@@ -693,6 +693,26 @@ button{ font-family:inherit; }
 .rule-sec h4{ margin:0 0 6px; font-size:13px; font-weight:800; }
 .rule-sec p{ margin:6px 0 0; font-size:11.5px; line-height:1.75; color:var(--ink-2); font-weight:600; }
 
+/* ---------- v2.14: 规则说明分页 ---------- */
+.rule-tabs{ display:flex; gap:6px; flex-wrap:wrap; margin:0 0 8px; }
+.rule-tab{
+  flex:1 1 0; min-width:64px; padding:8px 6px; border-radius:11px; cursor:pointer;
+  border:1px solid var(--line); background:var(--card-solid); color:var(--ink-2);
+  font-family:inherit; font-size:11.5px; line-height:1.2; font-weight:800;
+}
+.rule-tab:hover{ background:var(--hover); }
+.rule-tab.on{
+  background:linear-gradient(180deg,var(--green),var(--green-d)); border-color:transparent;
+  color:#fff; box-shadow:0 4px 12px rgba(79,156,95,.3);
+}
+.rule-crumb{
+  font-size:10.5px; font-weight:800; color:var(--ink-3); letter-spacing:.02em;
+  margin:0 0 10px; padding-bottom:8px; border-bottom:1px dashed var(--line-2);
+}
+.rule-page{ animation:ruleIn .16s ease-out; }
+@keyframes ruleIn{ from{ opacity:0; transform:translateY(4px); } to{ opacity:1; transform:none; } }
+.rule-page .rule-sec:last-child{ margin-bottom:2px; }
+
 /* ---------- nets / dark mode ---------- */
 
 /* ---------- v2.10: 河边「渔网 / 渔夫」小队卡 ---------- */

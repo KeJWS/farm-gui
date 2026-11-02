@@ -183,7 +183,7 @@
     merged.sprinklers = Math.round(num(s.sprinklers, 0, 0, 40));
     merged.harvester = !!s.harvester;
     merged.harvesterOn = s.harvesterOn !== false;
-    merged.seeder = !!s.seeder;
+    merged.seeder = Math.round(num(s.seeder === true ? 1 : s.seeder, 0, 0, BALANCE.device.seederMax));
     merged.seederOn = s.seederOn !== false;
     merged.autoSeed = (s.autoSeed && CROPS[s.autoSeed] && !CROPS[s.autoSeed].wild) ? s.autoSeed : null;
     merged.nets = Math.round(num(s.nets, 0, 0, NET_MAX));
@@ -341,7 +341,9 @@
     FERT_SELL_RATE: FERT_SELL_RATE, buySprinkler: buySprinkler, SPRINKLER_COST: SPRINKLER_COST,
     buyHarvester: buyHarvester, HARVESTER_COST: HARVESTER_COST, refreshOrders: refreshOrders,
     seederUnlocked: seederUnlocked, buySeeder: buySeeder, toggleSeeder: toggleSeeder,
-    setAutoSeed: setAutoSeed, SEEDER_COST: SEEDER_COST,
+    setAutoSeed: setAutoSeed, SEEDER_COST: SEEDER_COST, seederCount: seederCount,
+    seederMax: seederMax, seederPlots: seederPlots, seederUpkeep: seederUpkeep,
+    SEEDER_PLOTS: SEEDER_PLOTS,
     toggleHarvester: toggleHarvester, buyNet: buyNet, netCatch: netCatch,
     resetNets: resetNets, netSetCount: netSetCount, netPending: netPending, netResetCost: netResetCost,
     hireFisher: hireFisher, fireFisher: fireFisher,
@@ -375,7 +377,7 @@
     nextSeasonIdx: nextSeasonIdx, HIST_DAYS: HIST_DAYS,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather,
     TEAS: TEAS, TEA_LIST: TEA_LIST, teaList: teaList, teaStock: teaStock, teaById: teaById,
-    teaUnlocked: teaUnlocked, buyTea: buyTea, sellTea: sellTea, teaSellPrice: teaSellPrice,
+    teaUnlocked: teaUnlocked, buyTea: buyTea,
     KEYS: KEYS, CHESTS: CHESTS, keyUnlocked: keyUnlocked, buyKey: buyKey,
     sellJunk: sellJunk, openChest: openChest, fishIsJunk: fishIsJunk
   };

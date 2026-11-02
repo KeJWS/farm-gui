@@ -192,7 +192,12 @@ const devRows = [
   ['渔网', G.NET_COST, netPerDay, 0],
   ['洒水器', G.SPRINKLER_COST, fishPerE - 3 / 7, 1],                 // 每天省 1 点浇水体力
   ['自动收获器(5 块地)', G.HARVESTER_COST, 1.25 * fishPerE - 5 / 7, 1.25],
-  ['自动收获器(36 块地)', G.HARVESTER_COST, 9 * fishPerE - 5 / 7, 9]
+  ['自动收获器(36 块地)', G.HARVESTER_COST, 9 * fishPerE - 5 / 7, 9],
+  /* 自动播种器：一台 5 块地，每晚省 5 点播种体力，每台每周 6 金 */
+  ['自动播种器(1 台/5 块)', G.SEEDER_COST,
+    5 * fishPerE - G.BALANCE.upkeep.seeder / 7, 5],
+  ['自动播种器(4 台/20 块)', G.SEEDER_COST * 4,
+    20 * fishPerE - G.BALANCE.upkeep.seeder * 4 / 7, 20]
 ];
 devRows.forEach(function (r) {
   const days = r[1] / Math.max(0.1, r[2]);
@@ -201,11 +206,12 @@ devRows.forEach(function (r) {
 });
 
 /* ---------- 5. 每天固定支出 ---------- */
-function costs(maxEnergy, plots, sprinklers, nets, harvester) {
+function costs(maxEnergy, plots, sprinklers, nets, harvester, seeders) {
   const meal = Math.max(1, 3 + (maxEnergy - 10) / 5);
   const upkeep = G.plotUpkeep(plots) +
     sprinklers * G.BALANCE.upkeep.sprinkle + nets * G.BALANCE.upkeep.net +
-    (harvester ? G.BALANCE.upkeep.harvester : 0);
+    (harvester ? G.BALANCE.upkeep.harvester : 0) +
+    (seeders || 0) * G.BALANCE.upkeep.seeder;
   return { meal: meal, upkeep: upkeep / 7 };
 }
 
@@ -424,7 +430,9 @@ console.log('\n== 采集（' + G.BALANCE.forage.energy + ' 体力一次，按季
     Math.round(G.BALANCE.forage.qty3 * 100) + '% 再多 1）· 还有 ' +
     Math.round(G.BALANCE.forage.seedChance * 100) + '% 掉一颗当季种子');
   console.log('   最好的季节是「' + best.name + '」' + best.perE.toFixed(2) +
-    ' 金/体力 · 面团饵钓鱼 2.81 金/体力 → 采集是冬天的体力出口');
+    ' 金/体力 · 面团饵钓鱼（Lv10）约 ' +
+    ((evBait('dough', 'cloudy', 10, 4000).ev - 1) / 2).toFixed(2) +
+    ' 金/体力 → 采集是最强的体力出口（冬天也能用）');
 }
 
 /* ---------- 14. 小镇（金币出口） ---------- */
@@ -440,4 +448,106 @@ console.log('\n== 小镇捐赠（后期金币出口）==');
   console.log('   三档捐满共 ' + total + ' 金 —— 36 块地图后期日净约 1000，约 ' +
     Math.ceil(total / 1000) + ' 天存款就能买完');
   console.log('   加成：委托 +5% / 商店进价 −10% / 买卖市价 +8%（可叠加）');
+}
+
+/* ---------- 15. 钓鱼专项 ---------- */
+console.log('\n== 钓鱼专项 ==');
+{
+  const KIND_LABEL = { dough: '面团饵', worm: '蚯蚓', lure: '假饵', lure2: '高级假饵' };
+  const KIND_COST = { dough: 1, worm: 0, lure: G.BALANCE.lure.price / G.BALANCE.lure.dur,
+                      lure2: G.BALANCE.lure2.price / G.BALANCE.lure2.dur };
+
+  /* 一次模拟：咬钩率、毛收益、杂物/宝箱/鱼各多少 */
+  function sim(kind, level, weather, day, n) {
+    const s = G.createState();
+    s.weather = weather; s.day = day; s.maxEnergy = 1e9; s.coins = 0;
+    s.levels.fish = level;
+    if (kind === 'worm') s.bait.worm = 1e9;
+    else if (kind === 'dough') s.bait.dough = 1e9;
+    else if (kind === 'lure2') s.lure2 = { owned: true, dur: 1e9 };
+    else s.lure = { owned: true, dur: 1e9 };
+    let sum = 0, bite = 0, fishN = 0, junkN = 0, chestV = 0;
+    const chest = { wood: 0, iron: 0, gold: 0 };
+    for (let i = 0; i < n; i++) {
+      s.energy = 1e9;
+      s.levels.fishXp = 0; s.levels.fish = level;
+      const r = G.fish(s, kind);
+      if (!r.entry) continue;
+      bite++; sum += r.entry.price;
+      if (r.entry.chest) { chest[r.entry.chest]++; chestV += r.entry.price; }
+      else if (r.entry.trash) junkN++;
+      else fishN++;
+    }
+    return { ev: sum / n, bite: bite / n, casts: n,
+             fish: fishN / n, junk: junkN / n, chestV: chestV / n, chest: chest };
+  }
+
+  /* 1) 每杆净收益：4 种饵 × 3 个等级 */
+  console.log('   ① 每杆净收益（阴天，扣饵成本；体力按 2 金/点另算）');
+  console.log('   ' + pad('饵', 10) + pad('Lv1', 9) + pad('Lv5', 9) + pad('Lv10', 9) +
+    pad('饵成本/杆', 11) + 'Lv10 金/体力');
+  const sum1 = {}, sum10 = {};
+  [['dough', 1], ['worm', 0], ['lure', 0.25], ['lure2', 0.8]].forEach(function (b) {
+    G.setRng(mulberry32(7));
+    const l1 = sim(b[0], 1, 'cloudy', 31, 6000);
+    G.setRng(mulberry32(7));
+    const l5 = sim(b[0], 5, 'cloudy', 31, 6000);
+    G.setRng(mulberry32(7));
+    const l10 = sim(b[0], 10, 'cloudy', 31, 6000);
+    const net = function (r) { return r.ev - KIND_COST[b[0]]; };
+    sum1[b[0]] = net(l1);
+    sum10[b[0]] = net(l10);
+    console.log('   ' + pad(KIND_LABEL[b[0]], 10) + pad(net(l1).toFixed(2), 9) +
+      pad(net(l5).toFixed(2), 9) + pad(net(l10).toFixed(2), 9) +
+      pad(KIND_COST[b[0]].toFixed(2), 11) + (net(l10) / 2).toFixed(2));
+  });
+
+  /* 2) 宝箱：掉率与开箱净收益 */
+  G.setRng(mulberry32(9));
+  const c10 = sim('dough', 10, 'cloudy', 31, 20000);
+  const c1 = sim('dough', 1, 'cloudy', 31, 20000);
+  const chestNames = { wood: '木制', iron: '铁制', gold: '黄金' };
+  console.log('   ② 宝箱（面团饵，每 1000 杆）');
+  ['wood', 'iron', 'gold'].forEach(function (k) {
+    const per1000 = c10.chest[k] / 20;
+    console.log('   ' + pad(chestNames[k] + '宝箱', 8) + pad(per1000.toFixed(1) + ' 个', 9) +
+      'Lv1 ' + (c1.chest[k] / 20).toFixed(1) + ' 个 · 回收 ' + G.CHESTS[k].value + ' 金/个');
+  });
+  console.log('   宝箱回收价值合计 ' + c10.chestV.toFixed(2) + ' 金/杆（不含开箱收益）');
+  console.log('   开箱：木箱 10~26（均 18）· 铁箱物资约 70 金但钥匙 40 → 基本持平；' +
+    '金箱 200~320 + 高级物品，钥匙 120 → 净赚约 70~90');
+
+  /* 3) 各玩法 1 点体力能换多少金 */
+  const farmBest = farmRows(5).slice().sort(function (a, b) { return b.perE - a.perE; })[0];
+  const rows = [
+    ['打零工（全天）', G.WORK_RATE_FULL, '稳，每天一次'],
+    ['钓鱼 面团饵 Lv1', sum1.dough / 2, '还要 2 体力/杆'],
+    ['钓鱼 面团饵 Lv10', sum10.dough / 2, ''],
+    ['钓鱼 高级假饵 Lv10', sum10.lure2 / 2, '最强饵'],
+    ['采集 松茸（秋）', 24 * qEV(1) * (1 + G.BALANCE.forage.qty2 + G.BALANCE.forage.qty3) /
+      G.BALANCE.forage.energy, '5 体力/次'],
+    ['种田 ' + farmBest.name + '（Lv5）', farmBest.perE, '折算到体力']
+  ];
+  rows.sort(function (a, b) { return b[1] - a[1]; });
+  console.log('   ③ 1 点体力的价值排行');
+  rows.forEach(function (r) {
+    console.log('   ' + pad(r[0], 20) + pad(r[1].toFixed(2) + ' 金', 10) + r[2]);
+  });
+
+  /* 4) 升级速度 */
+  let need = 0;
+  for (let l = 1; l < G.BALANCE.level.max; l++) need += G.levelNeed(l);
+  const castsNeed = need * 2;
+  console.log('   ④ 钓鱼 Lv1 → Lv' + G.BALANCE.level.max + '：' + need + ' 经验 ≈ ' + castsNeed +
+    ' 杆（每 2 杆 1 点，完美品质 +2）');
+  console.log('      开局 15 体力每天 7 杆 → 约 ' + Math.ceil(castsNeed / 7) +
+    ' 天；体力拉到 40 每天 20 杆 → 约 ' + Math.ceil(castsNeed / 20) + ' 天');
+  console.log('      每级咬钩 +1.1%（封顶 +10%）、好鱼 +2.5%（封顶 +22.5%）：' +
+    '从 Lv1 到满级，每杆毛收益约 +' +
+    (((sim('dough', 10, 'cloudy', 31, 6000).ev / sim('dough', 1, 'cloudy', 31, 6000).ev) - 1) * 100).toFixed(0) + '%');
+
+  /* 5) 结论用数据 */
+  console.log('   ⑤ 现状：Lv10 面团饵每杆净 ' + sum10.dough.toFixed(2) + '（' +
+    (sum10.dough / 2).toFixed(2) + ' 金/体力），空竿率 ' + ((1 - c10.bite) * 100).toFixed(0) +
+    '%；Lv1 只有 ' + (sum1.dough / 2).toFixed(2) + ' 金/体力 —— 比打零工（2.00）高，比采集（松茸 10.39）低');
 }
