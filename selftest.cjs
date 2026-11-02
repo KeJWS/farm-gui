@@ -358,7 +358,10 @@ ok(!G.fertilizeAll(s, 'normal').ok, '已施肥的地块不再重复施');
 s = G.createState();
 s.seeds = { pumpkin: 2 }; s.coins = 100;
 G.plantAll(s, 'pumpkin');
-ok(G.fertTargets(s).length === 0, '南瓜 / 西瓜不吃肥料');
+const v28big = s.plots.filter(function (p) { return p.crop; });
+ok(v28big.length === 2, '反季南瓜也能种上（春天）', v28big.length);
+ok(v28big.every(function (p) { return G.expectedYield(s, p) === 1; }), '大作物产量固定 1 个，反季也不减');
+ok(v28big.every(function (p) { return G.fertBonus(p) === 0; }), '南瓜 / 西瓜不吃肥料产量加成');
 
 s = G.createState();
 s.seeds = { carrot: 4 }; s.coins = 100; s.energy = 20;
@@ -733,7 +736,7 @@ ok(G.storeCount(s, 'carrot') > 0, '开启后睡觉自动收');
 
 // 渔网
 G.setRng(function () { return 0.1; });
-s = G.createState(); s.coins = 500; s.nets = 2; s.bait.dough = 2; s.levels.fish = 3;
+s = G.createState(); s.coins = 500; s.nets = 2; s.netSet = 2; s.bait.dough = 2; s.levels.fish = 3;
 G.sleep(s);
 ok(s.bait.dough === 0 && s.fishBag.length === 2, '渔网每天耗面团饵并上鱼', { dough: s.bait.dough, n: s.fishBag.length });
 ok(G.buyNet(s).ok && s.nets === 3, '渔具店能买渔网');
@@ -821,14 +824,14 @@ const direct = ord.qty * G.CROPS[ord.crop].price;
 ok(Math.abs(ord.reward - Math.round(direct * 1.35)) <= 1, '委托报酬稳定在直售的 135%',
    { reward: ord.reward, direct: direct });
 
-// 设备维护费
+// 设备维护费（渔网不缴维护费）
 s = G.createState(); s.sprinklers = 3; s.nets = 2; s.harvester = true;
-ok(G.deviceUpkeep(s) === 3 * 3 + 2 * 3 + 5, '设备周维护费 = 洒水器 3 + 渔网 3 + 收获器 5', G.deviceUpkeep(s));
+ok(G.deviceUpkeep(s) === 3 * 3 + 5, '设备周维护费 = 洒水器 3 + 收获器 5（渔网免费）', G.deviceUpkeep(s));
 s = G.createState();
 s.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
 s.day = 6; s.coins = 200; s.sprinklers = 3; s.nets = 1;
 G.sleep(s);
-ok(s.coins === 200 - 4 - (15 + 9 + 3), '周末同时扣土地与设备维护费', s.coins);
+ok(s.coins === 200 - 4 - (15 + 9), '周末同时扣土地与设备维护费', s.coins);
 
 // 老存档图鉴回填
 const migFish = G.deserialize({
@@ -862,7 +865,7 @@ const bp = G.fishBuyPrice('crucian', s);
 ok(G.buyFish(s, 'crucian', 1).ok && s.coins === 100 - bp && s.fishBag.length === 1 && s.fishBag[0].v === 3,
    '水产店能买鱼（基础 5 金 × 市价，价值 3）', { coins: s.coins, bag: s.fishBag.length });
 ok(!G.buyFish(s, 'trash', 1).ok, '杂物买不到');
-ok(G.fishBuyPrice('koi') === 45, '锦鲤买价 45 金', G.fishBuyPrice('koi'));
+ok(G.fishBuyPrice('koi') === 33, '锦鲤买价 33 金（25 × 1.3）', G.fishBuyPrice('koi'));
 
 s = G.createState(); s.coins = 1e6; s.levels.fish = 7;
 while (G.buyNet(s).ok) { /* 买满 */ }
@@ -911,7 +914,7 @@ let netCatches = 0, netJunk = 0, netHigh = 0, netUsed = 0;
 for (let i = 0; i < 40; i++) {
   G.setRng(mulberry32(200 + i));
   const st = G.createState();
-  st.nets = 9; st.bait.dough = 9; st.weather = 'cloudy';
+  st.nets = 9; st.netSet = 9; st.bait.dough = 9; st.weather = 'cloudy';
   G.sleep(st);
   netUsed += 9;
   st.fishBag.forEach(function (e) {
@@ -1003,10 +1006,10 @@ section('v1.7 农产品店与等级');
 G.setRng(mulberry32(77));
 let cs = G.createState();
 cs.coins = 1000;
-ok(G.cropBuyPrice('carrot') === 7 && G.cropBuyPrice('pumpkin') === 198, '农产品买价 = 售价 ×1.8',
+ok(G.cropBuyPrice('carrot') === 5 && G.cropBuyPrice('pumpkin') === 143, '农产品买价 = 售价 ×1.3',
   [G.cropBuyPrice('carrot'), G.cropBuyPrice('pumpkin')]);
-ok(G.cropBuyPrice('tomato') > Math.round(G.CROPS.tomato.price * G.BALANCE.order.mult),
-  '买农产品凑委托必亏（买价 > 委托价）');
+ok(G.cropBuyPrice('carrot', cs) > Math.round(G.CROPS.carrot.price * G.BALANCE.order.mult),
+  '行情正常时买农产品凑委托必亏（买价 > 委托价）');
 
 const st0 = G.cropShopStock(cs, 'carrot');
 ok(st0 >= 1, '农产品店蔬菜有货', st0);
@@ -1395,13 +1398,21 @@ ok(G.isWinter(91) && !G.isWinter(90) && G.seasonOf(1) === '春' && G.seasonOf(12
 
 const v24S = G.createState();
 v24S.coins = 5000;
-v24S.seeds = { watermelon: 1, pumpkin: 1, carrot: 1 };
+v24S.seeds = { watermelon: 1, pumpkin: 1, carrot: 2 };
 v24S.day = 1;                                     // 春
 const pWater = G.plant(v24S, 0, 'watermelon');
-ok(!pWater.ok && pWater.msg.indexOf('夏') >= 0, '春天种不了西瓜（夏）', pWater.msg);
-const pPump = G.plant(v24S, 0, 'pumpkin');
-ok(!pPump.ok && pPump.msg.indexOf('秋') >= 0, '春天种不了南瓜（秋）', pPump.msg);
-ok(G.plant(v24S, 0, 'carrot').ok, '春天能种萝卜');
+ok(pWater.ok && pWater.off, '春天也能种西瓜（反季）', pWater.msg);
+ok(v24S.plots[0].off === 1, '反季地块打上标记');
+ok(G.needOf(v24S.plots[0]) === G.CROPS.watermelon.days * 2,
+  '反季大作物生长时间翻倍', G.needOf(v24S.plots[0]));
+const v28off = G.createState();
+v28off.seeds = { chili: 1 }; v28off.day = 1;      // 春，辣椒是夏·秋
+G.plant(v28off, 0, 'chili');
+G.plant(v24S, 1, 'carrot');
+ok(G.needOf(v24S.plots[1]) === G.CROPS.carrot.days, '当季不多花天数', G.needOf(v24S.plots[1]));
+ok(G.expectedYield(v28off, v28off.plots[0]) === Math.max(1, G.CROPS.chili.base - 1),
+  '反季第一茬少结 1 个', G.expectedYield(v28off, v28off.plots[0]));
+ok(G.marketInfo(v24S, 'watermelon').total >= 2 - 1e-9, '反季西瓜市价 ×2 起');
 
 const v24W = G.createState();
 v24W.coins = 5000; v24W.day = 91;                 // 冬
@@ -1415,11 +1426,14 @@ ok(!G.buySeed(v24W, 'carrot', 1).ok, '冬天种子店歇业');
 
 const v24Spr = G.createState();
 v24Spr.coins = 5000; v24Spr.day = 1;
-ok(!G.buySeed(v24Spr, 'watermelon', 1).ok, '春天买不到西瓜种子');
+ok(!G.buySeed(v24Spr, 'watermelon', 1).ok, '春天西瓜种子要 Lv6 才解锁');
 v24Spr.levels.farm = 6;
-ok(!G.buySeed(v24Spr, 'watermelon', 1).ok, '春天即使 Lv6 也买不到西瓜种子');
+const v28buyOff = G.buySeed(v24Spr, 'watermelon', 1);
+ok(v28buyOff.ok && v28buyOff.off && v28buyOff.cost === Math.ceil(36 * G.BALANCE.seed.offSeasonMul),
+  '春天 Lv6 能买反季西瓜种子，价格 ×1.8', v28buyOff);
 v24Spr.day = 31;
-ok(G.buySeed(v24Spr, 'watermelon', 1).ok, '夏天能买西瓜种子');
+const v28buyIn = G.buySeed(v24Spr, 'watermelon', 1);
+ok(v28buyIn.ok && !v28buyIn.off && v28buyIn.cost === 36, '夏天买西瓜种子是当季原价', v28buyIn);
 
 const v24Net = G.createState();
 v24Net.nets = 5; v24Net.bait.dough = 5; v24Net.day = 91;
@@ -1472,22 +1486,22 @@ ok(v25harvest(61) === v25harvest(1) + 1, '秋天收获 +1 个', [v25harvest(1), 
 /* 市场：供需 + 季节 */
 const v25m = G.createState();
 const v25base = G.marketMul(v25m, 'carrot');
-ok(Math.abs(v25base - 1.05) < 1e-9, '没人卖过：稀缺 ×1.05 × 当季 ×1.0', v25base);
+ok(Math.abs(v25base - 1.3) < 1e-9, '没人卖过：稀缺 ×1.30 × 当季 ×1.0', v25base);
 G.addSupply(v25m, 'carrot', 15);
 ok(G.marketMul(v25m, 'carrot') < v25base, '卖得越多越便宜', G.marketMul(v25m, 'carrot'));
-G.addSupply(v25m, 'carrot', 60);
-ok(Math.abs(G.marketInfo(v25m, 'carrot').supply - 0.75) < 1e-9, '供给有 0.75 下限');
-ok(Math.abs(G.marketInfo(v25m, 'watermelon').season - 1.2) < 1e-9, '反季作物 ×1.20');
+G.addSupply(v25m, 'carrot', 100);
+ok(Math.abs(G.marketInfo(v25m, 'carrot').supply - 0.7) < 1e-9, '供给有 ×0.70 下限');
+ok(Math.abs(G.marketInfo(v25m, 'watermelon').season - 2) < 1e-9, '反季作物 ×2');
 
-/* 睡觉后销量衰减 20% */
+/* 睡觉后销量衰减 30% */
 const v25d = G.createState();
 v25d.coins = 500;
 G.addStore(v25d, 'carrot', 'std', 10);
 G.sellOne(v25d, 'carrot');
 const v25sold = v25d.market.carrot.sold;
 G.sleep(v25d);
-ok(!v25d.market.carrot || Math.abs(v25d.market.carrot.sold - v25sold * 0.8) < 1e-9,
-  '睡觉后市场销量衰减 20%', v25sold);
+ok(!v25d.market.carrot || Math.abs(v25d.market.carrot.sold - v25sold * 0.7) < 1e-9,
+  '睡觉后市场销量回落 30%', v25sold);
 
 /* ---------- 5h. v2.6 渔获合并 / 鱼市价 / 长期订单提前奖励 ---------- */
 section('v2.6 渔获合并与鱼市价');
@@ -1517,7 +1531,7 @@ ok(G.fishMarketMul(v26m, '鲫鱼') < v26base, '鱼卖得多也会降价', G.fish
 
 /* 反季溢价 */
 const v26season = G.marketInfo(G.createState(), 'watermelon');
-ok(Math.abs(v26season.season - 1.2) < 1e-9 && !v26season.inSeason, '反季作物 ×1.20', v26season.season);
+ok(Math.abs(v26season.season - 2) < 1e-9 && !v26season.inSeason, '反季作物 ×2', v26season.season);
 const v26in = G.marketInfo(Object.assign(G.createState(), { day: 31 }), 'watermelon');
 ok(v26in.inSeason && Math.abs(v26in.season - 1) < 1e-9, '当季作物 ×1.00', v26in.season);
 
@@ -1573,6 +1587,90 @@ const v27p0 = G.cropBuyPrice('carrot', v27s);
 G.addSupply(v27s, 'carrot', 20);
 ok(G.cropBuyPrice('carrot', v27s) < v27p0, '卖得多，商店买价也跟着降',
   [v27p0, G.cropBuyPrice('carrot', v27s)]);
+
+/* ---------- 5j. v2.8 汛期定价 / 渔网重布 / 反季种子 ---------- */
+section('v2.8 汛期定价与渔网重布');
+
+/* 鱼市价：汛期 ×1，非汛期 ×2 */
+const v28fs = G.createState();
+v28fs.day = 61;                                   // 秋
+ok(G.fishSeasonOk('koi', 61) === false, '秋天锦鲤非汛期');
+const v28koiAut = G.fishMarketInfo(v28fs, '锦鲤');
+ok(Math.abs(v28koiAut.season - 2) < 1e-9 && !v28koiAut.inRun, '非汛期鱼价 ×2', v28koiAut.season);
+const v28koiSpr = G.fishMarketInfo(Object.assign(G.createState(), { day: 1 }), '锦鲤');
+ok(Math.abs(v28koiSpr.season - 1) < 1e-9 && v28koiSpr.inRun, '汛期鱼价 ×1', v28koiSpr.season);
+ok(v28koiAut.total > v28koiSpr.total * 1.5, '非汛期卖锦鲤更贵', [v28koiSpr.total, v28koiAut.total]);
+
+/* 市场系数：稀缺 ×1.30 + 反季 ×2 → 最高 ×2.60 */
+const v28mk = G.createState();
+v28mk.day = 1;                                    // 春
+ok(Math.abs(G.marketMul(v28mk, 'watermelon') - 2.6) < 1e-9,
+  '反季 + 稀缺最高 ×2.60', G.marketMul(v28mk, 'watermelon'));
+
+/* 渔网：不缴维护费、抓完要重布、重布 1 体力/张 */
+ok(G.BALANCE.upkeep.net === 0, '渔网维护费归零');
+ok(G.NET_COST === 50, '渔网 50 金/张', G.NET_COST);
+
+const v28net = G.createState();
+v28net.levels.fish = 5; v28net.coins = 1000;
+v28net.nets = 3; v28net.netSet = 3;
+ok(G.netSetCount(v28net) === 3 && G.netPending(v28net) === 0, '三张网都布置好了');
+G.setRng(function () { return 0.1; });            // 必上鱼
+v28net.bait.dough = 3;
+const v28nc = G.netCatch(v28net);
+ok(v28nc.got === 3 && G.netSetCount(v28net) === 0 && G.netPending(v28net) === 3,
+  '抓完鱼三张网都掉了，要重布', [v28nc.got, G.netSetCount(v28net)]);
+const v28rc = G.netResetCost(v28net);
+ok(v28rc === 3, '重布 3 张 = 3 体力', v28rc);
+v28net.energy = 10;
+ok(G.resetNets(v28net).ok && v28net.energy === 10 - v28rc && G.netSetCount(v28net) === 3,
+  '重布扣体力、网恢复', [v28net.energy, G.netSetCount(v28net)]);
+ok(!G.resetNets(v28net).ok, '都布好了不用再重布');
+
+/* 没布置的网当晚不出货 */
+const v28idle = G.createState();
+v28idle.nets = 2; v28idle.netSet = 0; v28idle.bait.dough = 5;
+const v28ir = G.netCatch(v28idle);
+ok(v28ir.used === 0 && v28idle.bait.dough === 5, '没布置的网不耗饵、不抓鱼', v28ir.used);
+
+/* 体力不够时只能布一部分 */
+const v28poor = G.createState();
+v28poor.nets = 5; v28poor.netSet = 0; v28poor.energy = 2;
+const v28pr = G.resetNets(v28poor);
+ok(v28pr.ok && v28pr.n === 2 && v28poor.energy === 0 && G.netSetCount(v28poor) === 2,
+  '体力不够只布一部分', [v28pr.n, G.netSetCount(v28poor)]);
+
+/* 买渔网默认已布置；老存档 netSet 缺失按全布好处理 */
+const v28buy = G.createState();
+v28buy.levels.fish = 5; v28buy.coins = 1000;
+G.buyNet(v28buy);
+ok(v28buy.nets === 1 && G.netSetCount(v28buy) === 1, '新买的网直接布好');
+const v28old = JSON.parse(G.serialize(G.createState()));
+v28old.nets = 4; delete v28old.netSet; delete v28old.shop; delete v28old.ach;
+ok(G.netSetCount(G.deserialize(v28old)) === 4, '老存档渔网默认全布好');
+
+/* 反季种植：生长 +2 天、第一茬 -1 个，卖价 ×2，种子 ×1.8 */
+const v28pl = G.createState();
+v28pl.coins = 5000; v28pl.day = 1;
+v28pl.levels.farm = 3;
+v28pl.seeds = { chili: 2 };
+const v28seedAt1 = G.seedBuyPrice(G.CROPS.chili, v28pl);
+ok(v28seedAt1 === Math.ceil(20 * 1.8), '春天买辣椒（反季）种子 36 金', v28seedAt1);
+v28pl.day = 31;
+ok(G.seedBuyPrice(G.CROPS.chili, v28pl) === 20, '夏天买辣椒种子回到 20 金');
+v28pl.day = 1;
+G.plant(v28pl, 0, 'chili');
+const v28yOff = G.expectedYield(v28pl, v28pl.plots[0]);
+const v28pl2 = G.createState();
+v28pl2.seeds = { chili: 1 }; v28pl2.day = 31;
+G.plant(v28pl2, 0, 'chili');
+const v28yIn = G.expectedYield(v28pl2, v28pl2.plots[0]);
+ok(v28yOff === v28yIn - 1, '反季第一茬少 1 个', [v28yOff, v28yIn]);
+ok(G.marketMul(v28pl, 'chili') > G.marketMul(v28pl2, 'chili'), '反季辣椒比当季贵',
+  [G.marketMul(v28pl, 'chili'), G.marketMul(v28pl2, 'chili')]);
+
+/* 商店售价整体降了 */
+ok(G.BALANCE.shop.priceMul === 1.3 && G.BALANCE.shop.cropPriceMul === 1.3, '水产店 / 农产品店进价系数 1.3');
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');

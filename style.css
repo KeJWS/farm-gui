@@ -766,6 +766,15 @@ button{ color:inherit; font:inherit; }
 .store-row .sf-note{ color:var(--ink-3); font-weight:700; }
 .store-row.sold-out{ opacity:.55; }
 
+/* ---------- v2.8: 进货库存圆点 / 反季小标签 ---------- */
+.stock-dots{ display:inline-flex; gap:3px; align-items:center; vertical-align:middle; margin:0 4px 0 2px; }
+.stock-dots i{ width:7px; height:7px; border-radius:50%; background:var(--track); display:block; }
+.stock-dots i.on{ background:var(--green); }
+.store-row.sold-out .stock-dots i.on{ background:var(--line-2); }
+.store-row .btn.mini{ flex:none; white-space:nowrap; }
+.tago{ display:inline-block; font-size:10px; font-weight:800; padding:0 5px; border-radius:6px;
+  background:rgba(201,85,74,.15); color:var(--red); vertical-align:middle; }
+
 .ach-row{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:11px;
   background:var(--card); border:1px solid var(--line); margin-top:6px; }
 .ach-row .ae{ font-size:20px; flex:none; width:26px; text-align:center; }

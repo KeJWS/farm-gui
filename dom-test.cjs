@@ -141,28 +141,47 @@ ok(html('#modal-root').indexOf('种子店') >= 0 && html('#modal-root').indexOf(
    '种子店弹窗（含肥料）能打开');
 ok(html('#modal-root').indexOf('需种田 Lv2') >= 0 && html('#modal-root').indexOf('需种田 Lv4') >= 0,
    '种子店按等级锁定高级种子与特效肥');
+ok(html('#modal-root').indexOf('反季 ×1.8') >= 0, '种子店标明反季种子更贵');
+ok(html('#modal-root').indexOf('反季种子') >= 0, '种子店说明反季也能种');
 clickAct('fishshop');
 ok(html('#modal-root').indexOf('水产店') >= 0 && html('#modal-root').indexOf('不能交委托') >= 0,
    '水产店弹窗能打开，并提示买来的鱼不能交委托');
 ok(html('#modal-root').indexOf('今日') >= 0 && html('#modal-root').indexOf('一般品质') >= 0,
    '水产店显示每日库存与「一般品质」');
+ok(html('#modal-root').indexOf('stock-dots') >= 0, '水产店进货用圆点显示库存');
+ok(html('#modal-root').indexOf('基准') >= 0 && html('#modal-root').indexOf('市价') >= 0,
+   '水产店进货价拆成基准 × 市价');
+ok(html('#modal-root').indexOf('鱼汛') >= 0 || html('#modal-root').indexOf('非汛期') >= 0,
+   '水产店进货显示汛期标签');
 ok(html('#modal-root').indexOf('fish-sell-id') >= 0, '水产店有自定义卖出选择框');
 ok(html('#modal-root').indexOf('D20 起进货') >= 0 && html('#modal-root').indexOf('D30 起进货') >= 0,
    '水产店高级鱼按天数锁定');
 ok(html('#modal-root').indexOf('未解锁') >= 0 &&
    html('#modal-root').indexOf('data-buyfish="koi" data-n="3"') < 0,
-   '未解锁的水产不显示「买3」');
+   '未解锁的水产不显示「买满」');
 clickAct('cropshop');
 ok(html('#modal-root').indexOf('农产品店') >= 0 && html('#modal-root').indexOf('全部卖出') >= 0,
    '农产品店弹窗能打开');
 ok(html('#modal-root').indexOf('今日') >= 0 && html('#modal-root').indexOf('一般品质') >= 0,
    '农产品店显示每日库存与「一般品质」');
+ok(html('#modal-root').indexOf('stock-dots') >= 0, '农产品店进货用圆点显示库存');
+ok(html('#modal-root').indexOf('基准') >= 0 && html('#modal-root').indexOf('共 <b>') >= 0,
+   '农产品店显示进货价构成与今日总量');
 ok(html('#modal-root').indexOf('D18 起进货') >= 0 && html('#modal-root').indexOf('D24 起进货') >= 0,
    '农产品店高级作物按天数锁定');
 ok(html('#modal-root').indexOf('data-buycrop="watermelon" data-n="3"') < 0,
    '未解锁的作物不显示「买3」');
 ok(html('#modal-root').indexOf('脆生生') >= 0, '农产品店显示作物简述');
 ok(html('#modal-root').indexOf('crop-sell-id') >= 0, '农产品店有自定义卖出选择框');
+
+console.log('\n== 市场行情 ==');
+document.querySelector('#btn-market').fire('click', { target: {} });
+ok(html('#modal-root').indexOf('市场行情') >= 0, '行情面板能打开');
+ok(html('#modal-root').indexOf('反季 ×2') >= 0, '行情显示反季 ×2');
+ok(html('#modal-root').indexOf('汛期 ×1') >= 0 || html('#modal-root').indexOf('非汛期 ×2') >= 0,
+   '行情显示鱼的汛期系数');
+ok(html('#modal-root').indexOf('×1.30') >= 0 && html('#modal-root').indexOf('回落 30%') >= 0,
+   '行情说明稀缺上限与回落幅度');
 
 console.log('\n== 收购箱 ==');
 document.querySelector('#btn-box').fire('click', { target: {} });

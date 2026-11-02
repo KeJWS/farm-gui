@@ -334,12 +334,21 @@
         : (state.harvesterOn ? '已开启 · 点击关闭' : '已关闭 · 点击开启'));
     const netLine = $('#net-line');
     if (netLine) {
-      netLine.innerHTML = !G.netUnlocked(state)
-        ? '🕸️ 渔网要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b>解锁（渔具店 ' + G.NET_COST + ' 金/张）'
-        : (state.nets > 0
-          ? '🕸️ 河边有 <b>' + state.nets + '</b> / ' + G.netMax(state) + ' 张渔网 · 每天耗 ' + state.nets +
-            ' 份面团饵，' + Math.round(G.NET_CHANCE * 100) + '% 概率各上 1 条'
-          : '🕸️ 河边还没放渔网（渔具店 ' + G.NET_COST + ' 金/张，现在最多 ' + G.netMax(state) + ' 张）');
+      if (!G.netUnlocked(state)) {
+        netLine.innerHTML = '🕸️ 渔网要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b>解锁（渔具店 ' +
+          G.NET_COST + ' 金/张）';
+      } else if (state.nets > 0) {
+        const setN = G.netSetCount(state), pend = G.netPending(state);
+        netLine.innerHTML = '🕸️ 已布 <b>' + setN + '</b>/' + state.nets + ' 张 · 每天耗 ' + setN +
+          ' 份面团饵，' + Math.round(G.NET_CHANCE * 100) + '% 概率各上 1 条 · 不缴维护费' +
+          (pend
+            ? '<br><b class="lock">' + pend + ' 张网里有鱼要收，重布 ' + G.netResetCost(state) + ' 体力</b> ' +
+              '<button class="btn mini" data-resetnets' + (state.energy < 1 ? ' disabled' : '') + '>🕸️ 重新布置</button>'
+            : '');
+      } else {
+        netLine.innerHTML = '🕸️ 河边还没放渔网（渔具店 ' + G.NET_COST + ' 金/张，现在最多 ' +
+          G.netMax(state) + ' 张）';
+      }
     }
 
     const teaBtn = $('[data-act="tea"]');
@@ -773,40 +782,50 @@
       return seedShop();
     }
 
+    const offMul = G.BALANCE.seed.offSeasonMul;
+    const offDays = G.BALANCE.seed.offSeasonDays;
+    const offPen = G.BALANCE.seed.offSeasonYield;
+    const marketMul = G.BALANCE.market.offSeason;
     const cards = G.CROP_LIST.map(function (c) {
       const owned = state.seeds[c.id] || 0;
       const inSeason = G.cropSeasonOk(c.id, state.day);
-      const dis = owned <= 0 || state.energy < 1 || !inSeason;
+      const dis = owned <= 0 || state.energy < 1;
+      const days = inSeason ? c.days : (c.big ? c.days * 2 : c.days + offDays);
+      const price = Math.round(c.price * (inSeason ? 1 : marketMul));
+      const seedCost = Math.ceil(c.seed * (inSeason ? 1 : offMul));
+      const lvBonus = G.farmYieldBonus(state);
       let profit = '';
       let lineY = '';
       let lineP = '';
+      let qty = 0;
       if (c.multi) {
-        const total = c.firstQty + c.regrowTimes * c.regrowQty;
-        lineY = c.days + ' 天 · 共 ' + total + ' 个';
-        lineP = c.price + ' 金/个 · 多次收';
-        profit = '净 +' + (total * c.price - c.seed);
+        qty = Math.max(1, c.firstQty - (inSeason ? 0 : offPen)) + c.regrowTimes * c.regrowQty;
+        lineY = days + ' 天 · 共 ' + qty + ' 个';
+        lineP = price + ' 金/个 · 多次收';
       } else if (c.big) {
-        lineY = c.days + ' 天 · 固定 1 个';
-        lineP = c.price + ' 金/个';
-        profit = '利润 +' + (c.price - c.seed);
+        qty = 1;
+        lineY = days + ' 天 · 固定 1 个';
+        lineP = price + ' 金/个';
       } else {
-        lineY = c.days + ' 天 · 产 ' + c.base + ' 个';
-        lineP = c.price + ' 金/个';
-        profit = '利润 +' + (c.base * c.price - c.seed) + '~';
+        qty = Math.max(1, c.base + lvBonus - (inSeason ? 0 : offPen));
+        lineY = days + ' 天 · 产 ' + qty + ' 个';
+        lineP = price + ' 金/个';
       }
+      profit = '净 +' + (qty * price - seedCost) + (c.multi || c.big ? '' : '~');
       return '<button class="crop-card" data-crop="' + c.id + '" data-plot="' + i + '"' +
         (batch ? ' data-batch="1"' : '') + (dis ? ' disabled' : '') + '>' +
         '<div class="ce">' + c.emoji + '</div>' +
-        '<div class="cn">' + c.name + '</div>' +
-        '<div class="cs">' + (owned ? '库存 ' + owned + ' 颗' : '没有种子') +
-          (inSeason ? '' : ' · 非当季') + '</div>' +
+        '<div class="cn">' + c.name + (inSeason ? '' : ' <span class="tago">反季</span>') + '</div>' +
+        '<div class="cs">' + (owned ? '库存 ' + owned + ' 颗' : '没有种子') + '</div>' +
         '<div class="cm">' + lineY + '</div>' +
         '<div class="cm">' + lineP + '</div>' +
-        '<div class="cp">' + (profit || '') + '</div>' +
+        '<div class="cp">' + profit + '</div>' +
       '</button>';
     }).join('');
 
-    const tip = '💡 现在是' + G.seasonOf(state.day) + '季：只有当季作物能种（卡片上会标季节）。' +
+    const tip = '💡 现在是' + G.seasonOf(state.day) + '季：当季作物正常，' +
+      '<b>反季也能种</b>——种子贵 ' + Math.round((offMul - 1) * 100) + '%、第一茬多 ' + offDays +
+      ' 天（南瓜/西瓜翻倍）、少 ' + offPen + ' 个，但收成卖价 ×' + marketMul + '。' +
       (batch ? '选一种会按库存把所有空地依次种上；种子用完就停。' : '播种只消耗背包里的种子。');
 
     openModal(batch ? '🌱 全部播种 · 选一种作物' : '🌱 第 ' + (i + 1) + ' 号地 · 播种',
@@ -819,24 +838,29 @@
 
   function seedShop() {
     const winter = G.isWinter(state.day);
+    const offMul = G.BALANCE.seed.offSeasonMul;
+    const offDays = G.BALANCE.seed.offSeasonDays;
     const rows = G.CROP_LIST.map(function (c) {
       const owned = state.seeds[c.id] || 0;
-      const bp = G.seedBuyPrice(c);
+      const bp = G.seedBuyPrice(c, state);
+      const base = G.seedBuyPrice(c, null);
       const sp = G.seedSellPrice(c);
       const lock = !G.seedUnlocked(state, c.id);
       const inSeason = G.cropSeasonOk(c.id, state.day);
-      const canBuy = inSeason && !lock;
-      const note = (lock ? ' <b class="lock">需种田 Lv' + c.lv + '</b>' : '') +
-        (!inSeason ? ' <b class="lock">' + G.seasonText(c.id) + '季才有</b>' : '');
+      const canBuy = !winter && !lock;
+      const days = inSeason ? c.days : (c.big ? c.days * 2 : c.days + offDays);
+      const tag = lock ? ' <b class="lock">需种田 Lv' + c.lv + '</b>'
+        : (inSeason ? ' <b class="own">当季</b>' : ' <b class="lock">反季</b>');
+      const sub = lock ? '等级不够，种子还没解锁'
+        : (winter ? '冬天种子店歇业了，开春再来'
+          : '买 <b>' + bp + '</b> 金' + (inSeason ? '' : '（当季 ' + base + '）') +
+            ' · 卖 ' + sp + ' 金 · ' + days + ' 天熟' + (inSeason ? '' : ' · 产量 −1'));
       return '<div class="shop-row' + (canBuy ? '' : ' locked') + '">' +
         '<span class="se">' + c.emoji + '</span>' +
         '<div class="sinfo">' +
           '<div class="sn">' + c.name +
-            (owned ? ' <b class="own">库存 ' + owned + '</b>' : '') + note + '</div>' +
-          '<div class="sv">' + (lock ? '等级不够，种子还没解锁'
-            : (!inSeason ? (winter ? '冬天种子店歇业了，开春再来'
-              : '现在是' + G.seasonOf(state.day) + '季，只能买' + G.seasonText(c.id) + '季的种子')
-              : '买 ' + bp + ' 金 · 卖 ' + sp + ' 金 · ' + c.days + ' 天成熟')) + '</div>' +
+            (owned ? ' <b class="own">库存 ' + owned + '</b>' : '') + tag + '</div>' +
+          '<div class="sv">' + sub + '</div>' +
         '</div>' +
         '<button class="btn mini" data-buyseed="' + c.id + '" data-n="1"' +
           (canBuy && state.coins >= bp ? '' : ' disabled') + '>买1</button>' +
@@ -869,11 +893,14 @@
 
     openModal('🌰 种子店 · ' + G.seasonOf(state.day) + '季',
       '<div class="shop-head">💰 <b>' + state.coins + '</b> 金' +
-        (winter ? ' · ❄️ 冬天歇业，只卖肥料' : ' · 只卖当季种子') + '</div>' +
+        (winter ? ' · ❄️ 冬天歇业，只卖肥料'
+                : ' · 当季原价 · 反季 ×' + offMul + '（慢 ' + offDays + ' 天、少 1 个）') + '</div>' +
       '<div class="shop-list">' + rows + '</div>' +
       '<div class="store-sub" style="margin-top:10px">🧪 肥料 · 买回来放仓库，施肥时消耗</div>' +
       '<div class="shop-list">' + fertRows + '</div>' +
-      '<div class="shop-tip">播种只消耗背包里的种子，而且<b>只能在当季播种</b>；肥料在「全部施肥」或地块详情里使用。</div>',
+      '<div class="shop-tip">反季种子<b>也能种</b>：第一茬多花 ' + offDays + ' 天（南瓜 / 西瓜直接翻倍）、少结 1 个，' +
+        '但反季的收成卖价 ×' + G.BALANCE.market.offSeason + ' —— 想赌一把就囤着晚卖。<br>' +
+        '冬天土地封冻，什么都不能种。肥料在「全部施肥」或地块详情里使用。</div>',
       '<button class="btn" data-sellallseeds>卖出全部种子</button>' +
       '<button class="btn" data-close>关闭</button>');
   }
@@ -942,17 +969,29 @@
         '<button class="btn mini" data-sellwormn="1"' + (worms ? '' : ' disabled') + '>卖</button>' +
         '<span class="bc-tip">现有 ' + worms + ' 条</span>' +
       '</div>' +
-      '<div class="store-sub" style="margin-top:10px">🕸️ 渔网 · 放到河边每天自动抓鱼</div>' +
+      '<div class="store-sub" style="margin-top:10px">🕸️ 渔网 · 放到河边每天自动抓鱼（不收维护费）</div>' +
       '<div class="store-row' + (netLock ? ' locked' : '') + '">' +
         '<span class="se">🕸️</span>' +
-        '<div><div class="sn">渔网 ×' + state.nets + ' / ' + (netLock ? '—' : netCap) +
+        '<div><div class="sn">渔网 <b class="own">已布 ' + G.netSetCount(state) + '</b> / 共 ' +
+          state.nets + ' / ' + (netLock ? '—' : netCap) +
           (netLock ? ' <b class="lock">需钓鱼 Lv' + G.BALANCE.gate.net + '</b>' : '') + '</div>' +
         '<div class="sv">' + (netLock ? '钓鱼等级不够，还没解锁'
           : G.NET_COST + ' 金/张 · 每天耗 1 面团饵 · ' + Math.round(G.NET_CHANCE * 100) +
-            '% 概率上 1 条 · Lv' + G.fishLv(state) + ' 上限 ' + netCap + ' 张') + '</div></div>' +
+            '% 概率上 1 条 · 抓完要花 ' + G.BALANCE.netReset.energy + ' 体力重布 · Lv' +
+            G.fishLv(state) + ' 上限 ' + netCap + ' 张') + '</div></div>' +
         '<button class="btn mini" data-buynet' +
         ((netLock || state.nets >= netCap || state.coins < G.NET_COST) ? ' disabled' : '') + '>放一张</button>' +
-      '</div>';
+      '</div>' +
+      (G.netPending(state)
+        ? '<div class="store-row">' +
+            '<span class="se">🌀</span>' +
+            '<div><div class="sn">有 <b class="lock">' + G.netPending(state) + '</b> 张网没收</div>' +
+            '<div class="sv">重布要 ' + G.netResetCost(state) + ' 体力（每张 ' +
+              G.BALANCE.netReset.energy + '）</div></div>' +
+            '<button class="btn mini" data-resetnets' + (state.energy < 1 ? ' disabled' : '') +
+              '>重新布置</button>' +
+          '</div>'
+        : '');
     openModal('🛒 渔具店', body, '<button class="btn" data-close>关闭</button>');
   }
 
@@ -989,8 +1028,11 @@
       '<div class="rule-sec">' +
         '<h4>🍂 季节</h4>' +
         '<p>每 <b>30 天</b>换一季：<b>春（1–30）/ 夏（31–60）/ 秋（61–90）/ 冬（91–120）</b>，然后循环。<br>' +
-        '每种作物只在<b>特定季节</b>能种、能买（见表里的「季节」列）；<b>冬天土地封冻、河面结冰</b>——' +
-        '不能播种、不能钓鱼（渔网也收不了），只能打工、卖库存、交委托。<br>' +
+        '当季的种子按<b>原价</b>卖；<b>反季的种子也卖，但贵 ×' + G.BALANCE.seed.offSeasonMul + '</b>，' +
+        '种下去第一茬多花 ' + G.BALANCE.seed.offSeasonDays + ' 天（南瓜 / 西瓜直接翻倍）、少结 ' +
+        G.BALANCE.seed.offSeasonYield + ' 个 —— 换来的好处是反季的收成卖价 <b>×' +
+        G.BALANCE.market.offSeason + '</b>。<br>' +
+        '<b>冬天土地封冻、河面结冰</b>——不能播种、不能钓鱼（渔网也收不了），种子店歇业，只能打工、卖库存、交委托。<br>' +
         '已经种下的作物不受换季影响，该熟还会熟。</p>' +
         '<table class="rule-table"><tr><th>季节</th><th>特点</th></tr>' +
         '<tr><td>🌱 春</td><td><b>多雨</b>（雨天 50%，自动浇水）</td></tr>' +
@@ -1007,8 +1049,10 @@
         '鲫鱼 春·秋 / 鲤鱼 春夏秋 / 鳜鱼 春·夏 / 鲈鱼 夏·秋 / 河豚 秋 / 锦鲤 春。<br>' +
         '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15、耐用 ' +
         G.BALANCE.lure.dur + ' 次。<br>' +
-        '🕸️ 渔网：每天耗 1 份面团饵，<b>70%</b> 网到 1 条标准及以下的普通鱼，<b>不会出杂物和宝箱</b>；' +
-        '要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b> 解锁，上限 = 2 + 钓鱼等级（最多 ' + G.NET_MAX + ' 张）。<br>' +
+        '🕸️ 渔网：<b>' + G.NET_COST + ' 金/张，不缴维护费</b>。晚上耗 1 份面团饵，<b>70%</b> 网到 1 条标准及以下的普通鱼，' +
+        '<b>不会出杂物和宝箱</b>；要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b> 解锁，上限 = 2 + 钓鱼等级（最多 ' + G.NET_MAX + ' 张）。<br>' +
+        '网到鱼就得下水把鱼取下来，<b>这张网要花 ' + G.BALANCE.netReset.energy + ' 体力重新布置</b>（没布置的网当晚不出货）；' +
+        '在河边或渔具店点「重新布置」一次补齐。<br>' +
         '渔获先进仓库：<b>鱼</b>去水产店卖或进收购箱；<b>杂物和宝箱</b>水产店不收，去<b>百货店</b>回收或开箱。<br>' +
         '🎁 宝箱按钓鱼等级掉落（木制随便掉、铁制 Lv' + G.BALANCE.chest.ironLv + '、黄金 Lv' +
         G.BALANCE.chest.goldLv + '），开箱奖励见「百货店」。</p>' +
@@ -1018,9 +1062,13 @@
         '<h4>🐟 水产店</h4>' +
         '<p>渔获在这里直接卖，<b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>再乘<b>市价</b>；<b>不收杂物和宝箱</b>（那些去百货店）。<br>' +
         '<b>同一种鱼的不同品质会合并成一行</b>（和仓库里的作物一样），显示品质构成和均价；卖出时<b>先卖品质差的</b>。<br>' +
-        '<b>鱼也受市场影响</b>：每卖 1 条 −1.5%（最低 ×0.75），隔天回落 20%；鱼没有季节差价。<br>' +
+        '<b>鱼也受市场影响</b>：刚开张 ×' + G.BALANCE.market.supplyMax + '（稀缺），每卖 1 条 −' +
+        G.BALANCE.market.fishStep + '，最低 ×' + G.BALANCE.market.supplyMin + '，隔天回落 ' +
+        Math.round((1 - G.BALANCE.market.decay) * 100) + '%。<br>' +
+        '鱼还跟着<b>汛期</b>走：汛期 ×1，<b>非汛期 ×' + G.BALANCE.market.offSeason + '</b>（稀罕货）。<br>' +
         '店里每天<b>进一批水产</b>（一般品质），每种数量随机、<b>睡觉后补货</b>，卖完只能等明天；' +
-        '买价是基础价的 ' + G.BALANCE.shop.priceMul + ' 倍<b>再乘鱼市价</b>（缺鱼时更贵），买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。<br>' +
+        '买价 = 基础价 × ' + G.BALANCE.shop.priceMul + ' <b>再乘鱼市价</b>（缺货 / 非汛期更贵），' +
+        '买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。<br>' +
         '河豚 <b>D' + G.FISH_UNLOCK.puffer + '</b> 起、锦鲤 <b>D' + G.FISH_UNLOCK.koi + '</b> 起才进货。</p>' +
       '</div>' +
 
@@ -1028,13 +1076,15 @@
         '<h4>🧺 农产品店</h4>' +
         '<p>作物在这里直接卖，同样 <b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>，再乘<b>市价系数</b>；仓库不再直接出售任何东西。<br>' +
         '<b>市价</b> = 供需 × 季节：<br>' +
-        '· <b>供需</b>：最近卖得越多越便宜（每件 −2%，最低 ×0.75），隔天回落 20%；卖得少就是 ×1.05（稀缺）<br>' +
-        '· <b>季节</b>：<b>反季 ×1.20</b>（过季稀缺、卖得贵），<b>当季 ×1.00</b>（满大街都是）<br>' +
-        '· 两相乘就是最终系数，界面上直接显示「市价 ×1.18 · 反季 · 平稳」<br>' +
-        '所以：<b>别一次性把同一种菜全砸出去</b>；囤到反季再卖，价格会更高。<br>' +
-        '商店的<b>买价</b>也会跟着市价走 —— 缺货时买得更贵。点商店面板的 <b>📈 行情</b> 看全部系数。<br>' +
-        '店里每天同样进一批作物（一般品质），买价是售价的 ' + G.BALANCE.shop.cropPriceMul +
-        ' 倍<b>再乘市价</b>（越稀缺越贵），转手必亏，只在凑委托或应急时买。<br>' +
+        '· <b>供需</b>：刚开张 ×' + G.BALANCE.market.supplyMax + '（稀缺），每卖 1 件 −' +
+        G.BALANCE.market.cropStep + '，最低 ×' + G.BALANCE.market.supplyMin + '（过剩）；隔天回落 ' +
+        Math.round((1 - G.BALANCE.market.decay) * 100) + '%<br>' +
+        '· <b>季节</b>：<b>反季 ×' + G.BALANCE.market.offSeason + '</b>（过季稀缺、卖得贵），<b>当季 ×1.00</b><br>' +
+        '· 两相乘就是最终系数，界面上直接显示「市价 ×2.20 · 反季 · 稀缺」<br>' +
+        '所以：<b>别一次性把同一种菜全砸出去</b>；囤到反季再卖，价格会翻倍。<br>' +
+        '商店的<b>买价</b>也会跟着市价走 —— 缺货 / 反季时买得更贵。点商店面板的 <b>📈 行情</b> 看全部系数。<br>' +
+        '店里每天同样进一批作物（一般品质），买价 = 售价 × ' + G.BALANCE.shop.cropPriceMul +
+        ' <b>再乘市价</b>，转手必亏，只在凑委托或应急时买。<br>' +
         '南瓜 <b>D' + G.CROP_UNLOCK.pumpkin + '</b> 起、西瓜 <b>D' + G.CROP_UNLOCK.watermelon + '</b> 起才进货。</p>' +
       '</div>' +
 
@@ -1081,7 +1131,8 @@
         '· 💰 税：每 30 天按（金币 + 仓库价值）<b>累进</b>收一次——前 2000 收 2%、2000~1 万收 4%、1 万以上收 6%，最低 ' +
         G.BALANCE.tax.min + ' 金（当前约 ' + G.taxDue(state) + ' 金）<br>' +
         '· 🧾 维护费：每 7 天收一次，土地 ' + G.plotUpkeep(state.plots.length) + ' 金（6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 ' +
-        G.BALANCE.upkeep.plotHigh + ' 金/周） + 设备 ' + G.deviceUpkeep(state) + ' 金<br>' +
+        G.BALANCE.upkeep.plotHigh + ' 金/周） + 设备 ' + G.deviceUpkeep(state) + ' 金（洒水器 3、自动收获器 5，' +
+        '<b>渔网不收维护费</b>）<br>' +
         '· 没钱吃饭只恢复到体力上限的 30%（至少 5 点），不会扣掉已有的体力<br>' +
         '· 种子 / 肥料都在种子店买卖（半价回收），肥料也只能在种子店卖；蚯蚓只能在渔具店卖（' + G.WORM_VALUE + ' 金/条）</p>' +
       '</div>' +
@@ -1339,6 +1390,19 @@
 
   /* ---------------- 农产品店（作物唯一收购处） ---------------- */
 
+  /* 进货库存小圆点：亮着的是还有货 */
+  function stockDots(st, cap) {
+    const n = Math.max(0, Math.min(cap, 9));
+    const on = Math.max(0, Math.min(n, st));
+    let out = '<span class="stock-dots" title="今日剩 ' + st + '/' + cap + '">';
+    for (let i = 0; i < n; i++) out += '<i class="' + (i < on ? 'on' : '') + '"></i>';
+    return out + '</span>';
+  }
+  /* 进货价的构成：基准 × 市价 */
+  function priceNote(base, mul) {
+    return '基准 ' + base + ' × 市价 ' + mul.toFixed(2);
+  }
+
   function cropShop() {
     const ids = Object.keys(state.store).filter(function (k) { return G.storeCount(state, k) > 0; })
       .sort(function (a, b) { return G.storeValue(state, b) - G.storeValue(state, a); });
@@ -1358,12 +1422,14 @@
           (mk.inSeason ? ' <b class="own">当季</b>' : ' <b class="lock">反季</b>') + '</div>' +
         '<div class="sv">' + mix.map(function (m) {
           return '<span style="color:' + m.color + '">' + m.name + ' ' + m.n + '</span>';
-        }).join(' · ') + ' · 均 ' + (val / n).toFixed(1) + ' 金 · ' + mk.tag + '</div></div>' +
+        }).join(' · ') + ' · 均 ' + (val / n).toFixed(1) + ' 金/个 · ' +
+          (mk.inSeason ? '当季 ×1' : '反季 ×' + mk.season) + ' · ' + mk.tag + '</div></div>' +
         '<span class="sp">' + val + ' 金</span>' +
         '<button class="btn mini" data-sellcrop="' + id + '">卖出</button>' +
       '</div>';
     }).join('') : '<div class="store-empty">仓库里没有作物，先去田里收点</div>';
 
+    let stockN = 0, soldOutN = 0, openN = 0;
     const buyRows = G.CROP_LIST.map(function (c) {
       const bp = G.cropBuyPrice(c.id, state);
       const st = G.cropShopStock(state, c.id);
@@ -1371,18 +1437,25 @@
       const unlock = G.CROP_UNLOCK[c.id] || 1;
       const locked = state.day < unlock;
       const soldOut = !locked && st <= 0;
+      const mk = G.marketInfo(state, c.id);
+      const base = Math.max(2, Math.round(c.price * G.BALANCE.shop.cropPriceMul));
+      if (!locked) { stockN += st; openN++; if (soldOut) soldOutN++; }
       return '<div class="store-row' + (soldOut ? ' sold-out' : '') + (locked ? ' locked' : '') + '">' +
         '<span class="se">' + c.emoji + '</span>' +
         '<div><div class="sn">' + c.name +
-          (locked ? ' <b class="lock">D' + unlock + ' 起进货</b>' : ' <b class="own">今日 ' + st + '/' + cap + '</b>') +
+          (locked ? ' <b class="lock">D' + unlock + ' 起进货</b>'
+                  : ' ' + stockDots(st, cap) + ' <b class="own">' + st + '/' + cap + '</b>') +
+          (mk.inSeason ? ' <b class="own">当季</b>' : ' <b class="lock">反季 ×' + mk.season + '</b>') +
           '</div>' +
         '<div class="sv">' + (locked ? '中后期才进这种作物'
-          : '一般品质 · 买 ' + bp + ' 金/个 · ' + (c.desc || '')) + '</div></div>' +
+          : '进价 <b>' + bp + '</b> 金/个 · ' + priceNote(base, mk.total) +
+            '（' + mk.tag + '）· ' + (c.desc || '')) + '</div></div>' +
         '<button class="btn mini" data-buycrop="' + c.id + '" data-n="1"' +
           (locked || soldOut || state.coins < bp ? ' disabled' : '') + '>' +
           (locked ? '未解锁' : (soldOut ? '售罄' : '买1')) + '</button>' +
-        (locked ? '' : '<button class="btn mini" data-buycrop="' + c.id + '" data-n="3"' +
-          (st < 3 || state.coins < bp * 3 ? ' disabled' : '') + '>买3</button>') +
+        (locked || soldOut ? '' :
+          '<button class="btn mini" data-buycrop="' + c.id + '" data-n="' + st + '"' +
+          (state.coins < bp * st ? ' disabled' : '') + '>买满</button>') +
       '</div>';
     }).join('');
 
@@ -1398,9 +1471,11 @@
             '<button class="btn mini" data-sellcropn="1">卖出</button>' +
             '<span class="bc-tip">从品质差的开始卖</span></div>'
         : '') +
-      '<div class="store-sub" style="margin-top:10px">今日进货 · 一般品质</div>' + buyRows +
-      '<div class="shop-tip">每天补一次货；这里买价是售价的 ' + G.BALANCE.shop.cropPriceMul +
-        ' 倍，转手必亏，只在凑委托 / 应急时买。想卖原价就把作物放进<b>收购箱</b>（仓库 📦），明天睡觉结算。</div>',
+      '<div class="store-sub" style="margin-top:10px">今日进货 · 一般品质 · 共 <b>' + stockN + '</b> 件' +
+        (soldOutN ? ' · ' + soldOutN + '/' + openN + ' 种售罄' : '') + '</div>' + buyRows +
+      '<div class="shop-tip">每天补一次货，卖完等明天。进价 = 基准价 × 市价（' +
+        '最近卖得多就便宜、反季贵 ×' + G.BALANCE.market.offSeason + '），所以转手必亏，只在凑委托 / 应急时买。<br>' +
+        '想卖原价就把作物放进<b>收购箱</b>（仓库 📦），明天睡觉结算。</div>',
       '<button class="btn" data-sellallcrop' + (total ? '' : ' disabled') + '>全部卖出</button>' +
       '<button class="btn" data-close>关闭</button>');
   }
@@ -1460,16 +1535,17 @@
       return '<div class="store-row">' +
         '<span class="se">' + g.emoji + '</span>' +
         '<div><div class="sn">' + g.name + ' ×' + g.count +
-          ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b></div>' +
+          ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b>' +
+          (mk.inRun ? ' <b class="own">汛期</b>' : ' <b class="lock">非汛期 ×' + mk.season + '</b>') + '</div>' +
         '<div class="sv">' + fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) +
-          ' 金/条 · ' + mk.tag + '</div></div>' +
+          ' 金/条 · ' + (mk.inRun ? '汛期 ×1' : '非汛期 ×' + mk.season) + ' · ' + mk.tag + '</div></div>' +
         '<span class="sp">' + g.total + ' 金</span>' +
         '<button class="btn mini" data-sellfish="' + g.key + '">卖出</button>' +
       '</div>';
     }).join('') : '<div class="store-empty">还没有渔获，先去河边甩两杆</div>';
 
     const buyList = G.FISH.filter(function (f) { return !f.trash && !f.noOrder; });
-    let outOfStock = 0;
+    let stockN = 0, soldOutN = 0, openN = 0;
     const buyRows = buyList.map(function (f) {
       const bp = G.fishBuyPrice(f.id, state);
       const st = G.shopStock(state, f.id);
@@ -1477,22 +1553,27 @@
       const unlock = G.FISH_UNLOCK[f.id] || 1;
       const locked = state.day < unlock;
       const inRun = G.fishSeasonOk(f.id, state.day);
-      if (!locked && !st) outOfStock++;
+      const mk = G.fishMarketInfo(state, f.name);
+      const base = Math.max(3, Math.round(f.base * G.BALANCE.shop.priceMul));
       const soldOut = !locked && st <= 0;
+      if (!locked) { stockN += st; openN++; if (soldOut) soldOutN++; }
       return '<div class="store-row' + (soldOut ? ' sold-out' : '') + (locked ? ' locked' : '') + '">' +
         '<span class="se">' + f.emoji + '</span>' +
         '<div><div class="sn">' + f.name +
-          (locked ? ' <b class="lock">D' + unlock + ' 起进货</b>' : ' <b class="own">今日 ' + st + '/' + cap + '</b>') +
-          ' ' + (inRun ? '<b class="own">鱼汛 ' + G.fishSeasonText(f.id) + '</b>'
-                       : '<b class="lock">非汛期</b>') +
+          (locked ? ' <b class="lock">D' + unlock + ' 起进货</b>'
+                  : ' ' + stockDots(st, cap) + ' <b class="own">' + st + '/' + cap + '</b>') +
+          (inRun ? ' <b class="own">鱼汛 ' + G.fishSeasonText(f.id) + '</b>'
+                 : ' <b class="lock">非汛期 ×' + mk.season + '</b>') +
           '</div>' +
         '<div class="sv">' + (locked ? '中后期才进这种水产' :
-          '一般品质 · 买 ' + bp + ' 金/条 · ' + G.fishDesc(f.name)) + '</div></div>' +
+          '进价 <b>' + bp + '</b> 金/条 · ' + priceNote(base, mk.total) +
+          '（' + mk.tag + '）· ' + G.fishDesc(f.name)) + '</div></div>' +
         '<button class="btn mini" data-buyfish="' + f.id + '" data-n="1"' +
           (locked || soldOut || state.coins < bp ? ' disabled' : '') + '>' +
           (locked ? '未解锁' : (soldOut ? '售罄' : '买1')) + '</button>' +
-        (locked ? '' : '<button class="btn mini" data-buyfish="' + f.id + '" data-n="3"' +
-          (st < 3 || state.coins < bp * 3 ? ' disabled' : '') + '>买3</button>') +
+        (locked || soldOut ? '' :
+          '<button class="btn mini" data-buyfish="' + f.id + '" data-n="' + st + '"' +
+          (state.coins < bp * st ? ' disabled' : '') + '>买满</button>') +
       '</div>';
     }).join('');
 
@@ -1508,9 +1589,10 @@
             '<button class="btn mini" data-sellfishn="1">卖出</button>' +
             '<span class="bc-tip">共 ' + total + ' 条</span></div>'
         : '') +
-      '<div class="store-sub" style="margin-top:10px">买水产 · 今日进货' +
-        (outOfStock === buyList.length ? '（全部售罄）' : '') + '</div>' + buyRows +
+      '<div class="store-sub" style="margin-top:10px">买水产 · 今日进货 · 共 <b>' + stockN + '</b> 条' +
+        (soldOutN ? ' · ' + soldOutN + '/' + openN + ' 种售罄' : '') + '</div>' + buyRows +
       '<div class="shop-tip">水产店每天补一次货，卖完要等明天；买来的鱼是<b>一般品质</b>，只能卖钱、不能交委托。<br>' +
+        '进价 = 基准价 × 市价（非汛期贵 ×' + G.BALANCE.market.offSeason + '）。<br>' +
         '直接卖只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折，想原价卖就放进<b>收购箱</b>（仓库 📦）。</div>',
       '<button class="btn" data-sellallfish' + (total ? '' : ' disabled') + '>全部卖出</button>' +
       '<button class="btn" data-close>关闭</button>');
@@ -1524,38 +1606,41 @@
 
   function marketModal() {
     const season = G.seasonOf(state.day);
+    const OFF = G.BALANCE.market.offSeason;
     const cropRows = G.CROP_LIST.map(function (c) {
       const mk = G.marketInfo(state, c.id);
       return '<div class="store-row">' +
         '<span class="se">' + c.emoji + '</span>' +
         '<div><div class="sn">' + c.name +
-          (mk.inSeason ? ' <b class="own">当季</b>' : ' <b class="lock">反季</b>') + '</div>' +
+          (mk.inSeason ? ' <b class="own">当季 ×1</b>' : ' <b class="lock">反季 ×' + mk.season + '</b>') + '</div>' +
         '<div class="sv">' + G.seasonText(c.id) + '季 · 最近卖出 ' + mk.sold.toFixed(0) +
-          ' 件 · ' + mk.tag + ' · 买价 ' + G.cropBuyPrice(c.id, state) + ' 金</div></div>' +
+          ' 件 · ' + mk.tag + '（×' + mk.supply.toFixed(2) + '）· 买价 ' + G.cropBuyPrice(c.id, state) + ' 金</div></div>' +
         '<span class="sp">×' + mk.total.toFixed(2) + '</span>' +
       '</div>';
     }).join('');
 
     const fishRows = G.FISH.filter(function (f) { return !f.trash && !f.chest; }).map(function (f) {
       const mk = G.fishMarketInfo(state, f.name);
-      const inRun = G.fishSeasonOk(f.id, state.day);
       return '<div class="store-row">' +
         '<span class="se">' + f.emoji + '</span>' +
         '<div><div class="sn">' + f.name +
-          (inRun ? ' <b class="own">鱼汛 ' + G.fishSeasonText(f.id) + '</b>' : ' <b class="lock">非汛期</b>') + '</div>' +
-        '<div class="sv">最近卖出 ' + mk.sold.toFixed(0) + ' 条 · ' + mk.tag +
-          ' · 买价 ' + G.fishBuyPrice(f.id, state) + ' 金</div></div>' +
+          (mk.inRun ? ' <b class="own">汛期 ×1</b>' : ' <b class="lock">非汛期 ×' + mk.season + '</b>') + '</div>' +
+        '<div class="sv">鱼汛 ' + G.fishSeasonText(f.id) + ' · 最近卖出 ' + mk.sold.toFixed(0) + ' 条 · ' +
+          mk.tag + '（×' + mk.supply.toFixed(2) + '）· 买价 ' + G.fishBuyPrice(f.id, state) + ' 金</div></div>' +
         '<span class="sp">×' + mk.total.toFixed(2) + '</span>' +
       '</div>';
     }).join('');
 
     openModal('📈 市场行情',
       '<div class="shop-head">现在是 <b>' + season + '季</b> · 最近销量越多越便宜</div>' +
-      '<div class="store-sub">🌱 作物 · 当季 ×1.00 / 反季 ×1.20</div>' + cropRows +
-      '<div class="store-sub" style="margin-top:10px">🐟 水产 · 只看供需，非汛期 ×0.3 上钩</div>' + fishRows +
-      '<div class="shop-tip">市价 = 供需 × 季节：作物每卖 1 件 −2%（最低 ×0.75），鱼每条 −1.5%；' +
-        '每天睡觉回落 20%。<br>反季的菜卖得更贵，囤到反季再出手更划算；但砸得太多一样会饱和。<br>' +
-        '商店的<b>买价</b>也跟着市价走 —— 缺货时买得更贵。</div>',
+      '<div class="store-sub">🌱 作物 · 当季 ×1 / 反季 ×' + OFF + '</div>' + cropRows +
+      '<div class="store-sub" style="margin-top:10px">🐟 水产 · 汛期 ×1 / 非汛期 ×' + OFF +
+        '（非汛期上钩率也只有 ' + G.FISH_OFF_SEASON + '）</div>' + fishRows +
+      '<div class="shop-tip">市价 = 供需 × 季节：刚开张是 <b>×' + G.BALANCE.market.supplyMax +
+        '</b>（稀缺），作物每卖 1 件 −0.02、鱼每条 −0.015，最低 ×' + G.BALANCE.market.supplyMin +
+        '（过剩）；每天睡觉销量回落 ' + Math.round((1 - G.BALANCE.market.decay) * 100) + '%。<br>' +
+        '反季的菜 / 非汛期的鱼卖价 <b>×' + OFF + '</b>，囤到那时候再出手翻倍 —— 但砸得太狠一样会饱和。<br>' +
+        '商店的<b>进价</b>也跟着市价走：缺货时进货更贵，反季进货更贵。</div>',
       '<button class="btn" data-close>关闭</button>');
   }
 
@@ -1673,7 +1758,8 @@
       ['金币', state.coins + ' 金'],
       ['体力', state.energy + ' / ' + state.maxEnergy + ' · 伙食 ' + G.mealFee(state) + ' 金/天'],
       ['土地', state.plots.length + ' 块 · 洒水器 ' + state.sprinklers + ' 个'],
-      ['设备', (state.harvester ? '自动收获器 ✅ · ' : '自动收获器 — · ') + '渔网 ' + state.nets + ' 张'],
+      ['设备', (state.harvester ? '自动收获器 ✅ · ' : '自动收获器 — · ') + '渔网 ' + state.nets +
+        ' 张（已布 ' + G.netSetCount(state) + '）'],
       ['种田等级', 'Lv' + lv.farm + (lv.farm >= G.BALANCE.level.max ? '（满级）' :
         '（' + lv.farmXp + '/' + G.levelNeed(lv.farm) + '）') + ' · ' + G.levelEffectText('farm', lv.farm)],
       ['钓鱼等级', 'Lv' + lv.fish + (lv.fish >= G.BALANCE.level.max ? '（满级）' :
@@ -2194,6 +2280,17 @@
       const buyNet = t.closest('[data-buynet]');
       if (buyNet && !buyNet.disabled) {
         const r = G.buyNet(state);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        if (modalOpen()) shopModal();
+        return;
+      }
+
+      // 重新布置渔网
+      const resetNet = t.closest('[data-resetnets]');
+      if (resetNet && !resetNet.disabled) {
+        const r = G.resetNets(state);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();

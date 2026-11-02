@@ -277,28 +277,83 @@ console.log('\n== 维护费 ==');
     '（土地 ' + land + ' + 设备 ' + dev + '）');
 });
 console.log('   土地：6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 ' + G.BALANCE.upkeep.plotHigh + ' 金/周；' +
-  '洒水器 3/周、渔网 3/周、收获器 5/周');
+  '洒水器 3/周、收获器 5/周、渔网免费');
 console.log('   参考：36 地图后期日毛收入约 1073，维护费占 ' +
-  ((G.plotUpkeep(36) + 36 * 3 + 9 * 3 + 5) / 7 / 1073 * 100).toFixed(1) + '%');
+  ((G.plotUpkeep(36) + 36 * 3 + 5) / 7 / 1073 * 100).toFixed(1) + '%');
 
 /* ---------- 9. 市场价格 ---------- */
 console.log('\n== 市场价格 ==');
-console.log('   作物价格系数 = 供需 × 季节');
-console.log('   供需：1.05 - 0.02 × 最近销量（下限 0.75，睡觉回落 20%）→ 卖 3 件就跌破 1.00');
-console.log('   季节：当季 ×1.00 / 反季 ×1.20');
+console.log('   价格系数 = 供需 × 季节（鱼：汛期）');
+console.log('   供需：1.30 - 0.02 × 最近销量（作物）/ 0.015（鱼），下限 0.70，睡觉回落 30%');
+console.log('   季节：当季 / 汛期 ×1.00 · 反季 / 非汛期 ×' + G.BALANCE.market.offSeason);
 {
-  const supply = function (sold) { return Math.max(0.75, Math.min(1.05, 1.05 - 0.02 * sold)); };
+  const M = G.BALANCE.market;
+  const supply = function (sold) { return Math.max(M.supplyMin, Math.min(M.supplyMax, M.supplyMax - M.cropStep * sold)); };
   console.log('   ' + pad('最近销量', 10) + pad('当季', 10) + pad('反季', 10) + '状态');
   [0, 3, 10, 20, 40].forEach(function (sold) {
     console.log('   ' + pad(sold + ' 件', 10) +
-      pad((supply(sold) * 1.0).toFixed(2), 10) + pad((supply(sold) * 1.2).toFixed(2), 10) +
-      (supply(sold) >= 1 ? '稀缺' : (supply(sold) <= 0.85 ? '过剩' : '平稳')));
+      pad((supply(sold) * 1.0).toFixed(2), 10) + pad((supply(sold) * M.offSeason).toFixed(2), 10) +
+      G.marketTag(supply(sold)));
   });
   const e = G.CROPS.eggplant;
   const base = (e.base + 1) * e.price / e.days;   // Lv5 一株
   console.log('   例：茄子（Lv5，约 ' + base.toFixed(1) + ' 金/地/天）');
-  console.log('     当季刚上市 ×1.05 → ' + (base * 1.05).toFixed(1) +
-    ' · 当季卖到饱和 ×0.75 → ' + (base * 0.75).toFixed(1) +
-    ' · 反季新鲜 ×1.26 → ' + (base * 1.26).toFixed(1));
-  console.log('   鱼：1.05 - 0.015 × 最近销量（下限 0.75）→ 卖 4 条跌破 1.00；鱼没有季节因子');
+  console.log('     当季刚上市 ×' + M.supplyMax + ' → ' + (base * M.supplyMax).toFixed(1) +
+    ' · 当季卖到饱和 ×' + M.supplyMin + ' → ' + (base * M.supplyMin).toFixed(1) +
+    ' · 反季稀缺 ×' + (M.supplyMax * M.offSeason).toFixed(2) + ' → ' + (base * M.supplyMax * M.offSeason).toFixed(1));
+  console.log('   鱼：' + M.supplyMax + ' - ' + M.fishStep + ' × 最近销量（下限 ' + M.supplyMin +
+    '）→ 非汛期 ×' + M.offSeason + '，上限 ×' + (M.supplyMax * M.offSeason).toFixed(2));
+  console.log('   商店进价 = 基准 × ' + G.BALANCE.shop.priceMul + ' × 市价 → 反季最贵时 ×' +
+    (G.BALANCE.shop.priceMul * M.supplyMax * M.offSeason).toFixed(2));
+}
+
+/* ---------- 10. 反季种植 vs 当季 ---------- */
+console.log('\n== 反季种植（种子 ×' + G.BALANCE.seed.offSeasonMul + '、慢 ' +
+  G.BALANCE.seed.offSeasonDays + ' 天、少 ' + G.BALANCE.seed.offSeasonYield + ' 个、卖价 ×' +
+  G.BALANCE.market.offSeason + '）==');
+{
+  /* 和上面的种田表同一套模型（Lv5 · 普通肥 · 品质取两次较好），只是换成反季参数 */
+  const LV = 5;
+  const bonus = Math.floor(LV / 4);
+  function cycle(c, off) {
+    const fert = !c.multi;
+    const add = (fert && !c.big) ? G.FERT.normal.add : 0;
+    const pen = off ? G.BALANCE.seed.offSeasonYield : 0;
+    const slow = off ? G.BALANCE.seed.offSeasonDays : 0;
+    const qty = c.multi ? Math.max(1, c.firstQty - pen) + c.regrowTimes * c.regrowQty
+      : (c.big ? c.base : Math.max(1, c.base + add + bonus - pen));
+    const days = c.multi ? (c.days + slow) + c.regrowTimes * c.regrowDays
+      : (c.big ? (off ? c.days * 2 : c.days) : c.days + slow);
+    const seed = Math.ceil(c.seed * (off ? G.BALANCE.seed.offSeasonMul : 1));
+    const gross = qty * c.price * (off ? G.BALANCE.market.offSeason : 1) * qEV(fert ? 2 : 1);
+    const net = gross - seed - (fert ? G.FERT.normal.cost : 0);
+    return { net: net, days: days, qty: qty };
+  }
+  const ids = ['chili', 'eggplant', 'tomato', 'corn', 'pumpkin', 'watermelon', 'strawberry', 'cucumber'];
+  console.log('   ' + pad('作物', 6) + pad('当季 金/地/天', 16) + pad('反季 金/地/天', 16) + '变化');
+  ids.forEach(function (id) {
+    const c = G.CROPS[id];
+    const a = cycle(c, false), b = cycle(c, true);
+    const inPer = a.net / a.days, offPer = b.net / b.days;
+    console.log('   ' + pad(c.name, 6) + pad(inPer.toFixed(1), 16) + pad(offPer.toFixed(1), 16) +
+      '反季 ×' + (offPer / inPer).toFixed(2));
+  });
+  console.log('   注：反季收成必须在反季卖掉才吃得到 ×2；囤到当季卖就是当季价。');
+}
+
+/* ---------- 11. 渔网 ---------- */
+console.log('\n== 渔网（' + G.NET_COST + ' 金/张，不缴维护费，抓完 1 体力重布）==');
+{
+  G.setRng(mulberry32(7));
+  const doughNet = evBait('dough', 'cloudy', 1, 4000).ev - 1;   // 每杆净收益
+  const perNet = G.NET_CHANCE * netEV - 1;                      // 每张网每天净收益（含 1 份饵）
+  const netEnergy = G.NET_CHANCE * G.BALANCE.netReset.energy;    // 平均每天为这张网花的体力
+  const perEnergy = perNet / netEnergy;
+  console.log('   每张网每天期望 命中 ' + (G.NET_CHANCE * 100).toFixed(0) + '% × 期望 ' + netEV.toFixed(2) +
+    ' − 1 饵 = 净 ' + perNet.toFixed(2) + ' 金');
+  console.log('   折算到体力（每天平均 ' + netEnergy.toFixed(2) + ' 体力重布）：' + perEnergy.toFixed(2) +
+    ' 金/体力 · 面团饵每杆 ' + (doughNet / 2).toFixed(2) + ' 金/体力 → 渔网更划算但每天封顶 9 条');
+  console.log('   满配 9 张：每天约 ' + (9 * perNet).toFixed(1) + ' 金 · 耗 9 份饵 · 重布约 ' +
+    (9 * G.NET_CHANCE).toFixed(1) + ' 体力 · 回本 ' +
+    Math.round(G.NET_COST / perNet) + ' 天/张');
 }
