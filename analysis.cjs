@@ -212,3 +212,42 @@ console.log('\n== 三种经营模型的日净收入 ==');
 scenario('早期', 3, 1, 5, 15, 0, 0, false, 'carrot', 100);
 scenario('中期', 20, 4, 15, 45, 3, 10, false, 'corn', 2000);
 scenario('后期', 60, 8, 36, 100, 9, 36, true, 'eggplant', 15000);
+
+/* ---------- 7. 委托 ---------- */
+console.log('\n== 委托收益 ==');
+[5, 20, 45, 75].forEach(function (day) {
+  const lv = day < 10 ? 2 : (day < 30 ? 3 : (day < 60 ? 5 : 7));
+  G.setRng(mulberry32(7));
+  const st = G.createState(); st.day = day; st.levels.farm = lv;
+  const os = G.makeOrders(st);
+  const sum = os.reduce(function (a, o) { return a + o.reward; }, 0);
+  console.log('   D' + pad(day, 3) + 'Lv' + lv + ' 三单合计 ' + sum + ' 金 · ' +
+    os.map(function (o) { return o.name + '×' + o.qty + '(' + o.reward + ')'; }).join(' · '));
+});
+G.setRng(mulberry32(8));
+const lo1 = G.makeLongOrder({ day: 45, levels: { farm: 5 } });
+console.log('   长期订单样本：' + lo1.name + '×' + lo1.qty + ' → ' + lo1.reward +
+  ' 金（5 天，约 ' + Math.round(lo1.reward / 5) + ' 金/天，2 倍价）');
+const osFish = (function () {
+  G.setRng(mulberry32(7));
+  const st = G.createState(); st.day = 45; st.levels.farm = 5;
+  return G.makeOrders(st).filter(function (o) { return o.kind === 'fish'; })[0];
+})();
+console.log('   鱼单：' + osFish.qty + ' 条 → ' + osFish.reward + ' 金（约 ' +
+  Math.round(osFish.reward / osFish.qty) + ' 金/条，直接卖鱼约 7 金/条）');
+
+/* ---------- 8. 维护费 ---------- */
+console.log('\n== 维护费 ==');
+[[10, 0, 0, 0], [20, 10, 3, 1], [36, 36, 9, 1]].forEach(function (row) {
+  const plots = row[0], sp = row[1], nets = row[2], harv = !!row[3];
+  const land = Math.max(0, plots - G.BALANCE.upkeep.free) * G.BALANCE.upkeep.plotPerWeek;
+  const dev = sp * G.BALANCE.upkeep.sprinkle + nets * G.BALANCE.upkeep.net +
+    (harv ? G.BALANCE.upkeep.harvester : 0);
+  const week = land + dev;
+  console.log('   ' + pad(plots + ' 地/' + sp + ' 洒水/' + nets + ' 网', 18) +
+    '周费 ' + pad(week + ' 金', 8) + '= ' + (week / 7).toFixed(1) + ' 金/天' +
+    '（土地 ' + land + ' + 设备 ' + dev + '）');
+});
+console.log('   土地 = (地块数 − 5) × 3/周；洒水器 3/周、渔网 3/周、收获器 5/周');
+console.log('   参考：36 地图后期日毛收入约 1073，维护费占 ' +
+  (233 / 7 / 1073 * 100).toFixed(1) + '%');

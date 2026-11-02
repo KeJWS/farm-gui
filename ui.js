@@ -426,7 +426,7 @@
             '<div class="sv"><span class="sf-note">' + (c.desc || '') + '</span> · ' + mixTxt +
               ' · 均 ' + (val / n).toFixed(1) + ' 金</div></div>' +
             '<span class="sp">' + val + ' 金</span>' +
-            '<button class="btn mini" data-boxopen="crop|' + id + '" title="放进收购箱，原价 +20%">📦</button>' +
+            '<button class="btn mini" data-boxcrop="' + id + '" title="整批放进收购箱，原价结算">📦</button>' +
           '</div>';
         }).join('')
       : '';
@@ -445,7 +445,7 @@
               '<span style="color:' + col + '">' + (q ? q.emoji + ' ' + q.name : '杂物') + '</span>' +
               ' · ' + g.v + ' 金/条</div></div>' +
             '<span class="sp">' + (g.v * g.count) + ' 金</span>' +
-            '<button class="btn mini" data-boxopen="fish|' + g.key + '" title="放进收购箱，原价 +20%">📦</button>' +
+            '<button class="btn mini" data-boxfish="' + g.key + '" title="整批放进收购箱，原价结算">📦</button>' +
           '</div>';
         }).join('')
       : '';
@@ -873,7 +873,7 @@
     const body =
       '<dl class="kv"><dt>🍞 面团饵</dt><dd>1 金/份 · 现有 ' + dough + ' 份 · 标准收获</dd>' +
       '<dt>🎣 假饵</dt><dd>' + lure.price + ' 金/个 · 耐用 ' + lure.dur + ' 次 · 持有上限 1</dd>' +
-      '<dt>🪱 蚯蚓</dt><dd>3 体力挖 1~3 条（晴天 −1、阴雨 +1）· 这里可以卖</dd></dl>' +
+      '<dt>🪱 蚯蚓</dt><dd>3 体力挖 1~3 条（晴天 −1、阴雨 +1）</dd></dl>' +
       '<div class="action-grid">' +
         '<button class="btn" data-buy="dough" data-n="1">🍞 买 1 份<small>1 金</small></button>' +
         '<button class="btn" data-buy="dough" data-n="5">🍞 买 5 份<small>5 金</small></button>' +
@@ -886,7 +886,7 @@
         '<button class="btn mini" data-buycustom="dough">买</button>' +
         '<span class="bc-tip">最多 999 份</span>' +
       '</div>' +
-      '<div class="store-sub" style="margin-top:10px">🪱 蚯蚓回收 · 只有这里收</div>' +
+      '<div class="store-sub" style="margin-top:10px">🪱 蚯蚓回收</div>' +
       '<div class="store-row">' +
         '<span class="se">🪱</span>' +
         '<div><div class="sn">现有蚯蚓 ×' + worms + '</div>' +
@@ -1282,8 +1282,7 @@
     }).join('');
 
     openModal('🧺 农产品店',
-      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金 · 作物在这里出售（' +
-        Math.round(G.BALANCE.shop.sellRate * 100) + ' 折）</div>' +
+      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金</div>' +
       '<div class="store-sub">卖作物 · ' + total + ' 个 · 共 ' + totalVal + ' 金</div>' + sellRows +
       (ids.length
         ? '<div class="buy-custom"><span>🧮 自定义卖出</span>' +
@@ -1325,39 +1324,17 @@
     openModal('📦 收购箱',
       '<div class="shop-head">待出货 <b>' + list.length + '</b> 批 · 原价合计 <b>' + total + '</b> 金</div>' +
       rows +
+      (list.length
+        ? '<div class="buy-custom"><span>🧮 自定义取出</span>' +
+            '<input id="box-take" type="number" min="1" step="1" value="1" inputmode="numeric">' +
+            '<button class="btn mini" data-boxtaken="1">取出</button>' +
+            '<span class="bc-tip">共 ' + list.reduce(function (a, e) { return a + (e.n || 1); }, 0) + ' 件</span></div>'
+        : '') +
       '<div class="shop-tip">放进去的货会在<b>下次睡觉时</b>按原价（100%）结算；' +
       '直接卖给水产店 / 农产品店只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) + '%。<br>' +
-      '放错了可以「全部取出」放回仓库。</div>',
+      '放错了可以取出放回仓库。</div>',
       '<button class="btn" data-boxtake' + (list.length ? '' : ' disabled') + '>全部取出</button>' +
       '<button class="btn" data-close>关闭</button>');
-  }
-
-  /* 放进收购箱：自定义数量 */
-  function boxPutModal(kind, key) {
-    if (kind === 'crop') {
-      const c = G.CROPS[key];
-      const n = G.storeCount(state, key);
-      if (!c || !n) { toast('仓库里没有这种作物', 'warn'); return; }
-      openModal('📦 放进收购箱 · ' + c.name,
-        '<div class="shop-head">现有 <b>' + n + '</b> 个' + ' · 原价 ' + G.storeValue(state, key) + ' 金</div>' +
-        '<div class="buy-custom"><span>数量</span>' +
-          '<input id="box-qty" type="number" min="1" max="' + n + '" value="' + n + '" inputmode="numeric">' +
-          '<span class="bc-tip">最多 ' + n + ' 个</span></div>' +
-        '<div class="shop-tip">从品质差的开始放，下次睡觉按原价结算。</div>',
-        '<button class="btn" data-boxput="crop|' + key + '">放入</button>' +
-        '<button class="btn" data-close>取消</button>');
-      return;
-    }
-    const g = G.fishGroups(state).filter(function (x) { return x.key === key; })[0];
-    if (!g) { toast('仓库里没有这种渔获', 'warn'); return; }
-    openModal('📦 放进收购箱 · ' + g.name,
-      '<div class="shop-head">现有 <b>' + g.count + '</b> 条 · ' + g.v + ' 金/条</div>' +
-      '<div class="buy-custom"><span>数量</span>' +
-        '<input id="box-qty" type="number" min="1" max="' + g.count + '" value="' + g.count + '" inputmode="numeric">' +
-        '<span class="bc-tip">最多 ' + g.count + ' 条</span></div>' +
-      '<div class="shop-tip">下次睡觉按原价结算。</div>',
-      '<button class="btn" data-boxput="fish|' + key + '">放入</button>' +
-      '<button class="btn" data-close>取消</button>');
   }
 
   function fishShop() {
@@ -1403,8 +1380,7 @@
     }).join('');
 
     openModal('🐟 水产店',
-      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金 · 渔获只能在这里出售（' +
-        Math.round(G.BALANCE.shop.sellRate * 100) + ' 折）</div>' +
+      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金</div>' +
       '<div class="store-sub">卖渔获 · ' + total + ' 条</div>' + sellRows +
       '<div class="store-sub" style="margin-top:10px">买水产 · 今日进货' +
         (outOfStock === buyList.length ? '（全部售罄）' : '') + '</div>' + buyRows +
@@ -1707,28 +1683,16 @@
         return;
       }
 
-      // 收购箱：打开放货弹窗
-      const boxOpen = t.closest('[data-boxopen]');
-      if (boxOpen) {
-        const v = boxOpen.dataset.boxopen;
-        const idx = v.indexOf('|');
-        boxPutModal(v.slice(0, idx), v.slice(idx + 1));
-        return;
-      }
-
-      // 收购箱：确认放入
-      const boxPut = t.closest('[data-boxput]');
-      if (boxPut) {
-        const v = boxPut.dataset.boxput;
-        const idx = v.indexOf('|');
-        const kind = v.slice(0, idx), key = v.slice(idx + 1);
-        const input = $('#box-qty');
-        let n = Math.floor(Number(input && input.value) || 0);
+      // 收购箱：自定义取出
+      const boxTakeN = t.closest('[data-boxtaken]');
+      if (boxTakeN) {
+        const input = $('#box-take');
+        const n = Math.floor(Number(input && input.value) || 0);
         if (!(n > 0)) { toast('请输入 1 以上的数量', 'warn'); return; }
-        const r = kind === 'crop' ? G.boxPutCrop(state, key, n) : G.boxPutFish(state, key, n);
-        if (r.ok) closeModal();
+        const r = G.boxTake(state, n);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
+        if (modalOpen()) boxModal();
         return;
       }
 

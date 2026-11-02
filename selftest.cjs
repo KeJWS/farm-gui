@@ -1180,6 +1180,16 @@ ok(p1.ok && p1.n === 3 && G.storeCount(bx, 'carrot') === 7 && G.boxCount(bx) ===
 const tk = G.boxTake(bx);
 ok(tk.ok && G.boxCount(bx) === 0 && G.storeCount(bx, 'carrot') === 10, '收购箱可取回仓库', G.storeCount(bx, 'carrot'));
 
+/* 自定义取出 */
+let bt = G.createState();
+G.addStore(bt, 'carrot', 'std', 10);
+G.boxPutCrop(bt, 'carrot');                       // 整批放入
+G.addStore(bt, 'cabbage', 'std', 5);
+G.boxPutCrop(bt, 'cabbage');
+const tk2 = G.boxTake(bt, 3);
+ok(tk2.ok && tk2.n === 3 && G.storeCount(bt, 'carrot') === 3 && G.boxCount(bt) === 2,
+  '收购箱可自定义取回数量', { got: G.storeCount(bt, 'carrot'), box: G.boxCount(bt) });
+
 /* 自定义卖出 */
 let sc = G.createState(); G.addStore(sc, 'carrot', 'std', 10);
 const s5 = G.sellCropN(sc, 'carrot', 4);

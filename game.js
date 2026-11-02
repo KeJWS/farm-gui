@@ -1272,29 +1272,50 @@
     return { ok: true, msg: g.name + '×' + qty + ' 已入箱', v: v, n: qty };
   }
 
-  /* 从收购箱把货取回仓库 */
-  function boxTake(s) {
+  /* 从收购箱取回 n 件（不传 n 就全取） */
+  function boxTake(s, n) {
     const list = s.box || [];
     if (!list.length) return { ok: false, msg: '收购箱是空的' };
-    let n = 0;
+    let left = n ? Math.max(1, Math.floor(n)) : Infinity;
+    let took = 0;
+    const rest = [];
     list.forEach(function (e) {
-      n += e.n || 1;
+      if (left <= 0) { rest.push(e); return; }
+      const total = e.n || 1;
+      const take = Math.min(total, left);
+      left -= take;
+      took += take;
       if (e.kind === 'crop') {
-        if (e.parts && e.parts.length) {
-          e.parts.forEach(function (p) { addStore(s, e.id, p.q, p.n); });
-        } else if (CROPS[e.id]) {
-          addStore(s, e.id, 'std', e.n || 1);
+        const parts = (e.parts && e.parts.length)
+          ? e.parts : [{ q: 'std', n: total, unit: Math.max(1, Math.round((e.v || 1) / total)) }];
+        let remain = take;
+        const keptParts = [];
+        parts.forEach(function (p) {
+          if (remain <= 0) { keptParts.push({ q: p.q, n: p.n, unit: p.unit }); return; }
+          const cut = Math.min(p.n, remain);
+          remain -= cut;
+          addStore(s, e.id, p.q, cut);
+          if (p.n - cut > 0) keptParts.push({ q: p.q, n: p.n - cut, unit: p.unit });
+        });
+        if (take < total) {
+          rest.push({ kind: 'crop', id: e.id, name: e.name, emoji: e.emoji,
+                      n: total - take, parts: keptParts,
+                      v: Math.round(e.v * (total - take) / total) });
         }
       } else {
-        const unit = Math.max(1, Math.round((e.v || 1) / (e.n || 1)));
-        for (let i = 0; i < (e.n || 1); i++) {
+        const unit = Math.max(1, Math.round((e.v || 1) / total));
+        for (let i = 0; i < take; i++) {
           s.fishBag.push({ name: e.name, emoji: e.emoji, q: e.q || null, v: unit, d: s.day });
+        }
+        if (take < total) {
+          rest.push({ kind: 'fish', name: e.name, emoji: e.emoji, q: e.q,
+                      n: total - take, v: Math.round(e.v * (total - take) / total) });
         }
       }
     });
-    s.box = [];
-    log(s, '📦 从收购箱取回 ' + n + ' 件', 'info');
-    return { ok: true, msg: '取回 ' + n + ' 件', n: n };
+    s.box = rest;
+    log(s, '📦 从收购箱取回 ' + took + ' 件', 'info');
+    return { ok: true, msg: '取回 ' + took + ' 件', n: took };
   }
 
   /* 收购箱出货：睡觉时按原价一次性结清 */
