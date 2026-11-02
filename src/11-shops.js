@@ -7,7 +7,7 @@
     if (!c) return 0;
     const mkt = s ? marketMul(s, id) : 1;
     const cut = s ? (1 - townBonus(s, 'shopCut')) : 1;
-    return Math.max(2, Math.round(c.price * BALANCE.shop.cropPriceMul * mkt * cut));
+    return Math.max(2, Math.round(c.price * BALANCE.shop.cropPriceMul * mkt * cut * (s ? tradeCut(s) : 1)));
   }
 
   function cropShopStock(s, id) {
@@ -26,6 +26,7 @@
     s.coins -= cost;
     s.cropShop.stock[id] = stock - qty;
     ledger(s, '买农产品 ' + c.name + ' ×' + qty, 0, cost);
+    tradeXp(s, cost);
     addStore(s, id, 'std', qty);
     log(s, '🛒 买进 ' + c.emoji + ' ' + c.name + ' ×' + qty + '（-' + cost + ' 金，今日剩 ' +
       s.cropShop.stock[id] + ' 个）', 'info');
@@ -284,14 +285,27 @@
     return { ok: true, msg: '自动播种器已' + (s.seederOn ? '开启' : '关闭'), on: s.seederOn };
   }
 
-  /* 选自动播种用哪种种子（必须是背包里有的） */
-  function setAutoSeed(s, id) {
-    if (!seederCount(s)) return { ok: false, msg: '要先买自动播种器' };
+  /* 第 k 台自己选的种子（每台可以不同） */
+  function autoSeedOf(s, k) {
+    const arr = s.autoSeeds || [];
+    const id = arr[k - 1];
+    return (id && CROPS[id] && !CROPS[id].wild) ? id : null;
+  }
+
+  function setAutoSeed(s, k, id) {
+    const n = seederCount(s);
+    if (!n) return { ok: false, msg: '要先买自动播种器' };
+    const mach = Math.round(k) || 1;
+    if (mach < 1 || mach > n) return { ok: false, msg: '没有第 ' + mach + ' 台播种器' };
     if (id && !CROPS[id]) return { ok: false, msg: '没有这种作物' };
+    if (id && CROPS[id].wild) return { ok: false, msg: '野货不能种' };
     if (id && (s.seeds[id] || 0) <= 0) return { ok: false, msg: '背包里没有 ' + CROPS[id].name + ' 种子' };
-    s.autoSeed = id || null;
-    log(s, '🌱 自动播种种子设为 ' + (id ? CROPS[id].name : '不设（不播种）'), 'info');
-    return { ok: true, msg: id ? '自动播种：' + CROPS[id].name : '已关闭自动播种', seed: s.autoSeed };
+    s.autoSeeds = (s.autoSeeds || []).slice(0, n);
+    while (s.autoSeeds.length < n) s.autoSeeds.push(null);
+    s.autoSeeds[mach - 1] = id || null;
+    log(s, '🌱 第 ' + mach + ' 台播种器设为 ' + (id ? CROPS[id].name : '不播种'), 'info');
+    return { ok: true, msg: id ? '第 ' + mach + ' 台：' + CROPS[id].name : '第 ' + mach + ' 台已关闭播种',
+             seed: id || null, mach: mach };
   }
 
   /* 委托手动刷新：每天一次 */
@@ -324,7 +338,8 @@
   }
   function seedBuyPrice(c, s) {
     if (!c) return 0;
-    return Math.ceil(c.seed * (seedOffSeason(s, c.id) ? BALANCE.seed.offSeasonMul : 1));
+    const base = c.seed * (seedOffSeason(s, c.id) ? BALANCE.seed.offSeasonMul : 1);
+    return Math.ceil(base * (s ? tradeCut(s) : 1));
   }
   function seedSellPrice(c) { return Math.max(1, Math.floor(c.seed * SEED_SELL_RATE)); }
 
@@ -341,6 +356,7 @@
     if (s.coins < cost) return { ok: false, msg: '金币不够（需要 ' + cost + ' 金）' };
     s.coins -= cost;
     ledger(s, '买种子 ' + c.name + '×' + qty, 0, cost);
+    tradeXp(s, cost);
     s.seeds[id] = (s.seeds[id] || 0) + qty;
     log(s, '🌰 买了 ' + c.name + '种子 ×' + qty + '（-' + cost + ' 金' +
       (off ? '，反季种子' : '') + '）', 'info');
@@ -357,6 +373,7 @@
     const left = have - qty;
     if (left > 0) s.seeds[id] = left; else delete s.seeds[id];
     addCoins(s, gain, '卖种子 ' + c.name);
+    tradeXp(s, gain);
     log(s, '💰 卖出 ' + c.name + '种子 ×' + qty + '，+' + gain + ' 金', 'good');
     return { ok: true, msg: '卖出 ' + qty + ' 颗种子，+' + gain + ' 金', qty: qty, income: gain };
   }
@@ -368,6 +385,7 @@
     ids.forEach(function (id) { total += (s.seeds[id] || 0) * seedSellPrice(CROPS[id]); });
     s.seeds = {};
     addCoins(s, total, '卖种子');
+    tradeXp(s, total);
     log(s, '💰 清空种子，+' + total + ' 金', 'good');
     return { ok: true, msg: '卖出全部种子，+' + total + ' 金', income: total };
   }

@@ -1353,7 +1353,10 @@ v23keyS.levels.fish = 4;
 ok(G.buyKey(v23keyS, 'iron', 1).ok && v23keyS.keys.iron === 1 && v23keyS.coins === 460, 'Lv4 解锁铁钥匙 40 金', v23keyS.keys);
 ok(!G.buyKey(v23keyS, 'gold', 1).ok, '金钥匙要 Lv7');
 v23keyS.levels.fish = 7;
-ok(G.buyKey(v23keyS, 'gold', 1).ok && v23keyS.keys.gold === 1, 'Lv7 解锁金钥匙');
+ok(!G.buyKey(v23keyS, 'gold', 1).ok, '金钥匙还要交易 Lv4');
+v23keyS.levels.trade = G.BALANCE.gate.goldKeyTrade;
+ok(G.buyKey(v23keyS, 'gold', 1).ok && v23keyS.keys.gold === 1, 'Lv7 + 交易 Lv4 解锁金钥匙');
+ok(G.keyUnlocked(v23keyS, 'iron'), '铁钥匙不受交易等级限制');
 
 /* 宝箱：木箱直接开、铁箱要钥匙 */
 const v23chS = G.createState();
@@ -1943,14 +1946,16 @@ v33b2.energy = 50;
 G.forage(v33b2);
 ok(v33b2.energy === 46, '采集满级只花 4 体力', v33b2.energy);
 
-/* 高级假饵 */
+/* 高级假饵：钓鱼 Lv6 + 交易 Lv3 */
 const v33f = G.createState();
 v33f.coins = 1000; v33f.levels.fish = G.BALANCE.gate.lure2 - 1;
 ok(!G.buyBait(v33f, 'lure2', 1).ok, '等级不够买不到高级假饵');
 v33f.levels.fish = G.BALANCE.gate.lure2;
+ok(!G.buyBait(v33f, 'lure2', 1).ok, '钓鱼到级但交易等级不够也买不到');
+v33f.levels.trade = G.BALANCE.gate.lure2Trade;
 const v33buy = G.buyBait(v33f, 'lure2', 1);
 ok(v33buy.ok && v33f.lure2.owned && v33f.lure2.dur === 100 && v33f.coins === 1000 - 20,
-  'Lv6 能买高级假饵（20 金 / 100 耐久）', v33f.coins);
+  'Lv6 + 交易 Lv3 能买高级假饵（20 金 / 100 耐久）', v33f.coins);
 ok(Math.abs(G.HOOK.lure2 - G.HOOK.dough) < 1e-9, '高级假饵咬钩率 = 面团饵');
 ok(G.BALANCE.bait.lureGood === 1.15 && G.BALANCE.bait.lureTrash === 0.3, '高级假饵好鱼率 = 假饵');
 
@@ -1980,9 +1985,9 @@ const v33sb = G.buySeeder(v33s);
 ok(v33sb.ok && v33s.seeder === 1 && v33s.coins === 3000 - G.SEEDER_COST, '买到第 1 台自动播种器', v33s.coins);
 ok(G.seederPlots(v33s) === 5, '一台只覆盖 5 块地', G.seederPlots(v33s));
 ok(G.deviceUpkeep(v33s) === G.BALANCE.upkeep.seeder, '播种器每周 6 金维护费', G.deviceUpkeep(v33s));
-ok(!G.setAutoSeed(v33s, 'carrot').ok, '没种子时选不了播种品种');
+ok(!G.setAutoSeed(v33s, 1, 'carrot').ok, '没种子时选不了播种品种');
 v33s.seeds = { carrot: 20 };
-ok(G.setAutoSeed(v33s, 'carrot').ok && v33s.autoSeed === 'carrot', '选上萝卜种子');
+ok(G.setAutoSeed(v33s, 1, 'carrot').ok && G.autoSeedOf(v33s, 1) === 'carrot', '选上萝卜种子');
 G.sleep(v33s);
 const v33planted = v33s.plots.filter(function (p) { return p.crop; }).length;
 ok(v33planted === 5, '一台只播 5 块', v33planted);
@@ -1997,7 +2002,7 @@ v33s2.coins = 3000; v33s2.levels.farm = G.BALANCE.gate.seeder;
 v33s2.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
 v33s2.seeds = { carrot: 20 };
 G.buySeeder(v33s2); G.buySeeder(v33s2);
-G.setAutoSeed(v33s2, 'carrot');
+G.setAutoSeed(v33s2, 1, 'carrot'); G.setAutoSeed(v33s2, 2, 'carrot');
 G.sleep(v33s2);
 ok(v33s2.plots.filter(function (p) { return p.crop; }).length === 10, '两台一晚播满 10 块',
   v33s2.plots.filter(function (p) { return p.crop; }).length);
@@ -2013,7 +2018,7 @@ v35.coins = 3000; v35.levels.farm = G.BALANCE.gate.seeder;
 v35.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
 v35.seeds = { carrot: 20 };
 G.buySeeder(v35);
-G.setAutoSeed(v35, 'carrot');
+G.setAutoSeed(v35, 1, 'carrot');
 ok(G.seederPlateOf(v35, 4) === 1 && G.seederPlateOf(v35, 5) === 0, '第 1 台只管 1–5 块');
 ok(G.seederPlateRange(2).from === 6 && G.seederPlateRange(2).to === 10, '第 2 台号段 6–10');
 /* 第 1 台没种子时，第 2 台（如果有）也不会替它种 */
@@ -2024,7 +2029,7 @@ ok(v35.plots.every(function (p) { return !p.crop; }), '没种子时整排都不�
 /* 收完立刻补种（机器管这块地） */
 const v35h = G.createState();
 v35h.coins = 3000; v35h.levels.farm = G.BALANCE.gate.seeder;
-v35h.seeder = 1; v35h.seederOn = true; v35h.autoSeed = 'carrot';
+v35h.seeder = 1; v35h.seederOn = true; v35h.autoSeeds = ['carrot'];
 v35h.seeds = { carrot: 5 };
 v35h.day = 10;
 v35h.plots[0] = { crop: 'carrot', growth: 2, watered: true, missed: 0, fert: 0,
@@ -2082,8 +2087,83 @@ const v35got2 = G.checkAchievements(v35ach).map(function (a) { return a.id; });
 ok(v35got2.indexOf('wild4') >= 0 && v35got2.indexOf('forage3') >= 0 &&
    v35got2.indexOf('forageLv5') >= 0, '四季野味 / 满载而归 / 认得百草都能解锁', v35got2.join(','));
 
+/* ---------- v2.16：每台播种器各选各的种子 ---------- */
+const v36 = G.createState();
+v36.coins = 3000; v36.levels.farm = G.BALANCE.gate.seeder;
+v36.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
+v36.seeds = { carrot: 10, potato: 10 };
+G.buySeeder(v36); G.buySeeder(v36);
+ok(G.setAutoSeed(v36, 1, 'carrot').ok && G.setAutoSeed(v36, 2, 'potato').ok, '两台各选各的种子');
+ok(G.autoSeedOf(v36, 1) === 'carrot' && G.autoSeedOf(v36, 2) === 'potato', '每台的种子互不影响',
+  [G.autoSeedOf(v36, 1), G.autoSeedOf(v36, 2)]);
+ok(!G.setAutoSeed(v36, 3, 'carrot').ok, '没有第 3 台就选不了');
+G.sleep(v36);
+ok(v36.plots.slice(0, 5).every(function (p) { return p.crop === 'carrot'; }), '第 1 台只播萝卜');
+ok(v36.plots.slice(5, 10).every(function (p) { return p.crop === 'potato'; }), '第 2 台只播土豆');
+
+/* 收获补种也用各自那台选的种子 */
+const v36h = G.createState();
+v36h.coins = 3000; v36h.levels.farm = G.BALANCE.gate.seeder;
+v36h.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
+v36h.seeds = { carrot: 5, potato: 5 };
+v36h.seeder = 2; v36h.seederOn = true; v36h.autoSeeds = ['carrot', 'potato'];
+v36h.day = 10;
+v36h.plots[6] = { crop: 'carrot', growth: 2, watered: true, missed: 0, fert: 0,
+  ripeDay: 9, hits: 0, phase: 'ripe', planted: 7, auto: 0 };
+const v36hr = G.harvest(v36h, 6);
+ok(v36hr.ok && v36hr.replanted === 'potato', '第 2 台的地收完补土豆', v36hr.replanted);
+
+/* 老存档 autoSeed 复制给所有机器 */
+const v36mig = G.deserialize(Object.assign(JSON.parse(G.serialize(G.createState())), {
+  seeder: 2, autoSeed: 'carrot'
+}));
+ok(v36mig.autoSeeds.length === 2 && v36mig.autoSeeds[0] === 'carrot' && v36mig.autoSeeds[1] === 'carrot',
+  '老存档单个 autoSeed 复制给两台', v36mig.autoSeeds);
+
+/* ---------- v2.16：交易等级 ---------- */
+const v36t = G.createState();
+v36t.coins = 2000;
+ok(G.tradeLv(v36t) === 1, '交易等级从 1 开始');
+G.buySeed(v36t, 'carrot', 1);
+ok(v36t.levels.tradeXp === Math.round(5 / G.BALANCE.trade.xpPer), '买种子按金额涨交易经验',
+  v36t.levels.tradeXp);
+const v36t2 = G.createState();
+v36t2.coins = 2000;
+G.levelNeed(1, 'trade');
+ok(G.levelNeed(1, 'trade') === G.BALANCE.trade.xpBase, '交易等级用更长的曲线',
+  G.levelNeed(1, 'trade'));
+G.tradeXp(v36t2, 600);                        // 600 金 = 120 经验
+ok(G.tradeLv(v36t2) >= 2, '交易额够就升级', G.tradeLv(v36t2));
+/* 进价随交易等级下降 */
+const v36p = G.createState();
+const v36p10 = G.createState();
+v36p10.levels.trade = G.BALANCE.level.max;
+const seedFull = G.seedBuyPrice(G.CROPS.watermelon, v36p);
+const seedCut = G.seedBuyPrice(G.CROPS.watermelon, v36p10);
+ok(seedCut < seedFull, '交易满级时种子进价更低', [seedFull, seedCut]);
+ok(Math.abs(G.tradeCut(v36p10) - (1 - G.BALANCE.trade.maxCut)) < 1e-9, '进价折扣封顶 4.5%',
+  G.tradeCut(v36p10));
+
+/* 挖蚯蚓 / 采集 Lv4、Lv8 加成 */
+const v36d = G.createState();
+v36d.levels.dig = 4;
+ok(G.digYieldBonus(v36d) === 1, '挖蚯蚓 Lv4 产量 +1', G.digYieldBonus(v36d));
+v36d.levels.dig = 8;
+ok(G.digYieldBonus(v36d) === 2, '挖蚯蚓 Lv8 产量 +2', G.digYieldBonus(v36d));
+G.setRng(mulberry32(2));
+v36d.energy = 100; v36d.weather = 'cloudy';
+const v36dn = G.digWorms(v36d).n;
+ok(v36dn >= 3, 'Lv8 阴天至少挖 3 条', v36dn);
+const v36f = G.createState();
+v36f.levels.forage = 4;
+ok(G.forageRolls(v36f) === 2, '采集 Lv4 品质取两次', G.forageRolls(v36f));
+v36f.levels.forage = 8;
+ok(G.forageRolls(v36f) === 3, '采集 Lv8 品质取三次', G.forageRolls(v36f));
+ok(G.levelEffectText('forage', 8).indexOf('品质') >= 0, '采集等级文案写品质',
+  G.levelEffectText('forage', 8));
+
 const v33w = G.createState();
-v33w.seeder = 2; v33w.seederOn = true; v33w.autoSeed = 'carrot';
+v33w.seeder = 2; v33w.seederOn = true; v33w.autoSeeds = ['carrot', 'carrot'];
 v33w.seeds = { carrot: 10 }; v33w.day = 91; v33w.coins = 1000;
 G.sleep(v33w);
 ok(v33w.plots.every(function (p) { return !p.crop; }), '冬天自动播种器不工作');

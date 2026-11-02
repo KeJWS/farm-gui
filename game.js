@@ -44,10 +44,13 @@
               offSeason: 1.7, decay: 0.7, scarce: 1.15, glut: 0.9,
               /* 委托的市价溢价封顶，避免一张单顶掉整个农场 */
               orderCap: 1.6 },
-    /* 采集：5 体力一次（采集满级 4），100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子 */
-    forage: { energy: 5, qty2: 0.75, qty3: 0.35, seedChance: 0.25, xp: 2 },
-    /* 挖蚯蚓：3 体力一次（满级 2），最多 5 条 */
-    dig: { energy: 3, xp: 2 },
+    /* 采集：5 体力一次（采集满级 4），100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子
+     * Lv4 / Lv8 各多取一次品质（野货品质更好） */
+    forage: { energy: 5, qty2: 0.75, qty3: 0.35, seedChance: 0.25, xp: 2, qualityAt: 4 },
+    /* 挖蚯蚓：3 体力一次（满级 2），1–3 条；Lv4 / Lv8 各 +1 条（最多 7 条） */
+    dig: { energy: 3, xp: 2, yieldAt: 4 },
+    /* 交易等级：买东西 / 卖东西按交易额涨经验（每 5 金 1 点），每级把商店进价压低 0.5%（最多 −4.5%） */
+    trade: { xpPer: 5, buyCut: 0.005, maxCut: 0.045, xpBase: 60, xpStep: 30 },
     /* 小镇捐赠：三档，捐得越多加成越多（金币出口） */
     town: [
       { id: 'stall', name: '村口小摊', emoji: '🏪', need: 2000, orderBonus: 0.05,
@@ -66,7 +69,7 @@
     level: { max: 10, xpBase: 15, xpStep: 10, maxEnergySave: 1 },
     /* 等级解锁：商店设备 / 高级种子 / 特效肥 / 渔网 / 渔夫 / 高级假饵 / 自动播种器 */
     gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2, fisher: 5,
-            seeder: 4, lure2: 6 },
+            seeder: 4, lure2: 6, lure2Trade: 3, goldKeyTrade: 4 },
     /* 宝箱：铁箱 / 金箱按钓鱼等级解锁 */
     chest: { ironLv: 4, goldLv: 7 }
   };
@@ -557,14 +560,42 @@
     return best;
   }
 
-  /* ---------------- 等级（种田 / 钓鱼 / 挖蚯蚓 / 采集） ---------------- */
+  /* ---------------- 等级（种田 / 钓鱼 / 挖蚯蚓 / 采集 / 交易） ---------------- */
 
-  const SKILLS = ['farm', 'fish', 'dig', 'forage'];
-  const SKILL_NAME = { farm: '种田', fish: '钓鱼', dig: '挖蚯蚓', forage: '采集' };
+  const SKILLS = ['farm', 'fish', 'dig', 'forage', 'trade'];
+  const SKILL_NAME = { farm: '种田', fish: '钓鱼', dig: '挖蚯蚓', forage: '采集', trade: '交易' };
 
-  function levelNeed(lv) {
+  /* 交易等级用一条更长的曲线（经验来自交易额，来得快） */
+  function levelNeed(lv, kind) {
+    const l = lv || 1;
+    if (kind === 'trade') {
+      const T = BALANCE.trade;
+      return T.xpBase + T.xpStep * (l - 1);
+    }
     const L = BALANCE.level;
-    return L.xpBase + L.xpStep * ((lv || 1) - 1);
+    return L.xpBase + L.xpStep * (l - 1);
+  }
+
+  /* 挖蚯蚓每 4 级 +1 条（Lv4 / Lv8） */
+  function digYieldBonus(s) {
+    return Math.floor(skillLv(s, 'dig') / BALANCE.dig.yieldAt);
+  }
+  /* 采集每 4 级多取一次品质（Lv4 / Lv8），效果等同施肥 */
+  function forageRolls(s) {
+    return 1 + Math.floor(skillLv(s, 'forage') / BALANCE.forage.qualityAt);
+  }
+
+  function tradeLv(s) { return skillLv(s, 'trade'); }
+  /* 交易等级：商店进价小幅下调 */
+  function tradeCut(s) {
+    const T = BALANCE.trade;
+    return 1 - Math.min(T.maxCut, (tradeLv(s) - 1) * T.buyCut);
+  }
+  /* 交易经验：按成交金额给（每 5 金 1 点） */
+  function tradeXp(s, gold) {
+    const g = Math.max(0, Math.round(gold || 0));
+    if (!g) return 0;
+    return addLevelXp(s, 'trade', g / BALANCE.trade.xpPer);
   }
 
   function levelEffectText(kind, lv) {
@@ -574,10 +605,16 @@
         Math.min(22.5, (lv - 1) * 2.5).toFixed(1) + '%';
     }
     if (kind === 'dig') {
-      return '挖蚯蚓 ' + digCostByLv(lv) + ' 体力' + (lv >= max ? '（满级已省 1 点）' : '');
+      return '挖蚯蚓 ' + digCostByLv(lv) + ' 体力 · 产量 +' + Math.floor(lv / BALANCE.dig.yieldAt) +
+        (lv >= max ? '（满级已省 1 点）' : '');
     }
     if (kind === 'forage') {
-      return '采集 ' + forageCostByLv(lv) + ' 体力' + (lv >= max ? '（满级已省 1 点）' : '');
+      return '采集 ' + forageCostByLv(lv) + ' 体力 · 品质 ×' +
+        (1 + Math.floor(lv / BALANCE.forage.qualityAt)) +
+        (lv >= max ? '（满级已省 1 点）' : '');
+    }
+    if (kind === 'trade') {
+      return '商店进价 −' + (Math.min(BALANCE.trade.maxCut, (lv - 1) * BALANCE.trade.buyCut) * 100).toFixed(1) + '%';
     }
     return '收获产量 +' + Math.floor(lv / 4);
   }
@@ -602,13 +639,13 @@
     const gain = (n === undefined || n === null) ? 1 : Math.max(0, Math.round(n));
     s.levels[xpKey] = (s.levels[xpKey] || 0) + gain;
     let ups = 0;
-    while (s.levels[key] < BALANCE.level.max && s.levels[xpKey] >= levelNeed(s.levels[key])) {
-      s.levels[xpKey] -= levelNeed(s.levels[key]);
+    while (s.levels[key] < BALANCE.level.max && s.levels[xpKey] >= levelNeed(s.levels[key], key)) {
+      s.levels[xpKey] -= levelNeed(s.levels[key], key);
       s.levels[key]++;
       ups++;
     }
     if (s.levels[key] >= BALANCE.level.max) {
-      s.levels[xpKey] = Math.min(s.levels[xpKey], levelNeed(BALANCE.level.max) - 1);
+      s.levels[xpKey] = Math.min(s.levels[xpKey], levelNeed(BALANCE.level.max, key) - 1);
     }
     if (ups) {
       log(s, '⭐ ' + SKILL_NAME[key] + '等级 → Lv' + s.levels[key] +
@@ -726,7 +763,7 @@
       harvesterOn: true,
       seeder: 0,
       seederOn: true,
-      autoSeed: null,
+      autoSeeds: [],
       nets: 0,
       netSet: 0,
       fisher: null,
@@ -746,7 +783,8 @@
       longOrder: null,
       shop: makeShop(1),
       cropShop: makeCropShop(1),
-      levels: { farm: 1, fish: 1, farmXp: 0, fishXp: 0, dig: 1, digXp: 0, forage: 1, forageXp: 0 },
+      levels: { farm: 1, fish: 1, farmXp: 0, fishXp: 0, dig: 1, digXp: 0, forage: 1, forageXp: 0,
+                trade: 1, tradeXp: 0 },
       ach: {},
       fishBook: { count: 0, entries: [], best: null, priciest: null },
       stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0,
@@ -919,17 +957,20 @@
     return k <= Math.max(0, Math.round(s.seeder || 0)) ? k : 0;
   }
 
-  /* 这块地能不能被播种器补种：有对应的机器、开着、选了种子、不是冬天、还有种子 */
+  /* 这块地能不能被播种器补种：有对应的机器、那台选了种子、开着、不是冬天、还有种子 */
   function canAutoSeed(s, idx) {
-    if (!seederPlateOf(s, idx)) return false;
-    if (!s.seederOn || !s.autoSeed || isWinter(s.day)) return false;
-    return (s.seeds[s.autoSeed] || 0) > 0;
+    const k = seederPlateOf(s, idx);
+    if (!k) return false;
+    const seed = autoSeedOf(s, k);
+    if (!seed || !s.seederOn || isWinter(s.day)) return false;
+    return (s.seeds[seed] || 0) > 0;
   }
 
   /* 收完立刻补种，返回种下的作物 id；不满足条件返回 null */
   function autoReplant(s, idx) {
-    if (!canAutoSeed(s, idx)) return null;
-    const seed = s.autoSeed;
+    const k = seederPlateOf(s, idx);
+    if (!k || !canAutoSeed(s, idx)) return null;
+    const seed = autoSeedOf(s, k);
     const r = plant(s, idx, seed, { free: true, quiet: true });
     return r.ok ? seed : null;
   }
@@ -1058,6 +1099,7 @@
     });
     s.stats.cropsSold = (s.stats.cropsSold || 0) + count;
     addCoins(s, income, '农产品店 · 卖作物');
+    tradeXp(s, income);
     log(s, '💰 农产品店收购 ' + parts.join('、') + '，收入 ' + income + ' 金（8 折）', 'good');
     return { ok: true, msg: '卖出全部，+' + income + ' 金', income: income, count: count };
   }
@@ -1083,6 +1125,7 @@
     addSupply(s, id, qty);
     s.stats.cropsSold = (s.stats.cropsSold || 0) + qty;
     addCoins(s, gain, '农产品店 · 卖 ' + CROPS[id].name + '×' + qty);
+    tradeXp(s, gain);
     log(s, '💰 农产品店收购 ' + CROPS[id].name + '×' + qty + '，+' + gain + ' 金（8 折）', 'good');
     return { ok: true, msg: '+' + gain + ' 金', income: gain, count: qty };
   }
@@ -1095,6 +1138,7 @@
     delete s.store[id];
     s.stats.cropsSold = (s.stats.cropsSold || 0) + n;
     addCoins(s, gain, '农产品店 · 卖 ' + CROPS[id].name);
+    tradeXp(s, gain);
     log(s, '💰 农产品店收购 ' + CROPS[id].name + '×' + n + '，+' + gain + ' 金（8 折）', 'good');
     return { ok: true, msg: '+' + gain + ' 金', income: gain, count: n };
   }
@@ -1234,21 +1278,21 @@
         (hrp ? ' · 补种 ' + hrp + ' 块' : '') });
     }
 
-    // 自动播种器：每台只管自己那 5 块，睡觉时把空着的补上（不耗体力）
-    if (s.seeder && s.seederOn && s.autoSeed && !isWinter(s.day)) {
-      const seed = s.autoSeed;
+    // 自动播种器：每台只管自己那 5 块，用自己选的种子把空着的补上（不耗体力）
+    if (s.seeder && s.seederOn && !isWinter(s.day)) {
       const per = BALANCE.device.seederPlots;
       const machines = Math.round(s.seeder || 0);
       let sn = 0;
       for (let k = 1; k <= machines; k++) {
+        const seed = autoSeedOf(s, k);
+        if (!seed) continue;
         for (let i = (k - 1) * per; i < Math.min(k * per, s.plots.length); i++) {
           if (s.plots[i].crop) continue;
           if ((s.seeds[seed] || 0) <= 0) break;
           if (plant(s, i, seed, { free: true, quiet: true }).ok) sn++;
         }
-        if ((s.seeds[seed] || 0) <= 0) break;
       }
-      if (sn) notes.push({ kind: 'seeder', text: '🌱 自动播种 ' + sn + ' 块 ' + CROPS[seed].name });
+      if (sn) notes.push({ kind: 'seeder', text: '🌱 自动播种 ' + sn + ' 块' });
     }
 
     s.plots.forEach(function (p) {
@@ -2004,6 +2048,7 @@
     s.stats.boxItems = (s.stats.boxItems || 0) + n;
     s.stats.boxIncome = (s.stats.boxIncome || 0) + value;
     addCoins(s, value, '收购箱出货');
+    tradeXp(s, value);
     return { n: n, value: value };
   }
 
@@ -2017,6 +2062,7 @@
     const gain = Math.max(1, Math.round(shopValue(raw) * sellBonus(s) * fishMarketMul(s, g.name)));
     addFishSupply(s, g.name, qty);
     addCoins(s, gain, '卖鱼 ' + g.name);
+    tradeXp(s, gain);
     log(s, '💰 卖出 ' + g.emoji + ' ' + g.name + ' ×' + qty + '，+' + gain + ' 金（8 折）', 'good');
     return { ok: true, msg: '卖出 ' + g.name + '×' + qty + '，+' + gain + ' 金', income: gain, count: qty };
   }
@@ -2031,6 +2077,7 @@
     const gain = qty * WORM_VALUE;
     s.bait.worm = have - qty;
     addCoins(s, gain, '卖蚯蚓');
+    tradeXp(s, gain);
     log(s, '💰 卖出蚯蚓 ×' + qty + '，+' + gain + ' 金', 'good');
     return { ok: true, qty: qty, income: gain, msg: '卖出蚯蚓 ×' + qty + '，+' + gain + ' 金' };
   }
@@ -2039,14 +2086,15 @@
     const cost = digCost(s);
     if (s.energy < cost) return { ok: false, msg: '体力不够（挖蚯蚓要 ' + cost + ' 点）' };
     const w = WEATHER[s.weather];
-    const n = clamp(randInt(1, 3) + w.wormMod, 1, 5);
+    const bonus = digYieldBonus(s);
+    const n = clamp(randInt(1, 3) + w.wormMod + bonus, 1, 5 + bonus);
     s.energy -= cost;
     s.bait.worm += n;
     s.stats.dug++;
     const up = addLevelXp(s, 'dig', BALANCE.dig.xp);
     log(s, '🪱 挖到蚯蚓 ×' + n + '（现有 ' + s.bait.worm + '）' +
-      (up ? ' · 挖蚯蚓 Lv' + digLv(s) : ''), 'good');
-    return { ok: true, msg: '挖到蚯蚓 ×' + n, n: n, levelUp: up, cost: cost };
+      (bonus ? ' · 等级产量 +' + bonus : '') + (up ? ' · 挖蚯蚓 Lv' + digLv(s) : ''), 'good');
+    return { ok: true, msg: '挖到蚯蚓 ×' + n, n: n, levelUp: up, cost: cost, bonus: bonus };
   }
 
 /* ==================== src/09-forage.js ==================== */
@@ -2076,7 +2124,7 @@
     let n = 1;
     if (rand() < BALANCE.forage.qty2) n++;
     if (rand() < BALANCE.forage.qty3) n++;
-    const q = rollQuality(1);
+    const q = rollQuality(forageRolls(s));
     addStore(s, w.id, q.id, n);
     s.stats.forages = (s.stats.forages || 0) + 1;
     s.stats.wild = s.stats.wild || {};
@@ -2104,6 +2152,7 @@
       const cost = 1 * n;
       if (s.coins < cost) return { ok: false, msg: '金币不够' };
       s.coins -= cost; ledger(s, '买面团饵 ×' + n, 0, cost);
+      tradeXp(s, cost);
       s.bait.dough += n;
       log(s, '🍞 买了面团饵 ×' + n + '（-' + cost + ' 金）', 'info');
       return { ok: true, msg: '面团饵 ×' + n };
@@ -2113,6 +2162,7 @@
       if (s.lure.owned) return { ok: false, msg: '假饵一次只能持 1 个' };
       if (s.coins < price) return { ok: false, msg: '金币不够（' + price + ' 金）' };
       s.coins -= price; ledger(s, '买假饵', 0, price);
+      tradeXp(s, price);
       s.lure.owned = true; s.lure.dur = dur;
       log(s, '🎣 买了一个假饵（耐用 ' + dur + ' 次）', 'info');
       return { ok: true, msg: '假饵到手' };
@@ -2122,9 +2172,13 @@
       if (fishLv(s) < BALANCE.gate.lure2) {
         return { ok: false, msg: '高级假饵要钓鱼 Lv' + BALANCE.gate.lure2 + ' 才解锁（现在 Lv' + fishLv(s) + '）' };
       }
+      if (tradeLv(s) < BALANCE.gate.lure2Trade) {
+        return { ok: false, msg: '高级假饵要交易 Lv' + BALANCE.gate.lure2Trade + ' 才解锁（现在 Lv' + tradeLv(s) + '）' };
+      }
       if (s.lure2.owned) return { ok: false, msg: '高级假饵一次只能持 1 个' };
       if (s.coins < L.price) return { ok: false, msg: '金币不够（' + L.price + ' 金）' };
       s.coins -= L.price; ledger(s, '买高级假饵', 0, L.price);
+      tradeXp(s, L.price);
       s.lure2.owned = true; s.lure2.dur = L.dur;
       log(s, '🪝 买了一个高级假饵（耐用 ' + L.dur + ' 次，咬钩同面团饵、好鱼同假饵）', 'info');
       return { ok: true, msg: '高级假饵到手' };
@@ -2170,28 +2224,38 @@
     if (!t) return { ok: false, msg: '没有这种茶' };
     if (!teaUnlocked(s, t)) return { ok: false, msg: '第 ' + t.day + ' 天才上架' };
     const qty = Math.max(1, Math.min(20, Math.floor(n || 1)));
-    const cost = t.price * qty;
+    const cost = Math.round(t.price * tradeCut(s)) * qty;
     if (s.coins < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
     s.coins -= cost; ledger(s, '买' + t.name + ' ×' + qty, 0, cost);
+    tradeXp(s, cost);
     s.teas = s.teas || {};
     s.teas[id] = (s.teas[id] || 0) + qty;
     log(s, t.emoji + ' 买了' + t.name + ' ×' + qty + '（-' + cost + ' 金）', 'info');
     return { ok: true, msg: t.name + ' ×' + qty, qty: qty, cost: cost };
   }
 
+  /* 金钥匙要交易等级（常跑商店的人才拿得到渠道） */
+  function keyTradeGate(id) {
+    return id === 'gold' ? BALANCE.gate.goldKeyTrade : 0;
+  }
   function keyUnlocked(s, id) {
     const k = KEYS[id];
-    return !!k && fishLv(s) >= (k.lv || 1);
+    if (!k || fishLv(s) < (k.lv || 1)) return false;
+    return tradeLv(s) >= keyTradeGate(id);
   }
 
   function buyKey(s, id, n) {
     const k = KEYS[id];
     if (!k) return { ok: false, msg: '没有这种钥匙' };
-    if (!keyUnlocked(s, id)) return { ok: false, msg: '钓鱼 Lv' + k.lv + ' 才上架' };
+    if (fishLv(s) < k.lv) return { ok: false, msg: '钓鱼 Lv' + k.lv + ' 才上架' };
+    if (tradeLv(s) < keyTradeGate(id)) {
+      return { ok: false, msg: k.name + '要交易 Lv' + keyTradeGate(id) + ' 才上架（现在 Lv' + tradeLv(s) + '）' };
+    }
     const qty = Math.max(1, Math.min(9, Math.floor(n || 1)));
-    const cost = k.price * qty;
+    const cost = Math.round(k.price * tradeCut(s)) * qty;
     if (s.coins < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
     s.coins -= cost; ledger(s, '买' + k.name + ' ×' + qty, 0, cost);
+    tradeXp(s, cost);
     s.keys = s.keys || { iron: 0, gold: 0 };
     s.keys[id] = (s.keys[id] || 0) + qty;
     log(s, k.emoji + ' 买了' + k.name + ' ×' + qty + '（-' + cost + ' 金）', 'info');
@@ -2209,6 +2273,7 @@
       return true;
     });
     addCoins(s, gain, '回收 ' + g.name);
+    tradeXp(s, gain);
     log(s, '💰 回收 ' + g.emoji + ' ' + g.name + ' ×' + g.count + '，+' + gain + ' 金（8 折）', 'good');
     return { ok: true, msg: '回收 ' + g.name + '×' + g.count + '，+' + gain + ' 金', income: gain };
   }
@@ -2357,7 +2422,7 @@
     if (!f) return 0;
     const mkt = s ? fishMarketMul(s, f.name) : 1;
     const cut = s ? (1 - townBonus(s, 'shopCut')) : 1;
-    return Math.max(3, Math.round(f.base * BALANCE.shop.priceMul * mkt * cut));
+    return Math.max(3, Math.round(f.base * BALANCE.shop.priceMul * mkt * cut * (s ? tradeCut(s) : 1)));
   }
 
   /* 今日库存（0 表示卖完 / 没进到货） */
@@ -2377,6 +2442,7 @@
     s.coins -= cost;
     s.shop.stock[id] = stock - qty;
     ledger(s, '买水产 ' + f.name + ' ×' + qty, 0, cost);
+    tradeXp(s, cost);
     for (let i = 0; i < qty; i++) {
       s.fishBag.push({ name: f.name, emoji: f.emoji, q: 'std', v: f.base, d: s.day, bought: true });
     }
@@ -2395,7 +2461,7 @@
     if (!c) return 0;
     const mkt = s ? marketMul(s, id) : 1;
     const cut = s ? (1 - townBonus(s, 'shopCut')) : 1;
-    return Math.max(2, Math.round(c.price * BALANCE.shop.cropPriceMul * mkt * cut));
+    return Math.max(2, Math.round(c.price * BALANCE.shop.cropPriceMul * mkt * cut * (s ? tradeCut(s) : 1)));
   }
 
   function cropShopStock(s, id) {
@@ -2414,6 +2480,7 @@
     s.coins -= cost;
     s.cropShop.stock[id] = stock - qty;
     ledger(s, '买农产品 ' + c.name + ' ×' + qty, 0, cost);
+    tradeXp(s, cost);
     addStore(s, id, 'std', qty);
     log(s, '🛒 买进 ' + c.emoji + ' ' + c.name + ' ×' + qty + '（-' + cost + ' 金，今日剩 ' +
       s.cropShop.stock[id] + ' 个）', 'info');
@@ -2672,14 +2739,27 @@
     return { ok: true, msg: '自动播种器已' + (s.seederOn ? '开启' : '关闭'), on: s.seederOn };
   }
 
-  /* 选自动播种用哪种种子（必须是背包里有的） */
-  function setAutoSeed(s, id) {
-    if (!seederCount(s)) return { ok: false, msg: '要先买自动播种器' };
+  /* 第 k 台自己选的种子（每台可以不同） */
+  function autoSeedOf(s, k) {
+    const arr = s.autoSeeds || [];
+    const id = arr[k - 1];
+    return (id && CROPS[id] && !CROPS[id].wild) ? id : null;
+  }
+
+  function setAutoSeed(s, k, id) {
+    const n = seederCount(s);
+    if (!n) return { ok: false, msg: '要先买自动播种器' };
+    const mach = Math.round(k) || 1;
+    if (mach < 1 || mach > n) return { ok: false, msg: '没有第 ' + mach + ' 台播种器' };
     if (id && !CROPS[id]) return { ok: false, msg: '没有这种作物' };
+    if (id && CROPS[id].wild) return { ok: false, msg: '野货不能种' };
     if (id && (s.seeds[id] || 0) <= 0) return { ok: false, msg: '背包里没有 ' + CROPS[id].name + ' 种子' };
-    s.autoSeed = id || null;
-    log(s, '🌱 自动播种种子设为 ' + (id ? CROPS[id].name : '不设（不播种）'), 'info');
-    return { ok: true, msg: id ? '自动播种：' + CROPS[id].name : '已关闭自动播种', seed: s.autoSeed };
+    s.autoSeeds = (s.autoSeeds || []).slice(0, n);
+    while (s.autoSeeds.length < n) s.autoSeeds.push(null);
+    s.autoSeeds[mach - 1] = id || null;
+    log(s, '🌱 第 ' + mach + ' 台播种器设为 ' + (id ? CROPS[id].name : '不播种'), 'info');
+    return { ok: true, msg: id ? '第 ' + mach + ' 台：' + CROPS[id].name : '第 ' + mach + ' 台已关闭播种',
+             seed: id || null, mach: mach };
   }
 
   /* 委托手动刷新：每天一次 */
@@ -2712,7 +2792,8 @@
   }
   function seedBuyPrice(c, s) {
     if (!c) return 0;
-    return Math.ceil(c.seed * (seedOffSeason(s, c.id) ? BALANCE.seed.offSeasonMul : 1));
+    const base = c.seed * (seedOffSeason(s, c.id) ? BALANCE.seed.offSeasonMul : 1);
+    return Math.ceil(base * (s ? tradeCut(s) : 1));
   }
   function seedSellPrice(c) { return Math.max(1, Math.floor(c.seed * SEED_SELL_RATE)); }
 
@@ -2729,6 +2810,7 @@
     if (s.coins < cost) return { ok: false, msg: '金币不够（需要 ' + cost + ' 金）' };
     s.coins -= cost;
     ledger(s, '买种子 ' + c.name + '×' + qty, 0, cost);
+    tradeXp(s, cost);
     s.seeds[id] = (s.seeds[id] || 0) + qty;
     log(s, '🌰 买了 ' + c.name + '种子 ×' + qty + '（-' + cost + ' 金' +
       (off ? '，反季种子' : '') + '）', 'info');
@@ -2745,6 +2827,7 @@
     const left = have - qty;
     if (left > 0) s.seeds[id] = left; else delete s.seeds[id];
     addCoins(s, gain, '卖种子 ' + c.name);
+    tradeXp(s, gain);
     log(s, '💰 卖出 ' + c.name + '种子 ×' + qty + '，+' + gain + ' 金', 'good');
     return { ok: true, msg: '卖出 ' + qty + ' 颗种子，+' + gain + ' 金', qty: qty, income: gain };
   }
@@ -2756,6 +2839,7 @@
     ids.forEach(function (id) { total += (s.seeds[id] || 0) * seedSellPrice(CROPS[id]); });
     s.seeds = {};
     addCoins(s, total, '卖种子');
+    tradeXp(s, total);
     log(s, '💰 清空种子，+' + total + ' 金', 'good');
     return { ok: true, msg: '卖出全部种子，+' + total + ' 金', income: total };
   }
@@ -2920,6 +3004,7 @@
     const bonus = Math.round(o.reward * Math.min(0.5, 0.1 * early));
     const total = o.reward + bonus;
     addCoins(s, total, '长期订单 · ' + o.name + '×' + o.qty);
+    tradeXp(s, total);
     log(s, '📜 长期订单完成：' + o.emoji + ' ' + o.name + ' ×' + o.qty + '，+' + total + ' 金' +
       (bonus ? '（提前 ' + early + ' 天，额外 +' + bonus + '）' : ''), 'good');
     s.longOrder = null;
@@ -2958,6 +3043,7 @@
     o.done = true;
     s.stats.orders = (s.stats.orders || 0) + 1;
     addCoins(s, o.reward, '委托 · ' + o.name + '×' + o.qty);
+    tradeXp(s, o.reward);
     log(s, '📋 完成委托：' + o.emoji + ' ' + o.name + ' ×' + o.qty + '，+' + o.reward + ' 金', 'good');
     return { ok: true, reward: o.reward, msg: '委托完成，+' + o.reward + ' 金' };
   }
@@ -3181,7 +3267,14 @@
     merged.harvesterOn = s.harvesterOn !== false;
     merged.seeder = Math.round(num(s.seeder === true ? 1 : s.seeder, 0, 0, BALANCE.device.seederMax));
     merged.seederOn = s.seederOn !== false;
-    merged.autoSeed = (s.autoSeed && CROPS[s.autoSeed] && !CROPS[s.autoSeed].wild) ? s.autoSeed : null;
+    // 每台播种器各选各的种子；老存档只有单个 autoSeed，就复制给全部机器
+    merged.autoSeeds = [];
+    const rawAuto = Array.isArray(s.autoSeeds) ? s.autoSeeds : [];
+    const legacyAuto = (s.autoSeed && CROPS[s.autoSeed] && !CROPS[s.autoSeed].wild) ? s.autoSeed : null;
+    for (let i = 0; i < merged.seeder; i++) {
+      const id = rawAuto[i] || legacyAuto;
+      merged.autoSeeds.push((id && CROPS[id] && !CROPS[id].wild) ? id : null);
+    }
     merged.nets = Math.round(num(s.nets, 0, 0, NET_MAX));
     // 老存档没有 netSet：默认所有渔网都已布置好
     merged.netSet = Math.round(num(s.netSet == null ? merged.nets : s.netSet, merged.nets, 0, merged.nets));
@@ -3278,10 +3371,12 @@
       fish: Math.round(num(rawLv && rawLv.fish, 1, 1, BALANCE.level.max)),
       dig: Math.round(num(rawLv && rawLv.dig, 1, 1, BALANCE.level.max)),
       forage: Math.round(num(rawLv && rawLv.forage, 1, 1, BALANCE.level.max)),
+      trade: Math.round(num(rawLv && rawLv.trade, 1, 1, BALANCE.level.max)),
       farmXp: Math.round(num(rawLv && rawLv.farmXp, 0, 0, 999999)),
       fishXp: Math.round(num(rawLv && rawLv.fishXp, 0, 0, 999999)),
       digXp: Math.round(num(rawLv && rawLv.digXp, 0, 0, 999999)),
-      forageXp: Math.round(num(rawLv && rawLv.forageXp, 0, 0, 999999))
+      forageXp: Math.round(num(rawLv && rawLv.forageXp, 0, 0, 999999)),
+      tradeXp: Math.round(num(rawLv && rawLv.tradeXp, 0, 0, 999999))
     };
     if (!rawLv || (merged.levels.farm === 1 && merged.levels.farmXp === 0 &&
                    merged.levels.fish === 1 && merged.levels.fishXp === 0 &&
@@ -3344,6 +3439,7 @@
     buyHarvester: buyHarvester, HARVESTER_COST: HARVESTER_COST, refreshOrders: refreshOrders,
     seederUnlocked: seederUnlocked, buySeeder: buySeeder, toggleSeeder: toggleSeeder,
     setAutoSeed: setAutoSeed, SEEDER_COST: SEEDER_COST, seederCount: seederCount,
+    autoSeedOf: autoSeedOf,
     seederMax: seederMax, seederPlots: seederPlots, seederUpkeep: seederUpkeep,
     seederPlateRange: seederPlateRange, seederPlateOf: seederPlateOf, canAutoSeed: canAutoSeed,
     SEEDER_PLOTS: SEEDER_PLOTS,
@@ -3366,6 +3462,8 @@
     seedUnlocked: seedUnlocked, fertUnlocked: fertUnlocked,    sprinklerUnlocked: sprinklerUnlocked, harvesterUnlocked: harvesterUnlocked,
     netUnlocked: netUnlocked, netMax: netMax, farmLv: farmLv, fishLv: fishLv,
     digLv: digLv, forageLv: forageLv, skillLv: skillLv, digCost: digCost, forageCost: forageCost,
+    digYieldBonus: digYieldBonus, forageRolls: forageRolls,
+    tradeLv: tradeLv, tradeCut: tradeCut, tradeXp: tradeXp, keyTradeGate: keyTradeGate,
     SKILLS: SKILLS, SKILL_NAME: SKILL_NAME,
     levelNeed: levelNeed, addLevelXp: addLevelXp, levelEffectText: levelEffectText,
     farmYieldBonus: farmYieldBonus, fishHookBonus: fishHookBonus, fishGoodBonus: fishGoodBonus,

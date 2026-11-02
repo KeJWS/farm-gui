@@ -556,3 +556,32 @@ console.log('\n== 钓鱼专项 ==');
     (sum10.dough / 2).toFixed(2) + ' 金/体力），空竿率 ' + ((1 - c10.bite) * 100).toFixed(0) +
     '%；Lv1 只有 ' + (sum1.dough / 2).toFixed(2) + ' 金/体力 —— 比打零工（2.00）高，比采集（松茸 10.39）低');
 }
+
+/* ---------- 16. 交易等级 ---------- */
+console.log('\n== 交易等级（买卖成交额换经验）==');
+{
+  const T = G.BALANCE.trade;
+  const need = function (lv) { return G.levelNeed(lv, 'trade'); };
+  let cumXp = 0, cumGold = 0;
+  console.log('   每 ' + T.xpPer + ' 金交易额 = 1 经验 · 每级进价 −' +
+    (T.buyCut * 100).toFixed(1) + '%（封顶 −' + (T.maxCut * 100).toFixed(1) + '%）');
+  console.log('   ' + pad('等级', 6) + pad('升级需经验', 12) + pad('累计经验', 10) +
+    pad('累计交易额', 12) + '进价折扣');
+  for (let lv = 1; lv < G.BALANCE.level.max; lv++) {
+    const n = need(lv);
+    cumXp += n; cumGold = cumXp * T.xpPer;
+    console.log('   ' + pad('Lv' + lv + '→' + (lv + 1), 6) + pad(n + ' 点', 12) +
+      pad(cumXp + ' 点', 10) + pad(cumGold + ' 金', 12) +
+      '−' + (Math.min(T.maxCut, lv * T.buyCut) * 100).toFixed(1) + '%');
+  }
+  const maxCut = 1 - T.maxCut;
+  const s1 = G.createState(), s10 = G.createState();
+  s10.levels.trade = G.BALANCE.level.max;
+  console.log('   参考：西瓜种子 ' + G.seedBuyPrice(G.CROPS.watermelon, s1) + ' → ' +
+    G.seedBuyPrice(G.CROPS.watermelon, s10) + ' 金 · 鲈鱼 ' +
+    G.fishBuyPrice('bass', s1) + ' → ' + G.fishBuyPrice('bass', s10) + ' 金/条');
+  console.log('   解锁：高级假饵要交易 Lv' + G.BALANCE.gate.lure2Trade + '（' +
+    (need(1) + need(2)) * T.xpPer + ' 金交易额）· 金钥匙要交易 Lv' +
+    G.BALANCE.gate.goldKeyTrade + '（' + (need(1) + need(2) + need(3)) * T.xpPer + ' 金）');
+  console.log('   满级进价系数 ' + maxCut.toFixed(3) + '（' + ((1 - maxCut) * 100).toFixed(1) + '% off）');
+}

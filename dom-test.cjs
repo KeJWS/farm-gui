@@ -111,6 +111,7 @@ const G = require('./game.js');
   st.levels.fish = 5;
   st.levels.farm = 4;
   st.seeder = 0;
+  st.seeds = { carrot: 10, potato: 5 };
   st.fisher = { lv: 3, xp: 4 };
   // 给萝卜造 7 天价格历史，方便测曲线
   st.marketHist = {
@@ -360,6 +361,8 @@ ok(html('#modal-root').indexOf('/ 1 台') >= 0, '买一台后显示台数上限'
 ok(html('#modal-root').indexOf('每晚自动播 <b>5</b>') >= 0, '一台覆盖 5 块');
 ok(html('#modal-root').indexOf('第 1 台') >= 0 && html('#modal-root').indexOf('第 1–5 块') >= 0,
    '面板列出每台负责的号段');
+ok(html('#modal-root').indexOf('data-mach="1"') >= 0 && html('#modal-root').indexOf('给第 1 台') >= 0,
+   '每台可以单独选种子');
 ok(html('#modal-root').indexOf('维护 6 金/周') >= 0, '显示当前播种器维护费');
 
 console.log('\n== 规则说明分页 ==');
@@ -403,7 +406,9 @@ document.querySelector('#btn-status').fire('click', { target: {} });
 const stHtml = html('#modal-root');
 ok(stHtml.indexOf('采集记录') >= 0, '状态面板新增采集记录');
 ok(stHtml.indexOf('挖蚯蚓等级') >= 0 && stHtml.indexOf('采集等级') >= 0, '状态面板列出两条新等级');
+ok(stHtml.indexOf('交易等级') >= 0, '状态面板列出交易等级');
 ok(stHtml.indexOf('其中自动播种器') < 0, '维护费不再带「其中自动播种器」');
+ok(text('#trade-lv').indexOf('Lv') >= 0, '商店面板显示交易等级', text('#trade-lv'));
 
 setTimeout(function () {
   console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));

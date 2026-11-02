@@ -8,28 +8,38 @@
     if (!t) return { ok: false, msg: '没有这种茶' };
     if (!teaUnlocked(s, t)) return { ok: false, msg: '第 ' + t.day + ' 天才上架' };
     const qty = Math.max(1, Math.min(20, Math.floor(n || 1)));
-    const cost = t.price * qty;
+    const cost = Math.round(t.price * tradeCut(s)) * qty;
     if (s.coins < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
     s.coins -= cost; ledger(s, '买' + t.name + ' ×' + qty, 0, cost);
+    tradeXp(s, cost);
     s.teas = s.teas || {};
     s.teas[id] = (s.teas[id] || 0) + qty;
     log(s, t.emoji + ' 买了' + t.name + ' ×' + qty + '（-' + cost + ' 金）', 'info');
     return { ok: true, msg: t.name + ' ×' + qty, qty: qty, cost: cost };
   }
 
+  /* 金钥匙要交易等级（常跑商店的人才拿得到渠道） */
+  function keyTradeGate(id) {
+    return id === 'gold' ? BALANCE.gate.goldKeyTrade : 0;
+  }
   function keyUnlocked(s, id) {
     const k = KEYS[id];
-    return !!k && fishLv(s) >= (k.lv || 1);
+    if (!k || fishLv(s) < (k.lv || 1)) return false;
+    return tradeLv(s) >= keyTradeGate(id);
   }
 
   function buyKey(s, id, n) {
     const k = KEYS[id];
     if (!k) return { ok: false, msg: '没有这种钥匙' };
-    if (!keyUnlocked(s, id)) return { ok: false, msg: '钓鱼 Lv' + k.lv + ' 才上架' };
+    if (fishLv(s) < k.lv) return { ok: false, msg: '钓鱼 Lv' + k.lv + ' 才上架' };
+    if (tradeLv(s) < keyTradeGate(id)) {
+      return { ok: false, msg: k.name + '要交易 Lv' + keyTradeGate(id) + ' 才上架（现在 Lv' + tradeLv(s) + '）' };
+    }
     const qty = Math.max(1, Math.min(9, Math.floor(n || 1)));
-    const cost = k.price * qty;
+    const cost = Math.round(k.price * tradeCut(s)) * qty;
     if (s.coins < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
     s.coins -= cost; ledger(s, '买' + k.name + ' ×' + qty, 0, cost);
+    tradeXp(s, cost);
     s.keys = s.keys || { iron: 0, gold: 0 };
     s.keys[id] = (s.keys[id] || 0) + qty;
     log(s, k.emoji + ' 买了' + k.name + ' ×' + qty + '（-' + cost + ' 金）', 'info');
@@ -47,6 +57,7 @@
       return true;
     });
     addCoins(s, gain, '回收 ' + g.name);
+    tradeXp(s, gain);
     log(s, '💰 回收 ' + g.emoji + ' ' + g.name + ' ×' + g.count + '，+' + gain + ' 金（8 折）', 'good');
     return { ok: true, msg: '回收 ' + g.name + '×' + g.count + '，+' + gain + ' 金', income: gain };
   }
@@ -195,7 +206,7 @@
     if (!f) return 0;
     const mkt = s ? fishMarketMul(s, f.name) : 1;
     const cut = s ? (1 - townBonus(s, 'shopCut')) : 1;
-    return Math.max(3, Math.round(f.base * BALANCE.shop.priceMul * mkt * cut));
+    return Math.max(3, Math.round(f.base * BALANCE.shop.priceMul * mkt * cut * (s ? tradeCut(s) : 1)));
   }
 
   /* 今日库存（0 表示卖完 / 没进到货） */
@@ -215,6 +226,7 @@
     s.coins -= cost;
     s.shop.stock[id] = stock - qty;
     ledger(s, '买水产 ' + f.name + ' ×' + qty, 0, cost);
+    tradeXp(s, cost);
     for (let i = 0; i < qty; i++) {
       s.fishBag.push({ name: f.name, emoji: f.emoji, q: 'std', v: f.base, d: s.day, bought: true });
     }

@@ -57,17 +57,20 @@
     return k <= Math.max(0, Math.round(s.seeder || 0)) ? k : 0;
   }
 
-  /* 这块地能不能被播种器补种：有对应的机器、开着、选了种子、不是冬天、还有种子 */
+  /* 这块地能不能被播种器补种：有对应的机器、那台选了种子、开着、不是冬天、还有种子 */
   function canAutoSeed(s, idx) {
-    if (!seederPlateOf(s, idx)) return false;
-    if (!s.seederOn || !s.autoSeed || isWinter(s.day)) return false;
-    return (s.seeds[s.autoSeed] || 0) > 0;
+    const k = seederPlateOf(s, idx);
+    if (!k) return false;
+    const seed = autoSeedOf(s, k);
+    if (!seed || !s.seederOn || isWinter(s.day)) return false;
+    return (s.seeds[seed] || 0) > 0;
   }
 
   /* 收完立刻补种，返回种下的作物 id；不满足条件返回 null */
   function autoReplant(s, idx) {
-    if (!canAutoSeed(s, idx)) return null;
-    const seed = s.autoSeed;
+    const k = seederPlateOf(s, idx);
+    if (!k || !canAutoSeed(s, idx)) return null;
+    const seed = autoSeedOf(s, k);
     const r = plant(s, idx, seed, { free: true, quiet: true });
     return r.ok ? seed : null;
   }
@@ -196,6 +199,7 @@
     });
     s.stats.cropsSold = (s.stats.cropsSold || 0) + count;
     addCoins(s, income, '农产品店 · 卖作物');
+    tradeXp(s, income);
     log(s, '💰 农产品店收购 ' + parts.join('、') + '，收入 ' + income + ' 金（8 折）', 'good');
     return { ok: true, msg: '卖出全部，+' + income + ' 金', income: income, count: count };
   }
@@ -221,6 +225,7 @@
     addSupply(s, id, qty);
     s.stats.cropsSold = (s.stats.cropsSold || 0) + qty;
     addCoins(s, gain, '农产品店 · 卖 ' + CROPS[id].name + '×' + qty);
+    tradeXp(s, gain);
     log(s, '💰 农产品店收购 ' + CROPS[id].name + '×' + qty + '，+' + gain + ' 金（8 折）', 'good');
     return { ok: true, msg: '+' + gain + ' 金', income: gain, count: qty };
   }
@@ -233,6 +238,7 @@
     delete s.store[id];
     s.stats.cropsSold = (s.stats.cropsSold || 0) + n;
     addCoins(s, gain, '农产品店 · 卖 ' + CROPS[id].name);
+    tradeXp(s, gain);
     log(s, '💰 农产品店收购 ' + CROPS[id].name + '×' + n + '，+' + gain + ' 金（8 折）', 'good');
     return { ok: true, msg: '+' + gain + ' 金', income: gain, count: n };
   }
@@ -372,21 +378,21 @@
         (hrp ? ' · 补种 ' + hrp + ' 块' : '') });
     }
 
-    // 自动播种器：每台只管自己那 5 块，睡觉时把空着的补上（不耗体力）
-    if (s.seeder && s.seederOn && s.autoSeed && !isWinter(s.day)) {
-      const seed = s.autoSeed;
+    // 自动播种器：每台只管自己那 5 块，用自己选的种子把空着的补上（不耗体力）
+    if (s.seeder && s.seederOn && !isWinter(s.day)) {
       const per = BALANCE.device.seederPlots;
       const machines = Math.round(s.seeder || 0);
       let sn = 0;
       for (let k = 1; k <= machines; k++) {
+        const seed = autoSeedOf(s, k);
+        if (!seed) continue;
         for (let i = (k - 1) * per; i < Math.min(k * per, s.plots.length); i++) {
           if (s.plots[i].crop) continue;
           if ((s.seeds[seed] || 0) <= 0) break;
           if (plant(s, i, seed, { free: true, quiet: true }).ok) sn++;
         }
-        if ((s.seeds[seed] || 0) <= 0) break;
       }
-      if (sn) notes.push({ kind: 'seeder', text: '🌱 自动播种 ' + sn + ' 块 ' + CROPS[seed].name });
+      if (sn) notes.push({ kind: 'seeder', text: '🌱 自动播种 ' + sn + ' 块' });
     }
 
     s.plots.forEach(function (p) {

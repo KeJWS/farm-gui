@@ -116,6 +116,7 @@
     const bonus = Math.round(o.reward * Math.min(0.5, 0.1 * early));
     const total = o.reward + bonus;
     addCoins(s, total, '长期订单 · ' + o.name + '×' + o.qty);
+    tradeXp(s, total);
     log(s, '📜 长期订单完成：' + o.emoji + ' ' + o.name + ' ×' + o.qty + '，+' + total + ' 金' +
       (bonus ? '（提前 ' + early + ' 天，额外 +' + bonus + '）' : ''), 'good');
     s.longOrder = null;
@@ -154,6 +155,7 @@
     o.done = true;
     s.stats.orders = (s.stats.orders || 0) + 1;
     addCoins(s, o.reward, '委托 · ' + o.name + '×' + o.qty);
+    tradeXp(s, o.reward);
     log(s, '📋 完成委托：' + o.emoji + ' ' + o.name + ' ×' + o.qty + '，+' + o.reward + ' 金', 'good');
     return { ok: true, reward: o.reward, msg: '委托完成，+' + o.reward + ' 金' };
   }

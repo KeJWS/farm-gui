@@ -195,7 +195,14 @@
     merged.harvesterOn = s.harvesterOn !== false;
     merged.seeder = Math.round(num(s.seeder === true ? 1 : s.seeder, 0, 0, BALANCE.device.seederMax));
     merged.seederOn = s.seederOn !== false;
-    merged.autoSeed = (s.autoSeed && CROPS[s.autoSeed] && !CROPS[s.autoSeed].wild) ? s.autoSeed : null;
+    // 每台播种器各选各的种子；老存档只有单个 autoSeed，就复制给全部机器
+    merged.autoSeeds = [];
+    const rawAuto = Array.isArray(s.autoSeeds) ? s.autoSeeds : [];
+    const legacyAuto = (s.autoSeed && CROPS[s.autoSeed] && !CROPS[s.autoSeed].wild) ? s.autoSeed : null;
+    for (let i = 0; i < merged.seeder; i++) {
+      const id = rawAuto[i] || legacyAuto;
+      merged.autoSeeds.push((id && CROPS[id] && !CROPS[id].wild) ? id : null);
+    }
     merged.nets = Math.round(num(s.nets, 0, 0, NET_MAX));
     // 老存档没有 netSet：默认所有渔网都已布置好
     merged.netSet = Math.round(num(s.netSet == null ? merged.nets : s.netSet, merged.nets, 0, merged.nets));
@@ -292,10 +299,12 @@
       fish: Math.round(num(rawLv && rawLv.fish, 1, 1, BALANCE.level.max)),
       dig: Math.round(num(rawLv && rawLv.dig, 1, 1, BALANCE.level.max)),
       forage: Math.round(num(rawLv && rawLv.forage, 1, 1, BALANCE.level.max)),
+      trade: Math.round(num(rawLv && rawLv.trade, 1, 1, BALANCE.level.max)),
       farmXp: Math.round(num(rawLv && rawLv.farmXp, 0, 0, 999999)),
       fishXp: Math.round(num(rawLv && rawLv.fishXp, 0, 0, 999999)),
       digXp: Math.round(num(rawLv && rawLv.digXp, 0, 0, 999999)),
-      forageXp: Math.round(num(rawLv && rawLv.forageXp, 0, 0, 999999))
+      forageXp: Math.round(num(rawLv && rawLv.forageXp, 0, 0, 999999)),
+      tradeXp: Math.round(num(rawLv && rawLv.tradeXp, 0, 0, 999999))
     };
     if (!rawLv || (merged.levels.farm === 1 && merged.levels.farmXp === 0 &&
                    merged.levels.fish === 1 && merged.levels.fishXp === 0 &&
@@ -358,6 +367,7 @@
     buyHarvester: buyHarvester, HARVESTER_COST: HARVESTER_COST, refreshOrders: refreshOrders,
     seederUnlocked: seederUnlocked, buySeeder: buySeeder, toggleSeeder: toggleSeeder,
     setAutoSeed: setAutoSeed, SEEDER_COST: SEEDER_COST, seederCount: seederCount,
+    autoSeedOf: autoSeedOf,
     seederMax: seederMax, seederPlots: seederPlots, seederUpkeep: seederUpkeep,
     seederPlateRange: seederPlateRange, seederPlateOf: seederPlateOf, canAutoSeed: canAutoSeed,
     SEEDER_PLOTS: SEEDER_PLOTS,
@@ -380,6 +390,8 @@
     seedUnlocked: seedUnlocked, fertUnlocked: fertUnlocked,    sprinklerUnlocked: sprinklerUnlocked, harvesterUnlocked: harvesterUnlocked,
     netUnlocked: netUnlocked, netMax: netMax, farmLv: farmLv, fishLv: fishLv,
     digLv: digLv, forageLv: forageLv, skillLv: skillLv, digCost: digCost, forageCost: forageCost,
+    digYieldBonus: digYieldBonus, forageRolls: forageRolls,
+    tradeLv: tradeLv, tradeCut: tradeCut, tradeXp: tradeXp, keyTradeGate: keyTradeGate,
     SKILLS: SKILLS, SKILL_NAME: SKILL_NAME,
     levelNeed: levelNeed, addLevelXp: addLevelXp, levelEffectText: levelEffectText,
     farmYieldBonus: farmYieldBonus, fishHookBonus: fishHookBonus, fishGoodBonus: fishGoodBonus,

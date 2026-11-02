@@ -59,14 +59,42 @@
     return best;
   }
 
-  /* ---------------- 等级（种田 / 钓鱼 / 挖蚯蚓 / 采集） ---------------- */
+  /* ---------------- 等级（种田 / 钓鱼 / 挖蚯蚓 / 采集 / 交易） ---------------- */
 
-  const SKILLS = ['farm', 'fish', 'dig', 'forage'];
-  const SKILL_NAME = { farm: '种田', fish: '钓鱼', dig: '挖蚯蚓', forage: '采集' };
+  const SKILLS = ['farm', 'fish', 'dig', 'forage', 'trade'];
+  const SKILL_NAME = { farm: '种田', fish: '钓鱼', dig: '挖蚯蚓', forage: '采集', trade: '交易' };
 
-  function levelNeed(lv) {
+  /* 交易等级用一条更长的曲线（经验来自交易额，来得快） */
+  function levelNeed(lv, kind) {
+    const l = lv || 1;
+    if (kind === 'trade') {
+      const T = BALANCE.trade;
+      return T.xpBase + T.xpStep * (l - 1);
+    }
     const L = BALANCE.level;
-    return L.xpBase + L.xpStep * ((lv || 1) - 1);
+    return L.xpBase + L.xpStep * (l - 1);
+  }
+
+  /* 挖蚯蚓每 4 级 +1 条（Lv4 / Lv8） */
+  function digYieldBonus(s) {
+    return Math.floor(skillLv(s, 'dig') / BALANCE.dig.yieldAt);
+  }
+  /* 采集每 4 级多取一次品质（Lv4 / Lv8），效果等同施肥 */
+  function forageRolls(s) {
+    return 1 + Math.floor(skillLv(s, 'forage') / BALANCE.forage.qualityAt);
+  }
+
+  function tradeLv(s) { return skillLv(s, 'trade'); }
+  /* 交易等级：商店进价小幅下调 */
+  function tradeCut(s) {
+    const T = BALANCE.trade;
+    return 1 - Math.min(T.maxCut, (tradeLv(s) - 1) * T.buyCut);
+  }
+  /* 交易经验：按成交金额给（每 5 金 1 点） */
+  function tradeXp(s, gold) {
+    const g = Math.max(0, Math.round(gold || 0));
+    if (!g) return 0;
+    return addLevelXp(s, 'trade', g / BALANCE.trade.xpPer);
   }
 
   function levelEffectText(kind, lv) {
@@ -76,10 +104,16 @@
         Math.min(22.5, (lv - 1) * 2.5).toFixed(1) + '%';
     }
     if (kind === 'dig') {
-      return '挖蚯蚓 ' + digCostByLv(lv) + ' 体力' + (lv >= max ? '（满级已省 1 点）' : '');
+      return '挖蚯蚓 ' + digCostByLv(lv) + ' 体力 · 产量 +' + Math.floor(lv / BALANCE.dig.yieldAt) +
+        (lv >= max ? '（满级已省 1 点）' : '');
     }
     if (kind === 'forage') {
-      return '采集 ' + forageCostByLv(lv) + ' 体力' + (lv >= max ? '（满级已省 1 点）' : '');
+      return '采集 ' + forageCostByLv(lv) + ' 体力 · 品质 ×' +
+        (1 + Math.floor(lv / BALANCE.forage.qualityAt)) +
+        (lv >= max ? '（满级已省 1 点）' : '');
+    }
+    if (kind === 'trade') {
+      return '商店进价 −' + (Math.min(BALANCE.trade.maxCut, (lv - 1) * BALANCE.trade.buyCut) * 100).toFixed(1) + '%';
     }
     return '收获产量 +' + Math.floor(lv / 4);
   }
@@ -104,13 +138,13 @@
     const gain = (n === undefined || n === null) ? 1 : Math.max(0, Math.round(n));
     s.levels[xpKey] = (s.levels[xpKey] || 0) + gain;
     let ups = 0;
-    while (s.levels[key] < BALANCE.level.max && s.levels[xpKey] >= levelNeed(s.levels[key])) {
-      s.levels[xpKey] -= levelNeed(s.levels[key]);
+    while (s.levels[key] < BALANCE.level.max && s.levels[xpKey] >= levelNeed(s.levels[key], key)) {
+      s.levels[xpKey] -= levelNeed(s.levels[key], key);
       s.levels[key]++;
       ups++;
     }
     if (s.levels[key] >= BALANCE.level.max) {
-      s.levels[xpKey] = Math.min(s.levels[xpKey], levelNeed(BALANCE.level.max) - 1);
+      s.levels[xpKey] = Math.min(s.levels[xpKey], levelNeed(BALANCE.level.max, key) - 1);
     }
     if (ups) {
       log(s, '⭐ ' + SKILL_NAME[key] + '等级 → Lv' + s.levels[key] +

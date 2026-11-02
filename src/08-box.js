@@ -127,6 +127,7 @@
     s.stats.boxItems = (s.stats.boxItems || 0) + n;
     s.stats.boxIncome = (s.stats.boxIncome || 0) + value;
     addCoins(s, value, '收购箱出货');
+    tradeXp(s, value);
     return { n: n, value: value };
   }
 
@@ -140,6 +141,7 @@
     const gain = Math.max(1, Math.round(shopValue(raw) * sellBonus(s) * fishMarketMul(s, g.name)));
     addFishSupply(s, g.name, qty);
     addCoins(s, gain, '卖鱼 ' + g.name);
+    tradeXp(s, gain);
     log(s, '💰 卖出 ' + g.emoji + ' ' + g.name + ' ×' + qty + '，+' + gain + ' 金（8 折）', 'good');
     return { ok: true, msg: '卖出 ' + g.name + '×' + qty + '，+' + gain + ' 金', income: gain, count: qty };
   }
@@ -154,6 +156,7 @@
     const gain = qty * WORM_VALUE;
     s.bait.worm = have - qty;
     addCoins(s, gain, '卖蚯蚓');
+    tradeXp(s, gain);
     log(s, '💰 卖出蚯蚓 ×' + qty + '，+' + gain + ' 金', 'good');
     return { ok: true, qty: qty, income: gain, msg: '卖出蚯蚓 ×' + qty + '，+' + gain + ' 金' };
   }
@@ -162,13 +165,14 @@
     const cost = digCost(s);
     if (s.energy < cost) return { ok: false, msg: '体力不够（挖蚯蚓要 ' + cost + ' 点）' };
     const w = WEATHER[s.weather];
-    const n = clamp(randInt(1, 3) + w.wormMod, 1, 5);
+    const bonus = digYieldBonus(s);
+    const n = clamp(randInt(1, 3) + w.wormMod + bonus, 1, 5 + bonus);
     s.energy -= cost;
     s.bait.worm += n;
     s.stats.dug++;
     const up = addLevelXp(s, 'dig', BALANCE.dig.xp);
     log(s, '🪱 挖到蚯蚓 ×' + n + '（现有 ' + s.bait.worm + '）' +
-      (up ? ' · 挖蚯蚓 Lv' + digLv(s) : ''), 'good');
-    return { ok: true, msg: '挖到蚯蚓 ×' + n, n: n, levelUp: up, cost: cost };
+      (bonus ? ' · 等级产量 +' + bonus : '') + (up ? ' · 挖蚯蚓 Lv' + digLv(s) : ''), 'good');
+    return { ok: true, msg: '挖到蚯蚓 ×' + n, n: n, levelUp: up, cost: cost, bonus: bonus };
   }
 
