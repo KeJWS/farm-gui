@@ -48,6 +48,50 @@ const d = evs['dough|cloudy'];
 const perE = (d.ev - 1) / 2;
 console.log('  面团饵', perE.toFixed(2), '金/体力');
 
+console.log('\n== 三种活计（金 / 体力）==');
+/* 品质期望倍率：取 times 次最好 */
+function qualityEV(times) {
+  let ev = 0, prev = 0;
+  G.QUALITY.forEach(function (q) {
+    const cum = prev + q.w / 100;
+    ev += (Math.pow(cum, times) - Math.pow(prev, times)) * q.mul;
+    prev = cum;
+  });
+  return ev;
+}
+const jobs = [];
+G.CROP_LIST.forEach(function (c) {
+  [[false, '裸种'], [true, '普通肥']].forEach(function (pair) {
+    const fert = pair[0];
+    const add = fert && !c.big && !c.multi ? G.FERT.normal.add : 0;
+    const qty = c.big ? 1 : (c.multi ? c.firstQty + c.regrowTimes * c.regrowQty : c.base + add);
+    const waters = c.multi ? c.days + c.regrowTimes * c.regrowDays : c.days;
+    const harvests = c.multi ? c.regrowTimes + 1 : 1;
+    const energy = 1 + waters + harvests;
+    const gross = qty * c.price * qualityEV(fert ? 2 : 1);
+    const net = gross - c.seed - (fert ? G.FERT.normal.cost : 0);
+    jobs.push({ name: c.name, label: pair[1], per: net / energy, net: net, energy: energy });
+  });
+});
+jobs.sort(function (a, b) { return b.per - a.per; });
+const cropTop = jobs[0];
+jobs.slice(0, 5).forEach(function (j) {
+  console.log('  ' + j.name.padEnd(5) + j.label.padEnd(6) + j.per.toFixed(2) + ' 金/体力' +
+    '（净 ' + Math.round(j.net) + ' 金 / ' + j.energy + ' 体力）');
+});
+console.log('  打工  全天  ' + G.WORK_RATE_FULL.toFixed(2) + ' 金/体力');
+console.log('  打工  半天  ' + G.WORK_RATE_HALF.toFixed(2) + ' 金/体力');
+console.log('  钓鱼  面团  ' + perE.toFixed(2) + ' 金/体力');
+
+console.log('\n== 委托样本（前 / 中 / 后期）==');
+[2, 6, 12, 45, 75, 105].forEach(function (day) {
+  G.setRng(mulberry32(7));
+  const os = G.makeOrders({ day: day });
+  console.log('  D' + String(day).padEnd(4) + os.map(function (o) {
+    return o.name + '×' + o.qty + '（' + o.reward + '金）';
+  }).join(' · '));
+});
+
 console.log('\n== 设备回本 ==');
 const pb = [
   ['洒水器', 80, perE - 3 / 7],

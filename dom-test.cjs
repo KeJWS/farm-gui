@@ -122,6 +122,8 @@ ok(html('#modal-root').indexOf('种子店') >= 0 && html('#modal-root').indexOf(
 clickAct('fishshop');
 ok(html('#modal-root').indexOf('水产店') >= 0 && html('#modal-root').indexOf('不能交委托') >= 0,
    '水产店弹窗能打开，并提示买来的鱼不能交委托');
+ok(html('#modal-root').indexOf('今日') >= 0 && html('#modal-root').indexOf('一般品质') >= 0,
+   '水产店显示每日库存与「一般品质」');
 clickAct('shop');
 ok(html('#modal-root').indexOf('渔具店') >= 0 && html('#modal-root').indexOf('渔网') >= 0,
    '渔具店弹窗（含渔网）能打开');
@@ -134,6 +136,13 @@ console.log('\n== 统计图 ==');
 document.querySelector('#btn-stats').fire('click', { target: {} });
 ok(html('#modal-root').indexOf('收益统计') >= 0 && html('#modal-root').indexOf('canvas') >= 0,
    '统计弹窗能打开并含 canvas');
+
+console.log('\n== 成就 ==');
+document.querySelector('#btn-ach').fire('click', { target: {} });
+ok(html('#modal-root').indexOf('成就') >= 0 && html('#modal-root').indexOf('第一筐菜') >= 0,
+   '成就弹窗能打开并列出条目');
+ok(html('#modal-root').indexOf('已解锁') >= 0 && html('#modal-root').indexOf('种田') >= 0,
+   '成就弹窗含统计与分类');
 
 setTimeout(function () {
   console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));

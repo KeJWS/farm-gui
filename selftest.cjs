@@ -912,6 +912,70 @@ ok(t1 > 0.3, '施肥仍然提升品质', t1.toFixed(2));
 s = G.createState(); s.coins = 1000;
 ok(!G.buyFish(s, 'chest', 1).ok, '水产店不卖宝箱');
 
+/* ---------- v1.6 水产店库存 ---------- */
+section('水产店库存（v1.6）');
+G.setRng(mulberry32(31));
+let shp = G.createState();
+const buyable = G.FISH.filter(f => !f.trash && !f.noOrder);
+ok(buyable.every(f => typeof G.shopStock(shp, f.id) === 'number'), '每种可买水产都有今日库存');
+ok(!('trash' in shp.shop.stock) && !('chest' in shp.shop.stock), '杂物 / 宝箱不进货');
+ok(buyable.every(f => {
+  const shopCap = (G.SHOP_STOCK[f.id] || [1, 2])[1];
+  const n = G.shopStock(shp, f.id);
+  return n >= 0 && n <= shopCap;
+}), '库存不超过当日进货上限');
+
+shp.coins = 500;
+const shopBefore = G.shopStock(shp, 'crucian');
+ok(shopBefore >= 2, '鲫鱼每天至少进 2 条', shopBefore);
+const shopBR = G.buyFish(shp, 'crucian', shopBefore);
+ok(shopBR.ok && G.shopStock(shp, 'crucian') === 0, '可以买光当日库存', { shopBefore, left: G.shopStock(shp, 'crucian') });
+ok(!G.buyFish(shp, 'crucian', 1).ok, '售罄后买不到');
+ok(!G.buyFish(shp, 'carp', 99).ok, '一次买超过库存会被拒绝');
+
+shp.shop.stock.crucian = 0;
+G.sleep(shp);
+ok(shp.shop.day === shp.day && G.shopStock(shp, 'crucian') > 0, '睡一觉水产店补货',
+  { day: shp.day, stock: G.shopStock(shp, 'crucian') });
+
+/* ---------- v1.6 成就 ---------- */
+section('成就与奖励（v1.6）');
+G.setRng(mulberry32(41));
+let achs = G.createState();
+ok(G.checkAchievements(achs).length === 0, '开局不会白送成就');
+
+achs.stats.harvests = 1;
+const achC0 = achs.coins;
+const achUn1 = G.checkAchievements(achs);
+ok(achUn1.some(x => x.id === 'harvest1') && achs.coins === achC0 + 15, '收获 1 次解锁成就并发 +15 金', achUn1);
+ok(G.checkAchievements(achs).length === 0, '同一成就不会重复发奖');
+
+achs.fishBook.count = 1;
+const achD0 = achs.bait.dough;
+const achUn2 = G.checkAchievements(achs);
+ok(achUn2.some(x => x.id === 'fish1') && achs.bait.dough === achD0 + 5, '钓到第一条鱼奖励 5 份面团饵', achUn2);
+
+achs.coins = 100000;
+while (achs.plots.length < 10) G.expand(achs);
+ok(G.checkAchievements(achs).some(x => x.id === 'plot10'), '10 块地解锁成就');
+
+const achInf = G.achInfo(achs);
+ok(achInf.length === G.ACH.length, '成就面板条目数一致', achInf.length);
+ok(achInf.every(x => x.cur >= 0 && x.cur <= x.goal), '成就进度不会超过目标');
+ok(achInf.filter(x => x.done).length >= 3, '已解锁成就标记正确');
+
+ok(G.fishDesc('鲫鱼').length > 0 && G.fishDesc('易拉罐').length > 0, '渔获与杂物都有简述');
+ok(G.fishDesc('不存在的鱼') === '', '未知渔获没有简述');
+
+const achRT = G.deserialize(G.serialize(achs));
+ok(achRT.ach.harvest1 && achRT.shop && typeof achRT.shop.stock === 'object', '成就与库存写进存档');
+
+const achLegacy = JSON.parse(G.serialize(G.createState()));
+delete achLegacy.shop; delete achLegacy.ach;
+const achMig = G.deserialize(achLegacy);
+ok(achMig.shop && Object.keys(achMig.shop.stock).length > 0, '老存档自动补进货表');
+ok(achMig.ach && Object.keys(achMig.ach).length === 0, '老存档成就为空');
+
 /* ---------- 6. 存读档 ---------- */
 section('存读档');
 s = G.createState();
@@ -935,7 +999,9 @@ const acts = [
   () => { const ids = Object.keys(G.CROPS); return G.plantAll(s, ids[Math.floor(Math.random() * ids.length)]); },
   () => { const i = Math.floor(Math.random() * s.plots.length); const ids = Object.keys(G.CROPS); return G.plant(s, i, ids[Math.floor(Math.random() * ids.length)]); },
   () => { const i = Math.floor(Math.random() * s.plots.length); return G.useFert(s, i, Math.random() < 0.5 ? 'normal' : 'special'); },
-  () => { const i = Math.floor(Math.random() * s.plots.length); return Math.random() < 0.5 ? G.water(s, i) : G.harvest(s, i); }
+  () => { const i = Math.floor(Math.random() * s.plots.length); return Math.random() < 0.5 ? G.water(s, i) : G.harvest(s, i); },
+  () => { const ids = ['crucian', 'carp', 'mandarin', 'bass', 'puffer', 'koi']; return G.buyFish(s, ids[Math.floor(Math.random() * ids.length)], 1); },
+  () => G.checkAchievements(s)
 ];
 let err = null;
 for (let i = 0; i < 3000; i++) {

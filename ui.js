@@ -422,15 +422,18 @@
       : '';
 
     const fishHtml = fishCount
-      ? '<div class="store-sub">🐟 渔获 · ' + fishCount + ' 条</div>' +
+      ? '<div class="store-sub">🐟 渔获 · ' + fishCount + ' 条（去水产店卖）</div>' +
         fish.map(function (g) {
           const q = G.qualityById(g.q);
           const col = q ? q.color : 'var(--ink-3)';
+          const desc = G.fishDesc(g.name);
           return '<div class="store-row">' +
             '<span class="se">' + g.emoji + '</span>' +
-            '<div><div class="sn">' + g.name + ' ×' + g.count + ' <span style="color:var(--ink-3);font-weight:600">水产店卖</span></div>' +
-            '<div class="sv" style="color:' + col + '">' +
-              (q ? q.emoji + ' ' + q.name : '杂物') + ' · ' + g.v + ' 金/条</div></div>' +
+            '<div><div class="sn">' + g.name + ' ×' + g.count + '</div>' +
+            '<div class="sv">' +
+              (desc ? '<span class="sf-note">' + desc + '</span> · ' : '') +
+              '<span style="color:' + col + '">' + (q ? q.emoji + ' ' + q.name : '杂物') + '</span>' +
+              ' · ' + g.v + ' 金/条</div></div>' +
             '<span class="sp">' + (g.v * g.count) + ' 金</span>' +
           '</div>';
         }).join('')
@@ -617,9 +620,11 @@
   }
 
   function commit(result) {
+    const unlocked = G.checkAchievements(state);
     renderAll();
     save();
     if (result && !result.ok && result.msg) toast(result.msg, 'warn');
+    achToasts(unlocked);
     return result;
   }
 
@@ -879,6 +884,13 @@
       '</div>' +
 
       '<div class="rule-sec">' +
+        '<h4>🐟 水产店</h4>' +
+        '<p>自己的渔获在这里卖，价格就是渔获的价值。<br>' +
+        '店里每天<b>进一批水产</b>（一般品质），每种数量随机、<b>睡觉后补货</b>，卖完只能等明天；' +
+        '买价是基础价的 ' + G.BALANCE.shop.priceMul + ' 倍，买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。</p>' +
+      '</div>' +
+
+      '<div class="rule-sec">' +
         '<h4>⭐ 品质（作物与鱼共用）</h4>' +
         '<table class="rule-table"><tr><th>品质</th><th>倍率</th><th>概率</th></tr>' +
         G.QUALITY.map(function (q) {
@@ -913,7 +925,14 @@
       '<div class="rule-sec">' +
         '<h4>📋 委托</h4>' +
         '<p>每天 2 个作物单 + 1 个鱼单，<b>每天自动换新</b>，另外还能<b>手动刷新一次</b>。<br>' +
-        '报酬高于直接卖约 40%，没交不罚。交委托先扣<b>品质差的</b>，交鱼先交最便宜的；杂物、宝箱不算数。</p>' +
+        '报酬约为直接卖的 ' + (G.BALANCE.order.mult * 100).toFixed(0) + '%，没交不罚；季节越往后要的量越多。' +
+        '交委托先扣<b>品质差的</b>，交鱼先交最便宜的；杂物、宝箱不算数。</p>' +
+      '</div>' +
+
+      '<div class="rule-sec">' +
+        '<h4>🏆 成就</h4>' +
+        '<p>共 <b>' + G.ACH.length + '</b> 项，分种田 / 钓鱼 / 经营 / 收集四类。达到条件会<b>自动发放</b>金币、种子、肥料或饵料，' +
+        '不用手动领；顶栏 🏆 里能看每项进度。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -980,6 +999,56 @@
       '<div class="store-sub">🐟 鱼类 · 首次 / 次数 / 累计价值</div>' + fishRows +
       '<div class="store-sub" style="margin-top:10px">🌱 作物 · 首次 / 数量 / 累计价值</div>' + cropRows,
       '<button class="btn" data-close>关闭</button>');
+  }
+
+  function achModal() {
+    const list = G.achInfo(state);
+    const done = list.filter(function (a) { return a.done; }).length;
+    const stat = '<div class="codex-stat" style="grid-template-columns:repeat(3,1fr)">' +
+      '<div><b>' + done + '/' + list.length + '</b><span>已解锁</span></div>' +
+      '<div><b>' + Math.round(done / list.length * 100) + '%</b><span>完成度</span></div>' +
+      '<div><b>' + (list.length - done) + '</b><span>待解锁</span></div>' +
+    '</div>';
+
+    const rows = ['farm', 'fish', 'biz', 'all'].map(function (cat) {
+      const items = list.filter(function (a) { return a.cat === cat; });
+      if (!items.length) return '';
+      return '<div class="store-sub">' + G.ACH_CATS[cat] + ' · ' +
+          items.filter(function (a) { return a.done; }).length + '/' + items.length + '</div>' +
+        items.map(function (a) {
+          const pct = Math.round(a.cur / a.goal * 100);
+          return '<div class="ach-row' + (a.done ? ' done' : '') + '">' +
+            '<span class="ae">' + a.emoji + '</span>' +
+            '<div class="ai">' +
+              '<div class="an">' + a.name +
+                (a.done ? ' <span class="adone">D' + a.day + '</span>' : '') + '</div>' +
+              '<div class="ad">' + a.desc + ' · 奖励 ' + a.reward + '</div>' +
+              '<div class="abar"><i style="width:' + pct + '%"></i></div>' +
+            '</div>' +
+            '<span class="ap">' + a.cur + '/' + a.goal + '</span>' +
+          '</div>';
+        }).join('');
+    }).join('');
+
+    openModal('🏆 成就', stat + rows +
+      '<div class="shop-tip">达成条件会<b>自动发放奖励</b>（金币 / 种子 / 肥料 / 饵料），进度存在存档里。</div>',
+      '<button class="btn" data-close>关闭</button>');
+  }
+
+  /* 成就解锁提示：一次解锁太多就合并成一条 */
+  function achToasts(list) {
+    if (!list || !list.length) return;
+    if (list.length > 3) {
+      toast('🏆 解锁 ' + list.length + ' 项成就，奖励已到账', 'good');
+      SFX.good();
+      return;
+    }
+    list.forEach(function (a, i) {
+      setTimeout(function () {
+        toast('🏆 ' + a.emoji + ' ' + a.name + ' · ' + a.reward, 'good');
+        SFX.good();
+      }, 260 + i * 620);
+    });
   }
 
   function statsModal() {
@@ -1069,30 +1138,42 @@
       return '<div class="store-row">' +
         '<span class="se">' + g.emoji + '</span>' +
         '<div><div class="sn">' + g.name + ' ×' + g.count + '</div>' +
-        '<div class="sv" style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
-          (q ? q.emoji + q.name : '杂物') + ' · ' + g.v + ' 金/条</div></div>' +
+        '<div class="sv">' +
+          (g.q ? '<span style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
+            (q ? q.emoji + q.name : '杂物') + '</span> · ' : '杂物 · ') +
+          g.v + ' 金/条 · ' + (g.bought ? '今天买进的' : '自己钓的') + '</div></div>' +
         '<span class="sp">' + (g.v * g.count) + ' 金</span>' +
         '<button class="btn mini" data-sellfish="' + g.key + '">卖出</button>' +
       '</div>';
     }).join('') : '<div class="store-empty">还没有渔获，先去河边甩两杆</div>';
 
-    const buyRows = G.FISH.filter(function (f) { return !f.trash && !f.noOrder; }).map(function (f) {
+    const buyList = G.FISH.filter(function (f) { return !f.trash && !f.noOrder; });
+    let outOfStock = 0;
+    const buyRows = buyList.map(function (f) {
       const bp = G.fishBuyPrice(f.id);
-      return '<div class="store-row">' +
+      const st = G.shopStock(state, f.id);
+      const cap = (G.SHOP_STOCK[f.id] || [1, 2])[1];
+      if (!st) outOfStock++;
+      const soldOut = st <= 0;
+      return '<div class="store-row' + (soldOut ? ' sold-out' : '') + '">' +
         '<span class="se">' + f.emoji + '</span>' +
-        '<div><div class="sn">' + f.name + '</div>' +
-        '<div class="sv">买 ' + bp + ' 金/条 · 基础值 ' + f.base + ' 金 · 不能交委托</div></div>' +
+        '<div><div class="sn">' + f.name +
+          ' <b class="own">今日 ' + st + '/' + cap + '</b></div>' +
+        '<div class="sv">一般品质 · 买 ' + bp + ' 金/条 · 不能交委托</div></div>' +
         '<button class="btn mini" data-buyfish="' + f.id + '" data-n="1"' +
-          (state.coins < bp ? ' disabled' : '') + '>买1</button>' +
+          (soldOut || state.coins < bp ? ' disabled' : '') + '>' +
+          (soldOut ? '售罄' : '买1') + '</button>' +
         '<button class="btn mini" data-buyfish="' + f.id + '" data-n="3"' +
-          (state.coins < bp * 3 ? ' disabled' : '') + '>买3</button>' +
+          (st < 3 || state.coins < bp * 3 ? ' disabled' : '') + '>买3</button>' +
       '</div>';
     }).join('');
 
     openModal('🐟 水产店',
       '<div class="shop-head">💰 <b>' + state.coins + '</b> 金 · 渔获只能在这里出售</div>' +
       '<div class="store-sub">卖渔获 · ' + total + ' 条</div>' + sellRows +
-      '<div class="store-sub" style="margin-top:10px">买水产 · 用来凑委托</div>' + buyRows,
+      '<div class="store-sub" style="margin-top:10px">买水产 · 今日进货' +
+        (outOfStock === buyList.length ? '（全部售罄）' : '') + '</div>' + buyRows +
+      '<div class="shop-tip">水产店每天补一次货，卖完要等明天；买来的鱼是<b>一般品质</b>，只能卖钱、不能交委托。</div>',
       '<button class="btn" data-sellallfish' + (total ? '' : ' disabled') + '>全部卖出</button>' +
       '<button class="btn" data-close>关闭</button>');
   }
@@ -1120,16 +1201,21 @@
       ['金币', state.coins + ' 金'],
       ['体力', state.energy + ' / ' + state.maxEnergy + ' · 伙食 ' + G.mealFee(state) + ' 金/天'],
       ['土地', state.plots.length + ' 块 · 洒水器 ' + state.sprinklers + ' 个'],
-      ['设备', '自动收获器 ' + (state.harvester ? '✅ 已安装' : '— 未安装')],
+      ['设备', (state.harvester ? '自动收获器 ✅ · ' : '自动收获器 — · ') + '渔网 ' + state.nets + ' 张'],
       ['维护费', '每周 ' + (G.plotUpkeep(state.plots.length) + G.deviceUpkeep(state)) +
         ' 金（土地 ' + G.plotUpkeep(state.plots.length) + ' + 设备 ' + G.deviceUpkeep(state) + '）'],
-      ['税金', '每 30 天 ' + G.taxDue(state) + ' 金（按金币 5%）'],
+      ['税金', '每 30 天 ' + G.taxDue(state) + ' 金（金币+仓库的 ' +
+        (G.BALANCE.tax.rate * 100).toFixed(0) + '%，最低 ' + G.BALANCE.tax.min + '）'],
       ['仓库总价', G.storeTotal(state) + ' 金'],
       ['累计播种', state.stats.planted + ' 次'],
       ['累计收获', state.stats.harvests + ' 次'],
       ['累计钓鱼', state.stats.casts + ' 次'],
       ['挖蚯蚓', state.stats.dug + ' 次'],
       ['完成委托', (state.stats.orders || 0) + ' 单'],
+      ['成就', (function () {
+        const list = G.achInfo(state);
+        return list.filter(function (a) { return a.done; }).length + ' / ' + list.length;
+      })()],
       ['最高品质', b && b.quality ? b.quality.emoji + ' ' + b.quality.name + ' · ' + b.fish : '—'],
       ['最贵一条', p ? p.fish + ' · ' + p.price + ' 金' : '—']
     ];
@@ -1514,6 +1600,7 @@
     $('#btn-settings').addEventListener('click', settingsModal);
     $('#btn-status').addEventListener('click', statusModal);
     $('#btn-codex').addEventListener('click', codexModal);
+    $('#btn-ach').addEventListener('click', achModal);
     $('#btn-refresh-orders').addEventListener('click', function () {
       const r = G.refreshOrders(state);
       commit(r);
@@ -1582,6 +1669,7 @@
       state = G.createState();
     }
     bind();
+    const unlocked = G.checkAchievements(state);
     renderAll();
     save();
 
@@ -1590,6 +1678,7 @@
     } else {
       setTimeout(function () { toast('🌾 欢迎来到我的小农场！先给空地播种吧', 'good'); }, 300);
     }
+    if (unlocked.length) setTimeout(function () { achToasts(unlocked); }, 900);
   }
 
   boot();
