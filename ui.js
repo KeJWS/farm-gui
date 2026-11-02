@@ -210,6 +210,19 @@
     $('#hud-fee').textContent = '🍖 ' + G.mealFee(state) + ' 金/天';
     $('#hud-plots').textContent = '🏞️ ' + state.plots.length + ' 块';
     $('#season').textContent = G.seasonOf(state.day) + ' · 第 ' + state.day + ' 天';
+
+    const lv = state.levels || { farm: 1, fish: 1, farmXp: 0, fishXp: 0 };
+    const farmLvEl = $('#farm-lv'), fishLvEl = $('#fish-lv');
+    if (farmLvEl) {
+      farmLvEl.textContent = '🌱 Lv' + lv.farm;
+      farmLvEl.title = '种田等级：' + G.levelEffectText('farm', lv.farm) +
+        ' · 经验 ' + lv.farmXp + '/' + G.levelNeed(lv.farm);
+    }
+    if (fishLvEl) {
+      fishLvEl.textContent = '🎣 Lv' + lv.fish;
+      fishLvEl.title = '钓鱼等级：' + G.levelEffectText('fish', lv.fish) +
+        ' · 经验 ' + lv.fishXp + '/' + G.levelNeed(lv.fish);
+    }
   }
 
   /* ---------------- 农田 ---------------- */
@@ -827,7 +840,7 @@
     }).join('');
 
     openModal('🌰 种子店',
-      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金 · 卖回价是买价的一半</div>' +
+      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金</div>' +
       '<div class="shop-list">' + rows + '</div>' +
       '<div class="store-sub" style="margin-top:10px">🧪 肥料 · 买回来放仓库，施肥时消耗</div>' +
       '<div class="shop-list">' + fertRows + '</div>' +
@@ -1005,8 +1018,8 @@
         '）：睡觉时自动收走成熟作物，不耗体力<br>' +
         '· 💰 税：每 30 天按（金币 + 仓库价值）<b>累进</b>收一次——前 2000 收 2%、2000~1 万收 4%、1 万以上收 6%，最低 ' +
         G.BALANCE.tax.min + ' 金（当前约 ' + G.taxDue(state) + ' 金）<br>' +
-        '· 🧾 维护费：每 7 天收一次，土地 ' + G.plotUpkeep(state.plots.length) + ' 金 + 设备 ' +
-        G.deviceUpkeep(state) + ' 金<br>' +
+        '· 🧾 维护费：每 7 天收一次，土地 ' + G.plotUpkeep(state.plots.length) + ' 金（6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 10 金/周）' +
+        ' + 设备 ' + G.deviceUpkeep(state) + ' 金<br>' +
         '· 没钱吃饭只恢复到体力上限的 30%（至少 5 点），不会扣掉已有的体力<br>' +
         '· 种子 / 肥料都在种子店买卖（半价回收），肥料也只能在种子店卖；蚯蚓只能在渔具店卖（' + G.WORM_VALUE + ' 金/条）</p>' +
       '</div>' +
@@ -1016,7 +1029,7 @@
         '<p>每天 2 个作物单 + 1 个鱼单，<b>每天自动换新</b>，另外还能<b>手动刷新一次</b>。<br>' +
         '报酬约为直接卖的 ' + (G.BALANCE.order.mult * 100).toFixed(0) + '%，没交不罚；季节越往后要的量越多。<br>' +
         '委托池按天数逐档解锁（D1 / D3 / D5 / D7 / D9 / D12 / D15），并且<b>只会要你当前等级买得到的作物</b>；' +
-        '贵的作物被点单的概率更高，鱼单单价也随季节涨（11 → 15 → 19 → 23）。<br>' +
+        '贵的作物一次要 2–3 个，单张报酬<b>最低 40 金</b>；鱼单单价随季节涨（11 → 15 → 19 → 23）。<br>' +
         '📜 <b>长期订单</b>：5 天期限、数量大、<b>2 倍报酬</b>，完成后自动换下一张（过期也会换）。<br>' +
         '交委托先扣<b>品质差的</b>，交鱼先交最便宜的；杂物、宝箱不算数。</p>' +
       '</div>' +
@@ -1033,7 +1046,7 @@
 
       '<div class="rule-sec">' +
         '<h4>🏆 成就</h4>' +
-        '<p>共 <b>' + G.ACH.length + '</b> 项，分种田 / 钓鱼 / 经营 / 收集四类。每项给<b>成就点</b>，' +
+        '<p>共 <b>' + G.ACH.length + '</b> 项，分种田 / 钓鱼 / 经营 / 收集四类。每项给<b>成就点</b>和<b>实质奖励</b>（金币 / 种子 / 肥料 / 饵料）；' +
         '每 10 点 <b>+1% 售价</b>（最多 +20%，作用于商店与收购箱）；顶栏 🏆 里能看每项进度。</p>' +
       '</div>' +
 
@@ -1127,7 +1140,7 @@
             '<div class="ai">' +
               '<div class="an">' + a.name +
                 (a.done ? ' <span class="adone">D' + a.day + '</span>' : '') + '</div>' +
-              '<div class="ad">' + a.desc + ' · 奖励 ' + a.reward + '</div>' +
+              '<div class="ad">' + a.desc + ' · ' + a.reward + '</div>' +
               '<div class="abar"><i style="width:' + pct + '%"></i></div>' +
             '</div>' +
             '<span class="ap">' + a.cur + '/' + a.goal + '</span>' +
@@ -1150,7 +1163,7 @@
     }
     list.forEach(function (a, i) {
       setTimeout(function () {
-        toast('🏆 ' + a.emoji + ' ' + a.name + ' · ' + a.reward, 'good');
+        toast('🏆 ' + a.emoji + ' ' + a.name + ' · ' + (a.text || a.reward), 'good');
         SFX.good();
       }, 260 + i * 620);
     });
@@ -1326,6 +1339,9 @@
       rows +
       (list.length
         ? '<div class="buy-custom"><span>🧮 自定义取出</span>' +
+            '<select id="box-pick">' + list.map(function (e, i) {
+              return '<option value="' + i + '">' + (e.emoji || '📦') + ' ' + e.name + ' ×' + e.n + '</option>';
+            }).join('') + '</select>' +
             '<input id="box-take" type="number" min="1" step="1" value="1" inputmode="numeric">' +
             '<button class="btn mini" data-boxtaken="1">取出</button>' +
             '<span class="bc-tip">共 ' + list.reduce(function (a, e) { return a + (e.n || 1); }, 0) + ' 件</span></div>'
@@ -1382,6 +1398,17 @@
     openModal('🐟 水产店',
       '<div class="shop-head">💰 <b>' + state.coins + '</b> 金</div>' +
       '<div class="store-sub">卖渔获 · ' + total + ' 条</div>' + sellRows +
+      (groups.length
+        ? '<div class="buy-custom"><span>🧮 自定义卖出</span>' +
+            '<select id="fish-sell-id">' + groups.map(function (g) {
+              const q = G.qualityById(g.q);
+              return '<option value="' + g.key + '">' + g.emoji + ' ' + g.name + ' ×' + g.count +
+                (q ? '（' + q.name + '）' : '') + '</option>';
+            }).join('') + '</select>' +
+            '<input id="fish-sell-n" type="number" min="1" step="1" value="1" inputmode="numeric">' +
+            '<button class="btn mini" data-sellfishn="1">卖出</button>' +
+            '<span class="bc-tip">共 ' + total + ' 条</span></div>'
+        : '') +
       '<div class="store-sub" style="margin-top:10px">买水产 · 今日进货' +
         (outOfStock === buyList.length ? '（全部售罄）' : '') + '</div>' + buyRows +
       '<div class="shop-tip">水产店每天补一次货，卖完要等明天；买来的鱼是<b>一般品质</b>，只能卖钱、不能交委托。<br>' +
@@ -1672,6 +1699,22 @@
         return;
       }
 
+      // 水产店：自定义卖出
+      const sellFishN = t.closest('[data-sellfishn]');
+      if (sellFishN) {
+        const sel = $('#fish-sell-id'), input = $('#fish-sell-n');
+        const key = sel && sel.value;
+        const n = Math.floor(Number(input && input.value) || 0);
+        if (!key) { toast('先选一种渔获', 'warn'); return; }
+        if (!(n > 0)) { toast('请输入 1 以上的数量', 'warn'); return; }
+        const r = G.sellFishGroupN(state, key, n);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        if (modalOpen()) fishShop();
+        return;
+      }
+
       // 卖一种鱼（水产店）
       const sellFish = t.closest('[data-sellfish]');
       if (sellFish) {
@@ -1683,13 +1726,14 @@
         return;
       }
 
-      // 收购箱：自定义取出
+      // 收购箱：自定义取出（可选物品）
       const boxTakeN = t.closest('[data-boxtaken]');
       if (boxTakeN) {
-        const input = $('#box-take');
+        const sel = $('#box-pick'), input = $('#box-take');
+        const idx = sel ? Number(sel.value) : 0;
         const n = Math.floor(Number(input && input.value) || 0);
         if (!(n > 0)) { toast('请输入 1 以上的数量', 'warn'); return; }
-        const r = G.boxTake(state, n);
+        const r = G.boxTakeEntry(state, idx, n);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (modalOpen()) boxModal();

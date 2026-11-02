@@ -14,7 +14,7 @@
     prices: { sprinkler: 80, harvester: 200, net: 80, netMax: 9 },
     netChance: 0.7,
     work: { full: 2.0, half: 1.2 },
-    upkeep: { plotPerWeek: 3, free: 5, sprinkle: 3, net: 3, harvester: 5 },
+    upkeep: { plotPerWeek: 3, plotMid: 6, plotHigh: 10, free: 5, sprinkle: 3, net: 3, harvester: 5 },
     tax: { rate: 0.04, min: 30, every: 30 },
     order: { mult: 1.35, seasonStep: 0.6 },
     expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
@@ -156,93 +156,131 @@
   const ACH = [
     /* 种田 */
     { id: 'harvest1',  cat: 'farm', emoji: '🌱', name: '第一筐菜',   desc: '收获 1 次作物',        goal: 1,
-      val: function (s) { return s.stats.harvests || 0; }, pts: 1 },
+      val: function (s) { return s.stats.harvests || 0; }, reward: { coins: 15 }, pts: 1 },
     { id: 'harvest50', cat: 'farm', emoji: '🧺', name: '田里好手',   desc: '累计收获 50 次',       goal: 50,
-      val: function (s) { return s.stats.harvests || 0; }, pts: 2 },
+      val: function (s) { return s.stats.harvests || 0; }, reward: { coins: 60, seeds: { carrot: 3 } }, pts: 2 },
     { id: 'harvest200', cat: 'farm', emoji: '🚜', name: '老农把式',  desc: '累计收获 200 次',      goal: 200,
-      val: function (s) { return s.stats.harvests || 0; }, pts: 4 },
+      val: function (s) { return s.stats.harvests || 0; }, reward: { coins: 250 }, pts: 4 },
     { id: 'plot10',    cat: 'farm', emoji: '🏞️', name: '小有规模',   desc: '土地达到 10 块',       goal: 10,
-      val: function (s) { return s.plots.length; }, pts: 2 },
+      val: function (s) { return s.plots.length; }, reward: { coins: 40 }, pts: 2 },
     { id: 'plot20',    cat: 'farm', emoji: '🌾', name: '良田成片',   desc: '土地达到 20 块',       goal: 20,
-      val: function (s) { return s.plots.length; }, pts: 3 },
+      val: function (s) { return s.plots.length; }, reward: { ferts: { normal: 5 } }, pts: 3 },
     { id: 'plot36',    cat: 'farm', emoji: '🗺️', name: '大地主',     desc: '土地达到 36 块',       goal: 36,
-      val: function (s) { return s.plots.length; }, pts: 6 },
+      val: function (s) { return s.plots.length; }, reward: { coins: 2000 }, pts: 6 },
     { id: 'crop10',    cat: 'farm', emoji: '🌽', name: '五谷丰登',   desc: '收获过全部 10 种作物', goal: 10,
-      val: cropSpeciesOwned, pts: 3 },
+      val: cropSpeciesOwned, reward: { coins: 250, seeds: { pumpkin: 1 } }, pts: 3 },
 
     /* 钓鱼 */
     { id: 'fish1',     cat: 'fish', emoji: '🎣', name: '开张啦',     desc: '钓上第 1 条鱼',        goal: 1,
-      val: function (s) { return (s.fishBook && s.fishBook.count) || 0; }, pts: 1 },
+      val: function (s) { return (s.fishBook && s.fishBook.count) || 0; }, reward: { bait: { dough: 5 } }, pts: 1 },
     { id: 'cast100',   cat: 'fish', emoji: '🌊', name: '垂钓老手',   desc: '累计甩杆 100 次',      goal: 100,
-      val: function (s) { return s.stats.casts || 0; }, pts: 2 },
+      val: function (s) { return s.stats.casts || 0; }, reward: { coins: 100 }, pts: 2 },
     { id: 'perfect1',  cat: 'fish', emoji: '🌟', name: '完美一击',   desc: '钓到 1 条完美品质的鱼', goal: 1,
-      val: perfectFish, pts: 2 },
+      val: perfectFish, reward: { coins: 80 }, pts: 2 },
     { id: 'perfect10', cat: 'fish', emoji: '💫', name: '完美主义者', desc: '钓到 10 条完美品质的鱼', goal: 10,
-      val: perfectFish, pts: 4 },
+      val: perfectFish, reward: { coins: 500 }, pts: 4 },
     { id: 'fish7',     cat: 'fish', emoji: '🐠', name: '鱼类图鉴',   desc: '集齐 7 种鱼',          goal: 7,
-      val: fishSpeciesOwned, pts: 5 },
+      val: fishSpeciesOwned, reward: { ferts: { special: 3 } }, pts: 5 },
     { id: 'fishval',   cat: 'fish', emoji: '💎', name: '鱼市大亨',   desc: '鱼类累计价值 5000 金', goal: 5000,
-      val: fishValueTotal, pts: 3 },
+      val: fishValueTotal, reward: { coins: 400 }, pts: 3 },
 
     /* 经营 */
     { id: 'order1',    cat: 'biz',  emoji: '📋', name: '第一单',     desc: '完成 1 个委托',        goal: 1,
-      val: function (s) { return s.stats.orders || 0; }, pts: 1 },
+      val: function (s) { return s.stats.orders || 0; }, reward: { coins: 20 }, pts: 1 },
     { id: 'order30',   cat: 'biz',  emoji: '🤝', name: '可靠伙伴',   desc: '累计完成 30 个委托',   goal: 30,
-      val: function (s) { return s.stats.orders || 0; }, pts: 3 },
+      val: function (s) { return s.stats.orders || 0; }, reward: { coins: 150 }, pts: 3 },
     { id: 'coins1k',   cat: 'biz',  emoji: '💰', name: '小有积蓄',   desc: '金币达到 1000',        goal: 1000,
-      val: function (s) { return Math.max(s.coins || 0, 0); }, pts: 2 },
+      val: function (s) { return Math.max(s.coins || 0, 0); }, reward: { coins: 80 }, pts: 2 },
     { id: 'coins10k',  cat: 'biz',  emoji: '🤑', name: '万元户',     desc: '金币达到 10000',       goal: 10000,
-      val: function (s) { return Math.max(s.coins || 0, 0); }, pts: 5 },
+      val: function (s) { return Math.max(s.coins || 0, 0); }, reward: { coins: 1500 }, pts: 5 },
     { id: 'day30',     cat: 'biz',  emoji: '📅', name: '一个月',     desc: '经营满 30 天',         goal: 30,
-      val: function (s) { return s.day || 1; }, pts: 2 },
+      val: function (s) { return s.day || 1; }, reward: { coins: 50 }, pts: 2 },
     { id: 'day100',    cat: 'biz',  emoji: '🏡', name: '百日农场',   desc: '经营满 100 天',        goal: 100,
-      val: function (s) { return s.day || 1; }, pts: 4 },
+      val: function (s) { return s.day || 1; }, reward: { coins: 400 }, pts: 4 },
 
     /* 收集 */
     { id: 'codexall',  cat: 'all',  emoji: '📖', name: '全图鉴',     desc: '7 种鱼 + 10 种作物都收过', goal: 17,
       val: function (s) { return fishSpeciesOwned(s) + cropSpeciesOwned(s); },
-      pts: 8 },
+      reward: { coins: 500, ferts: { special: 5 } }, pts: 8 },
 
     /* v1.7 追加：等级 / 经营 / 长期 */
     { id: 'farmLv3',   cat: 'farm', emoji: '🌿', name: '种田入门',   desc: '种田等级到 Lv3',       goal: 3,
-      val: function (s) { return (s.levels && s.levels.farm) || 1; }, pts: 2 },
+      val: function (s) { return (s.levels && s.levels.farm) || 1; }, reward: { coins: 40 }, pts: 2 },
     { id: 'farmLv6',   cat: 'farm', emoji: '🌻', name: '老把式',     desc: '种田等级到 Lv6',       goal: 6,
-      val: function (s) { return (s.levels && s.levels.farm) || 1; }, pts: 3 },
+      val: function (s) { return (s.levels && s.levels.farm) || 1; }, reward: { ferts: { normal: 6 } }, pts: 3 },
     { id: 'fishLv3',   cat: 'fish', emoji: '🎏', name: '手感来了',   desc: '钓鱼等级到 Lv3',       goal: 3,
-      val: function (s) { return (s.levels && s.levels.fish) || 1; }, pts: 2 },
+      val: function (s) { return (s.levels && s.levels.fish) || 1; }, reward: { bait: { dough: 10 } }, pts: 2 },
     { id: 'fishLv6',   cat: 'fish', emoji: '🐋', name: '河边常客',   desc: '钓鱼等级到 Lv6',       goal: 6,
-      val: function (s) { return (s.levels && s.levels.fish) || 1; }, pts: 3 },
+      val: function (s) { return (s.levels && s.levels.fish) || 1; }, reward: { coins: 300 }, pts: 3 },
     { id: 'cropsold100', cat: 'biz', emoji: '🛒', name: '农产品大客户', desc: '累计卖出 100 个作物', goal: 100,
-      val: function (s) { return s.stats.cropsSold || 0; }, pts: 2 },
+      val: function (s) { return s.stats.cropsSold || 0; }, reward: { coins: 80 }, pts: 2 },
     { id: 'order100',  cat: 'biz',  emoji: '📦', name: '老主顾',     desc: '累计完成 100 个委托',  goal: 100,
-      val: function (s) { return s.stats.orders || 0; }, pts: 5 },
+      val: function (s) { return s.stats.orders || 0; }, reward: { coins: 600 }, pts: 5 },
     { id: 'coins50k',  cat: 'biz',  emoji: '🏦', name: '富甲一方',   desc: '金币达到 50000',       goal: 50000,
-      val: function (s) { return Math.max(s.coins || 0, 0); }, pts: 8 },
+      val: function (s) { return Math.max(s.coins || 0, 0); }, reward: { coins: 3000 }, pts: 8 },
     { id: 'day200',    cat: 'biz',  emoji: '🗓️', name: '两百天',     desc: '经营满 200 天',        goal: 200,
-      val: function (s) { return s.day || 1; }, pts: 6 },
+      val: function (s) { return s.day || 1; }, reward: { coins: 800 }, pts: 6 },
     { id: 'perfect50', cat: 'fish', emoji: '✨', name: '完美猎手',   desc: '钓到 50 条完美品质的鱼', goal: 50,
-      val: perfectFish, pts: 6 },
+      val: perfectFish, reward: { coins: 1200 }, pts: 6 },
     { id: 'fishval20k', cat: 'fish', emoji: '🐚', name: '水产大户',  desc: '鱼类累计价值 20000 金', goal: 20000,
-      val: fishValueTotal, pts: 5 },
+      val: fishValueTotal, reward: { coins: 800 }, pts: 5 },
     { id: 'cropval5k', cat: 'farm', emoji: '🌾', name: '粮仓满满',   desc: '作物累计价值 5000 金', goal: 5000,
-      val: cropValueTotal, pts: 3 },
+      val: cropValueTotal, reward: { coins: 300 }, pts: 3 },
     { id: 'net9',      cat: 'fish', emoji: '🕸️', name: '网罗天下',   desc: '渔网放满 9 张',        goal: 9,
-      val: function (s) { return s.nets || 0; }, pts: 3 },
+      val: function (s) { return s.nets || 0; }, reward: { coins: 200 }, pts: 3 },
 
     /* v1.9 追加：挖蚯蚓 / 打零工 */
     { id: 'dig50',     cat: 'fish', emoji: '🪱', name: '蚯蚓猎手',   desc: '累计挖蚯蚓 50 次',     goal: 50,
-      val: function (s) { return s.stats.dug || 0; }, pts: 2 },
+      val: function (s) { return s.stats.dug || 0; }, reward: { coins: 60, bait: { dough: 5 } }, pts: 2 },
     { id: 'dig200',    cat: 'fish', emoji: '🕳️', name: '土里刨食',   desc: '累计挖蚯蚓 200 次',    goal: 200,
-      val: function (s) { return s.stats.dug || 0; }, pts: 4 },
+      val: function (s) { return s.stats.dug || 0; }, reward: { coins: 300 }, pts: 4 },
     { id: 'work30',    cat: 'biz',  emoji: '🕐', name: '打工人',     desc: '累计打零工 30 次',     goal: 30,
-      val: function (s) { return s.stats.works || 0; }, pts: 2 },
+      val: function (s) { return s.stats.works || 0; }, reward: { coins: 150 }, pts: 2 },
     { id: 'work100',   cat: 'biz',  emoji: '🕑', name: '劳模',       desc: '累计打零工 100 次',    goal: 100,
-      val: function (s) { return s.stats.works || 0; }, pts: 5 }
+      val: function (s) { return s.stats.works || 0; }, reward: { coins: 600 }, pts: 5 },
+
+    /* v2.2 追加：收购箱 */
+    { id: 'box100',    cat: 'biz',  emoji: '📦', name: '第一车货',   desc: '收购箱累计出货 100 件', goal: 100,
+      val: function (s) { return s.stats.boxItems || 0; }, reward: { coins: 100 }, pts: 2 },
+    { id: 'box500',    cat: 'biz',  emoji: '🚚', name: '物流大户',   desc: '收购箱累计出货 500 件', goal: 500,
+      val: function (s) { return s.stats.boxItems || 0; }, reward: { coins: 400, ferts: { normal: 3 } }, pts: 4 },
+    { id: 'boxval5k',  cat: 'biz',  emoji: '💴', name: '箱赚五千',   desc: '收购箱累计收益 5000 金', goal: 5000,
+      val: function (s) { return s.stats.boxIncome || 0; }, reward: { coins: 300 }, pts: 3 }
   ];
 
   const ACH_CATS = { farm: '🌱 种田', fish: '🎣 钓鱼', biz: '💰 经营', all: '🏆 收集' };
 
-  function rewardText(pts) { return '+' + (pts || 0) + ' 成就点'; }
+  /* 成就奖励文案：成就点 + 金币 / 种子 / 肥料 / 饵料 */
+  function rewardText(a) {
+    const parts = [(a.pts || 0) + ' 点'];
+    const r = a.reward || {};
+    if (r.coins) parts.push(r.coins + ' 金');
+    ['seeds', 'ferts', 'bait'].forEach(function (k) {
+      const bag = r[k] || {};
+      Object.keys(bag).forEach(function (id) {
+        let name = id;
+        if (k === 'seeds' && CROPS[id]) name = CROPS[id].name + '种子';
+        if (k === 'ferts' && FERT[id]) name = FERT[id].name;
+        if (k === 'bait') name = id === 'worm' ? '蚯蚓' : '面团饵';
+        parts.push(name + '×' + bag[id]);
+      });
+    });
+    return '奖励 ' + parts.join(' · ');
+  }
+
+  function applyReward(s, r) {
+    r = r || {};
+    if (r.coins) addCoins(s, r.coins, '成就奖励');
+    Object.keys(r.seeds || {}).forEach(function (id) {
+      s.seeds[id] = (s.seeds[id] || 0) + r.seeds[id];
+    });
+    Object.keys(r.ferts || {}).forEach(function (id) {
+      s.ferts[id] = (s.ferts[id] || 0) + r.ferts[id];
+    });
+    Object.keys(r.bait || {}).forEach(function (id) {
+      s.bait[id] = (s.bait[id] || 0) + r.bait[id];
+    });
+  }
 
   /* 成就点 → 售价加成：每 10 点 +1%，最多 +20% */
   function achPts(s) {
@@ -253,7 +291,7 @@
     return 1 + Math.min(0.2, Math.floor(achPts(s) / 10) * 0.01);
   }
 
-  /* 检查并解锁：返回本次新解锁的成就（点数立即生效） */
+  /* 检查并解锁：点数 + 实质奖励一起发放 */
   function checkAchievements(s) {
     s.ach = s.ach || {};
     const out = [];
@@ -261,10 +299,11 @@
       if (s.ach[a.id]) return;
       if (a.val(s) < a.goal) return;
       s.ach[a.id] = s.day;
+      applyReward(s, a.reward);
       const bonus = Math.round((sellBonus(s) - 1) * 100);
-      log(s, '🏆 成就解锁：' + a.emoji + ' ' + a.name + '（' + rewardText(a.pts) +
+      log(s, '🏆 成就解锁：' + a.emoji + ' ' + a.name + '（' + rewardText(a) +
         ' · 售价 +' + bonus + '%）', 'good');
-      out.push({ id: a.id, name: a.name, emoji: a.emoji, pts: a.pts, bonus: bonus });
+      out.push({ id: a.id, name: a.name, emoji: a.emoji, pts: a.pts, bonus: bonus, text: rewardText(a) });
     });
     return out;
   }
@@ -276,7 +315,7 @@
       const cur = Math.min(a.val(s), a.goal);
       return { id: a.id, cat: a.cat, emoji: a.emoji, name: a.name, desc: a.desc,
                goal: a.goal, cur: cur, done: !!s.ach[a.id], day: s.ach[a.id] || 0,
-               pts: a.pts, reward: rewardText(a.pts) };
+               pts: a.pts, reward: rewardText(a) };
     });
   }
 
@@ -472,7 +511,8 @@
       levels: { farm: 1, fish: 1, farmXp: 0, fishXp: 0 },
       ach: {},
       fishBook: { count: 0, entries: [], best: null, priciest: null },
-      stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0 }
+      stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0,
+               longOrders: 0, boxItems: 0, boxIncome: 0 }
     };
     return s;
   }
@@ -502,8 +542,15 @@
 
   function mealFee(s) { return Math.max(1, 3 + (s.maxEnergy - 10) / 5); }
 
-  /* 5 块地之后，每周要交土地维护费（每多一块 3 金/周） */
-  function plotUpkeep(plots) { return Math.max(0, plots - BALANCE.upkeep.free) * BALANCE.upkeep.plotPerWeek; }
+  /* 土地维护：超过 5 块开始收费，20 块以上 6 金/周、30 块以上 10 金/周 */
+  function plotUpkeep(plots) {
+    const U = BALANCE.upkeep;
+    let fee = 0;
+    for (let i = U.free; i < plots; i++) {
+      fee += i < 20 ? U.plotPerWeek : (i < 30 ? U.plotMid : U.plotHigh);
+    }
+    return fee;
+  }
 
   /* 设备每周维护费：洒水器 2、渔网 2、自动收获器 4 */
   function deviceUpkeep(s) {
@@ -1272,6 +1319,34 @@
     return { ok: true, msg: g.name + '×' + qty + ' 已入箱', v: v, n: qty };
   }
 
+  /* 从某一批里取回 take 件（就地修改 entry） */
+  function takeFromEntry(s, e, take) {
+    const total = e.n || 1;
+    const t = Math.min(total, take);
+    if (e.kind === 'crop') {
+      const parts = (e.parts && e.parts.length)
+        ? e.parts : [{ q: 'std', n: total, unit: Math.max(1, Math.round((e.v || 1) / total)) }];
+      let remain = t;
+      const kept = [];
+      parts.forEach(function (p) {
+        if (remain <= 0) { kept.push({ q: p.q, n: p.n, unit: p.unit }); return; }
+        const cut = Math.min(p.n, remain);
+        remain -= cut;
+        addStore(s, e.id, p.q, cut);
+        if (p.n - cut > 0) kept.push({ q: p.q, n: p.n - cut, unit: p.unit });
+      });
+      e.parts = kept;
+    } else {
+      const unit = Math.max(1, Math.round((e.v || 1) / total));
+      for (let i = 0; i < t; i++) {
+        s.fishBag.push({ name: e.name, emoji: e.emoji, q: e.q || null, v: unit, d: s.day });
+      }
+    }
+    e.n = total - t;
+    e.v = Math.max(1, Math.round((e.v || 1) * e.n / total));
+    return t;
+  }
+
   /* 从收购箱取回 n 件（不传 n 就全取） */
   function boxTake(s, n) {
     const list = s.box || [];
@@ -1281,41 +1356,24 @@
     const rest = [];
     list.forEach(function (e) {
       if (left <= 0) { rest.push(e); return; }
-      const total = e.n || 1;
-      const take = Math.min(total, left);
-      left -= take;
-      took += take;
-      if (e.kind === 'crop') {
-        const parts = (e.parts && e.parts.length)
-          ? e.parts : [{ q: 'std', n: total, unit: Math.max(1, Math.round((e.v || 1) / total)) }];
-        let remain = take;
-        const keptParts = [];
-        parts.forEach(function (p) {
-          if (remain <= 0) { keptParts.push({ q: p.q, n: p.n, unit: p.unit }); return; }
-          const cut = Math.min(p.n, remain);
-          remain -= cut;
-          addStore(s, e.id, p.q, cut);
-          if (p.n - cut > 0) keptParts.push({ q: p.q, n: p.n - cut, unit: p.unit });
-        });
-        if (take < total) {
-          rest.push({ kind: 'crop', id: e.id, name: e.name, emoji: e.emoji,
-                      n: total - take, parts: keptParts,
-                      v: Math.round(e.v * (total - take) / total) });
-        }
-      } else {
-        const unit = Math.max(1, Math.round((e.v || 1) / total));
-        for (let i = 0; i < take; i++) {
-          s.fishBag.push({ name: e.name, emoji: e.emoji, q: e.q || null, v: unit, d: s.day });
-        }
-        if (take < total) {
-          rest.push({ kind: 'fish', name: e.name, emoji: e.emoji, q: e.q,
-                      n: total - take, v: Math.round(e.v * (total - take) / total) });
-        }
-      }
+      const t = takeFromEntry(s, e, left);
+      left -= t; took += t;
+      if (e.n > 0) rest.push(e);
     });
     s.box = rest;
     log(s, '📦 从收购箱取回 ' + took + ' 件', 'info');
     return { ok: true, msg: '取回 ' + took + ' 件', n: took };
+  }
+
+  /* 从收购箱取回指定批次 n 件 */
+  function boxTakeEntry(s, idx, n) {
+    const list = s.box || [];
+    const e = list[idx];
+    if (!e) return { ok: false, msg: '没有这一项' };
+    const took = takeFromEntry(s, e, n ? Math.max(1, Math.floor(n)) : (e.n || 1));
+    if (e.n <= 0) list.splice(idx, 1);
+    log(s, '📦 从收购箱取回 ' + e.name + ' ×' + took, 'info');
+    return { ok: true, msg: '取回 ' + e.name + ' ×' + took, n: took };
   }
 
   /* 收购箱出货：睡觉时按原价一次性结清 */
@@ -1325,8 +1383,28 @@
     const value = boxValue(s);
     const n = list.reduce(function (a, e) { return a + (e.n || 1); }, 0);
     s.box = [];
+    s.stats.boxItems = (s.stats.boxItems || 0) + n;
+    s.stats.boxIncome = (s.stats.boxIncome || 0) + value;
     addCoins(s, value, '收购箱出货');
     return { n: n, value: value };
+  }
+
+  /* 水产店：自定义卖 n 条 */
+  function sellFishGroupN(s, key, n) {
+    const g = fishGroups(s).filter(function (x) { return x.key === key; })[0];
+    if (!g) return { ok: false, msg: '仓库里没有这种鱼' };
+    const qty = Math.max(1, Math.min(g.count, Math.floor(n || g.count)));
+    let left = qty;
+    const kept = [];
+    (s.fishBag || []).forEach(function (e) {
+      if (fishKey(e) === key && left > 0) { left--; return; }
+      kept.push(e);
+    });
+    s.fishBag = kept;
+    const gain = Math.max(1, Math.round(shopValue(g.v * qty) * sellBonus(s)));
+    addCoins(s, gain, '卖鱼 ' + g.name);
+    log(s, '💰 卖出 ' + g.emoji + ' ' + g.name + ' ×' + qty + '，+' + gain + ' 金（8 折）', 'good');
+    return { ok: true, msg: '卖出 ' + g.name + '×' + qty + '，+' + gain + ' 金', income: gain, count: qty };
   }
 
   /* 蚯蚓也能卖：3 金/条（只在渔具店卖） */
@@ -1733,8 +1811,8 @@
       let c = pickOrderCrop(pool, used);
       if (!c) c = pool[i % pool.length];
       used.push(c.id);
-      const qty = Math.max(1, Math.round((c.price >= 20 ? randInt(1, 2) : randInt(3, 6)) * mult));
-      const reward = Math.max(6, Math.round(qty * c.price * BALANCE.order.mult));
+      const qty = Math.max(1, Math.round((c.price >= 20 ? randInt(2, 3) : randInt(3, 6)) * mult));
+      const reward = Math.max(40, Math.round(qty * c.price * BALANCE.order.mult));
       orders.push({
         id: 'd' + day + '-c' + i, kind: 'crop', crop: c.id, name: c.name, emoji: c.emoji,
         qty: qty, reward: reward, done: false
@@ -1913,7 +1991,7 @@
     merged.lure.dur = Math.round(num(merged.lure.dur, 0, 0, BALANCE.lure.dur));
     merged.lure.owned = !!merged.lure.owned && merged.lure.dur > 0;
     merged.fishBook = Object.assign({ count: 0, entries: [], best: null, priciest: null }, s.fishBook || {});
-    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0 }, s.stats || {});
+    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0 }, s.stats || {});
     merged.box = Array.isArray(s.box) ? s.box.slice(0, 500).filter(function (e) {
       return e && (e.kind === 'crop' || e.kind === 'fish') && e.name;
     }).map(function (e) {
@@ -2104,7 +2182,8 @@
     storeTotal: storeTotal, taxDue: taxDue, buyFish: buyFish, fishBuyPrice: fishBuyPrice, deviceUpkeep: deviceUpkeep, HOOK: HOOK,
     fishDesc: fishDesc, shopStock: shopStock, rollShopStock: rollShopStock, makeShop: makeShop, SHOP_STOCK: SHOP_STOCK,
     shopValue: shopValue, shopSellValue: shopSellValue, sellCropN: sellCropN, takeStoreN: takeStoreN,
-    boxCount: boxCount, boxValue: boxValue, boxPutCrop: boxPutCrop, boxPutFish: boxPutFish, boxTake: boxTake, shipBox: shipBox,
+    boxCount: boxCount, boxValue: boxValue, boxPutCrop: boxPutCrop, boxPutFish: boxPutFish, boxTake: boxTake,
+    boxTakeEntry: boxTakeEntry, sellFishGroupN: sellFishGroupN, shipBox: shipBox,
     cropBuyPrice: cropBuyPrice, cropShopStock: cropShopStock, buyCrop: buyCrop, makeCropShop: makeCropShop,
     rollCropStock: rollCropStock, cropStockCap: cropStockCap, FISH_UNLOCK: FISH_UNLOCK, CROP_UNLOCK: CROP_UNLOCK,
     seedUnlocked: seedUnlocked, fertUnlocked: fertUnlocked,    sprinklerUnlocked: sprinklerUnlocked, harvesterUnlocked: harvesterUnlocked,

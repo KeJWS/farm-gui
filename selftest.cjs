@@ -957,14 +957,14 @@ ok(G.checkAchievements(achs).length === 0, '开局不会白送成就');
 achs.stats.harvests = 1;
 const achC0 = achs.coins;
 const achUn1 = G.checkAchievements(achs);
-ok(achUn1.some(x => x.id === 'harvest1') && achs.coins === achC0, '收获 1 次解锁成就（不再直接发金币）', achUn1);
+ok(achUn1.some(x => x.id === 'harvest1') && achs.coins === achC0 + 15, '成就同时发点数与金币', achUn1);
 ok(G.achPts(achs) === 1, '解锁后获得 1 点成就点', G.achPts(achs));
 ok(G.checkAchievements(achs).length === 0, '同一成就不会重复发奖');
 
 achs.fishBook.count = 1;
 const achD0 = achs.bait.dough;
 const achUn2 = G.checkAchievements(achs);
-ok(achUn2.some(x => x.id === 'fish1') && achs.bait.dough === achD0, '钓到第一条鱼只给成就点，不发饵料', achUn2);
+ok(achUn2.some(x => x.id === 'fish1') && achs.bait.dough === achD0 + 5, '成就也会发实物奖励（面团饵）', achUn2);
 
 achs.coins = 100000;
 while (achs.plots.length < 10) G.expand(achs);
@@ -1051,7 +1051,7 @@ let lureS = G.createState(); lureS.coins = 100;
 G.buyBait(lureS, 'lure', 1);
 ok(lureS.lure.dur === 25 && lureS.coins === 95, '假饵 5 金 · 耐用 25 次', lureS.lure.dur);
 
-ok(G.ACH.length === 36, '成就总数 36', G.ACH.length);
+ok(G.ACH.length === 39, '成就总数 39', G.ACH.length);
 
 const retro = G.deserialize({ plots: [], coins: 100, day: 20, stats: { harvests: 100, casts: 300 } });
 ok(retro.levels.farm > 1 && retro.levels.fish > 1, '老存档按历史次数补等级',
@@ -1204,6 +1204,47 @@ ab.ach.fish7 = 1;                                                               
 ok(G.achPts(ab) === 12 && Math.abs(G.sellBonus(ab) - 1.01) < 1e-9, '满 10 点 +1% 售价', G.sellBonus(ab));
 G.addStore(ab, 'carrot', 'std', 100);          // 原价 400
 ok(G.shopSellValue(ab, 'carrot') === 323, '售价加成作用于商店收购', G.shopSellValue(ab, 'carrot'));
+
+/* ---------- v2.2 维护费 / 委托优化 / 收购箱 ---------- */
+section('v2.2 维护费与委托');
+ok(G.plotUpkeep(10) === 15 && G.plotUpkeep(20) === 45 && G.plotUpkeep(25) === 75 && G.plotUpkeep(36) === 165,
+  '土地维护费分段 3 / 6 / 10',
+  [G.plotUpkeep(10), G.plotUpkeep(20), G.plotUpkeep(25), G.plotUpkeep(36)]);
+
+let ordS = G.createState(); ordS.day = 60; ordS.levels.farm = 8;
+let allOrders = [];
+for (let i = 0; i < 30; i++) { G.setRng(mulberry32(100 + i)); allOrders = allOrders.concat(G.makeOrders(ordS)); }
+ok(allOrders.every(function (o) { return o.kind !== 'crop' || o.reward >= 40; }),
+  '委托报酬最低 40 金', Math.min.apply(null, allOrders.map(function (o) { return o.reward; })));
+ok(allOrders.filter(function (o) { return o.kind === 'crop' && o.qty >= 2; }).length > 0,
+  '贵作物一次要 2 个以上');
+
+/* 收购箱：按批次取出 */
+let bxs = G.createState();
+G.addStore(bxs, 'carrot', 'std', 10); G.boxPutCrop(bxs, 'carrot');
+G.addStore(bxs, 'cabbage', 'std', 5); G.boxPutCrop(bxs, 'cabbage');
+const bte1 = G.boxTakeEntry(bxs, 1, 2);
+ok(bte1.ok && bte1.n === 2 && G.storeCount(bxs, 'cabbage') === 2 && G.boxCount(bxs) === 2,
+  '收购箱可按批次取出', { took: bte1.n, cabbage: G.storeCount(bxs, 'cabbage') });
+const bte2 = G.boxTakeEntry(bxs, 1, 99);
+ok(bte2.ok && G.storeCount(bxs, 'cabbage') === 5 && G.boxCount(bxs) === 1, '取空后该批次移出箱子');
+
+/* 水产店自定义卖出 */
+let fsS = G.createState();
+for (let i = 0; i < 6; i++) fsS.fishBag.push({ name: '鲤鱼', emoji: '🐟', q: 'std', v: 6, d: 1 });
+const sfish = G.sellFishGroupN(fsS, G.fishKey(fsS.fishBag[0]), 2);
+ok(sfish.ok && sfish.count === 2 && fsS.fishBag.length === 4, '水产店可自定义卖鱼', sfish);
+
+/* 收购箱出货统计 + 成就 */
+let bx2 = G.createState(); bx2.coins = 100;
+G.addStore(bx2, 'carrot', 'std', 10);
+G.boxPutCrop(bx2, 'carrot');
+G.sleep(bx2);
+ok(bx2.stats.boxItems === 10 && bx2.stats.boxIncome > 0, '收购箱出货计入统计', bx2.stats);
+const boxAch = G.checkAchievements(Object.assign(G.createState(),
+  { stats: { boxItems: 500, boxIncome: 5000 } }));
+ok(boxAch.some(function (x) { return x.id === 'box100'; }) &&
+   boxAch.some(function (x) { return x.id === 'boxval5k'; }), '收购箱成就能解锁');
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');

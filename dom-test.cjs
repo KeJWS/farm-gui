@@ -96,6 +96,9 @@ const G = require('./game.js');
 (function seedSave() {
   const st = G.createState();
   G.addStore(st, 'carrot', 'std', 12);
+  st.fishBag.push({ name: '鲫鱼', emoji: '🐟', q: 'std', v: 3, d: 1 });
+  G.addStore(st, 'cabbage', 'std', 5);
+  G.boxPutCrop(st, 'cabbage');                 // 收购箱里放一批，便于测取出
   st.longOrder = G.makeLongOrder({ day: 5, levels: { farm: 3 } });
   st.coins = 500;
   localStorage.setItem('farm-gui-save-v1', G.serialize(st));
@@ -120,6 +123,8 @@ console.log('== 首屏渲染 ==');
 ok(html('#plot-grid').indexOf('class="plot') >= 0 && (html('#plot-grid').match(/class="plot /g) || []).length === 5,
    '农田渲染出 5 块地');
 ok(text('#hud-plots').indexOf('5 块') >= 0, 'HUD 显示 5 块地', text('#hud-plots'));
+ok(text('#farm-lv').indexOf('Lv') >= 0 && text('#fish-lv').indexOf('Lv') >= 0,
+   '农田 / 河边显示等级', [text('#farm-lv'), text('#fish-lv')]);
 ok(text('#store-sum').indexOf('总价') >= 0, '仓库显示总价值', text('#store-sum'));
 ok(html('#store-list').indexOf('去水产店卖') < 0, '仓库渔获不再写「去水产店卖」');
 ok(html('#store-list').indexOf('脆生生') >= 0, '仓库作物显示简述');
@@ -139,6 +144,7 @@ ok(html('#modal-root').indexOf('水产店') >= 0 && html('#modal-root').indexOf(
    '水产店弹窗能打开，并提示买来的鱼不能交委托');
 ok(html('#modal-root').indexOf('今日') >= 0 && html('#modal-root').indexOf('一般品质') >= 0,
    '水产店显示每日库存与「一般品质」');
+ok(html('#modal-root').indexOf('fish-sell-id') >= 0, '水产店有自定义卖出选择框');
 ok(html('#modal-root').indexOf('D20 起进货') >= 0 && html('#modal-root').indexOf('D30 起进货') >= 0,
    '水产店高级鱼按天数锁定');
 ok(html('#modal-root').indexOf('未解锁') >= 0 &&
@@ -161,6 +167,7 @@ document.querySelector('#btn-box').fire('click', { target: {} });
 ok(html('#modal-root').indexOf('收购箱') >= 0 && html('#modal-root').indexOf('原价') >= 0,
    '收购箱弹窗能打开并说明原价结算');
 ok(html('#modal-root').indexOf('全部取出') >= 0, '收购箱有「全部取出」');
+ok(html('#modal-root').indexOf('box-pick') >= 0, '收购箱可取指定批次');
 clickAct('shop');
 ok(html('#modal-root').indexOf('面团饵自定义数量') >= 0 && html('#modal-root').indexOf('dough-qty') >= 0,
    '渔具店有面团饵自定义数量输入');
