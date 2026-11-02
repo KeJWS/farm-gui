@@ -1007,27 +1007,39 @@ button{ color:inherit; font:inherit; }
 
   /* ---------------- 静态数据 ---------------- */
 
+  /* 季节：0 春 / 1 夏 / 2 秋 / 3 冬。seasons 里没有的季节不能播种，种子店也不卖 */
   const CROPS = {
     carrot:     { name: '萝卜', emoji: '🥕', seed: 5,  days: 2, base: 3, price: 4,  big: false, lv: 1,
-                  desc: '脆生生，炖汤最甜' },
+                  seasons: [0, 2], desc: '脆生生，炖汤最甜' },
     cabbage:    { name: '白菜', emoji: '🥬', seed: 7,  days: 2, base: 2, price: 8,  big: false, lv: 1,
-                  desc: '冬天囤一车也不坏' },
+                  seasons: [0, 2], desc: '冬天囤一车也不坏' },
     potato:     { name: '土豆', emoji: '🥔', seed: 9,  days: 3, base: 3, price: 8,  big: false, lv: 1,
-                  desc: '怎么做都好吃，管饱' },
+                  seasons: [0, 1], desc: '怎么做都好吃，管饱' },
+    spinach:    { name: '菠菜', emoji: '🥬', seed: 6,  days: 2, base: 2, price: 7,  big: false, lv: 1,
+                  seasons: [0, 2], desc: '一茬接一茬，凉拌最爽口' },
     corn:       { name: '玉米', emoji: '🌽', seed: 14, days: 3, base: 2, price: 16, big: false, lv: 2,
-                  desc: '刚摘的最甜，能磨面' },
+                  seasons: [0, 1], desc: '刚摘的最甜，能磨面' },
     eggplant:   { name: '茄子', emoji: '🍆', seed: 17, days: 4, base: 2, price: 22, big: false, lv: 3,
-                  desc: '紫得发亮，红烧下饭' },
+                  seasons: [1, 2], desc: '紫得发亮，红烧下饭' },
     tomato:     { name: '番茄', emoji: '🍅', seed: 19, days: 4, base: 3, price: 16, big: false, lv: 3,
-                  desc: '沙瓤，生吃拌糖也行' },
+                  seasons: [1, 2], desc: '沙瓤，生吃拌糖也行' },
+    chili:      { name: '辣椒', emoji: '🌶️', seed: 20, days: 4, base: 3, price: 21, big: false, lv: 3,
+                  seasons: [1, 2], desc: '够辣，晒干了更好卖' },
     pumpkin:    { name: '南瓜', emoji: '🎃', seed: 26, days: 5, base: 1, price: 110, big: true, lv: 5,
-                  desc: '一株一个，个头抵一筐；施肥只提品质' },
+                  seasons: [2], desc: '一株一个，个头抵一筐；施肥只提品质' },
     watermelon: { name: '西瓜', emoji: '🍉', seed: 36, days: 5, base: 1, price: 140, big: true, lv: 6,
-                  desc: '沙甜起沙，一个顶一车；施肥只提品质' },
+                  seasons: [1], desc: '沙甜起沙，一个顶一车；施肥只提品质' },
+    sweetpotato:{ name: '红薯', emoji: '🍠', seed: 12, days: 4, base: 4, price: 10, big: false, lv: 2,
+                  seasons: [2], desc: '烤着吃最香，管饱又耐放' },
     cucumber:   { name: '黄瓜', emoji: '🥒', seed: 19, days: 3, price: 13, multi: true, lv: 4,
-                  firstQty: 2, regrowDays: 2, regrowQty: 2, regrowTimes: 2, desc: '顶花带刺，摘了还能再长' },
+                  seasons: [1], firstQty: 2, regrowDays: 2, regrowQty: 2, regrowTimes: 2,
+                  desc: '顶花带刺，摘了还能再长' },
+    grape:      { name: '葡萄', emoji: '🍇', seed: 26, days: 4, price: 12, multi: true, lv: 4,
+                  seasons: [1], firstQty: 3, regrowDays: 2, regrowQty: 3, regrowTimes: 2,
+                  desc: '一串一串地结，越摘越有' },
     strawberry: { name: '草莓', emoji: '🍓', seed: 22, days: 3, price: 9,  multi: true, lv: 4,
-                  firstQty: 3, regrowDays: 1, regrowQty: 2, regrowTimes: 3, desc: '娇气，但一直能摘' }
+                  seasons: [0], firstQty: 3, regrowDays: 1, regrowQty: 2, regrowTimes: 3,
+                  desc: '娇气，但一直能摘' }
   };
   Object.keys(CROPS).forEach(function (k) { CROPS[k].id = k; });
   const CROP_LIST = Object.keys(CROPS).map(function (k) { return CROPS[k]; });
@@ -1044,6 +1056,7 @@ button{ color:inherit; font:inherit; }
     { name: '旧靴子', emoji: '👢', desc: '单只，另一只还在河底' },
     { name: '水草',   emoji: '🌿', desc: '缠在钩上，只能当肥料' }
   ];
+  const TRASH_NAMES = TRASH.map(function (t) { return t.name; });
 
   const QUALITY = [
     { id: 'bad',    name: '劣质', emoji: '⬜', mul: 0.4, w: 10, color: '#8d939a' },
@@ -1097,11 +1110,11 @@ button{ color:inherit; font:inherit; }
   const TEAS = {
     green:  { id: 'green',  name: '绿茶',   emoji: '🍵', price: 12, energy: 4,  day: 1,
               desc: '清清爽爽，提神又不腻' },
-    black:  { id: 'black',  name: '红茶',   emoji: '🫖', price: 17, energy: 6,  day: 8,
+    black:  { id: 'black',  name: '红茶',   emoji: '🫖', price: 17, energy: 6,  day: 5,
               desc: '加一块方糖，暖到心里' },
-    milk:   { id: 'milk',   name: '奶茶',   emoji: '🧋', price: 24, energy: 9,  day: 16,
+    milk:   { id: 'milk',   name: '奶茶',   emoji: '🧋', price: 24, energy: 9,  day: 10,
               desc: '三分糖，珍珠要多' },
-    coffee: { id: 'coffee', name: '咖啡',   emoji: '☕', price: 30, energy: 12, day: 26,
+    coffee: { id: 'coffee', name: '咖啡',   emoji: '☕', price: 30, energy: 12, day: 16,
               desc: '一口下去，天都亮了' }
   };
   const TEA_LIST = Object.keys(TEAS).map(function (k) { return TEAS[k]; });
@@ -1174,7 +1187,7 @@ button{ color:inherit; font:inherit; }
       val: function (s) { return s.plots.length; }, reward: { ferts: { normal: 5 } }, pts: 3 },
     { id: 'plot36',    cat: 'farm', emoji: '🗺️', name: '大地主',     desc: '土地达到 36 块',       goal: 36,
       val: function (s) { return s.plots.length; }, reward: { coins: 2000 }, pts: 6 },
-    { id: 'crop10',    cat: 'farm', emoji: '🌽', name: '五谷丰登',   desc: '收获过全部 10 种作物', goal: 10,
+    { id: 'crop10',    cat: 'farm', emoji: '🌽', name: '五谷丰登',   desc: '收获过全部 14 种作物', goal: 14,
       val: cropSpeciesOwned, reward: { coins: 250, seeds: { pumpkin: 1 } }, pts: 3 },
 
     /* 钓鱼 */
@@ -1206,7 +1219,7 @@ button{ color:inherit; font:inherit; }
       val: function (s) { return s.day || 1; }, reward: { coins: 400 }, pts: 4 },
 
     /* 收集 */
-    { id: 'codexall',  cat: 'all',  emoji: '📖', name: '全图鉴',     desc: '7 种鱼 + 10 种作物都收过', goal: 17,
+    { id: 'codexall',  cat: 'all',  emoji: '📖', name: '全图鉴',     desc: '7 种鱼 + 14 种作物都收过', goal: 21,
       val: function (s) { return fishSpeciesOwned(s) + cropSpeciesOwned(s); },
       reward: { coins: 500, ferts: { special: 5 } }, pts: 8 },
 
@@ -1365,10 +1378,23 @@ button{ color:inherit; font:inherit; }
     return list[list.length - 1];
   }
 
-  /* 季节目前只影响顶栏文案：每 30 天换一季（后续可挂作物限制） */
+  /* 季节：每 30 天换一季，冬天（第 4 季）土地封冻、河面结冰 */
   const SEASONS = ['春', '夏', '秋', '冬'];
-  function seasonOf(day) {
-    return SEASONS[Math.floor((Math.max(1, day) - 1) / 30) % 4];
+  const WINTER = 3;
+  function seasonIdx(day) { return Math.floor((Math.max(1, day || 1) - 1) / 30) % 4; }
+  function seasonOf(day) { return SEASONS[seasonIdx(day)]; }
+  function isWinter(day) { return seasonIdx(day) === WINTER; }
+
+  /* 这种作物现在能不能种 / 买 */
+  function cropSeasonOk(id, day) {
+    const c = CROPS[id];
+    if (!c) return false;
+    return (c.seasons || [0, 1, 2]).indexOf(seasonIdx(day)) >= 0;
+  }
+  function seasonText(id) {
+    const c = CROPS[id];
+    const ss = (c && c.seasons) || [];
+    return ss.map(function (i) { return SEASONS[i]; }).join('·');
   }
 
   function rollWeather() { return weighted(WEATHER_LIST, 'w').id; }
@@ -1665,6 +1691,10 @@ button{ color:inherit; font:inherit; }
     const c = CROPS[cropId];
     if (!p) return { ok: false, msg: '没有这块地' };
     if (!c) return { ok: false, msg: '没有这种作物' };
+    if (isWinter(s.day)) return { ok: false, msg: '冬天土地封冻了，开春再种吧' };
+    if (!cropSeasonOk(cropId, s.day)) {
+      return { ok: false, msg: c.name + ' 是' + seasonText(cropId) + '季作物，现在是' + seasonOf(s.day) + '季' };
+    }
     if (p.crop) return { ok: false, msg: '这块地不是空地' };
     if (s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
 
@@ -1729,10 +1759,8 @@ button{ color:inherit; font:inherit; }
     else if (c.big) qty = clamp(c.base - p.missed, 1, 9);
     else qty = clamp(c.base + farmYieldBonus(s) + randInt(-1, 1) - p.missed + fertBonus(p), 1, 99);
 
-    // 作物也有品质：施肥会多滚几次取最好的（普通肥 2 次、特效肥 3 次）
-    // 大作物不吃产量加成，品质加成就是它唯一的施肥收益
-    const rolls = 1 + (p.fert > 0 ? 1 : 0) + (p.fert >= FERT.special.add ? 1 : 0);
-    const q = rollQuality(rolls);
+    // 作物也有品质：施肥会多滚一次取最好的（普通肥 / 特效肥都是取 2 次最好）
+    const q = rollQuality(p.fert > 0 ? 2 : 1);
     const unit = unitValue(p.crop, q.id);
     addStore(s, p.crop, q.id, qty);
 
@@ -2079,6 +2107,7 @@ button{ color:inherit; font:inherit; }
   function fish(s, preferBait, opts) {
     opts = opts || {};
     const w = WEATHER[s.weather];
+    if (isWinter(s.day)) return { ok: false, msg: '河面结冰了，冬天钓不了鱼' };
     if (!opts.free && s.energy < 2) return { ok: false, msg: '体力不够（钓鱼要 2 点）' };
     const kind = opts.forceKind || pickBait(s, preferBait);
     if (!kind) return { ok: false, msg: '没有饵料了，先去挖蚯蚓或买面团饵' };
@@ -2172,11 +2201,11 @@ button{ color:inherit; font:inherit; }
 
   /* 全体力钓鱼：一直甩到体力不够 / 没饵，日志只留一条汇总 */
   function fishAll(s, preferBait) {
-    let n = 0, empty = 0, value = 0, chests = 0, ups = 0;
+    let n = 0, empty = 0, value = 0, chests = 0, ups = 0, lastErr = '';
     const got = [];
     while (s.energy >= 2 && n < 400) {
       const r = fish(s, preferBait, { quiet: true });
-      if (!r.ok) break;
+      if (!r.ok) { lastErr = r.msg; break; }
       n++;
       if (r.empty) empty++;
       else {
@@ -2187,7 +2216,7 @@ button{ color:inherit; font:inherit; }
       }
       ups += r.levelUp || 0;
     }
-    if (!n) return { ok: false, msg: '体力不够（钓鱼要 2 点），先睡觉吧' };
+    if (!n) return { ok: false, msg: lastErr || '体力不够（钓鱼要 2 点），先睡觉吧' };
     log(s, '⚡ 一口气甩了 ' + n + ' 杆' + (empty ? '（空竿 ' + empty + '）' : '') +
       '，渔获值 ' + value + ' 金' + (chests ? '，捞到宝箱 ' + chests + ' 个' : ''), 'good');
     return { ok: true, count: n, empty: empty, income: value, chests: chests, levelUp: ups,
@@ -2220,8 +2249,13 @@ button{ color:inherit; font:inherit; }
     return '';
   }
 
-  /* 杂物 / 宝箱：水产店不收，只能拿去百货店 */
-  function fishIsJunk(e) { return !!(e && (e.trash || e.chest)); }
+  /* 杂物 / 宝箱：水产店不收，只能拿去百货店或收购箱 */
+  function fishIsJunk(e) {
+    if (!e) return false;
+    if (e.trash || e.chest) return true;
+    // 老存档里的杂物可能没带 trash 标记，按名字兜底
+    return TRASH_NAMES.indexOf(e.name) >= 0;
+  }
 
   /* 渔获分组：mode='fish' 只看鱼 / 'junk' 只看杂物和宝箱 / 不传就是全部 */
   function fishGroups(s, mode) {
@@ -2658,11 +2692,11 @@ button{ color:inherit; font:inherit; }
         s.seeds[c.id] = (s.seeds[c.id] || 0) + n;
         gains.push(c.emoji + ' ' + c.name + '种子×' + n);
       } else if (pick === 4) {
-        const n = randInt(12, 18);
+        const n = randInt(4, 6);
         s.bait.dough = (s.bait.dough || 0) + n;
         gains.push('🍞 面团饵×' + n);
       } else {
-        const n = randInt(12, 18);
+        const n = randInt(5, 7);
         s.bait.worm = (s.bait.worm || 0) + n;
         gains.push('🪱 蚯蚓×' + n);
       }
@@ -2682,7 +2716,7 @@ button{ color:inherit; font:inherit; }
         s.seeds[c2.id] = (s.seeds[c2.id] || 0) + n;
         gains.push(c2.emoji + ' ' + c2.name + '种子×' + n);
       } else {
-        const n = randInt(14, 18);
+        const n = randInt(8, 10);
         s.bait.worm = (s.bait.worm || 0) + n;
         gains.push('🪱 蚯蚓×' + n);
       }
@@ -2834,6 +2868,7 @@ button{ color:inherit; font:inherit; }
 
   function netCatch(s) {
     let got = 0, used = 0, value = 0;
+    if (isWinter(s.day)) return { used: 0, got: 0, value: 0, frozen: true };
     for (let i = 0; i < s.nets; i++) {
       if ((s.bait.dough || 0) < 1) break;
       s.bait.dough--;
@@ -2915,6 +2950,10 @@ button{ color:inherit; font:inherit; }
     if (!seedUnlocked(s, id)) {
       return { ok: false, msg: c.name + '种子要种田 Lv' + c.lv + ' 才解锁（现在 Lv' + farmLv(s) + '）' };
     }
+    if (isWinter(s.day)) return { ok: false, msg: '冬天种子店歇业了，开春再来' };
+    if (!cropSeasonOk(id, s.day)) {
+      return { ok: false, msg: c.name + ' 只在' + seasonText(id) + '季卖（现在是' + seasonOf(s.day) + '季）' };
+    }
     const qty = Math.max(1, Math.floor(n || 1));
     const cost = seedBuyPrice(c) * qty;
     if (s.coins < cost) return { ok: false, msg: '金币不够（需要 ' + cost + ' 金）' };
@@ -2954,6 +2993,10 @@ button{ color:inherit; font:inherit; }
   function plantAll(s, cropId) {
     const c = CROPS[cropId];
     if (!c) return { ok: false, msg: '没有这种作物' };
+    if (isWinter(s.day)) return { ok: false, msg: '冬天土地封冻了，开春再种吧' };
+    if (!cropSeasonOk(cropId, s.day)) {
+      return { ok: false, msg: c.name + ' 是' + seasonText(cropId) + '季作物，现在是' + seasonOf(s.day) + '季' };
+    }
     const targets = [];
     s.plots.forEach(function (p, i) { if (!p.crop) targets.push(i); });
     if (!targets.length) return { ok: false, msg: '没有空地了' };
@@ -3420,6 +3463,7 @@ button{ color:inherit; font:inherit; }
     BALANCE: BALANCE, CROPS: CROPS, CROP_LIST: CROP_LIST, FERT: FERT, QUALITY: QUALITY, FISH: FISH,
     WEATHER: WEATHER, WEATHER_LIST: WEATHER_LIST, BAIT: BAIT, SAVE_VERSION: SAVE_VERSION,
     setRng: setRng, seasonOf: seasonOf, SEASONS: SEASONS,
+    seasonIdx: seasonIdx, isWinter: isWinter, cropSeasonOk: cropSeasonOk, seasonText: seasonText,
     createState: createState, serialize: serialize, deserialize: deserialize,
     ledgerByDay: ledgerByDay, logByDay: logByDay,
     makeOrders: makeOrders, deliverOrder: deliverOrder, orderHave: orderHave, orderPool: orderPool,
@@ -3682,7 +3726,8 @@ button{ color:inherit; font:inherit; }
 
     $('#hud-fee').textContent = '🍖 ' + G.mealFee(state) + ' 金/天';
     $('#hud-plots').textContent = '🏞️ ' + state.plots.length + ' 块';
-    $('#season').textContent = G.seasonOf(state.day) + ' · 第 ' + state.day + ' 天';
+    $('#season').textContent = (G.isWinter(state.day) ? '❄️ ' : '') +
+      G.seasonOf(state.day) + ' · 第 ' + state.day + ' 天';
 
     const lv = state.levels || { farm: 1, fish: 1, farmXp: 0, fishXp: 0 };
     const farmLvEl = $('#farm-lv'), fishLvEl = $('#fish-lv');
@@ -3761,14 +3806,16 @@ button{ color:inherit; font:inherit; }
     const seedTotal = Object.keys(state.seeds).reduce(function (n, k) { return n + (state.seeds[k] || 0); }, 0);
     const fertList = G.fertTargets(state);
 
+    const frozen = G.isWinter(state.day);
     $('[data-act="waterAll"]').disabled = !anyGrow;
     $('[data-act="harvestAll"]').disabled = !anyRipe;
-    $('[data-act="plantAll"]').disabled = !anyEmpty;
+    $('[data-act="plantAll"]').disabled = !anyEmpty || frozen;
     $('[data-act="fertilizeAll"]').disabled = !fertList.length || state.energy < 1 || state.coins < 5;
-    $('#plantall-txt').textContent = anyEmpty
-      ? (seedTotal ? '库存 ' + seedTotal + ' 颗 · 空地 ' + state.plots.filter(function (p) { return !p.crop; }).length + ' 块'
-                   : '没种子 · 点这里去种子店')
-      : '没有空地';
+    $('#plantall-txt').textContent = frozen ? '❄️ 冬天土地封冻'
+      : (anyEmpty
+        ? (seedTotal ? '库存 ' + seedTotal + ' 颗 · 空地 ' + state.plots.filter(function (p) { return !p.crop; }).length + ' 块'
+                     : '没种子 · 点这里去种子店')
+        : '没有空地');
     $('#fertall-txt').textContent = fertList.length
       ? '可施 ' + fertList.length + ' 块 · 5 金起'
       : (anyGrow ? '都施过肥了' : '没有进行中的作物');
@@ -3845,7 +3892,7 @@ button{ color:inherit; font:inherit; }
     }
     $('#bait-row').innerHTML = list.map(function (b) {
       const bd = G.BAIT[b.id];
-      const cnt = b.id === 'lure' ? (b.n ? b.n + '/20' : '无') : '×' + b.n;
+      const cnt = b.id === 'lure' ? (b.n ? b.n + '/' + G.BALANCE.lure.dur : '无') : '×' + b.n;
       return '<div class="bait ' + (b.id === baitSel ? 'sel ' : '') + (b.n ? '' : 'off') +
         '" data-bait="' + b.id + '" title="' + bd.desc + '"' +
         ' role="button" tabindex="0" aria-label="' + bd.name + '，' + (b.n ? b.n + ' 个' : '没有') + '"' +
@@ -3854,8 +3901,14 @@ button{ color:inherit; font:inherit; }
         '<span class="bc">' + cnt + '</span></div>';
     }).join('');
 
-    $('[data-act="cast"]').disabled = state.energy < 2;
-    $('[data-act="cast5"]').disabled = state.energy < 10;   // 5 杆要 10 体力，不够就别假装能连甩
+    const frozen = G.isWinter(state.day);
+    const castBtn = $('[data-act="cast"]');
+    castBtn.disabled = frozen || state.energy < 2;
+    castBtn.title = frozen ? '河面结冰，冬天钓不了鱼' : '';
+    const cast5Btn = $('[data-act="cast5"]');
+    cast5Btn.disabled = frozen || state.energy < 10;   // 5 杆要 10 体力，不够就别假装能连甩
+    const castAllBtn = $('[data-act="castAll"]');
+    if (castAllBtn) { castAllBtn.disabled = frozen; castAllBtn.title = frozen ? '河面结冰' : ''; }
   }
 
   /* 最近渔获：单杆/连甩都按条列出来，保留最近 5 条 */
@@ -4155,7 +4208,10 @@ button{ color:inherit; font:inherit; }
 
   function plotModal(i) {
     const p = state.plots[i];
-    if (!p.crop) return cropPicker(i);
+    if (!p.crop) {
+      if (G.isWinter(state.day)) { toast('❄️ 冬天土地封冻，开春再种', 'warn'); return; }
+      return cropPicker(i);
+    }
 
     const c = G.CROPS[p.crop];
     const need = G.needOf(p);
@@ -4231,7 +4287,8 @@ button{ color:inherit; font:inherit; }
 
     const cards = G.CROP_LIST.map(function (c) {
       const owned = state.seeds[c.id] || 0;
-      const dis = owned <= 0 || state.energy < 1;
+      const inSeason = G.cropSeasonOk(c.id, state.day);
+      const dis = owned <= 0 || state.energy < 1 || !inSeason;
       let profit = '';
       let lineY = '';
       let lineP = '';
@@ -4253,16 +4310,16 @@ button{ color:inherit; font:inherit; }
         (batch ? ' data-batch="1"' : '') + (dis ? ' disabled' : '') + '>' +
         '<div class="ce">' + c.emoji + '</div>' +
         '<div class="cn">' + c.name + '</div>' +
-        '<div class="cs">' + (owned ? '库存 ' + owned + ' 颗' : '没有种子') + '</div>' +
+        '<div class="cs">' + (owned ? '库存 ' + owned + ' 颗' : '没有种子') +
+          (inSeason ? '' : ' · 非当季') + '</div>' +
         '<div class="cm">' + lineY + '</div>' +
         '<div class="cm">' + lineP + '</div>' +
         '<div class="cp">' + (profit || '') + '</div>' +
       '</button>';
     }).join('');
 
-    const tip = batch
-      ? '💡 选一种作物，会按库存把所有空地依次种上；种子用完就停。'
-      : '💡 播种只消耗背包里的种子，种子要去种子店买。';
+    const tip = '💡 现在是' + G.seasonOf(state.day) + '季：只有当季作物能种（卡片上会标季节）。' +
+      (batch ? '选一种会按库存把所有空地依次种上；种子用完就停。' : '播种只消耗背包里的种子。');
 
     openModal(batch ? '🌱 全部播种 · 选一种作物' : '🌱 第 ' + (i + 1) + ' 号地 · 播种',
       cards + '<div style="margin-top:12px;font-size:11.5px;color:var(--ink-3);font-weight:600">' + tip + '</div>',
@@ -4273,24 +4330,30 @@ button{ color:inherit; font:inherit; }
   /* ---------------- 种子店 ---------------- */
 
   function seedShop() {
+    const winter = G.isWinter(state.day);
     const rows = G.CROP_LIST.map(function (c) {
       const owned = state.seeds[c.id] || 0;
       const bp = G.seedBuyPrice(c);
       const sp = G.seedSellPrice(c);
       const lock = !G.seedUnlocked(state, c.id);
-      return '<div class="shop-row' + (lock ? ' locked' : '') + '">' +
+      const inSeason = G.cropSeasonOk(c.id, state.day);
+      const canBuy = inSeason && !lock;
+      const note = (lock ? ' <b class="lock">需种田 Lv' + c.lv + '</b>' : '') +
+        (!inSeason ? ' <b class="lock">' + G.seasonText(c.id) + '季才有</b>' : '');
+      return '<div class="shop-row' + (canBuy ? '' : ' locked') + '">' +
         '<span class="se">' + c.emoji + '</span>' +
         '<div class="sinfo">' +
           '<div class="sn">' + c.name +
-            (owned ? ' <b class="own">库存 ' + owned + '</b>' : '') +
-            (lock ? ' <b class="lock">需种田 Lv' + c.lv + '</b>' : '') + '</div>' +
+            (owned ? ' <b class="own">库存 ' + owned + '</b>' : '') + note + '</div>' +
           '<div class="sv">' + (lock ? '等级不够，种子还没解锁'
-            : '买 ' + bp + ' 金 · 卖 ' + sp + ' 金 · ' + c.days + ' 天成熟') + '</div>' +
+            : (!inSeason ? (winter ? '冬天种子店歇业了，开春再来'
+              : '现在是' + G.seasonOf(state.day) + '季，只能买' + G.seasonText(c.id) + '季的种子')
+              : '买 ' + bp + ' 金 · 卖 ' + sp + ' 金 · ' + c.days + ' 天成熟')) + '</div>' +
         '</div>' +
         '<button class="btn mini" data-buyseed="' + c.id + '" data-n="1"' +
-          (lock || state.coins < bp ? ' disabled' : '') + '>买1</button>' +
+          (canBuy && state.coins >= bp ? '' : ' disabled') + '>买1</button>' +
         '<button class="btn mini" data-buyseed="' + c.id + '" data-n="5"' +
-          (lock || state.coins < bp * 5 ? ' disabled' : '') + '>买5</button>' +
+          (canBuy && state.coins >= bp * 5 ? '' : ' disabled') + '>买5</button>' +
         '<button class="btn mini" data-sellseed="' + c.id + '"' +
           (owned <= 0 ? ' disabled' : '') +
           ' title="' + (owned ? '卖出全部，+' + owned * sp + ' 金' : '没有库存') + '">卖光</button>' +
@@ -4316,12 +4379,13 @@ button{ color:inherit; font:inherit; }
       '</div>';
     }).join('');
 
-    openModal('🌰 种子店',
-      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金</div>' +
+    openModal('🌰 种子店 · ' + G.seasonOf(state.day) + '季',
+      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金' +
+        (winter ? ' · ❄️ 冬天歇业，只卖肥料' : ' · 只卖当季种子') + '</div>' +
       '<div class="shop-list">' + rows + '</div>' +
       '<div class="store-sub" style="margin-top:10px">🧪 肥料 · 买回来放仓库，施肥时消耗</div>' +
       '<div class="shop-list">' + fertRows + '</div>' +
-      '<div class="shop-tip">播种只消耗背包里的种子；肥料在「全部施肥」或地块详情里使用。</div>',
+      '<div class="shop-tip">播种只消耗背包里的种子，而且<b>只能在当季播种</b>；肥料在「全部施肥」或地块详情里使用。</div>',
       '<button class="btn" data-sellallseeds>卖出全部种子</button>' +
       '<button class="btn" data-close>关闭</button>');
   }
@@ -4408,7 +4472,7 @@ button{ color:inherit; font:inherit; }
     const cropRows = G.CROP_LIST.map(function (c) {
       return '<tr><td>' + c.emoji + ' ' + c.name + '</td><td>' + c.seed + ' 金</td><td>' + c.days + ' 天</td>' +
         '<td>' + (c.multi ? '首次 ' + c.firstQty + ' 个' : (c.big ? '1 个（固定）' : c.base + ' ±1')) + '</td>' +
-        '<td>' + c.price + ' 金</td><td>Lv' + (c.lv || 1) + '</td></tr>';
+        '<td>' + c.price + ' 金</td><td>' + G.seasonText(c.id) + '</td><td>Lv' + (c.lv || 1) + '</td></tr>';
     }).join('');
 
     const body =
@@ -4422,17 +4486,25 @@ button{ color:inherit; font:inherit; }
 
       '<div class="rule-sec">' +
         '<h4>🌱 作物</h4>' +
-        '<table class="rule-table"><tr><th>作物</th><th>种子</th><th>生长</th><th>产量/块</th><th>单果</th><th>解锁</th></tr>' +
+        '<table class="rule-table"><tr><th>作物</th><th>种子</th><th>生长</th><th>产量/块</th><th>单果</th><th>季节</th><th>解锁</th></tr>' +
         cropRows + '</table>' +
         '<p>生长按浇水天数推进，成熟当天不能收、<b>次日</b>才能收。<br>' +
         '普通作物产量 = 基础 ±1 − 漏浇 + 施肥 + 等级加成（每 4 级 +1，最低 1）；' +
         '<b>南瓜 / 西瓜固定 1 个</b>，不吃等级和产量肥料，只有<b>肥料品质加成</b>（见「肥料」）。<br>' +
-        '高级种子要<b>种田等级</b>解锁：玉米 Lv2、茄子/番茄 Lv3、黄瓜/草莓 Lv4、南瓜 Lv5、西瓜 Lv6。</p>' +
+        '高级种子要<b>种田等级</b>解锁：玉米 Lv2、茄子/番茄/辣椒 Lv3、黄瓜/葡萄/草莓 Lv4、南瓜 Lv5、西瓜 Lv6。</p>' +
+      '</div>' +
+
+      '<div class="rule-sec">' +
+        '<h4>🍂 季节</h4>' +
+        '<p>每 <b>30 天</b>换一季：<b>春（1–30）/ 夏（31–60）/ 秋（61–90）/ 冬（91–120）</b>，然后循环。<br>' +
+        '每种作物只在<b>特定季节</b>能种、能买（见表里的「季节」列）；<b>冬天土地封冻、河面结冰</b>——' +
+        '不能播种、不能钓鱼（渔网也收不了），只能打工、卖库存、交委托。<br>' +
+        '已经种下的作物不受换季影响，该熟还会熟。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
         '<h4>🎣 钓鱼</h4>' +
-        '<p>2 体力 + 1 份饵甩一杆。<b>先判定咬钩</b>：面团饵 92%、蚯蚓 95%、假饵 72%，晴天 −12%、雨天 +8%。<br>' +
+        '<p>2 体力 + 1 份饵甩一杆（<b>冬天河面结冰，钓不了</b>）。<b>先判定咬钩</b>：面团饵 92%、蚯蚓 95%、假饵 72%，晴天 −12%、雨天 +8%。<br>' +
         '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15、耐用 ' +
         G.BALANCE.lure.dur + ' 次。<br>' +
         '🕸️ 渔网：每天耗 1 份面团饵，<b>70%</b> 网到 1 条标准及以下的普通鱼，<b>不会出杂物和宝箱</b>；' +

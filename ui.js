@@ -209,7 +209,8 @@
 
     $('#hud-fee').textContent = '🍖 ' + G.mealFee(state) + ' 金/天';
     $('#hud-plots').textContent = '🏞️ ' + state.plots.length + ' 块';
-    $('#season').textContent = G.seasonOf(state.day) + ' · 第 ' + state.day + ' 天';
+    $('#season').textContent = (G.isWinter(state.day) ? '❄️ ' : '') +
+      G.seasonOf(state.day) + ' · 第 ' + state.day + ' 天';
 
     const lv = state.levels || { farm: 1, fish: 1, farmXp: 0, fishXp: 0 };
     const farmLvEl = $('#farm-lv'), fishLvEl = $('#fish-lv');
@@ -288,14 +289,16 @@
     const seedTotal = Object.keys(state.seeds).reduce(function (n, k) { return n + (state.seeds[k] || 0); }, 0);
     const fertList = G.fertTargets(state);
 
+    const frozen = G.isWinter(state.day);
     $('[data-act="waterAll"]').disabled = !anyGrow;
     $('[data-act="harvestAll"]').disabled = !anyRipe;
-    $('[data-act="plantAll"]').disabled = !anyEmpty;
+    $('[data-act="plantAll"]').disabled = !anyEmpty || frozen;
     $('[data-act="fertilizeAll"]').disabled = !fertList.length || state.energy < 1 || state.coins < 5;
-    $('#plantall-txt').textContent = anyEmpty
-      ? (seedTotal ? '库存 ' + seedTotal + ' 颗 · 空地 ' + state.plots.filter(function (p) { return !p.crop; }).length + ' 块'
-                   : '没种子 · 点这里去种子店')
-      : '没有空地';
+    $('#plantall-txt').textContent = frozen ? '❄️ 冬天土地封冻'
+      : (anyEmpty
+        ? (seedTotal ? '库存 ' + seedTotal + ' 颗 · 空地 ' + state.plots.filter(function (p) { return !p.crop; }).length + ' 块'
+                     : '没种子 · 点这里去种子店')
+        : '没有空地');
     $('#fertall-txt').textContent = fertList.length
       ? '可施 ' + fertList.length + ' 块 · 5 金起'
       : (anyGrow ? '都施过肥了' : '没有进行中的作物');
@@ -372,7 +375,7 @@
     }
     $('#bait-row').innerHTML = list.map(function (b) {
       const bd = G.BAIT[b.id];
-      const cnt = b.id === 'lure' ? (b.n ? b.n + '/20' : '无') : '×' + b.n;
+      const cnt = b.id === 'lure' ? (b.n ? b.n + '/' + G.BALANCE.lure.dur : '无') : '×' + b.n;
       return '<div class="bait ' + (b.id === baitSel ? 'sel ' : '') + (b.n ? '' : 'off') +
         '" data-bait="' + b.id + '" title="' + bd.desc + '"' +
         ' role="button" tabindex="0" aria-label="' + bd.name + '，' + (b.n ? b.n + ' 个' : '没有') + '"' +
@@ -381,8 +384,14 @@
         '<span class="bc">' + cnt + '</span></div>';
     }).join('');
 
-    $('[data-act="cast"]').disabled = state.energy < 2;
-    $('[data-act="cast5"]').disabled = state.energy < 10;   // 5 杆要 10 体力，不够就别假装能连甩
+    const frozen = G.isWinter(state.day);
+    const castBtn = $('[data-act="cast"]');
+    castBtn.disabled = frozen || state.energy < 2;
+    castBtn.title = frozen ? '河面结冰，冬天钓不了鱼' : '';
+    const cast5Btn = $('[data-act="cast5"]');
+    cast5Btn.disabled = frozen || state.energy < 10;   // 5 杆要 10 体力，不够就别假装能连甩
+    const castAllBtn = $('[data-act="castAll"]');
+    if (castAllBtn) { castAllBtn.disabled = frozen; castAllBtn.title = frozen ? '河面结冰' : ''; }
   }
 
   /* 最近渔获：单杆/连甩都按条列出来，保留最近 5 条 */
@@ -682,7 +691,10 @@
 
   function plotModal(i) {
     const p = state.plots[i];
-    if (!p.crop) return cropPicker(i);
+    if (!p.crop) {
+      if (G.isWinter(state.day)) { toast('❄️ 冬天土地封冻，开春再种', 'warn'); return; }
+      return cropPicker(i);
+    }
 
     const c = G.CROPS[p.crop];
     const need = G.needOf(p);
@@ -758,7 +770,8 @@
 
     const cards = G.CROP_LIST.map(function (c) {
       const owned = state.seeds[c.id] || 0;
-      const dis = owned <= 0 || state.energy < 1;
+      const inSeason = G.cropSeasonOk(c.id, state.day);
+      const dis = owned <= 0 || state.energy < 1 || !inSeason;
       let profit = '';
       let lineY = '';
       let lineP = '';
@@ -780,16 +793,16 @@
         (batch ? ' data-batch="1"' : '') + (dis ? ' disabled' : '') + '>' +
         '<div class="ce">' + c.emoji + '</div>' +
         '<div class="cn">' + c.name + '</div>' +
-        '<div class="cs">' + (owned ? '库存 ' + owned + ' 颗' : '没有种子') + '</div>' +
+        '<div class="cs">' + (owned ? '库存 ' + owned + ' 颗' : '没有种子') +
+          (inSeason ? '' : ' · 非当季') + '</div>' +
         '<div class="cm">' + lineY + '</div>' +
         '<div class="cm">' + lineP + '</div>' +
         '<div class="cp">' + (profit || '') + '</div>' +
       '</button>';
     }).join('');
 
-    const tip = batch
-      ? '💡 选一种作物，会按库存把所有空地依次种上；种子用完就停。'
-      : '💡 播种只消耗背包里的种子，种子要去种子店买。';
+    const tip = '💡 现在是' + G.seasonOf(state.day) + '季：只有当季作物能种（卡片上会标季节）。' +
+      (batch ? '选一种会按库存把所有空地依次种上；种子用完就停。' : '播种只消耗背包里的种子。');
 
     openModal(batch ? '🌱 全部播种 · 选一种作物' : '🌱 第 ' + (i + 1) + ' 号地 · 播种',
       cards + '<div style="margin-top:12px;font-size:11.5px;color:var(--ink-3);font-weight:600">' + tip + '</div>',
@@ -800,24 +813,30 @@
   /* ---------------- 种子店 ---------------- */
 
   function seedShop() {
+    const winter = G.isWinter(state.day);
     const rows = G.CROP_LIST.map(function (c) {
       const owned = state.seeds[c.id] || 0;
       const bp = G.seedBuyPrice(c);
       const sp = G.seedSellPrice(c);
       const lock = !G.seedUnlocked(state, c.id);
-      return '<div class="shop-row' + (lock ? ' locked' : '') + '">' +
+      const inSeason = G.cropSeasonOk(c.id, state.day);
+      const canBuy = inSeason && !lock;
+      const note = (lock ? ' <b class="lock">需种田 Lv' + c.lv + '</b>' : '') +
+        (!inSeason ? ' <b class="lock">' + G.seasonText(c.id) + '季才有</b>' : '');
+      return '<div class="shop-row' + (canBuy ? '' : ' locked') + '">' +
         '<span class="se">' + c.emoji + '</span>' +
         '<div class="sinfo">' +
           '<div class="sn">' + c.name +
-            (owned ? ' <b class="own">库存 ' + owned + '</b>' : '') +
-            (lock ? ' <b class="lock">需种田 Lv' + c.lv + '</b>' : '') + '</div>' +
+            (owned ? ' <b class="own">库存 ' + owned + '</b>' : '') + note + '</div>' +
           '<div class="sv">' + (lock ? '等级不够，种子还没解锁'
-            : '买 ' + bp + ' 金 · 卖 ' + sp + ' 金 · ' + c.days + ' 天成熟') + '</div>' +
+            : (!inSeason ? (winter ? '冬天种子店歇业了，开春再来'
+              : '现在是' + G.seasonOf(state.day) + '季，只能买' + G.seasonText(c.id) + '季的种子')
+              : '买 ' + bp + ' 金 · 卖 ' + sp + ' 金 · ' + c.days + ' 天成熟')) + '</div>' +
         '</div>' +
         '<button class="btn mini" data-buyseed="' + c.id + '" data-n="1"' +
-          (lock || state.coins < bp ? ' disabled' : '') + '>买1</button>' +
+          (canBuy && state.coins >= bp ? '' : ' disabled') + '>买1</button>' +
         '<button class="btn mini" data-buyseed="' + c.id + '" data-n="5"' +
-          (lock || state.coins < bp * 5 ? ' disabled' : '') + '>买5</button>' +
+          (canBuy && state.coins >= bp * 5 ? '' : ' disabled') + '>买5</button>' +
         '<button class="btn mini" data-sellseed="' + c.id + '"' +
           (owned <= 0 ? ' disabled' : '') +
           ' title="' + (owned ? '卖出全部，+' + owned * sp + ' 金' : '没有库存') + '">卖光</button>' +
@@ -843,12 +862,13 @@
       '</div>';
     }).join('');
 
-    openModal('🌰 种子店',
-      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金</div>' +
+    openModal('🌰 种子店 · ' + G.seasonOf(state.day) + '季',
+      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金' +
+        (winter ? ' · ❄️ 冬天歇业，只卖肥料' : ' · 只卖当季种子') + '</div>' +
       '<div class="shop-list">' + rows + '</div>' +
       '<div class="store-sub" style="margin-top:10px">🧪 肥料 · 买回来放仓库，施肥时消耗</div>' +
       '<div class="shop-list">' + fertRows + '</div>' +
-      '<div class="shop-tip">播种只消耗背包里的种子；肥料在「全部施肥」或地块详情里使用。</div>',
+      '<div class="shop-tip">播种只消耗背包里的种子，而且<b>只能在当季播种</b>；肥料在「全部施肥」或地块详情里使用。</div>',
       '<button class="btn" data-sellallseeds>卖出全部种子</button>' +
       '<button class="btn" data-close>关闭</button>');
   }
@@ -935,7 +955,7 @@
     const cropRows = G.CROP_LIST.map(function (c) {
       return '<tr><td>' + c.emoji + ' ' + c.name + '</td><td>' + c.seed + ' 金</td><td>' + c.days + ' 天</td>' +
         '<td>' + (c.multi ? '首次 ' + c.firstQty + ' 个' : (c.big ? '1 个（固定）' : c.base + ' ±1')) + '</td>' +
-        '<td>' + c.price + ' 金</td><td>Lv' + (c.lv || 1) + '</td></tr>';
+        '<td>' + c.price + ' 金</td><td>' + G.seasonText(c.id) + '</td><td>Lv' + (c.lv || 1) + '</td></tr>';
     }).join('');
 
     const body =
@@ -949,17 +969,25 @@
 
       '<div class="rule-sec">' +
         '<h4>🌱 作物</h4>' +
-        '<table class="rule-table"><tr><th>作物</th><th>种子</th><th>生长</th><th>产量/块</th><th>单果</th><th>解锁</th></tr>' +
+        '<table class="rule-table"><tr><th>作物</th><th>种子</th><th>生长</th><th>产量/块</th><th>单果</th><th>季节</th><th>解锁</th></tr>' +
         cropRows + '</table>' +
         '<p>生长按浇水天数推进，成熟当天不能收、<b>次日</b>才能收。<br>' +
         '普通作物产量 = 基础 ±1 − 漏浇 + 施肥 + 等级加成（每 4 级 +1，最低 1）；' +
         '<b>南瓜 / 西瓜固定 1 个</b>，不吃等级和产量肥料，只有<b>肥料品质加成</b>（见「肥料」）。<br>' +
-        '高级种子要<b>种田等级</b>解锁：玉米 Lv2、茄子/番茄 Lv3、黄瓜/草莓 Lv4、南瓜 Lv5、西瓜 Lv6。</p>' +
+        '高级种子要<b>种田等级</b>解锁：玉米 Lv2、茄子/番茄/辣椒 Lv3、黄瓜/葡萄/草莓 Lv4、南瓜 Lv5、西瓜 Lv6。</p>' +
+      '</div>' +
+
+      '<div class="rule-sec">' +
+        '<h4>🍂 季节</h4>' +
+        '<p>每 <b>30 天</b>换一季：<b>春（1–30）/ 夏（31–60）/ 秋（61–90）/ 冬（91–120）</b>，然后循环。<br>' +
+        '每种作物只在<b>特定季节</b>能种、能买（见表里的「季节」列）；<b>冬天土地封冻、河面结冰</b>——' +
+        '不能播种、不能钓鱼（渔网也收不了），只能打工、卖库存、交委托。<br>' +
+        '已经种下的作物不受换季影响，该熟还会熟。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
         '<h4>🎣 钓鱼</h4>' +
-        '<p>2 体力 + 1 份饵甩一杆。<b>先判定咬钩</b>：面团饵 92%、蚯蚓 95%、假饵 72%，晴天 −12%、雨天 +8%。<br>' +
+        '<p>2 体力 + 1 份饵甩一杆（<b>冬天河面结冰，钓不了</b>）。<b>先判定咬钩</b>：面团饵 92%、蚯蚓 95%、假饵 72%，晴天 −12%、雨天 +8%。<br>' +
         '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15、耐用 ' +
         G.BALANCE.lure.dur + ' 次。<br>' +
         '🕸️ 渔网：每天耗 1 份面团饵，<b>70%</b> 网到 1 条标准及以下的普通鱼，<b>不会出杂物和宝箱</b>；' +

@@ -74,6 +74,7 @@ ok(exp === Math.max(1, 3 - 1), '预计产量扣除漏浇', exp);
 section('黄瓜 / 草莓 多次收获');
 G.setRng(mulberry32(3));
 s = G.createState();
+s.day = 31;                                    // 夏天，黄瓜当季
 s.coins = 999;
 s.seeds = { cucumber: 1 };
 G.plant(s, 0, 'cucumber');
@@ -96,6 +97,7 @@ ok(!s.plots[0].crop, '收满 3 次后地块清空');
 section('留种规则');
 G.setRng(() => 0.05);                     // 必定触发 30% 留种
 s = G.createState();
+s.day = 31;                               // 夏天，黄瓜当季
 s.coins = 999;
 s.seeds = { cucumber: 1 };
 G.plant(s, 0, 'cucumber');
@@ -155,9 +157,9 @@ ok(fishWithoutQuality, '非垃圾鱼都带品质');
 
 /* 卖鱼 */
 const bagBefore = s.fishBag.slice();
-const fishOnly = bagBefore.filter(e => !e.trash && !e.chest).reduce((n, e) => n + e.v, 0);
+const fishOnly = bagBefore.filter(e => !G.fishIsJunk(e)).reduce((n, e) => n + e.v, 0);
 const soldAll = G.sellAllFish(s);
-ok(soldAll.ok && soldAll.income === G.shopValue(fishOnly) && s.coins === coinsAtStart + G.shopValue(fishOnly) && s.fishBag.every(e => e.trash || e.chest),
+ok(soldAll.ok && soldAll.income === G.shopValue(fishOnly) && s.coins === coinsAtStart + G.shopValue(fishOnly) && s.fishBag.every(e => G.fishIsJunk(e)),
    '全部卖鱼：按 8 折结算，杂物和宝箱留下', { gain: soldAll.income, full: fishOnly });
 
 /* 分组出售 */
@@ -168,11 +170,13 @@ for (let i = 0; i < 60 && got12 < 12; i++) {
   const rr = G.fish(s, 'worm');
   if (rr.ok && rr.entry) got12++;
 }
+const fishLeft = () => s.fishBag.filter(e => !G.fishIsJunk(e)).length;
+const fishN0 = fishLeft();
 const groups = G.fishGroups(s, "fish");
-ok(groups.length >= 1 && groups.reduce((n, g) => n + g.count, 0) === 12, '渔获按鱼种+品质分组', groups.length);
+ok(groups.length >= 1 && groups.reduce((n, g) => n + g.count, 0) === fishN0, '渔获按鱼种+品质分组', groups.length);
 const g0 = groups[0], coinsBeforeGroup = s.coins;
 const rGroup = G.sellFishGroup(s, g0.key);
-ok(rGroup.ok && s.coins === coinsBeforeGroup + G.shopValue(g0.v * g0.count) && G.fishGroups(s, "fish").reduce((n, g) => n + g.count, 0) === 12 - g0.count,
+ok(rGroup.ok && s.coins === coinsBeforeGroup + G.shopValue(g0.v * g0.count) && fishLeft() === fishN0 - g0.count,
    '卖一组鱼结算正确（8 折）', { key: g0.key, gain: rGroup.income });
 
 /* 全部卖出（作物 + 渔获） */
@@ -379,6 +383,7 @@ ok(!G.useFert(s, 0, 'normal').ok, '没肥料时施不了肥');
 /* ---------- 5e. 铲除 ---------- */
 section('铲除作物');
 s = G.createState();
+s.day = 61;                                    // 秋天，南瓜当季
 s.seeds = { carrot: 1, pumpkin: 1 };
 G.plant(s, 0, 'carrot');
 ok(G.clearPlot(s, 0).ok && !s.plots[0].crop, '铲除后地块变回空地');
@@ -917,7 +922,7 @@ ok(rate > 0.6 && rate < 0.8, '渔网上鱼率约 70%', (rate * 100).toFixed(0) +
 
 G.setRng(mulberry32(9)); const t1 = avgTier(1);
 G.setRng(mulberry32(9)); const t2 = avgTier(2);
-ok(t2 > t1 + 0.15, '特效肥品质明显优于普通肥（3 次 vs 2 次）', [t1.toFixed(2), t2.toFixed(2)]);
+ok(Math.abs(t1 - t2) < 0.06, '普通肥与特效肥的品质加成一致（都是取 2 次）', [t1.toFixed(2), t2.toFixed(2)]);
 ok(t1 > 0.3, '施肥仍然提升品质', t1.toFixed(2));
 
 s = G.createState(); s.coins = 1000;
@@ -1062,9 +1067,10 @@ ok(retro.levels.farm > 1 && retro.levels.fish > 1, '老存档按历史次数补�
 section('v1.8 等级解锁与库存');
 G.setRng(mulberry32(88));
 let gateS = G.createState(); gateS.coins = 10000;
+gateS.day = 31;                                // 夏天：玉米 / 西瓜当季
 ok(!G.buySeed(gateS, 'corn', 1).ok, 'Lv1 买不了玉米种子');
 ok(!G.buySeed(gateS, 'watermelon', 1).ok, 'Lv1 买不了西瓜种子');
-ok(G.buySeed(gateS, 'carrot', 1).ok, 'Lv1 能买萝卜种子');
+ok(G.buySeed(gateS, 'potato', 1).ok, 'Lv1 能买当季的土豆种子');
 gateS.levels.farm = 6;
 ok(G.buySeed(gateS, 'watermelon', 1).ok, '种田 Lv6 能买西瓜种子');
 ok(G.seedUnlocked(gateS, 'pumpkin') && G.seedUnlocked(gateS, 'strawberry'), '高级种子按等级解锁');
@@ -1153,7 +1159,7 @@ section('v2.0 长期订单 / 收购箱 / 成就点');
 G.setRng(mulberry32(202));
 
 /* 委托池按等级裁剪 */
-ok(G.orderPool(18, 1).length === 4, 'Lv1 时委托池只有买得到的 4 种', G.orderPool(18, 1).length);
+ok(G.orderPool(18, 1).length === 6, 'Lv1 时委托池只有买得到的 6 种', G.orderPool(18, 1).length);
 ok(G.orderPool(18, 10).length === 10, 'Lv10 时委托池全开', G.orderPool(18, 10).length);
 let os2 = G.createState(); os2.day = 18; os2.levels.farm = 3;
 G.setRng(mulberry32(5));
@@ -1370,6 +1376,50 @@ ok(!G.fishAll(v23noBait, 'dough').ok, '没饵时全体力钓鱼直接失败');
 const v23achNew = G.checkAchievements(Object.assign(G.createState(), { stats: { teas: 10, chests: 10 } }));
 ok(v23achNew.some(x => x.id === 'tea10') && v23achNew.some(x => x.id === 'chest10'), '下午茶 / 开箱成就能解锁');
 ok(G.ACH.length === 43, '成就总数 43', G.ACH.length);
+
+/* ---------- 5f. v2.4 季节 ---------- */
+section('v2.4 季节');
+
+ok(G.CROP_LIST.length === 14, '作物扩到 14 种', G.CROP_LIST.length);
+ok(G.isWinter(91) && !G.isWinter(90) && G.seasonOf(1) === '春' && G.seasonOf(121) === '春',
+  '季节按 30 天一轮：冬 91-120，第 121 天回到春天',
+  [G.seasonOf(1), G.seasonOf(31), G.seasonOf(61), G.seasonOf(91), G.seasonOf(121)]);
+
+const v24S = G.createState();
+v24S.coins = 5000;
+v24S.seeds = { watermelon: 1, pumpkin: 1, carrot: 1 };
+v24S.day = 1;                                     // 春
+const pWater = G.plant(v24S, 0, 'watermelon');
+ok(!pWater.ok && pWater.msg.indexOf('夏') >= 0, '春天种不了西瓜（夏）', pWater.msg);
+const pPump = G.plant(v24S, 0, 'pumpkin');
+ok(!pPump.ok && pPump.msg.indexOf('秋') >= 0, '春天种不了南瓜（秋）', pPump.msg);
+ok(G.plant(v24S, 0, 'carrot').ok, '春天能种萝卜');
+
+const v24W = G.createState();
+v24W.coins = 5000; v24W.day = 91;                 // 冬
+v24W.seeds = { carrot: 1 };
+ok(!G.plant(v24W, 0, 'carrot').ok, '冬天不能播种');
+ok(!G.plantAll(v24W, 'carrot').ok, '冬天不能全部播种');
+v24W.energy = 20; v24W.bait.dough = 10;
+ok(!G.fish(v24W, 'dough').ok, '冬天不能钓鱼');
+ok(!G.fishAll(v24W, 'dough').ok, '冬天不能全体力钓鱼');
+ok(!G.buySeed(v24W, 'carrot', 1).ok, '冬天种子店歇业');
+
+const v24Spr = G.createState();
+v24Spr.coins = 5000; v24Spr.day = 1;
+ok(!G.buySeed(v24Spr, 'watermelon', 1).ok, '春天买不到西瓜种子');
+v24Spr.levels.farm = 6;
+ok(!G.buySeed(v24Spr, 'watermelon', 1).ok, '春天即使 Lv6 也买不到西瓜种子');
+v24Spr.day = 31;
+ok(G.buySeed(v24Spr, 'watermelon', 1).ok, '夏天能买西瓜种子');
+
+const v24Net = G.createState();
+v24Net.nets = 5; v24Net.bait.dough = 5; v24Net.day = 91;
+const v24nr = G.netCatch(v24Net);
+ok(v24nr.got === 0 && v24Net.bait.dough === 5, '冬天渔网不工作、也不耗饵', v24nr);
+
+ok(G.TEAS.green.day === 1 && G.TEAS.coffee.day === 16, '茶提前到 D1 / D5 / D10 / D16',
+  [G.TEAS.green.day, G.TEAS.black.day, G.TEAS.milk.day, G.TEAS.coffee.day]);
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');
