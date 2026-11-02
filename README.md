@@ -131,6 +131,7 @@ node selftest.cjs      # 270 项逻辑自测：播种/种子店/肥料/品质/�
 node check-ui.cjs      # 校验 ui.js 用到的 id、data-act 在 index.html 里都存在
 node dom-test.cjs      # DOM 冒烟：用最小 DOM 桩把 ui.js 跑起来，测渲染与弹窗
 node balance.cjs       # 数值体检：钓鱼期望 / 三种活计收益 / 委托样本 / 设备回本 / 套利检查
+node analysis.cjs      # 收益分析：作物 / 钓鱼 / 渔网 / 设备回本 / 早中后期日净收入
 node build-single.cjs  # 把三件套内联成 我的小农场.html
 ```
 
