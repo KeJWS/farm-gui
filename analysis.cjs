@@ -342,7 +342,7 @@ console.log('\n== 反季种植（种子 ×' + G.BALANCE.seed.offSeasonMul + '、
     console.log('   ' + pad(c.name, 6) + pad(inPer.toFixed(1), 16) + pad(offPer.toFixed(1), 16) +
       '反季 ×' + (offPer / inPer).toFixed(2));
   });
-  console.log('   注：反季收成必须在反季卖掉才吃得到 ×2；囤到当季卖就是当季价。');
+  console.log('   注：反季收成必须在反季卖掉才吃得到 ×1.7；囤到当季卖就是当季价。');
 }
 
 /* ---------- 11. 渔网 ---------- */
