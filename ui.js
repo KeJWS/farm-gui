@@ -379,7 +379,7 @@
     }
     const sum = catchLog.reduce(function (n, e) { return n + e.price; }, 0);
     box.innerHTML =
-      '<div class="catch-sum">最近 ' + catchLog.length + ' 条 · 共值 ' + sum + ' 金（在仓库里卖）</div>' +
+      '<div class="catch-sum">最近 ' + catchLog.length + ' 条 · 共值 ' + sum + ' 金（已入仓库）</div>' +
       '<div class="catch-list">' + catchLog.map(function (e) {
         const col = e.quality ? e.quality.color : '#9a866c';
         return '<div class="catch-item" style="border-left-color:' + col + '">' +
@@ -423,14 +423,16 @@
           return '<div class="store-row">' +
             '<span class="se">' + c.emoji + '</span>' +
             '<div><div class="sn">' + c.name + ' ×' + n + '</div>' +
-            '<div class="sv">' + mixTxt + ' · 均 ' + (val / n).toFixed(1) + ' 金</div></div>' +
+            '<div class="sv"><span class="sf-note">' + (c.desc || '') + '</span> · ' + mixTxt +
+              ' · 均 ' + (val / n).toFixed(1) + ' 金</div></div>' +
             '<span class="sp">' + val + ' 金</span>' +
+            '<button class="btn mini" data-boxcrop="' + id + '" title="放进收购箱，原价 +20%">📦</button>' +
           '</div>';
         }).join('')
       : '';
 
     const fishHtml = fishCount
-      ? '<div class="store-sub">🐟 渔获 · ' + fishCount + ' 条（去水产店卖）</div>' +
+      ? '<div class="store-sub">🐟 渔获 · ' + fishCount + ' 条</div>' +
         fish.map(function (g) {
           const q = G.qualityById(g.q);
           const col = q ? q.color : 'var(--ink-3)';
@@ -443,6 +445,7 @@
               '<span style="color:' + col + '">' + (q ? q.emoji + ' ' + q.name : '杂物') + '</span>' +
               ' · ' + g.v + ' 金/条</div></div>' +
             '<span class="sp">' + (g.v * g.count) + ' 金</span>' +
+            '<button class="btn mini" data-boxfish="' + g.key + '" title="放进收购箱，原价 +20%">📦</button>' +
           '</div>';
         }).join('')
       : '';
@@ -486,6 +489,12 @@
       : '<span style="color:var(--ink-3)">无（收获 30% 留种，或去商店买）</span>');
 
     $('#store-sum').textContent = '总价 ' + G.storeTotal(state) + ' 金';
+    const boxBtn = $('#btn-box');
+    if (boxBtn) {
+      const n = G.boxCount(state);
+      boxBtn.textContent = '📦 收购箱' + (n ? ' (' + n + ')' : '');
+      boxBtn.title = n ? '待出货 ' + G.boxValue(state) + ' 金' : '仓库里点 📦 放货进去';
+    }
   }
 
   /* ---------------- 配送委托（按天刷新） ---------------- */
@@ -868,6 +877,12 @@
         '<span class="sp">' + (worms * G.WORM_VALUE) + ' 金</span>' +
         '<button class="btn mini" data-sellworm' + (worms ? '' : ' disabled') + '>全部卖出</button>' +
       '</div>' +
+      '<div class="buy-custom">' +
+        '<span>🪱 蚯蚓自定义出售</span>' +
+        '<input type="number" id="worm-qty" min="1" max="999" step="1" value="10" inputmode="numeric">' +
+        '<button class="btn mini" data-sellwormn="1"' + (worms ? '' : ' disabled') + '>卖</button>' +
+        '<span class="bc-tip">现有 ' + worms + ' 条</span>' +
+      '</div>' +
       '<div class="store-sub" style="margin-top:10px">🕸️ 渔网 · 放到河边每天自动抓鱼</div>' +
       '<div class="store-row' + (netLock ? ' locked' : '') + '">' +
         '<span class="se">🕸️</span>' +
@@ -918,7 +933,7 @@
 
       '<div class="rule-sec">' +
         '<h4>🐟 水产店</h4>' +
-        '<p>自己的渔获在这里卖，价格就是渔获的价值。<br>' +
+        '<p>渔获在这里直接卖，<b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>结算。<br>' +
         '店里每天<b>进一批水产</b>（一般品质），每种数量随机、<b>睡觉后补货</b>，卖完只能等明天；' +
         '买价是基础价的 ' + G.BALANCE.shop.priceMul + ' 倍，买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。<br>' +
         '河豚 <b>D' + G.FISH_UNLOCK.puffer + '</b> 起、锦鲤 <b>D' + G.FISH_UNLOCK.koi + '</b> 起才进货。</p>' +
@@ -926,10 +941,17 @@
 
       '<div class="rule-sec">' +
         '<h4>🧺 农产品店</h4>' +
-        '<p>作物<b>只能在这里卖</b>，价格 = 单价 × 品质倍率；仓库不再直接出售任何东西。<br>' +
+        '<p>作物在这里直接卖，同样 <b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>；仓库不再直接出售任何东西。<br>' +
         '店里每天同样进一批作物（一般品质），买价是售价的 ' + G.BALANCE.shop.cropPriceMul +
         ' 倍，转手必亏，只在凑委托或应急时买。<br>' +
         '南瓜 <b>D' + G.CROP_UNLOCK.pumpkin + '</b> 起、西瓜 <b>D' + G.CROP_UNLOCK.watermelon + '</b> 起才进货。</p>' +
+      '</div>' +
+
+      '<div class="rule-sec">' +
+        '<h4>📦 收购箱</h4>' +
+        '<p>在仓库点每行的 <b>📦</b>，把整批作物 / 渔获放进收购箱，<b>下次睡觉时按原价（100%）结算</b>。<br>' +
+        '直接卖给水产店 / 农产品店只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) +
+        '%，所以：<b>急用钱走商店，不急就进收购箱</b>。箱子里的货也计入税金基数，不能用来避税。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -1229,22 +1251,45 @@
           (locked ? ' <b class="lock">D' + unlock + ' 起进货</b>' : ' <b class="own">今日 ' + st + '/' + cap + '</b>') +
           '</div>' +
         '<div class="sv">' + (locked ? '中后期才进这种作物'
-          : '一般品质 · 买 ' + bp + ' 金/个 · 卖回去只值 ' + c.price + ' 金') + '</div></div>' +
+          : '一般品质 · 买 ' + bp + ' 金/个 · ' + (c.desc || '')) + '</div></div>' +
         '<button class="btn mini" data-buycrop="' + c.id + '" data-n="1"' +
           (locked || soldOut || state.coins < bp ? ' disabled' : '') + '>' +
           (locked ? '未解锁' : (soldOut ? '售罄' : '买1')) + '</button>' +
-        '<button class="btn mini" data-buycrop="' + c.id + '" data-n="3"' +
-          (locked || st < 3 || state.coins < bp * 3 ? ' disabled' : '') + '>买3</button>' +
+        (locked ? '' : '<button class="btn mini" data-buycrop="' + c.id + '" data-n="3"' +
+          (st < 3 || state.coins < bp * 3 ? ' disabled' : '') + '>买3</button>') +
       '</div>';
     }).join('');
 
     openModal('🧺 农产品店',
-      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金 · 作物<b>只能在这里卖</b></div>' +
+      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金 · 作物<b>只能在这里卖</b>（' +
+        Math.round(G.BALANCE.shop.sellRate * 100) + ' 折）</div>' +
       '<div class="store-sub">卖作物 · ' + total + ' 个 · 共 ' + totalVal + ' 金</div>' + sellRows +
       '<div class="store-sub" style="margin-top:10px">今日进货 · 一般品质</div>' + buyRows +
       '<div class="shop-tip">每天补一次货；这里买价是售价的 ' + G.BALANCE.shop.cropPriceMul +
-        ' 倍，转手必亏，只在凑委托 / 应急时买。</div>',
+        ' 倍，转手必亏，只在凑委托 / 应急时买。想卖原价就把作物放进<b>收购箱</b>（仓库 📦），明天睡觉结算。</div>',
       '<button class="btn" data-sellallcrop' + (total ? '' : ' disabled') + '>全部卖出</button>' +
+      '<button class="btn" data-close>关闭</button>');
+  }
+
+  /* ---------------- 收购箱 ---------------- */
+
+  function boxModal() {
+    const list = state.box || [];
+    const total = G.boxValue(state);
+    const rows = list.length ? list.map(function (e) {
+      return '<div class="store-row">' +
+        '<span class="se">' + (e.emoji || '📦') + '</span>' +
+        '<div><div class="sn">' + e.name + ' ×' + e.n + '</div>' +
+        '<div class="sv">原价 ' + e.v + ' 金</div></div>' +
+        '<span class="sp">' + e.v + ' 金</span>' +
+      '</div>';
+    }).join('') : '<div class="store-empty">收购箱是空的：在仓库点 📦 把作物 / 渔获放进来</div>';
+
+    openModal('📦 收购箱',
+      '<div class="shop-head">待出货 <b>' + list.length + '</b> 批 · 原价合计 <b>' + total + '</b> 金</div>' +
+      rows +
+      '<div class="shop-tip">放进去的货会在<b>下次睡觉时</b>按原价（100%）结算；' +
+      '直接卖给水产店 / 农产品店只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) + '%。</div>',
       '<button class="btn" data-close>关闭</button>');
   }
 
@@ -1259,7 +1304,7 @@
         '<div class="sv">' +
           (g.q ? '<span style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
             (q ? q.emoji + q.name : '杂物') + '</span> · ' : '杂物 · ') +
-          g.v + ' 金/条 · ' + (g.bought ? '今天买进的' : '自己钓的') + '</div></div>' +
+          g.v + ' 金/条</div></div>' +
         '<span class="sp">' + (g.v * g.count) + ' 金</span>' +
         '<button class="btn mini" data-sellfish="' + g.key + '">卖出</button>' +
       '</div>';
@@ -1285,17 +1330,19 @@
         '<button class="btn mini" data-buyfish="' + f.id + '" data-n="1"' +
           (locked || soldOut || state.coins < bp ? ' disabled' : '') + '>' +
           (locked ? '未解锁' : (soldOut ? '售罄' : '买1')) + '</button>' +
-        '<button class="btn mini" data-buyfish="' + f.id + '" data-n="3"' +
-          (locked || st < 3 || state.coins < bp * 3 ? ' disabled' : '') + '>买3</button>' +
+        (locked ? '' : '<button class="btn mini" data-buyfish="' + f.id + '" data-n="3"' +
+          (st < 3 || state.coins < bp * 3 ? ' disabled' : '') + '>买3</button>') +
       '</div>';
     }).join('');
 
     openModal('🐟 水产店',
-      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金 · 渔获只能在这里出售</div>' +
+      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金 · 渔获只能在这里出售（' +
+        Math.round(G.BALANCE.shop.sellRate * 100) + ' 折）</div>' +
       '<div class="store-sub">卖渔获 · ' + total + ' 条</div>' + sellRows +
       '<div class="store-sub" style="margin-top:10px">买水产 · 今日进货' +
         (outOfStock === buyList.length ? '（全部售罄）' : '') + '</div>' + buyRows +
-      '<div class="shop-tip">水产店每天补一次货，卖完要等明天；买来的鱼是<b>一般品质</b>，只能卖钱、不能交委托。</div>',
+      '<div class="shop-tip">水产店每天补一次货，卖完要等明天；买来的鱼是<b>一般品质</b>，只能卖钱、不能交委托。<br>' +
+        '直接卖只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折，想原价卖就放进<b>收购箱</b>（仓库 📦）。</div>',
       '<button class="btn" data-sellallfish' + (total ? '' : ' disabled') + '>全部卖出</button>' +
       '<button class="btn" data-close>关闭</button>');
   }
@@ -1334,6 +1381,7 @@
       ['税金', '还有 ' + nextTax + ' 天 · 约 ' + G.taxDue(state) + ' 金（累进 2% / 4% / 6%，最低 ' +
         G.BALANCE.tax.min + '）'],
       ['仓库总价', G.storeTotal(state) + ' 金'],
+      ['收购箱', G.boxCount(state) + ' 批 · ' + G.boxValue(state) + ' 金（睡觉结算）'],
       ['累计播种', state.stats.planted + ' 次'],
       ['累计收获', state.stats.harvests + ' 次'],
       ['累计钓鱼', state.stats.casts + ' 次'],
@@ -1592,6 +1640,24 @@
         return;
       }
 
+      // 收购箱：放货
+      const boxCrop = t.closest('[data-boxcrop]');
+      if (boxCrop) {
+        const r = G.boxPutCrop(state, boxCrop.dataset.boxcrop);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        return;
+      }
+      const boxFish = t.closest('[data-boxfish]');
+      if (boxFish) {
+        const r = G.boxPutFish(state, boxFish.dataset.boxfish);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        return;
+      }
+
       // 农产品店：卖作物 / 全部卖出 / 买作物
       const sellCrop = t.closest('[data-sellcrop]');
       if (sellCrop) {
@@ -1706,6 +1772,20 @@
         return;
       }
 
+      // 卖蚯蚓（自定义数量）
+      const sellWormN = t.closest('[data-sellwormn]');
+      if (sellWormN && !sellWormN.disabled) {
+        const input = $('#worm-qty');
+        let n = Math.floor(Number(input && input.value) || 0);
+        if (!(n > 0)) { toast('请输入 1 以上的数量', 'warn'); return; }
+        const r = G.sellWorms(state, Math.min(999, n));
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        if (modalOpen()) shopModal();
+        return;
+      }
+
       // 卖蚯蚓
       const sellWorm = t.closest('[data-sellworm]');
       if (sellWorm) {
@@ -1768,6 +1848,7 @@
     });
 
     $('#btn-settings').addEventListener('click', settingsModal);
+    $('#btn-box').addEventListener('click', boxModal);
     $('#btn-status').addEventListener('click', statusModal);
     $('#btn-codex').addEventListener('click', codexModal);
     $('#btn-ach').addEventListener('click', achModal);

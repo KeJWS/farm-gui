@@ -157,8 +157,8 @@ ok(fishWithoutQuality, '非垃圾鱼都带品质');
 /* 卖鱼 */
 const bagBefore = s.fishBag.slice();
 const soldAll = G.sellAllFish(s);
-ok(soldAll.ok && soldAll.income === total && s.coins === coinsAtStart + total && s.fishBag.length === 0,
-   '全部卖鱼：金币 = 初始 + 渔获总值', { gain: soldAll.income, coins: s.coins });
+ok(soldAll.ok && soldAll.income === G.shopValue(total) && s.coins === coinsAtStart + G.shopValue(total) && s.fishBag.length === 0,
+   '全部卖鱼：按 8 折结算', { gain: soldAll.income, full: total });
 
 /* 分组出售 */
 s.bait.worm = 100;
@@ -172,8 +172,8 @@ const groups = G.fishGroups(s);
 ok(groups.length >= 1 && groups.reduce((n, g) => n + g.count, 0) === 12, '渔获按鱼种+品质分组', groups.length);
 const g0 = groups[0], coinsBeforeGroup = s.coins;
 const rGroup = G.sellFishGroup(s, g0.key);
-ok(rGroup.ok && s.coins === coinsBeforeGroup + g0.v * g0.count && s.fishBag.length === 12 - g0.count,
-   '卖一组鱼结算正确', { key: g0.key, gain: rGroup.income });
+ok(rGroup.ok && s.coins === coinsBeforeGroup + G.shopValue(g0.v * g0.count) && s.fishBag.length === 12 - g0.count,
+   '卖一组鱼结算正确（8 折）', { key: g0.key, gain: rGroup.income });
 
 /* 全部卖出（作物 + 渔获） */
 s = G.createState();
@@ -181,8 +181,8 @@ s.bait.worm = 20; G.addStore(s, 'carrot', 'std', 2);
 for (let i = 0; i < 3; i++) { s.energy = 10; G.fish(s, 'worm'); }
 const beforeAll = s.coins;
 const rAll = G.sellAll(s);
-ok(rAll.ok && s.coins === beforeAll + 8 && s.fishBag.length > 0 && Object.keys(s.store).length === 0,
-   '仓库「全部卖出」只卖作物，渔获留给水产店', { coins: s.coins - beforeAll, fish: s.fishBag.length });
+ok(rAll.ok && s.coins === beforeAll + 6 && s.fishBag.length > 0 && Object.keys(s.store).length === 0,
+   '仓库「全部卖出」只卖作物（8 折），渔获留给水产店', { coins: s.coins - beforeAll, fish: s.fishBag.length });
 
 /* 天气只影响上钩概率，不影响售价 */
 section('天气 → 上钩概率');
@@ -557,7 +557,7 @@ G.addStore(s, 'carrot', 'legend', 1);
 const vAll = 2 * G.unitValue('carrot', 'bad') + G.unitValue('carrot', 'legend');
 ok(G.storeValue(s, 'carrot') === vAll && G.storeCount(s, 'carrot') === 3, '仓库估值按品质累加', G.storeValue(s, 'carrot'));
 const coinsQ = s.coins;
-ok(G.sellOne(s, 'carrot').ok && s.coins - coinsQ === vAll && !s.store.carrot, '单卖按品质结算');
+ok(G.sellOne(s, 'carrot').ok && s.coins - coinsQ === G.shopValue(vAll) && !s.store.carrot, '单卖按品质结算（8 折）');
 ok(G.storeMix(s, 'carrot').length === 0, '卖空后仓库不留空桶');
 
 s = G.createState();
@@ -1051,7 +1051,7 @@ let lureS = G.createState(); lureS.coins = 100;
 G.buyBait(lureS, 'lure', 1);
 ok(lureS.lure.dur === 25 && lureS.coins === 95, '假饵 5 金 · 耐用 25 次', lureS.lure.dur);
 
-ok(G.ACH.length === 32, '成就总数 32', G.ACH.length);
+ok(G.ACH.length === 36, '成就总数 36', G.ACH.length);
 
 const retro = G.deserialize({ plots: [], coins: 100, day: 20, stats: { harvests: 100, casts: 300 } });
 ok(retro.levels.farm > 1 && retro.levels.fish > 1, '老存档按历史次数补等级',
@@ -1110,6 +1110,42 @@ ok(lateCrop > 0, 'D24 起才进西瓜', lateCrop);
 /* 老存档读过之后，渔网数量不会被上限打回 */
 const netSave = G.deserialize({ plots: [], coins: 100, day: 40, nets: 9, levels: { farm: 8, fish: 10, farmXp: 0, fishXp: 0 } });
 ok(netSave.nets === 9, '高等级存档的渔网数量保留', netSave.nets);
+
+/* ---------- v1.9 收购箱 / 统计 / 播报 ---------- */
+section('v1.9 收购箱与统计');
+G.setRng(mulberry32(99));
+let bs = G.createState(); bs.coins = 100;
+G.addStore(bs, 'carrot', 'std', 10);                       // 原价 40 金
+ok(G.shopSellValue(bs, 'carrot') === 32, '商店直接收购 8 折', G.shopSellValue(bs, 'carrot'));
+ok(G.boxPutCrop(bs, 'carrot').ok && G.boxCount(bs) === 1 && G.storeCount(bs, 'carrot') === 0,
+  '作物整批放进收购箱');
+ok(G.boxValue(bs) === 40, '收购箱按原价估值', G.boxValue(bs));
+
+const beforeShip = bs.coins, shipFee = G.mealFee(bs);
+G.sleep(bs);
+ok(G.boxCount(bs) === 0 && bs.coins === beforeShip + 40 - shipFee, '睡觉时按原价结清收购箱',
+  { coins: bs.coins, expect: beforeShip + 40 - shipFee });
+
+let bf = G.createState();
+bf.fishBag = [{ name: '鲫鱼', emoji: '🐟', q: 'std', v: 3, d: 1 }];
+ok(G.boxPutFish(bf, G.fishKey(bf.fishBag[0])).ok && G.boxCount(bf) === 1 && bf.fishBag.length === 0,
+  '渔获也能进收购箱');
+
+const tb = G.createState(); tb.coins = 0;
+tb.box = [{ kind: 'crop', name: '萝卜', emoji: '🥕', n: 10, v: 400 }];
+ok(G.taxBase(tb) === 400, '收购箱里的货也计入税金基数', G.taxBase(tb));
+
+let ws = G.createState(); ws.stats.dug = 50; ws.stats.works = 30;
+const unW = G.checkAchievements(ws);
+ok(unW.some(x => x.id === 'dig50') && unW.some(x => x.id === 'work30'), '挖蚯蚓 / 打零工成就能解锁');
+
+let wk = G.createState(); wk.coins = 0; wk.energy = 15;
+G.work(wk, 'full');
+ok(wk.stats.works === 1, '打零工计入统计');
+
+const sleepNotes = G.sleep(G.createState()).notes.map(n => n.kind);
+ok(sleepNotes.indexOf('order') < 0 && sleepNotes.indexOf('shop') < 0,
+  '睡觉播报不再提示委托换新 / 商店补货', sleepNotes);
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');

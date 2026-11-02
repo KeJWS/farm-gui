@@ -111,6 +111,7 @@ ok(html('#plot-grid').indexOf('class="plot') >= 0 && (html('#plot-grid').match(/
    '农田渲染出 5 块地');
 ok(text('#hud-plots').indexOf('5 块') >= 0, 'HUD 显示 5 块地', text('#hud-plots'));
 ok(text('#store-sum').indexOf('总价') >= 0, '仓库显示总价值', text('#store-sum'));
+ok(html('#store-list').indexOf('去水产店卖') < 0, '仓库渔获不再写「去水产店卖」');
 ok(html('#order-list').indexOf('报酬') >= 0 && html('#order-list').indexOf('交付') >= 0, '委托面板渲染出报酬与交付按钮');
 ok(html('#ledger').indexOf('D1') >= 0, '账本渲染出 D1');
 ok(html('#log').indexOf('D1') >= 0, '日志渲染出 D1');
@@ -128,6 +129,9 @@ ok(html('#modal-root').indexOf('今日') >= 0 && html('#modal-root').indexOf('�
    '水产店显示每日库存与「一般品质」');
 ok(html('#modal-root').indexOf('D20 起进货') >= 0 && html('#modal-root').indexOf('D30 起进货') >= 0,
    '水产店高级鱼按天数锁定');
+ok(html('#modal-root').indexOf('未解锁') >= 0 &&
+   html('#modal-root').indexOf('data-buyfish="koi" data-n="3"') < 0,
+   '未解锁的水产不显示「买3」');
 clickAct('cropshop');
 ok(html('#modal-root').indexOf('农产品店') >= 0 && html('#modal-root').indexOf('全部卖出') >= 0,
    '农产品店弹窗能打开');
@@ -135,6 +139,14 @@ ok(html('#modal-root').indexOf('今日') >= 0 && html('#modal-root').indexOf('�
    '农产品店显示每日库存与「一般品质」');
 ok(html('#modal-root').indexOf('D18 起进货') >= 0 && html('#modal-root').indexOf('D24 起进货') >= 0,
    '农产品店高级作物按天数锁定');
+ok(html('#modal-root').indexOf('data-buycrop="watermelon" data-n="3"') < 0,
+   '未解锁的作物不显示「买3」');
+ok(html('#modal-root').indexOf('脆生生') >= 0, '农产品店显示作物简述');
+
+console.log('\n== 收购箱 ==');
+document.querySelector('#btn-box').fire('click', { target: {} });
+ok(html('#modal-root').indexOf('收购箱') >= 0 && html('#modal-root').indexOf('原价') >= 0,
+   '收购箱弹窗能打开并说明原价结算');
 clickAct('shop');
 ok(html('#modal-root').indexOf('面团饵自定义数量') >= 0 && html('#modal-root').indexOf('dough-qty') >= 0,
    '渔具店有面团饵自定义数量输入');
