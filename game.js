@@ -414,10 +414,28 @@
       }, reward: { coins: 250, ferts: { special: 2 } }, pts: 3 },
     { id: 'forageLv5', cat: 'all',  emoji: '🧭', name: '认得百草',   desc: '采集等级到 Lv5',       goal: 5,
       val: function (s) { return (s.levels && s.levels.forage) || 1; },
-      reward: { coins: 200, bait: { dough: 10 } }, pts: 3 }
+      reward: { coins: 200, bait: { dough: 10 } }, pts: 3 },
+
+    /* v2.17 追加：设备 */
+    { id: 'devSprinkler', cat: 'dev', emoji: '🚿', name: '第一根水管', desc: '买 1 个洒水器',        goal: 1,
+      val: function (s) { return s.sprinklers || 0; }, reward: { coins: 30 }, pts: 1 },
+    { id: 'devSprinkler10', cat: 'dev', emoji: '⛲', name: '自动灌溉',   desc: '洒水器达到 10 个',     goal: 10,
+      val: function (s) { return s.sprinklers || 0; }, reward: { coins: 200 }, pts: 3 },
+    { id: 'devHarvester', cat: 'dev', emoji: '🤖', name: '铁牛下地',    desc: '买自动收获器',         goal: 1,
+      val: function (s) { return s.harvester ? 1 : 0; }, reward: { coins: 150 }, pts: 2 },
+    { id: 'devSeeder',    cat: 'dev', emoji: '🌱', name: '播种流水线',  desc: '买 1 台自动播种器',    goal: 1,
+      val: function (s) { return Math.round(s.seeder || 0); }, reward: { coins: 150 }, pts: 2 },
+    { id: 'devSeeder4',   cat: 'dev', emoji: '🏭', name: '育苗车间',    desc: '自动播种器达到 4 台',  goal: 4,
+      val: function (s) { return Math.round(s.seeder || 0); }, reward: { coins: 400 }, pts: 4 },
+    { id: 'devAuto',      cat: 'dev', emoji: '🏗️', name: '全自动农场',  desc: '洒水器 5 个 + 自动收获器 + 播种器 2 台',
+      goal: 1,
+      val: function (s) {
+        return ((s.sprinklers || 0) >= 5 && s.harvester && Math.round(s.seeder || 0) >= 2) ? 1 : 0;
+      },
+      reward: { coins: 500, ferts: { special: 2 } }, pts: 5 }
   ];
 
-  const ACH_CATS = { farm: '🌱 种田', fish: '🎣 钓鱼', biz: '💰 经营', all: '🏆 收集' };
+  const ACH_CATS = { farm: '🌱 种田', fish: '🎣 钓鱼', dev: '🔧 设备', biz: '💰 经营', all: '🏆 收集' };
 
   /* 成就奖励文案：成就点 + 金币 / 种子 / 肥料 / 饵料 / 茶 / 钥匙 */
   function rewardText(a) {

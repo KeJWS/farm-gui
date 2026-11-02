@@ -271,8 +271,21 @@ ok(html('#modal-root').indexOf('已解锁') >= 0 && html('#modal-root').indexOf(
    '成就弹窗含统计与分类');
 ok(html('#modal-root').indexOf('成就点') >= 0 && html('#modal-root').indexOf('售价加成') >= 0,
    '成就弹窗显示成就点与售价加成');
+ok((html('#modal-root').match(/data-achcat=/g) || []).length === 5, '成就按 5 类分页');
+(function achCollect() {
+  const btn = { dataset: { achcat: 'all' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-achcat]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
 ok(html('#modal-root').indexOf('跑山人') >= 0 && html('#modal-root').indexOf('四季野味') >= 0,
-   '成就弹窗含采集成就');
+   '「收集」页含采集成就');
+(function achDev() {
+  const btn = { dataset: { achcat: 'dev' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-achcat]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+ok(html('#modal-root').indexOf('全自动农场') >= 0 && html('#modal-root').indexOf('播种流水线') >= 0,
+   '「设备」页含设备成就');
 
 console.log('\n== 百货店 ==');
 clickAct('depart');

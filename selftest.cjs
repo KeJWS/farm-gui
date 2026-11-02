@@ -1078,7 +1078,7 @@ let lureS = G.createState(); lureS.coins = 100;
 G.buyBait(lureS, 'lure', 1);
 ok(lureS.lure.dur === 25 && lureS.coins === 95, '假饵 5 金 · 耐用 25 次', lureS.lure.dur);
 
-ok(G.ACH.length === 49, '成就总数 49', G.ACH.length);
+ok(G.ACH.length === 55, '成就总数 55', G.ACH.length);
 
 const retro = G.deserialize({ plots: [], coins: 100, day: 20, stats: { harvests: 100, casts: 300 } });
 ok(retro.levels.farm > 1 && retro.levels.fish > 1, '老存档按历史次数补等级',
@@ -1402,7 +1402,7 @@ ok(!G.fishAll(v23noBait, 'dough').ok, '没饵时全体力钓鱼直接失败');
 /* 新成就 */
 const v23achNew = G.checkAchievements(Object.assign(G.createState(), { stats: { teas: 10, chests: 10 } }));
 ok(v23achNew.some(x => x.id === 'tea10') && v23achNew.some(x => x.id === 'chest10'), '下午茶 / 开箱成就能解锁');
-ok(G.ACH.length === 49, '成就总数 49', G.ACH.length);
+ok(G.ACH.length === 55, '成就总数 55', G.ACH.length);
 
 /* ---------- 5f. v2.4 季节 ---------- */
 section('v2.4 季节');

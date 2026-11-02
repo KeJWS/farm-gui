@@ -585,3 +585,59 @@ console.log('\n== 交易等级（买卖成交额换经验）==');
     G.BALANCE.gate.goldKeyTrade + '（' + (need(1) + need(2) + need(3)) * T.xpPer + ' 金）');
   console.log('   满级进价系数 ' + maxCut.toFixed(3) + '（' + ((1 - maxCut) * 100).toFixed(1) + '% off）');
 }
+
+/* ---------- 17. 成就 ---------- */
+console.log('\n== 成就（' + G.ACH.length + ' 项）==');
+{
+  function rewardGold(r) {
+    r = r || {};
+    let v = r.coins || 0;
+    Object.keys(r.seeds || {}).forEach(function (id) { v += (G.CROPS[id] ? G.CROPS[id].seed : 0) * r.seeds[id]; });
+    Object.keys(r.ferts || {}).forEach(function (id) { v += (G.FERT[id] ? G.FERT[id].cost : 0) * r.ferts[id]; });
+    Object.keys(r.bait || {}).forEach(function (id) { v += (id === 'worm' ? 3 : 1) * r.bait[id]; });
+    Object.keys(r.teas || {}).forEach(function (id) { v += (G.TEAS[id] ? G.TEAS[id].price : 0) * r.teas[id]; });
+    Object.keys(r.keys || {}).forEach(function (id) { v += (G.KEYS[id] ? G.KEYS[id].price : 0) * r.keys[id]; });
+    return v;
+  }
+  const cats = Object.keys(G.ACH_CATS);
+  let totalPts = 0, totalGold = 0, totalItems = 0;
+  console.log('   ' + pad('分类', 10) + pad('项数', 6) + pad('点数', 6) +
+    pad('现金', 8) + pad('物资折价', 10) + '合计');
+  cats.forEach(function (cat) {
+    const items = G.ACH.filter(function (a) { return a.cat === cat; });
+    if (!items.length) return;
+    let pts = 0, gold = 0, itemsVal = 0;
+    items.forEach(function (a) {
+      pts += a.pts || 0;
+      const r = a.reward || {};
+      gold += r.coins || 0;
+      itemsVal += rewardGold(r) - (r.coins || 0);
+    });
+    totalPts += pts; totalGold += gold; totalItems += itemsVal;
+    console.log('   ' + pad(G.ACH_CATS[cat], 10) + pad(items.length, 6) + pad(pts, 6) +
+      pad(gold, 8) + pad(Math.round(itemsVal), 10) + Math.round(gold + itemsVal) + ' 金');
+  });
+  console.log('   合计 ' + totalPts + ' 点 · 奖励约 ' + Math.round(totalGold + totalItems) + ' 金（现金 ' +
+    totalGold + ' + 物资 ' + Math.round(totalItems) + '）');
+  const capPts = 200;
+  console.log('   售价加成：每 10 点 +1%，封顶 +20%，需要 ' + capPts + ' 点 —— 现有 ' + totalPts +
+    ' 点，' + (totalPts >= capPts ? '刚好够满' : '全解锁也只有 +' + Math.min(20, Math.floor(totalPts / 10)) + '%'));
+
+  /* 设备 / 采集等新分类的占比 */
+  const byCat = {};
+  G.ACH.forEach(function (a) { byCat[a.cat] = (byCat[a.cat] || 0) + 1; });
+  console.log('   分类占比：' + Object.keys(byCat).map(function (k) {
+    return G.ACH_CATS[k] + ' ' + byCat[k] + ' 项';
+  }).join(' · '));
+
+  /* 最值钱的 5 项 */
+  const rich = G.ACH.slice().sort(function (a, b) { return rewardGold(b.reward) - rewardGold(a.reward); }).slice(0, 5);
+  console.log('   奖励最厚的 5 项：');
+  rich.forEach(function (a) {
+    console.log('   ' + pad(a.emoji + ' ' + a.name, 12) + pad(a.pts + ' 点', 6) +
+      pad(Math.round(rewardGold(a.reward)) + ' 金', 9) + '（' + a.desc + '）');
+  });
+  /* 最容易顺手拿到的 6 项（goal 很小） */
+  const easy = G.ACH.filter(function (a) { return a.goal <= 5; }).slice(0, 6);
+  console.log('   顺手就能拿的低门槛项：' + easy.map(function (a) { return a.emoji + a.name + '(' + a.goal + ')'; }).join(' · '));
+}

@@ -383,7 +383,7 @@
     const digCost = G.digCost(state);
     $('[data-act="dig"]').disabled = state.energy < digCost;
     const digTxt = $('#dig-txt');
-    if (digTxt) digTxt.textContent = digCost + ' 体力 · 满级省 1';
+    if (digTxt) digTxt.textContent = digCost + ' 体力';
     const forageBtn = $('[data-act="forage"]');
     if (forageBtn) {
       const fp = G.foragePool(state.day);
@@ -1497,7 +1497,8 @@
 
       '<div class="rule-sec">' +
         '<h4>🏆 成就</h4>' +
-        '<p>共 <b>' + G.ACH.length + '</b> 项，分种田 / 钓鱼 / 经营 / 收集四类。每项给<b>成就点</b>和<b>实质奖励</b>（金币 / 种子 / 肥料 / 饵料）；' +
+        '<p>共 <b>' + G.ACH.length + '</b> 项，分<b>种田 / 钓鱼 / 设备 / 经营 / 收集</b>五类，顶栏 🏆 里按分类翻页看。' +
+        '每项给<b>成就点</b>和<b>实质奖励</b>（金币 / 种子 / 肥料 / 饵料）；' +
         '每 10 点 <b>+1% 售价</b>（最多 +20%，作用于商店与收购箱）；顶栏 🏆 里能看每项进度。</p>' +
       '</div>' +
 
@@ -1601,6 +1602,10 @@
       '<button class="btn" data-close>关闭</button>');
   }
 
+  /* 成就分页：按分类一页一页翻 */
+  let achCat = 'farm';
+  const ACH_ORDER = ['farm', 'fish', 'dev', 'biz', 'all'];
+
   function achModal() {
     const list = G.achInfo(state);
     const done = list.filter(function (a) { return a.done; }).length;
@@ -1613,29 +1618,44 @@
       '<div><b>' + Math.round(done / list.length * 100) + '%</b><span>完成度</span></div>' +
     '</div>';
 
-    const rows = ['farm', 'fish', 'biz', 'all'].map(function (cat) {
+    if (ACH_ORDER.indexOf(achCat) < 0) achCat = 'farm';
+    const tabs = ACH_ORDER.map(function (cat) {
       const items = list.filter(function (a) { return a.cat === cat; });
-      if (!items.length) return '';
-      return '<div class="store-sub">' + G.ACH_CATS[cat] + ' · ' +
-          items.filter(function (a) { return a.done; }).length + '/' + items.length + '</div>' +
-        items.map(function (a) {
-          const pct = Math.round(a.cur / a.goal * 100);
-          return '<div class="ach-row' + (a.done ? ' done' : '') + '">' +
-            '<span class="ae">' + a.emoji + '</span>' +
-            '<div class="ai">' +
-              '<div class="an">' + a.name +
-                (a.done ? ' <span class="adone">D' + a.day + '</span>' : '') + '</div>' +
-              '<div class="ad">' + a.desc + ' · ' + a.reward + '</div>' +
-              '<div class="abar"><i style="width:' + pct + '%"></i></div>' +
-            '</div>' +
-            '<span class="ap">' + a.cur + '/' + a.goal + '</span>' +
-          '</div>';
-        }).join('');
+      const d = items.filter(function (a) { return a.done; }).length;
+      return '<button class="rule-tab' + (achCat === cat ? ' on' : '') + '" data-achcat="' + cat + '">' +
+        G.ACH_CATS[cat] + '<br><small>' + d + '/' + items.length + '</small></button>';
     }).join('');
 
-    openModal('🏆 成就', stat + rows +
+    const items = list.filter(function (a) { return a.cat === achCat; });
+    const rows = items.map(function (a) {
+      const pct = Math.round(a.cur / a.goal * 100);
+      return '<div class="ach-row' + (a.done ? ' done' : '') + '">' +
+        '<span class="ae">' + a.emoji + '</span>' +
+        '<div class="ai">' +
+          '<div class="an">' + a.name +
+            (a.done ? ' <span class="adone">D' + a.day + '</span>' : '') + '</div>' +
+          '<div class="ad">' + a.desc + ' · ' + a.reward + '</div>' +
+          '<div class="abar"><i style="width:' + pct + '%"></i></div>' +
+        '</div>' +
+        '<span class="ap">' + a.cur + '/' + a.goal + '</span>' +
+      '</div>';
+    }).join('');
+
+    const idx = ACH_ORDER.indexOf(achCat);
+    const nav = (idx > 0
+      ? '<button class="btn" data-achnav="-1">← 上一类</button>'
+      : '<button class="btn" disabled>← 上一类</button>') +
+      (idx < ACH_ORDER.length - 1
+        ? '<button class="btn" data-achnav="1">下一类 →</button>'
+        : '<button class="btn" disabled>下一类 →</button>');
+
+    openModal('🏆 成就',
+      stat + '<div class="rule-tabs">' + tabs + '</div>' +
+      '<div class="rule-crumb">' + G.ACH_CATS[achCat] + ' · ' +
+        items.filter(function (a) { return a.done; }).length + '/' + items.length + ' 已解锁</div>' +
+      (rows || '<div class="store-empty">这一类还没有成就</div>') +
       '<div class="shop-tip">每个成就给<b>成就点</b>，每 10 点 +1% 售价（最多 +20%，只作用于商店 / 收购箱）。进度存在存档里。</div>',
-      '<button class="btn" data-close>关闭</button>');
+      nav + '<button class="btn" data-close>关闭</button>');
   }
 
   /* 成就解锁提示：一次解锁太多就合并成一条 */
@@ -2465,6 +2485,22 @@
         helpPage = Math.max(0, Math.min(helpPages().length - 1,
           helpPage + Number(helpNav.dataset.helpnav)));
         helpModal();
+        return;
+      }
+
+      // 成就翻页
+      const achTab = t.closest('[data-achcat]');
+      if (achTab) {
+        achCat = achTab.dataset.achcat;
+        achModal();
+        return;
+      }
+      const achNav = t.closest('[data-achnav]');
+      if (achNav && !achNav.disabled) {
+        let i = ACH_ORDER.indexOf(achCat) + Number(achNav.dataset.achnav);
+        i = Math.max(0, Math.min(ACH_ORDER.length - 1, i));
+        achCat = ACH_ORDER[i];
+        achModal();
         return;
       }
 
