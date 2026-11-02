@@ -923,7 +923,9 @@ button{ color:inherit; font:inherit; }
     </div>
 
     <div class="panel">
-      <div class="panel-head"><h2>🏪 商店</h2></div>
+      <div class="panel-head"><h2>🏪 商店</h2>
+        <button class="btn mini" id="btn-market">📈 行情</button>
+      </div>
       <div class="shop-two shop-four">
         <button class="btn" data-act="seedshop">🌰 种子店<small>买种子</small></button>
         <button class="btn" data-act="shop">🛒 渔具店<small>面团饵 · 假饵</small></button>
@@ -1071,17 +1073,17 @@ button{ color:inherit; font:inherit; }
   const FISH = [
     { id: 'trash', name: '垃圾',     emoji: '🗑️', base: 1,  w: 18, trash: true,
       desc: '河里捞上来的不是鱼' },
-    { id: 'crucian', name: '鲫鱼',   emoji: '🐟', base: 3,  w: 24,
+    { id: 'crucian', name: '鲫鱼',   emoji: '🐟', base: 3,  w: 24, seasons: [0, 2],
       desc: '肉嫩刺多，熬汤最鲜' },
-    { id: 'carp',  name: '鲤鱼',     emoji: '🐟', base: 6,  w: 20,
+    { id: 'carp',  name: '鲤鱼',     emoji: '🐟', base: 6,  w: 20, seasons: [0, 1, 2],
       desc: '常见河鱼，红烧一绝' },
-    { id: 'mandarin', name: '鳜鱼',  emoji: '🐠', base: 10, w: 13,
+    { id: 'mandarin', name: '鳜鱼',  emoji: '🐠', base: 10, w: 13, seasons: [0, 1],
       desc: '桃花流水鳜鱼肥' },
-    { id: 'bass',  name: '鲈鱼',     emoji: '🐟', base: 12, w: 10,
+    { id: 'bass',  name: '鲈鱼',     emoji: '🐟', base: 12, w: 11, seasons: [1, 2],
       desc: '清蒸最见功夫' },
-    { id: 'puffer', name: '河豚',    emoji: '🐡', base: 20, w: 6,
+    { id: 'puffer', name: '河豚',    emoji: '🐡', base: 20, w: 9, seasons: [2],
       desc: '有毒性，老饕甘愿冒险' },
-    { id: 'koi',   name: '锦鲤',     emoji: '🐉', base: 25, w: 4,
+    { id: 'koi',   name: '锦鲤',     emoji: '🐉', base: 25, w: 6, seasons: [0],
       desc: '好运的象征，卖价不菲' },
     { id: 'chestWood', name: '木制宝箱', emoji: '🪵', base: 10, w: 5, chest: 'wood', noOrder: true,
       desc: '木头做的，直接撬开就是几枚铜板' },
@@ -1128,6 +1130,21 @@ button{ color:inherit; font:inherit; }
   const FISH_UNLOCK = { puffer: 20, koi: 30 };
   /* 高级作物中后期才进货 */
   const CROP_UNLOCK = { pumpkin: 18, watermelon: 24 };
+
+  /* 鱼群季节：汛期权重 ×1.25，非汛期 ×0.3（还能钓到，但明显少） */
+  const FISH_OFF_SEASON = 0.3;
+  const FISH_IN_SEASON = 1.25;
+
+  function fishSeasonOk(id, day) {
+    const f = FISH.filter(function (x) { return x.id === id; })[0];
+    if (!f || !f.seasons) return true;
+    return f.seasons.indexOf(seasonIdx(day || 1)) >= 0;
+  }
+  function fishSeasonText(id) {
+    const f = FISH.filter(function (x) { return x.id === id; })[0];
+    if (!f || !f.seasons) return '四季';
+    return f.seasons.map(function (i) { return SEASONS[i]; }).join('·');
+  }
 
   const Q_IDS = QUALITY.map(function (q) { return q.id; });
 
@@ -2185,6 +2202,9 @@ button{ color:inherit; font:inherit; }
       else if (kind === 'worm') mul = BALANCE.bait.wormGood;
       else if (kind === 'lure') mul = BALANCE.bait.lureGood;
       if (!f.trash && !f.chest) mul *= fishGoodBonus(s);
+      if (f.seasons) {
+        mul *= f.seasons.indexOf(seasonIdx(s.day)) >= 0 ? FISH_IN_SEASON : FISH_OFF_SEASON;
+      }
       return Object.assign({}, f, { w: f.w * mul });
     }).filter(Boolean);
     const f = weighted(table, 'w');
@@ -2548,9 +2568,9 @@ button{ color:inherit; font:inherit; }
     const qty = Math.max(1, Math.min(g.count, Math.floor(n || g.count)));
     const parts = takeFishN(s, key, qty);
     const raw = parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
-    const mkt = g.chest ? 1 : fishMarketMul(s, g.name);
+    const mkt = g.junk ? 1 : fishMarketMul(s, g.name);   // 杂物 / 宝箱不受市价影响
     const v = Math.max(1, Math.round(raw * sellBonus(s) * mkt));
-    if (!g.chest) addFishSupply(s, g.name, qty);
+    if (!g.junk) addFishSupply(s, g.name, qty);
     s.box = s.box || [];
     s.box.push({ kind: 'fish', name: g.name, emoji: g.emoji, n: qty, parts: parts, v: v,
                  chest: g.chest || undefined, junk: g.junk || undefined,
@@ -2909,10 +2929,12 @@ button{ color:inherit; font:inherit; }
     return BALANCE.tax.every - ((s.day || 1) % BALANCE.tax.every);
   }
 
-  /* 水产店售价：基础价的 1.8 倍 */
-  function fishBuyPrice(id) {
+  /* 水产店售价：基础价 × 1.8 × 鱼市价（缺鱼时更贵） */
+  function fishBuyPrice(id, s) {
     const f = FISH.filter(function (x) { return x.id === id; })[0];
-    return f ? Math.max(3, Math.round(f.base * BALANCE.shop.priceMul)) : 0;
+    if (!f) return 0;
+    const mkt = s ? fishMarketMul(s, f.name) : 1;
+    return Math.max(3, Math.round(f.base * BALANCE.shop.priceMul * mkt));
   }
 
   /* 今日库存（0 表示卖完 / 没进到货） */
@@ -2927,7 +2949,7 @@ button{ color:inherit; font:inherit; }
     const stock = shopStock(s, id);
     if (stock <= 0) return { ok: false, msg: f.name + '今天卖完了，明天再来' };
     if (stock < qty) return { ok: false, msg: '库存只剩 ' + stock + ' 条' };
-    const cost = fishBuyPrice(id) * qty;
+    const cost = fishBuyPrice(id, s) * qty;
     if (s.coins < cost) return { ok: false, msg: '金币不够' };
     s.coins -= cost;
     s.shop.stock[id] = stock - qty;
@@ -2942,10 +2964,12 @@ button{ color:inherit; font:inherit; }
 
   /* ---------------- 农产品店（作物唯一出售处 + 每日进货） ---------------- */
 
-  /* 买价 = 售价 ×2.2，一般品质（标准），转手必亏，只用来应急凑单 */
-  function cropBuyPrice(id) {
+  /* 买价 = 售价 × 1.8 × 作物市价（缺货时更贵），一般品质（标准），转手必亏，只用来应急凑单 */
+  function cropBuyPrice(id, s) {
     const c = CROPS[id];
-    return c ? Math.max(2, Math.round(c.price * BALANCE.shop.cropPriceMul)) : 0;
+    if (!c) return 0;
+    const mkt = s ? marketMul(s, id) : 1;
+    return Math.max(2, Math.round(c.price * BALANCE.shop.cropPriceMul * mkt));
   }
 
   function cropShopStock(s, id) {
@@ -2959,7 +2983,7 @@ button{ color:inherit; font:inherit; }
     const stock = cropShopStock(s, id);
     if (stock <= 0) return { ok: false, msg: c.name + '今天卖完了，明天再来' };
     if (stock < qty) return { ok: false, msg: '库存只剩 ' + stock + ' 个' };
-    const cost = cropBuyPrice(id) * qty;
+    const cost = cropBuyPrice(id, s) * qty;
     if (s.coins < cost) return { ok: false, msg: '金币不够' };
     s.coins -= cost;
     s.cropShop.stock[id] = stock - qty;
@@ -2973,7 +2997,10 @@ button{ color:inherit; font:inherit; }
   /* 渔网：每天吃 1 份面团饵，70% 概率网到 1 条「标准及以下」的普通鱼（不出杂物/宝箱） */
   const NET_QUALITIES = ['bad', 'common', 'std'];
   function netCatchOne(s) {
-    const pool = FISH.filter(function (f) { return !f.trash && !f.noOrder; });
+    const pool = FISH.filter(function (f) { return !f.trash && !f.noOrder; }).map(function (f) {
+      const off = (f.seasons && f.seasons.indexOf(seasonIdx(s.day)) < 0) ? FISH_OFF_SEASON : 1;
+      return Object.assign({}, f, { w: f.w * off });
+    });
     const f = weighted(pool, 'w');
     const qs = QUALITY.filter(function (q) { return NET_QUALITIES.indexOf(q.id) >= 0; });
     const q = weighted(qs, 'w');
@@ -3157,17 +3184,17 @@ button{ color:inherit; font:inherit; }
 
   /* ---------------- 每日委托 ---------------- */
 
-  /* 委托池：按天数一档档解锁（前期慢一点，后期全开） */
+  /* 委托池：按天数一档档解锁（前期慢一点，后期全开）；同档内按解锁等级 + 种子价排 */
   const ORDER_TIERS = [
-    { day: 1, n: 3 }, { day: 3, n: 4 }, { day: 5, n: 5 }, { day: 7, n: 6 },
-    { day: 9, n: 7 }, { day: 12, n: 8 }, { day: 15, n: 9 }, { day: 18, n: 10 }
+    { day: 1, n: 4 }, { day: 3, n: 5 }, { day: 5, n: 6 }, { day: 7, n: 7 },
+    { day: 9, n: 8 }, { day: 12, n: 10 }, { day: 15, n: 11 }, { day: 18, n: 13 }, { day: 21, n: 14 }
   ];
 
   function orderPool(day, farmLevel) {
     const lv = farmLevel || 10;                       // 不传等级时不做裁剪（给测试/兼容用）
     const sorted = CROP_LIST.slice()
       .filter(function (c) { return (c.lv || 1) <= lv + 1; })
-      .sort(function (a, b) { return a.seed - b.seed; });
+      .sort(function (a, b) { return ((a.lv || 1) - (b.lv || 1)) || (a.seed - b.seed); });
     let n = ORDER_TIERS[0].n;
     ORDER_TIERS.forEach(function (t) { if (day >= t.day) n = t.n; });
     return sorted.slice(0, Math.min(n, sorted.length));
@@ -3629,6 +3656,7 @@ button{ color:inherit; font:inherit; }
     takeStore: takeStore, unitValue: unitValue,
     fishGroups: fishGroups, fishKey: fishKey, sellFishGroup: sellFishGroup, sellAllFish: sellAllFish,
     fishMarketInfo: fishMarketInfo, fishMarketMul: fishMarketMul, addFishSupply: addFishSupply, takeFishN: takeFishN,
+    fishSeasonOk: fishSeasonOk, fishSeasonText: fishSeasonText, FISH_OFF_SEASON: FISH_OFF_SEASON,
     sellWorms: sellWorms, WORM_VALUE: WORM_VALUE,
     qualityById: qualityById,
     buySeed: buySeed, seedBuyPrice: seedBuyPrice, seedSellPrice: seedSellPrice,
@@ -4672,6 +4700,8 @@ button{ color:inherit; font:inherit; }
       '<div class="rule-sec">' +
         '<h4>🎣 钓鱼</h4>' +
         '<p>2 体力 + 1 份饵甩一杆（<b>冬天河面结冰，钓不了</b>）。<b>先判定咬钩</b>：面团饵 92%、蚯蚓 95%、假饵 72%，晴天 −12%、雨天 +8%。<br>' +
+        '🐟 <b>鱼汛</b>：每种鱼只在特定季节成群——汛期上钩权重 ×1.25，非汛期 ×0.3。' +
+        '鲫鱼 春·秋 / 鲤鱼 春夏秋 / 鳜鱼 春·夏 / 鲈鱼 夏·秋 / 河豚 秋 / 锦鲤 春。<br>' +
         '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15、耐用 ' +
         G.BALANCE.lure.dur + ' 次。<br>' +
         '🕸️ 渔网：每天耗 1 份面团饵，<b>70%</b> 网到 1 条标准及以下的普通鱼，<b>不会出杂物和宝箱</b>；' +
@@ -4687,7 +4717,7 @@ button{ color:inherit; font:inherit; }
         '<b>同一种鱼的不同品质会合并成一行</b>（和仓库里的作物一样），显示品质构成和均价；卖出时<b>先卖品质差的</b>。<br>' +
         '<b>鱼也受市场影响</b>：每卖 1 条 −1.5%（最低 ×0.75），隔天回落 20%；鱼没有季节差价。<br>' +
         '店里每天<b>进一批水产</b>（一般品质），每种数量随机、<b>睡觉后补货</b>，卖完只能等明天；' +
-        '买价是基础价的 ' + G.BALANCE.shop.priceMul + ' 倍，买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。<br>' +
+        '买价是基础价的 ' + G.BALANCE.shop.priceMul + ' 倍<b>再乘鱼市价</b>（缺鱼时更贵），买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。<br>' +
         '河豚 <b>D' + G.FISH_UNLOCK.puffer + '</b> 起、锦鲤 <b>D' + G.FISH_UNLOCK.koi + '</b> 起才进货。</p>' +
       '</div>' +
 
@@ -4699,8 +4729,9 @@ button{ color:inherit; font:inherit; }
         '· <b>季节</b>：<b>反季 ×1.20</b>（过季稀缺、卖得贵），<b>当季 ×1.00</b>（满大街都是）<br>' +
         '· 两相乘就是最终系数，界面上直接显示「市价 ×1.18 · 反季 · 平稳」<br>' +
         '所以：<b>别一次性把同一种菜全砸出去</b>；囤到反季再卖，价格会更高。<br>' +
+        '商店的<b>买价</b>也会跟着市价走 —— 缺货时买得更贵。点商店面板的 <b>📈 行情</b> 看全部系数。<br>' +
         '店里每天同样进一批作物（一般品质），买价是售价的 ' + G.BALANCE.shop.cropPriceMul +
-        ' 倍，转手必亏，只在凑委托或应急时买。<br>' +
+        ' 倍<b>再乘市价</b>（越稀缺越贵），转手必亏，只在凑委托或应急时买。<br>' +
         '南瓜 <b>D' + G.CROP_UNLOCK.pumpkin + '</b> 起、西瓜 <b>D' + G.CROP_UNLOCK.watermelon + '</b> 起才进货。</p>' +
       '</div>' +
 
@@ -5031,7 +5062,7 @@ button{ color:inherit; font:inherit; }
     }).join('') : '<div class="store-empty">仓库里没有作物，先去田里收点</div>';
 
     const buyRows = G.CROP_LIST.map(function (c) {
-      const bp = G.cropBuyPrice(c.id);
+      const bp = G.cropBuyPrice(c.id, state);
       const st = G.cropShopStock(state, c.id);
       const cap = G.cropStockCap(c);
       const unlock = G.CROP_UNLOCK[c.id] || 1;
@@ -5137,17 +5168,20 @@ button{ color:inherit; font:inherit; }
     const buyList = G.FISH.filter(function (f) { return !f.trash && !f.noOrder; });
     let outOfStock = 0;
     const buyRows = buyList.map(function (f) {
-      const bp = G.fishBuyPrice(f.id);
+      const bp = G.fishBuyPrice(f.id, state);
       const st = G.shopStock(state, f.id);
       const cap = (G.SHOP_STOCK[f.id] || [1, 2])[1];
       const unlock = G.FISH_UNLOCK[f.id] || 1;
       const locked = state.day < unlock;
+      const inRun = G.fishSeasonOk(f.id, state.day);
       if (!locked && !st) outOfStock++;
       const soldOut = !locked && st <= 0;
       return '<div class="store-row' + (soldOut ? ' sold-out' : '') + (locked ? ' locked' : '') + '">' +
         '<span class="se">' + f.emoji + '</span>' +
         '<div><div class="sn">' + f.name +
           (locked ? ' <b class="lock">D' + unlock + ' 起进货</b>' : ' <b class="own">今日 ' + st + '/' + cap + '</b>') +
+          ' ' + (inRun ? '<b class="own">鱼汛 ' + G.fishSeasonText(f.id) + '</b>'
+                       : '<b class="lock">非汛期</b>') +
           '</div>' +
         '<div class="sv">' + (locked ? '中后期才进这种水产' :
           '一般品质 · 买 ' + bp + ' 金/条 · ' + G.fishDesc(f.name)) + '</div></div>' +
@@ -5182,6 +5216,45 @@ button{ color:inherit; font:inherit; }
   function statsPlaceholder() {}
 
   /* ---------------- 下午茶 ---------------- */
+
+  /* ---------------- 市场行情 ---------------- */
+
+  function marketModal() {
+    const season = G.seasonOf(state.day);
+    const cropRows = G.CROP_LIST.map(function (c) {
+      const mk = G.marketInfo(state, c.id);
+      return '<div class="store-row">' +
+        '<span class="se">' + c.emoji + '</span>' +
+        '<div><div class="sn">' + c.name +
+          (mk.inSeason ? ' <b class="own">当季</b>' : ' <b class="lock">反季</b>') + '</div>' +
+        '<div class="sv">' + G.seasonText(c.id) + '季 · 最近卖出 ' + mk.sold.toFixed(0) +
+          ' 件 · ' + mk.tag + ' · 买价 ' + G.cropBuyPrice(c.id, state) + ' 金</div></div>' +
+        '<span class="sp">×' + mk.total.toFixed(2) + '</span>' +
+      '</div>';
+    }).join('');
+
+    const fishRows = G.FISH.filter(function (f) { return !f.trash && !f.chest; }).map(function (f) {
+      const mk = G.fishMarketInfo(state, f.name);
+      const inRun = G.fishSeasonOk(f.id, state.day);
+      return '<div class="store-row">' +
+        '<span class="se">' + f.emoji + '</span>' +
+        '<div><div class="sn">' + f.name +
+          (inRun ? ' <b class="own">鱼汛 ' + G.fishSeasonText(f.id) + '</b>' : ' <b class="lock">非汛期</b>') + '</div>' +
+        '<div class="sv">最近卖出 ' + mk.sold.toFixed(0) + ' 条 · ' + mk.tag +
+          ' · 买价 ' + G.fishBuyPrice(f.id, state) + ' 金</div></div>' +
+        '<span class="sp">×' + mk.total.toFixed(2) + '</span>' +
+      '</div>';
+    }).join('');
+
+    openModal('📈 市场行情',
+      '<div class="shop-head">现在是 <b>' + season + '季</b> · 最近销量越多越便宜</div>' +
+      '<div class="store-sub">🌱 作物 · 当季 ×1.00 / 反季 ×1.20</div>' + cropRows +
+      '<div class="store-sub" style="margin-top:10px">🐟 水产 · 只看供需，非汛期 ×0.3 上钩</div>' + fishRows +
+      '<div class="shop-tip">市价 = 供需 × 季节：作物每卖 1 件 −2%（最低 ×0.75），鱼每条 −1.5%；' +
+        '每天睡觉回落 20%。<br>反季的菜卖得更贵，囤到反季再出手更划算；但砸得太多一样会饱和。<br>' +
+        '商店的<b>买价</b>也跟着市价走 —— 缺货时买得更贵。</div>',
+      '<button class="btn" data-close>关闭</button>');
+  }
 
   function teaModal() {
     const canDrink = !state.teaUsed && state.energy < state.maxEnergy;
@@ -5905,6 +5978,8 @@ button{ color:inherit; font:inherit; }
     $('#btn-status').addEventListener('click', statusModal);
     $('#btn-codex').addEventListener('click', codexModal);
     $('#btn-ach').addEventListener('click', achModal);
+    const mktBtn = $('#btn-market');
+    if (mktBtn) mktBtn.addEventListener('click', marketModal);
     $('#btn-refresh-orders').addEventListener('click', function () {
       const r = G.refreshOrders(state);
       commit(r);

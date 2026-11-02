@@ -629,7 +629,7 @@ ok(s.manualRefreshUsed === false && G.refreshOrders(s).ok, '新的一天又有�
 
 const oldSave = G.deserialize({ plots: [], coins: 10, day: 3 });
 ok(Array.isArray(oldSave.orders) && oldSave.orders.length === 3, '老存档没有委托字段时自动补一份');
-ok(G.orderPool(3).length === 4 && G.orderPool(30).length === 10, '委托池随天数解锁');
+ok(G.orderPool(3).length === 5 && G.orderPool(30).length === 14, '委托池随天数解锁');
 
 /* ---------- 5m. v1.1.0：洒水器 / 零工一天一次 / 委托过滤 / 蚯蚓 ---------- */
 section('v1.1.0 新功能');
@@ -858,9 +858,9 @@ ok(s.day === 30 && s.coins === 1000 - 4 - 30, '第 30 天结算月税（税前 9
 ok(G.taxInDays(s) === 30, '刚缴完税，下次还有 30 天', G.taxInDays(s));
 
 s = G.createState(); s.coins = 100; s.fishBag = [];
-const bp = G.fishBuyPrice('crucian');
+const bp = G.fishBuyPrice('crucian', s);
 ok(G.buyFish(s, 'crucian', 1).ok && s.coins === 100 - bp && s.fishBag.length === 1 && s.fishBag[0].v === 3,
-   '水产店能买鱼（5 金/条，价值 3）', { coins: s.coins, bag: s.fishBag.length });
+   '水产店能买鱼（基础 5 金 × 市价，价值 3）', { coins: s.coins, bag: s.fishBag.length });
 ok(!G.buyFish(s, 'trash', 1).ok, '杂物买不到');
 ok(G.fishBuyPrice('koi') === 45, '锦鲤买价 45 金', G.fishBuyPrice('koi'));
 
@@ -1049,8 +1049,8 @@ ok(Math.abs(G.fishGoodBonus(lvF) - 1.225) < 1e-9, '满级好鱼权重 +22.5%', G
 ok(G.checkAchievements(lvS).some(x => x.id === 'farmLv3'), '等级成就可解锁');
 
 /* 委托池逐档解锁 + 鱼单随季节涨价 */
-ok(G.orderPool(1).length === 3 && G.orderPool(3).length === 4 && G.orderPool(9).length === 7 &&
-   G.orderPool(18).length === 10, '委托池逐档解锁 3/4/7/10',
+ok(G.orderPool(1).length === 4 && G.orderPool(3).length === 5 && G.orderPool(9).length === 8 &&
+   G.orderPool(18).length === 13, '委托池逐档解锁 4/5/8/13',
   [1, 3, 9, 18].map(d => G.orderPool(d).length).join('/'));
 G.setRng(mulberry32(404));
 const fishEarly = G.makeOrders({ day: 20 }).filter(o => o.kind === 'fish')[0];
@@ -1167,7 +1167,7 @@ G.setRng(mulberry32(202));
 
 /* 委托池按等级裁剪 */
 ok(G.orderPool(18, 1).length === 6, 'Lv1 时委托池只有买得到的 6 种', G.orderPool(18, 1).length);
-ok(G.orderPool(18, 10).length === 10, 'Lv10 时委托池全开', G.orderPool(18, 10).length);
+ok(G.orderPool(18, 10).length === 13, 'Lv10 时委托池基本全开（13 种）', G.orderPool(18, 10).length);
 let os2 = G.createState(); os2.day = 18; os2.levels.farm = 3;
 G.setRng(mulberry32(5));
 const osList = G.makeOrders(os2);
@@ -1538,6 +1538,41 @@ const v26early = v26long(3);
 ok(v26early.gain === 130 && v26early.bonus === 30, '提前 3 天 +30%', v26early);
 const v26max = v26long(9);
 ok(v26max.gain === 150 && v26max.bonus === 50, '提前奖励封顶 +50%', v26max);
+
+/* ---------- 5i. v2.7 鱼汛 / 杂物不吃市价 / 商店买价 ---------- */
+section('v2.7 鱼汛与市价');
+
+ok(!G.fishSeasonOk('puffer', 1) && G.fishSeasonOk('puffer', 61), '河豚只在秋天有汛期',
+  [G.fishSeasonOk('puffer', 1), G.fishSeasonOk('puffer', 61)]);
+ok(G.fishSeasonText('crucian') === '春·秋', '鲫鱼汛期 春·秋', G.fishSeasonText('crucian'));
+
+function v27count(day, times) {
+  G.setRng(mulberry32(123));
+  const st = G.createState();
+  st.day = day; st.bait.dough = 1e9; st.energy = 1e9; st.maxEnergy = 1e9;
+  let n = 0;
+  for (let i = 0; i < times; i++) {
+    st.energy = 10;
+    const r = G.fish(st, 'dough');
+    if (r.ok && r.entry && !r.entry.empty && r.entry.fish === '河豚') n++;
+  }
+  return n;
+}
+const v27spring = v27count(31, 3000);   // 夏（河豚非汛期）
+const v27autumn = v27count(61, 3000);   // 秋（汛期）
+ok(v27autumn > v27spring * 2, '汛期河豚明显更多', [v27spring, v27autumn]);
+
+const v27box = G.createState();
+v27box.fishBag.push({ name: '易拉罐', emoji: '🥫', q: null, v: 1, d: 1, no: true, trash: true });
+const v27r = G.boxPutFish(v27box, G.fishKey(v27box.fishBag[0]), 1);
+ok(v27r.ok && v27r.v === 1, '杂物进收购箱不吃市价', v27r.v);
+ok(!v27box.marketF['易拉罐'], '杂物不计入市场销量');
+
+const v27s = G.createState();
+const v27p0 = G.cropBuyPrice('carrot', v27s);
+G.addSupply(v27s, 'carrot', 20);
+ok(G.cropBuyPrice('carrot', v27s) < v27p0, '卖得多，商店买价也跟着降',
+  [v27p0, G.cropBuyPrice('carrot', v27s)]);
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');

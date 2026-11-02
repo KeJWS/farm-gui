@@ -1003,6 +1003,8 @@
       '<div class="rule-sec">' +
         '<h4>🎣 钓鱼</h4>' +
         '<p>2 体力 + 1 份饵甩一杆（<b>冬天河面结冰，钓不了</b>）。<b>先判定咬钩</b>：面团饵 92%、蚯蚓 95%、假饵 72%，晴天 −12%、雨天 +8%。<br>' +
+        '🐟 <b>鱼汛</b>：每种鱼只在特定季节成群——汛期上钩权重 ×1.25，非汛期 ×0.3。' +
+        '鲫鱼 春·秋 / 鲤鱼 春夏秋 / 鳜鱼 春·夏 / 鲈鱼 夏·秋 / 河豚 秋 / 锦鲤 春。<br>' +
         '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15、耐用 ' +
         G.BALANCE.lure.dur + ' 次。<br>' +
         '🕸️ 渔网：每天耗 1 份面团饵，<b>70%</b> 网到 1 条标准及以下的普通鱼，<b>不会出杂物和宝箱</b>；' +
@@ -1018,7 +1020,7 @@
         '<b>同一种鱼的不同品质会合并成一行</b>（和仓库里的作物一样），显示品质构成和均价；卖出时<b>先卖品质差的</b>。<br>' +
         '<b>鱼也受市场影响</b>：每卖 1 条 −1.5%（最低 ×0.75），隔天回落 20%；鱼没有季节差价。<br>' +
         '店里每天<b>进一批水产</b>（一般品质），每种数量随机、<b>睡觉后补货</b>，卖完只能等明天；' +
-        '买价是基础价的 ' + G.BALANCE.shop.priceMul + ' 倍，买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。<br>' +
+        '买价是基础价的 ' + G.BALANCE.shop.priceMul + ' 倍<b>再乘鱼市价</b>（缺鱼时更贵），买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。<br>' +
         '河豚 <b>D' + G.FISH_UNLOCK.puffer + '</b> 起、锦鲤 <b>D' + G.FISH_UNLOCK.koi + '</b> 起才进货。</p>' +
       '</div>' +
 
@@ -1030,8 +1032,9 @@
         '· <b>季节</b>：<b>反季 ×1.20</b>（过季稀缺、卖得贵），<b>当季 ×1.00</b>（满大街都是）<br>' +
         '· 两相乘就是最终系数，界面上直接显示「市价 ×1.18 · 反季 · 平稳」<br>' +
         '所以：<b>别一次性把同一种菜全砸出去</b>；囤到反季再卖，价格会更高。<br>' +
+        '商店的<b>买价</b>也会跟着市价走 —— 缺货时买得更贵。点商店面板的 <b>📈 行情</b> 看全部系数。<br>' +
         '店里每天同样进一批作物（一般品质），买价是售价的 ' + G.BALANCE.shop.cropPriceMul +
-        ' 倍，转手必亏，只在凑委托或应急时买。<br>' +
+        ' 倍<b>再乘市价</b>（越稀缺越贵），转手必亏，只在凑委托或应急时买。<br>' +
         '南瓜 <b>D' + G.CROP_UNLOCK.pumpkin + '</b> 起、西瓜 <b>D' + G.CROP_UNLOCK.watermelon + '</b> 起才进货。</p>' +
       '</div>' +
 
@@ -1362,7 +1365,7 @@
     }).join('') : '<div class="store-empty">仓库里没有作物，先去田里收点</div>';
 
     const buyRows = G.CROP_LIST.map(function (c) {
-      const bp = G.cropBuyPrice(c.id);
+      const bp = G.cropBuyPrice(c.id, state);
       const st = G.cropShopStock(state, c.id);
       const cap = G.cropStockCap(c);
       const unlock = G.CROP_UNLOCK[c.id] || 1;
@@ -1468,17 +1471,20 @@
     const buyList = G.FISH.filter(function (f) { return !f.trash && !f.noOrder; });
     let outOfStock = 0;
     const buyRows = buyList.map(function (f) {
-      const bp = G.fishBuyPrice(f.id);
+      const bp = G.fishBuyPrice(f.id, state);
       const st = G.shopStock(state, f.id);
       const cap = (G.SHOP_STOCK[f.id] || [1, 2])[1];
       const unlock = G.FISH_UNLOCK[f.id] || 1;
       const locked = state.day < unlock;
+      const inRun = G.fishSeasonOk(f.id, state.day);
       if (!locked && !st) outOfStock++;
       const soldOut = !locked && st <= 0;
       return '<div class="store-row' + (soldOut ? ' sold-out' : '') + (locked ? ' locked' : '') + '">' +
         '<span class="se">' + f.emoji + '</span>' +
         '<div><div class="sn">' + f.name +
           (locked ? ' <b class="lock">D' + unlock + ' 起进货</b>' : ' <b class="own">今日 ' + st + '/' + cap + '</b>') +
+          ' ' + (inRun ? '<b class="own">鱼汛 ' + G.fishSeasonText(f.id) + '</b>'
+                       : '<b class="lock">非汛期</b>') +
           '</div>' +
         '<div class="sv">' + (locked ? '中后期才进这种水产' :
           '一般品质 · 买 ' + bp + ' 金/条 · ' + G.fishDesc(f.name)) + '</div></div>' +
@@ -1513,6 +1519,45 @@
   function statsPlaceholder() {}
 
   /* ---------------- 下午茶 ---------------- */
+
+  /* ---------------- 市场行情 ---------------- */
+
+  function marketModal() {
+    const season = G.seasonOf(state.day);
+    const cropRows = G.CROP_LIST.map(function (c) {
+      const mk = G.marketInfo(state, c.id);
+      return '<div class="store-row">' +
+        '<span class="se">' + c.emoji + '</span>' +
+        '<div><div class="sn">' + c.name +
+          (mk.inSeason ? ' <b class="own">当季</b>' : ' <b class="lock">反季</b>') + '</div>' +
+        '<div class="sv">' + G.seasonText(c.id) + '季 · 最近卖出 ' + mk.sold.toFixed(0) +
+          ' 件 · ' + mk.tag + ' · 买价 ' + G.cropBuyPrice(c.id, state) + ' 金</div></div>' +
+        '<span class="sp">×' + mk.total.toFixed(2) + '</span>' +
+      '</div>';
+    }).join('');
+
+    const fishRows = G.FISH.filter(function (f) { return !f.trash && !f.chest; }).map(function (f) {
+      const mk = G.fishMarketInfo(state, f.name);
+      const inRun = G.fishSeasonOk(f.id, state.day);
+      return '<div class="store-row">' +
+        '<span class="se">' + f.emoji + '</span>' +
+        '<div><div class="sn">' + f.name +
+          (inRun ? ' <b class="own">鱼汛 ' + G.fishSeasonText(f.id) + '</b>' : ' <b class="lock">非汛期</b>') + '</div>' +
+        '<div class="sv">最近卖出 ' + mk.sold.toFixed(0) + ' 条 · ' + mk.tag +
+          ' · 买价 ' + G.fishBuyPrice(f.id, state) + ' 金</div></div>' +
+        '<span class="sp">×' + mk.total.toFixed(2) + '</span>' +
+      '</div>';
+    }).join('');
+
+    openModal('📈 市场行情',
+      '<div class="shop-head">现在是 <b>' + season + '季</b> · 最近销量越多越便宜</div>' +
+      '<div class="store-sub">🌱 作物 · 当季 ×1.00 / 反季 ×1.20</div>' + cropRows +
+      '<div class="store-sub" style="margin-top:10px">🐟 水产 · 只看供需，非汛期 ×0.3 上钩</div>' + fishRows +
+      '<div class="shop-tip">市价 = 供需 × 季节：作物每卖 1 件 −2%（最低 ×0.75），鱼每条 −1.5%；' +
+        '每天睡觉回落 20%。<br>反季的菜卖得更贵，囤到反季再出手更划算；但砸得太多一样会饱和。<br>' +
+        '商店的<b>买价</b>也跟着市价走 —— 缺货时买得更贵。</div>',
+      '<button class="btn" data-close>关闭</button>');
+  }
 
   function teaModal() {
     const canDrink = !state.teaUsed && state.energy < state.maxEnergy;
@@ -2236,6 +2281,8 @@
     $('#btn-status').addEventListener('click', statusModal);
     $('#btn-codex').addEventListener('click', codexModal);
     $('#btn-ach').addEventListener('click', achModal);
+    const mktBtn = $('#btn-market');
+    if (mktBtn) mktBtn.addEventListener('click', marketModal);
     $('#btn-refresh-orders').addEventListener('click', function () {
       const r = G.refreshOrders(state);
       commit(r);

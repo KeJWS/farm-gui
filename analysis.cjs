@@ -96,6 +96,32 @@ const weatherRow = ['sunny', 'cloudy', 'rain'].map(function (w) {
   return G.WEATHER[w].name + ' ' + r.ev.toFixed(2);
 });
 console.log('   面团饵 天气对比：' + weatherRow.join(' · '));
+
+/* 鱼汛：同一套期望，按季节各跑一遍（鱼汛期目标鱼权重 ×1，非汛期 ×0.3） */
+function evBaitSeason(kind, day, level, n) {
+  const s = G.createState();
+  s.weather = 'cloudy'; s.maxEnergy = 1e9; s.coins = 0; s.day = day;
+  s.levels.fish = level;
+  if (kind === 'worm') s.bait.worm = 1e9;
+  else s.bait.dough = 1e9;
+  let sum = 0, bite = 0;
+  for (let i = 0; i < n; i++) {
+    s.energy = 1e9;
+    s.levels.fishXp = 0; s.levels.fish = level;
+    const r = G.fish(s, kind);
+    if (r.entry) { bite++; sum += r.entry.price; }
+  }
+  return { ev: sum / n, bite: bite / n };
+}
+console.log('   鱼汛（面团饵 Lv1，每杆期望）：' + ['春', '夏', '秋'].map(function (nm, i) {
+  G.setRng(mulberry32(7));
+  const r = evBaitSeason('dough', 1 + i * 30, 1, 6000);
+  return nm + ' ' + r.ev.toFixed(2);
+}).join(' · ') + '（冬天不能钓）');
+console.log('   鱼汛表：' + G.FISH.filter(function (f) { return f.seasons; })
+  .map(function (f) { return f.name + ' ' + f.seasons.map(function (i) { return G.SEASONS[i]; }).join(''); })
+  .join(' · '));
+
 /* 蚯蚓要花体力挖：3 体力挖 1~3 条，晴天 −1、阴雨 +1 */
 const wormAvg = 3;                        // 阴天 2~4 条
 const wormPerCastE = 2 + 3 / wormAvg;     // 1 杆 2 点体力 + 一根蚯蚓摊到的挖掘体力
