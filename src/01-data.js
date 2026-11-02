@@ -9,7 +9,7 @@
   /* ---------------- 数值表（BALANCE） ---------------- */
 
   const BALANCE = {
-    hook: { dough: 0.92, worm: 0.95, lure: 0.72 },
+    hook: { dough: 0.92, worm: 0.95, lure: 0.72, lure2: 0.92 },
     weatherHook: { sunny: -0.12, cloudy: 0, rain: 0.08 },
     bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.15 },
     prices: { sprinkler: 80, harvester: 200, net: 50, netMax: 9 },
@@ -25,16 +25,20 @@
     tax: { rate: 0.04, min: 30, every: 30 },
     order: { mult: 1.35, seasonStep: 0.6 },
     expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
-    device: { sprinkler: 80, harvester: 300, net: 50 },
+    device: { sprinkler: 80, harvester: 300, net: 50, seeder: 600, seederPlots: 5 },
     lure: { price: 5, dur: 25 },
+    /* 高级假饵：钓鱼 Lv6 解锁，20 金 / 100 次；咬钩率跟面团饵一样，好鱼率跟假饵一样 */
+    lure2: { price: 20, dur: 100, lv: 6 },
     shop: { priceMul: 1.3, cropPriceMul: 1.3, restock: true, sellRate: 0.8 },
-    /* 市场：供需 1.30（稀缺）→ 0.70（过剩），反季 ×2，每天睡觉回落 30% */
+    /* 茶在百货店买的，可以半价卖回去 */
+    teaSellRate: 0.5,
+    /* 市场：供需 1.30（稀缺）→ 0.70（过剩），反季 ×1.7，每天睡觉回落 30% */
     market: { supplyMax: 1.3, supplyMin: 0.7, cropStep: 0.02, fishStep: 0.015,
-              offSeason: 2.0, decay: 0.7, scarce: 1.15, glut: 0.9,
+              offSeason: 1.7, decay: 0.7, scarce: 1.15, glut: 0.9,
               /* 委托的市价溢价封顶，避免一张单顶掉整个农场 */
               orderCap: 1.6 },
-    /* 采集：3 体力一次，1~2 件当季野货，20% 额外掉一颗当季种子 */
-    forage: { energy: 3, double: 0.25, seedChance: 0.2 },
+    /* 采集：5 体力一次，100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子 */
+    forage: { energy: 5, qty2: 0.75, qty3: 0.35, seedChance: 0.25 },
     /* 小镇捐赠：三档，捐得越多加成越多（金币出口） */
     town: [
       { id: 'stall', name: '村口小摊', emoji: '🏪', need: 2000, orderBonus: 0.05,
@@ -51,8 +55,9 @@
            bands: [{ upTo: 2000, rate: 0.02 }, { upTo: 10000, rate: 0.04 }, { upTo: null, rate: 0.06 }] },
     /* 等级：每级所需经验 = 15 + 10×(级-1)，满级 10 */
     level: { max: 10, xpBase: 15, xpStep: 10 },
-    /* 等级解锁：商店设备 / 高级种子 / 特效肥 / 渔网 / 渔夫 */
-    gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2, fisher: 5 },
+    /* 等级解锁：商店设备 / 高级种子 / 特效肥 / 渔网 / 渔夫 / 高级假饵 / 自动播种器 */
+    gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2, fisher: 5,
+            seeder: 4, lure2: 6 },
     /* 宝箱：铁箱 / 金箱按钓鱼等级解锁 */
     chest: { ironLv: 4, goldLv: 7 }
   };
@@ -243,7 +248,9 @@
   const BAIT = {
     worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '好鱼概率 ×1.35 · 品质取两次较好' },
     dough: { id: 'dough', name: '面团饵', emoji: '🍞', desc: '标准钓鱼体验 · 92% 咬钩' },
-    lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 20 次 · 杂物少、品质取两次较好，但只有 72% 咬钩' }
+    lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 25 次 · 杂物少、品质取两次较好，但只有 72% 咬钩' },
+    lure2: { id: 'lure2', name: '高级假饵', emoji: '🪝',
+             desc: '耐用 100 次 · 咬钩率跟面团饵一样（92%），好鱼率跟假饵一样 · 钓鱼 Lv' + BALANCE.lure2.lv + ' 解锁' }
   };
   /* 各饵的咬钩基础概率（天气再加减） */
   const HOOK = BALANCE.hook;

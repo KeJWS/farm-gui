@@ -1,4 +1,5 @@
 /* 逻辑自测：node selftest.cjs */
+require('./ensure-build.cjs')();
 const G = require('./game.js');
 
 let pass = 0, fail = 0;
@@ -1503,7 +1504,7 @@ G.addSupply(v25m, 'carrot', 15);
 ok(G.marketMul(v25m, 'carrot') < v25base, '卖得越多越便宜', G.marketMul(v25m, 'carrot'));
 G.addSupply(v25m, 'carrot', 100);
 ok(Math.abs(G.marketInfo(v25m, 'carrot').supply - 0.7) < 1e-9, '供给有 ×0.70 下限');
-ok(Math.abs(G.marketInfo(v25m, 'watermelon').season - 2) < 1e-9, '反季作物 ×2');
+ok(Math.abs(G.marketInfo(v25m, 'watermelon').season - 1.7) < 1e-9, '反季作物 ×1.7');
 
 /* 睡觉后销量衰减 30% */
 const v25d = G.createState();
@@ -1543,7 +1544,7 @@ ok(G.fishMarketMul(v26m, '鲫鱼') < v26base, '鱼卖得多也会降价', G.fish
 
 /* 反季溢价 */
 const v26season = G.marketInfo(G.createState(), 'watermelon');
-ok(Math.abs(v26season.season - 2) < 1e-9 && !v26season.inSeason, '反季作物 ×2', v26season.season);
+ok(Math.abs(v26season.season - 1.7) < 1e-9 && !v26season.inSeason, '反季作物 ×1.7', v26season.season);
 const v26in = G.marketInfo(Object.assign(G.createState(), { day: 31 }), 'watermelon');
 ok(v26in.inSeason && Math.abs(v26in.season - 1) < 1e-9, '当季作物 ×1.00', v26in.season);
 
@@ -1608,16 +1609,16 @@ const v28fs = G.createState();
 v28fs.day = 61;                                   // 秋
 ok(G.fishSeasonOk('koi', 61) === false, '秋天锦鲤非汛期');
 const v28koiAut = G.fishMarketInfo(v28fs, '锦鲤');
-ok(Math.abs(v28koiAut.season - 2) < 1e-9 && !v28koiAut.inRun, '非汛期鱼价 ×2', v28koiAut.season);
+ok(Math.abs(v28koiAut.season - 1.7) < 1e-9 && !v28koiAut.inRun, '非汛期鱼价 ×1.7', v28koiAut.season);
 const v28koiSpr = G.fishMarketInfo(Object.assign(G.createState(), { day: 1 }), '锦鲤');
 ok(Math.abs(v28koiSpr.season - 1) < 1e-9 && v28koiSpr.inRun, '汛期鱼价 ×1', v28koiSpr.season);
 ok(v28koiAut.total > v28koiSpr.total * 1.5, '非汛期卖锦鲤更贵', [v28koiSpr.total, v28koiAut.total]);
 
-/* 市场系数：稀缺 ×1.30 + 反季 ×2 → 最高 ×2.60 */
+/* 市场系数：稀缺 ×1.30 + 反季 ×1.7 → 最高 ×2.21 */
 const v28mk = G.createState();
 v28mk.day = 1;                                    // 春
-ok(Math.abs(G.marketMul(v28mk, 'watermelon') - 2.6) < 1e-9,
-  '反季 + 稀缺最高 ×2.60', G.marketMul(v28mk, 'watermelon'));
+ok(Math.abs(G.marketMul(v28mk, 'watermelon') - 2.21) < 1e-9,
+  '反季 + 稀缺最高 ×2.21', G.marketMul(v28mk, 'watermelon'));
 
 /* 渔网：不缴维护费、抓完要重布、重布 1 体力/张 */
 ok(G.BALANCE.upkeep.net === 0, '渔网维护费归零');
@@ -1807,8 +1808,9 @@ const v31 = G.createState();
 v31.energy = 50;
 const v31r1 = G.forage(v31);
 ok(v31r1.ok && v31r1.wild === 'shepherd', '春天采到荠菜', v31r1.wild);
-ok(v31.energy === 47 && G.storeCount(v31, 'shepherd') === v31r1.qty, '采集扣 3 体力并进仓库',
-  [v31.energy, G.storeCount(v31, 'shepherd')]);
+ok(v31.energy === 50 - G.BALANCE.forage.energy && G.storeCount(v31, 'shepherd') === v31r1.qty,
+  '采集扣 5 体力并进仓库', [v31.energy, G.storeCount(v31, 'shepherd')]);
+ok(v31r1.qty >= 1 && v31r1.qty <= 3, '采集一次 1~3 件', v31r1.qty);
 v31.day = 31;
 ok(G.forage(v31).wild === 'berry', '夏天采到野莓');
 v31.day = 61;
@@ -1875,11 +1877,14 @@ ok(G.marketHeadroom(v31h, 'carrot').atFloor, '卖到底价时提示已到底');
 section('v2.12 价格历史');
 
 /* 采集不再吃天气 */
-const v32 = G.createState();
-v32.weather = 'rain'; v32.energy = 50;
-G.setRng(function () { return 0.5; });        // 0.5 命中不了 25% 双份
-const v32r = G.forage(v32);
-ok(v32r.ok && v32r.qty === 1, '雨天采集也不会翻倍（采集不受天气影响）', v32r.qty);
+function v32forageQty(weather) {
+  const st = G.createState();
+  st.weather = weather; st.energy = 50;
+  G.setRng(mulberry32(7));
+  return G.forage(st).qty;
+}
+ok(v32forageQty('rain') === v32forageQty('sunny'), '采集不受天气影响（雨天和晴天一样）',
+  [v32forageQty('rain'), v32forageQty('sunny')]);
 
 /* 价格历史：开局 1 个点，每天 +1 */
 const v32h = G.createState();
@@ -1913,6 +1918,73 @@ ok(G.cropNextSeasonMul(v32n, 'watermelon') === 1, '西瓜下季（夏）是当�
 ok(G.cropNextSeasonMul(v32n, 'pumpkin') === G.BALANCE.market.offSeason, '南瓜下季转反季',
   G.cropNextSeasonMul(v32n, 'pumpkin'));
 ok(G.fishNextSeasonMul(v32n, '锦鲤') === G.BALANCE.market.offSeason, '锦鲤下季转非汛期');
+
+/* ---------- 5n. v2.13 采集/高级假饵/茶叶/自动播种器 ---------- */
+section('v2.13 高级假饵与自动播种器');
+
+ok(Math.abs(G.BALANCE.market.offSeason - 1.7) < 1e-9, '反季系数改成 ×1.7');
+
+/* 采集：5 体力、1~3 件 */
+const v33 = G.createState();
+G.setRng(mulberry32(3));
+const q33 = [];
+for (let i = 0; i < 300; i++) { v33.energy = 50; q33.push(G.forage(v33).qty); }
+ok(Math.min.apply(null, q33) === 1 && Math.max.apply(null, q33) === 3, '采集能出 1~3 件',
+  [Math.min.apply(null, q33), Math.max.apply(null, q33)]);
+const avg33 = q33.reduce(function (a, b) { return a + b; }, 0) / q33.length;
+ok(Math.abs(avg33 - 2.1) < 0.15, '采集期望约 2.1 件', avg33.toFixed(2));
+ok(v33.energy === 45, '采集扣 5 体力', v33.energy);
+
+/* 高级假饵 */
+const v33f = G.createState();
+v33f.coins = 1000; v33f.levels.fish = G.BALANCE.gate.lure2 - 1;
+ok(!G.buyBait(v33f, 'lure2', 1).ok, '等级不够买不到高级假饵');
+v33f.levels.fish = G.BALANCE.gate.lure2;
+const v33buy = G.buyBait(v33f, 'lure2', 1);
+ok(v33buy.ok && v33f.lure2.owned && v33f.lure2.dur === 100 && v33f.coins === 1000 - 20,
+  'Lv6 能买高级假饵（20 金 / 100 耐久）', v33f.coins);
+ok(Math.abs(G.HOOK.lure2 - G.HOOK.dough) < 1e-9, '高级假饵咬钩率 = 面团饵');
+ok(G.BALANCE.bait.lureGood === 1.15 && G.BALANCE.bait.lureTrash === 0.3, '高级假饵好鱼率 = 假饵');
+
+const v33c = G.createState();
+v33c.lure2 = { owned: true, dur: 5 };
+v33c.weather = 'cloudy';
+G.setRng(function () { return 0.5; });
+const v33cast = G.fish(v33c, 'lure2');
+ok(v33cast.ok && v33c.lure2.dur === 4, '用高级假饵钓一杆扣 1 耐久', v33c.lure2.dur);
+
+/* 茶叶半价回收 */
+const v33t = G.createState();
+v33t.coins = 100;
+G.buyTea(v33t, 'green', 2);
+const v33coin = v33t.coins;
+const v33sell = G.sellTea(v33t, 'green', 1);
+ok(v33sell.ok && v33sell.income === 6 && v33t.coins === v33coin + 6, '绿茶半价卖回 6 金', v33sell.income);
+ok(G.teaSellPrice(G.TEAS.coffee) === 15, '咖啡半价 15 金');
+ok(G.sellTea(v33t, 'coffee', 1).ok === false, '没有的茶卖不了');
+
+/* 自动播种器 */
+const v33s = G.createState();
+v33s.coins = 2000; v33s.levels.farm = G.BALANCE.gate.seeder - 1;
+ok(!G.buySeeder(v33s).ok, '等级不够买不到自动播种器');
+v33s.levels.farm = G.BALANCE.gate.seeder;
+const v33sb = G.buySeeder(v33s);
+ok(v33sb.ok && v33s.seeder && v33s.coins === 2000 - G.SEEDER_COST, '买到自动播种器', v33s.coins);
+ok(!G.setAutoSeed(v33s, 'carrot').ok, '没种子时选不了播种品种');
+v33s.seeds = { carrot: 10 };
+ok(G.setAutoSeed(v33s, 'carrot').ok && v33s.autoSeed === 'carrot', '选上萝卜种子');
+v33s.plots = new Array(8).fill(0).map(function () { return G.createState().plots[0]; });
+v33s.stats.planted = 0;
+G.sleep(v33s);
+ok(v33s.plots.filter(function (p) { return p.crop; }).length === 5, '睡一觉自动播 5 块',
+  v33s.plots.filter(function (p) { return p.crop; }).length);
+ok(v33s.seeds.carrot === 5 && v33s.stats.planted === 5, '消耗 5 颗种子', v33s.seeds.carrot);
+
+const v33w = G.createState();
+v33w.seeder = true; v33w.seederOn = true; v33w.autoSeed = 'carrot';
+v33w.seeds = { carrot: 10 }; v33w.day = 91; v33w.coins = 1000;
+G.sleep(v33w);
+ok(v33w.plots.every(function (p) { return !p.crop; }), '冬天自动播种器不工作');
 
 /* 委托市价溢价：长期订单也吃 */
 const v29L = G.createState();

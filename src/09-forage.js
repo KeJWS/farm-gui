@@ -20,7 +20,10 @@
     if (s.energy < cost) return { ok: false, msg: '体力不够（采集要 ' + cost + ' 点），先睡觉吧' };
     s.energy -= cost;
     const w = pool[Math.floor(rand() * pool.length)];
-    const n = 1 + (rand() < BALANCE.forage.double ? 1 : 0);
+    // 100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件（最多 3 件）
+    let n = 1;
+    if (rand() < BALANCE.forage.qty2) n++;
+    if (rand() < BALANCE.forage.qty3) n++;
     const q = rollQuality(1);
     addStore(s, w.id, q.id, n);
     s.stats.forages = (s.stats.forages || 0) + 1;
@@ -56,6 +59,18 @@
       s.lure.owned = true; s.lure.dur = dur;
       log(s, '🎣 买了一个假饵（耐用 ' + dur + ' 次）', 'info');
       return { ok: true, msg: '假饵到手' };
+    }
+    if (kind === 'lure2') {
+      const L = BALANCE.lure2;
+      if (fishLv(s) < BALANCE.gate.lure2) {
+        return { ok: false, msg: '高级假饵要钓鱼 Lv' + BALANCE.gate.lure2 + ' 才解锁（现在 Lv' + fishLv(s) + '）' };
+      }
+      if (s.lure2.owned) return { ok: false, msg: '高级假饵一次只能持 1 个' };
+      if (s.coins < L.price) return { ok: false, msg: '金币不够（' + L.price + ' 金）' };
+      s.coins -= L.price; ledger(s, '买高级假饵', 0, L.price);
+      s.lure2.owned = true; s.lure2.dur = L.dur;
+      log(s, '🪝 买了一个高级假饵（耐用 ' + L.dur + ' 次，咬钩同面团饵、好鱼同假饵）', 'info');
+      return { ok: true, msg: '高级假饵到手' };
     }
     return { ok: false, msg: '这种饵料买不到' };
   }

@@ -17,6 +17,26 @@
     return { ok: true, msg: t.name + ' ×' + qty, qty: qty, cost: cost };
   }
 
+  /* 茶可以半价卖回百货店（成就奖励的茶也算） */
+  function teaSellPrice(t) {
+    return Math.max(1, Math.floor(t.price * BALANCE.teaSellRate));
+  }
+
+  function sellTea(s, id, n) {
+    const t = TEAS[id];
+    if (!t) return { ok: false, msg: '没有这种茶' };
+    const have = (s.teas && s.teas[id]) || 0;
+    if (!have) return { ok: false, msg: '没有' + t.name };
+    const qty = n ? Math.min(Math.max(1, Math.floor(n)), have) : have;
+    const unit = teaSellPrice(t);
+    const gain = qty * unit;
+    s.teas[id] = have - qty;
+    if (s.teas[id] <= 0) delete s.teas[id];
+    addCoins(s, gain, '卖' + t.name + ' ×' + qty);
+    log(s, '💰 卖出' + t.name + ' ×' + qty + '，+' + gain + ' 金（半价）', 'good');
+    return { ok: true, msg: '卖出 ' + qty + ' 杯' + t.name + '，+' + gain + ' 金', qty: qty, income: gain };
+  }
+
   function keyUnlocked(s, id) {
     const k = KEYS[id];
     return !!k && fishLv(s) >= (k.lv || 1);

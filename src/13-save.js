@@ -72,6 +72,9 @@
     merged.lure = Object.assign({ owned: false, dur: 0 }, s.lure || {});
     merged.lure.dur = Math.round(num(merged.lure.dur, 0, 0, BALANCE.lure.dur));
     merged.lure.owned = !!merged.lure.owned && merged.lure.dur > 0;
+    merged.lure2 = Object.assign({ owned: false, dur: 0 }, s.lure2 || {});
+    merged.lure2.dur = Math.round(num(merged.lure2.dur, 0, 0, BALANCE.lure2.dur));
+    merged.lure2.owned = !!merged.lure2.owned && merged.lure2.dur > 0;
     merged.fishBook = Object.assign({ count: 0, entries: [], best: null, priciest: null }, s.fishBook || {});
     merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0 }, s.stats || {});
     merged.teas = Object.assign({ green: 0, black: 0, milk: 0, coffee: 0 }, s.teas || {});
@@ -180,6 +183,9 @@
     merged.sprinklers = Math.round(num(s.sprinklers, 0, 0, 40));
     merged.harvester = !!s.harvester;
     merged.harvesterOn = s.harvesterOn !== false;
+    merged.seeder = !!s.seeder;
+    merged.seederOn = s.seederOn !== false;
+    merged.autoSeed = (s.autoSeed && CROPS[s.autoSeed] && !CROPS[s.autoSeed].wild) ? s.autoSeed : null;
     merged.nets = Math.round(num(s.nets, 0, 0, NET_MAX));
     // 老存档没有 netSet：默认所有渔网都已布置好
     merged.netSet = Math.round(num(s.netSet == null ? merged.nets : s.netSet, merged.nets, 0, merged.nets));
@@ -334,6 +340,8 @@
     useFert: useFert, buyFertItem: buyFertItem, sellFert: sellFert, fertSellPrice: fertSellPrice,
     FERT_SELL_RATE: FERT_SELL_RATE, buySprinkler: buySprinkler, SPRINKLER_COST: SPRINKLER_COST,
     buyHarvester: buyHarvester, HARVESTER_COST: HARVESTER_COST, refreshOrders: refreshOrders,
+    seederUnlocked: seederUnlocked, buySeeder: buySeeder, toggleSeeder: toggleSeeder,
+    setAutoSeed: setAutoSeed, SEEDER_COST: SEEDER_COST,
     toggleHarvester: toggleHarvester, buyNet: buyNet, netCatch: netCatch,
     resetNets: resetNets, netSetCount: netSetCount, netPending: netPending, netResetCost: netResetCost,
     hireFisher: hireFisher, fireFisher: fireFisher,
@@ -367,7 +375,7 @@
     nextSeasonIdx: nextSeasonIdx, HIST_DAYS: HIST_DAYS,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather,
     TEAS: TEAS, TEA_LIST: TEA_LIST, teaList: teaList, teaStock: teaStock, teaById: teaById,
-    teaUnlocked: teaUnlocked, buyTea: buyTea,
+    teaUnlocked: teaUnlocked, buyTea: buyTea, sellTea: sellTea, teaSellPrice: teaSellPrice,
     KEYS: KEYS, CHESTS: CHESTS, keyUnlocked: keyUnlocked, buyKey: buyKey,
     sellJunk: sellJunk, openChest: openChest, fishIsJunk: fishIsJunk
   };

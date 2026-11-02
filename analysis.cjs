@@ -5,6 +5,7 @@
  *   - 每日被动收益（渔网）
  * 再拼成早 / 中 / 后期三种经营模型的日净收入。
  */
+require('./ensure-build.cjs')();
 const G = require('./game.js');
 
 function mulberry32(a) {
@@ -66,6 +67,7 @@ function evBait(kind, weather, level, n) {
   s.levels.fish = level;
   if (kind === 'worm') s.bait.worm = 1e9;
   else if (kind === 'dough') s.bait.dough = 1e9;
+  else if (kind === 'lure2') s.lure2 = { owned: true, dur: 1e9 };
   else s.lure = { owned: true, dur: 1e9 };
   let sum = 0, bite = 0;
   for (let i = 0; i < n; i++) {
@@ -78,7 +80,8 @@ function evBait(kind, weather, level, n) {
 }
 
 console.log('\n== 钓鱼：每杆期望（阴天，Lv1 / Lv10）==');
-const baits = [['dough', '面团', 1], ['worm', '蚯蚓', 0], ['lure', '假饵', 0.25]];
+const baits = [['dough', '面团', 1], ['worm', '蚯蚓', 0], ['lure', '假饵', 0.25],
+               ['lure2', '高级假饵', 20 / 100]];
 baits.forEach(function (b) {
   G.setRng(mulberry32(7));
   const a = evBait(b[0], 'cloudy', 1, 6000);
@@ -406,7 +409,7 @@ console.log('\n== 雇佣渔夫（钓鱼 Lv' + G.BALANCE.gate.fisher + ' 解锁�
 console.log('\n== 采集（' + G.BALANCE.forage.energy + ' 体力一次，按季节出不同野货）==');
 {
   const qe = qEV(1);
-  const avgQty = 1 + G.BALANCE.forage.double;
+  const avgQty = 1 + G.BALANCE.forage.qty2 + G.BALANCE.forage.qty3;
   let best = null;
   G.WILD_LIST.forEach(function (w) {
     const per = w.price * qe * avgQty;
@@ -416,8 +419,10 @@ console.log('\n== 采集（' + G.BALANCE.forage.energy + ' 体力一次，按季
       pad(w.price + ' 金/件', 10) + '期望 ' + per.toFixed(1) + ' 金/次 · ' +
       perE.toFixed(2) + ' 金/体力');
   });
-  console.log('   期望件数 ' + avgQty.toFixed(2) + '（' + Math.round(G.BALANCE.forage.double * 100) +
-    '% 双份 / 雨天必双份）· 还有 ' + Math.round(G.BALANCE.forage.seedChance * 100) + '% 掉一颗当季种子');
+  console.log('   期望件数 ' + avgQty.toFixed(2) + '（保底 1 + ' +
+    Math.round(G.BALANCE.forage.qty2 * 100) + '% 再来 1 + ' +
+    Math.round(G.BALANCE.forage.qty3 * 100) + '% 再多 1）· 还有 ' +
+    Math.round(G.BALANCE.forage.seedChance * 100) + '% 掉一颗当季种子');
   console.log('   最好的季节是「' + best.name + '」' + best.perE.toFixed(2) +
     ' 金/体力 · 面团饵钓鱼 2.81 金/体力 → 采集是冬天的体力出口');
 }

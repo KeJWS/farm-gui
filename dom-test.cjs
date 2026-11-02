@@ -2,6 +2,7 @@
  * 不装 jsdom，用一个最小 DOM 桩把 ui.js 真正跑起来：
  * boot → renderAll → 点几个按钮打开弹窗 → 检查渲染结果。
  */
+require('./ensure-build.cjs')();
 const fs = require('fs');
 
 let pass = 0, fail = 0;
@@ -219,8 +220,8 @@ ok(html('#modal-root').indexOf('crop-sell-id') >= 0, '农产品店有自定义�
 console.log('\n== 市场行情 ==');
 document.querySelector('#btn-market').fire('click', { target: {} });
 ok(html('#modal-root').indexOf('市场行情') >= 0, '行情面板能打开');
-ok(html('#modal-root').indexOf('反季 ×2') >= 0, '行情显示反季 ×2');
-ok(html('#modal-root').indexOf('汛期 ×1') >= 0 || html('#modal-root').indexOf('非汛期 ×2') >= 0,
+ok(html('#modal-root').indexOf('反季 ×1.7') >= 0, '行情显示反季 ×1.7');
+ok(html('#modal-root').indexOf('汛期 ×1') >= 0 || html('#modal-root').indexOf('非汛期 ×1.7') >= 0,
    '行情显示鱼的汛期系数');
 ok(html('#modal-root').indexOf('×1.30') >= 0 && html('#modal-root').indexOf('回落 30%') >= 0,
    '行情说明稀缺上限与回落幅度');
@@ -244,6 +245,9 @@ ok(html('#modal-root').indexOf('渔具店') >= 0 && html('#modal-root').indexOf(
    '渔具店弹窗（含渔网）能打开');
 ok(html('#modal-root').indexOf('渔夫') >= 0 && html('#modal-root').indexOf('data-fisherup') >= 0,
    '渔具店能花钱升级渔夫');
+ok(html('#modal-root').indexOf('高级假饵') >= 0 && html('#modal-root').indexOf('data-buy="lure2"') >= 0,
+   '渔具店卖高级假饵');
+ok(html('#modal-root').indexOf('需钓鱼 Lv6') >= 0, '高级假饵按钓鱼等级锁定');
 ok(html('#modal-root').indexOf('不收维护费') < 0, '渔具店不再写「不收维护费」');
 ok(html('#modal-root').indexOf('data-resetnets') < 0, '渔具店没有「重新布置」按钮');
 clickAct('fertilizeAll');
@@ -270,6 +274,8 @@ clickAct('depart');
 ok(html('#modal-root').indexOf('百货店') >= 0 && html('#modal-root').indexOf('茶叶') >= 0,
    '百货店弹窗能打开');
 ok(html('#modal-root').indexOf('data-buytea="green"') >= 0, '百货店能买茶');
+ok(html('#modal-root').indexOf('data-selltea="green"') >= 0 && html('#modal-root').indexOf('半价回收') >= 0,
+   '茶叶可以半价卖回百货店');
 ok(html('#modal-root').indexOf('钓鱼 Lv7 解锁') >= 0, '金钥匙按钓鱼等级锁定');
 ok(html('#modal-root').indexOf('只收宝箱') >= 0, '百货店只收宝箱、不收杂物');
 ok(html('#modal-root').indexOf('data-openchest') >= 0 && html('#modal-root').indexOf('木制宝箱') >= 0,

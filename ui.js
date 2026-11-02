@@ -332,6 +332,17 @@
       : (!state.harvester
         ? G.HARVESTER_COST + ' 金 · 睡觉时自动收'
         : (state.harvesterOn ? '已开启 · 点击关闭' : '已关闭 · 点击开启'));
+    const seedTxt = $('#seeder-txt');
+    if (seedTxt) {
+      const seedLock = !G.seederUnlocked(state);
+      seedTxt.textContent = seedLock
+        ? '需种田 Lv' + G.BALANCE.gate.seeder + ' 解锁'
+        : (!state.seeder
+          ? G.SEEDER_COST + ' 金 · 每天自动播 ' + G.BALANCE.device.seederPlots + ' 块'
+          : (state.autoSeed
+            ? (state.seederOn ? '已开启 · ' : '已关闭 · ') + G.CROPS[state.autoSeed].name
+            : '没选种子 · 点击设置'));
+    }
     renderCrew();
 
     const teaBtn = $('[data-act="tea"]');
@@ -454,10 +465,12 @@
   /* ---------------- 钓鱼 ---------------- */
 
   function renderBait() {
+    const lure2Open = G.fishLv(state) >= G.BALANCE.gate.lure2;
     const list = [
       { id: 'worm', n: state.bait.worm },
       { id: 'dough', n: state.bait.dough },
-      { id: 'lure', n: state.lure.owned ? state.lure.dur : 0 }
+      { id: 'lure', n: state.lure.owned ? state.lure.dur : 0 },
+      { id: 'lure2', n: (state.lure2 && state.lure2.owned) ? state.lure2.dur : 0, lock: !lure2Open }
     ];
     if (!list.some(function (b) { return b.id === baitSel && b.n > 0; })) {
       const first = list.filter(function (b) { return b.n > 0; })[0];
@@ -465,8 +478,11 @@
     }
     $('#bait-row').innerHTML = list.map(function (b) {
       const bd = G.BAIT[b.id];
-      const cnt = b.id === 'lure' ? (b.n ? b.n + '/' + G.BALANCE.lure.dur : '无') : '×' + b.n;
-      return '<div class="bait ' + (b.id === baitSel ? 'sel ' : '') + (b.n ? '' : 'off') +
+      const max = b.id === 'lure' ? G.BALANCE.lure.dur : (b.id === 'lure2' ? G.BALANCE.lure2.dur : 0);
+      const cnt = max
+        ? (b.n ? b.n + '/' + max : (b.lock ? 'Lv' + G.BALANCE.gate.lure2 : '无'))
+        : '×' + b.n;
+      return '<div class="bait ' + (b.id === baitSel ? 'sel ' : '') + (b.n || b.lock ? '' : 'off') +
         '" data-bait="' + b.id + '" title="' + bd.desc + '"' +
         ' role="button" tabindex="0" aria-label="' + bd.name + '，' + (b.n ? b.n + ' 个' : '没有') + '"' +
         ' aria-pressed="' + (b.id === baitSel) + '">' +
@@ -1017,23 +1033,74 @@
       '<button class="btn" data-close>取消</button>');
   }
 
+  /* ---------------- 自动播种器 ---------------- */
+
+  function seederModal() {
+    if (!G.seederUnlocked(state)) {
+      toast('自动播种器要种田 Lv' + G.BALANCE.gate.seeder + ' 才解锁', 'warn');
+      return;
+    }
+    const plots = G.BALANCE.device.seederPlots;
+    if (!state.seeder) {
+      openModal('🌱 自动播种器',
+        '<div class="shop-head">💰 <b>' + state.coins + '</b> 金</div>' +
+        '<div class="shop-tip">每天睡前自动往空地里播 <b>' + plots + '</b> 块，<b>不耗体力</b>，' +
+          '但会消耗背包里的种子。买下来之后再选「用哪种种子」。<br>' +
+          '冬天不工作；种子用完就停。</div>',
+        '<button class="btn" data-buyseeder' + (state.coins < G.SEEDER_COST ? ' disabled' : '') +
+          '>买下来（' + G.SEEDER_COST + ' 金）</button>' +
+        '<button class="btn" data-close>取消</button>');
+      return;
+    }
+    const rows = G.CROP_LIST.filter(function (c) { return (state.seeds[c.id] || 0) > 0; })
+      .map(function (c) {
+        const on = state.autoSeed === c.id;
+        return '<div class="store-row">' +
+          '<span class="se">' + c.emoji + '</span>' +
+          '<div><div class="sn">' + c.name + ' <b class="own">种子 ×' + state.seeds[c.id] + '</b>' +
+            (on ? ' <b class="own">自动播种中</b>' : '') + '</div>' +
+          '<div class="sv">' + (G.cropSeasonOk(c.id, state.day) ? '当季' : '反季') + ' · ' +
+            c.days + ' 天熟</div></div>' +
+          '<button class="btn mini" data-autoseed="' + c.id + '">' + (on ? '取消' : '用这个') + '</button>' +
+        '</div>';
+      }).join('');
+    openModal('🌱 自动播种器',
+      '<div class="shop-head">每天自动播 <b>' + plots + '</b> 块空地 · ' +
+        (state.seederOn ? '已开启' : '已关闭') + ' · 种田 Lv' + G.farmLv(state) + '</div>' +
+      (rows || '<div class="store-empty">背包里没有种子，先去种子店买</div>') +
+      '<div class="shop-tip">自动播种不耗体力，只消耗种子；冬天不工作。' +
+        '选好种子后，每次睡觉都会把空着的 <b>' + plots + '</b> 块地补上。</div>',
+      '<button class="btn" data-toggleseeder>' + (state.seederOn ? '关掉自动播种' : '开启自动播种') + '</button>' +
+      '<button class="btn" data-close>关闭</button>');
+  }
+
   /* ---------------- 商店 / 帮助 / 重置 ---------------- */
 
   function shopModal() {
     const worms = state.bait.worm || 0;
     const dough = state.bait.dough || 0;
     const lure = G.BALANCE.lure;
+    const lure2 = G.BALANCE.lure2;
+    const lure2Open = G.fishLv(state) >= G.BALANCE.gate.lure2;
+    const lure2Have = (state.lure2 && state.lure2.owned) ? state.lure2.dur : 0;
     const netLock = !G.netUnlocked(state);
     const netCap = G.netMax(state);
     const body =
       '<dl class="kv"><dt>🍞 面团饵</dt><dd>1 金/份 · 现有 ' + dough + ' 份 · 标准收获</dd>' +
       '<dt>🎣 假饵</dt><dd>' + lure.price + ' 金/个 · 耐用 ' + lure.dur + ' 次 · 持有上限 1</dd>' +
+      '<dt>🪝 高级假饵</dt><dd>' + (lure2Open
+        ? lure2.price + ' 金/个 · 耐用 ' + lure2.dur + ' 次 · 现有 ' + lure2Have + ' 次'
+        : '钓鱼 Lv' + G.BALANCE.gate.lure2 + ' 解锁') + '</dd>' +
       '<dt>🪱 蚯蚓</dt><dd>3 体力挖 1~3 条（晴天 −1、阴雨 +1）</dd></dl>' +
       '<div class="action-grid">' +
         '<button class="btn" data-buy="dough" data-n="1">🍞 买 1 份<small>1 金</small></button>' +
         '<button class="btn" data-buy="dough" data-n="5">🍞 买 5 份<small>5 金</small></button>' +
         '<button class="btn" data-buy="lure" data-n="1">🎣 买假饵<small>' + lure.price + ' 金 · ' +
           lure.dur + ' 次</small></button>' +
+        '<button class="btn' + (lure2Open ? '' : ' locked') + '" data-buy="lure2" data-n="1"' +
+          (lure2Open && state.coins >= lure2.price ? '' : ' disabled') + '>' +
+          '🪝 买高级假饵<small>' + (lure2Open ? lure2.price + ' 金 · ' + lure2.dur + ' 次'
+            : '需钓鱼 Lv' + G.BALANCE.gate.lure2) + '</small></button>' +
       '</div>' +
       '<div class="buy-custom">' +
         '<span>🍞 面团饵自定义数量</span>' +
@@ -1158,6 +1225,9 @@
         '鲫鱼 春·秋 / 鲤鱼 春夏秋 / 鳜鱼 春·夏 / 鲈鱼 夏·秋 / 河豚 秋 / 锦鲤 春。<br>' +
         '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15、耐用 ' +
         G.BALANCE.lure.dur + ' 次。<br>' +
+        '🪝 <b>高级假饵</b>（钓鱼 Lv' + G.BALANCE.gate.lure2 + ' 解锁）：' + G.BALANCE.lure2.price +
+        ' 金 / 耐用 <b>' + G.BALANCE.lure2.dur + '</b> 次 —— <b>咬钩率同面团饵（92%）、好鱼率同假饵</b>' +
+        '（杂物 ×0.3、好鱼 ×1.15、品质取两次较好），是后期最省心的饵。<br>' +
         '🕸️ 渔网：<b>' + G.NET_COST + ' 金/张，不缴维护费</b>。晚上耗 1 份面团饵，<b>' +
         Math.round(G.NET_CHANCE * 100) + '%</b> 网到 1 条标准及以下的普通鱼，' +
         '<b>不会出杂物和宝箱</b>；要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b> 解锁，上限 = 2 + 钓鱼等级（最多 ' + G.NET_MAX + ' 张）。<br>' +
@@ -1182,7 +1252,8 @@
         G.WILD_LIST.map(function (w) {
           return w.emoji + ' ' + w.name + '（' + G.seasonText(w.id) + ' · ' + w.price + ' 金）';
         }).join(' · ') + '。<br>' +
-        '一次 1 件，' + Math.round(G.BALANCE.forage.double * 100) + '% 概率采到 2 件；' +
+        '一次保底 1 件，<b>' + Math.round(G.BALANCE.forage.qty2 * 100) + '% 概率再来 1 件</b>、' +
+        '<b>' + Math.round(G.BALANCE.forage.qty3 * 100) + '% 概率再多 1 件</b>（最多 3 件）；' +
         Math.round(G.BALANCE.forage.seedChance * 100) + '% 概率顺手摘到一颗当季作物种子（<b>和天气无关</b>）。<br>' +
         '野货直接进仓库，和作物一样按品质定价、一样吃<b>市价</b>，可以卖给农产品店或放进收购箱；' +
         '冬天也能采，是封冻期唯一的野外收入。</p>' +
@@ -1211,7 +1282,7 @@
         Math.round((1 - G.BALANCE.market.decay) * 100) + '%<br>' +
         '· <b>季节</b>：<b>反季 ×' + G.BALANCE.market.offSeason + '</b>（过季稀缺、卖得贵），<b>当季 ×1.00</b><br>' +
         '· 两相乘就是最终系数，界面上直接显示「市价 ×2.20 · 反季 · 稀缺」<br>' +
-        '所以：<b>别一次性把同一种菜全砸出去</b>；囤到反季再卖，价格会翻倍。<br>' +
+        '所以：<b>别一次性把同一种菜全砸出去</b>；囤到反季再卖，价格会翻上去。<br>' +
         '商店的<b>买价</b>也会跟着市价走 —— 缺货 / 反季时买得更贵。点商店面板的 <b>📈 行情</b> 看全部系数。<br>' +
         '店里每天同样进一批作物（一般品质），买价 = 售价 × ' + G.BALANCE.shop.cropPriceMul +
         ' <b>再乘市价</b>，转手必亏，只在凑委托或应急时买。<br>' +
@@ -1267,6 +1338,8 @@
         '）：每天自动浇 1 块地，不耗体力（雨天自动浇，不叠加）<br>' +
         '· 🤖 自动收获器 ' + G.HARVESTER_COST + ' 金（需种田 Lv' + G.BALANCE.gate.harvester +
         '）：睡觉时自动收走成熟作物，不耗体力<br>' +
+        '· 🌱 自动播种器 ' + G.SEEDER_COST + ' 金（需种田 Lv' + G.BALANCE.gate.seeder +
+        '）：睡觉时自动往空地播 <b>' + G.BALANCE.device.seederPlots + '</b> 块（用你选的种子，不耗体力）<br>' +
         '· 💰 税：每 30 天按（金币 + 仓库价值）<b>累进</b>收一次——前 2000 收 2%、2000~1 万收 4%、1 万以上收 6%，最低 ' +
         G.BALANCE.tax.min + ' 金（当前约 ' + G.taxDue(state) + ' 金）<br>' +
         '· 🧾 维护费：每 7 天收一次，土地 ' + G.plotUpkeep(state.plots.length) + ' 金（6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 ' +
@@ -1308,7 +1381,9 @@
         G.TEA_LIST.map(function (t) {
           return t.name + ' ' + t.price + ' 金/+' + t.energy;
         }).join(' · ') + '：D' + G.TEA_LIST.map(function (t) { return t.day; }).join(' / D') +
-        ' 上架，<b>大杯单价更便宜</b>。<br>' +
+        ' 上架，<b>大杯单价更便宜</b>。买多了可以<b>半价卖回</b>（绿 ' +
+        G.teaSellPrice(G.TEAS.green) + ' / 红 ' + G.teaSellPrice(G.TEAS.black) + ' / 奶 ' +
+        G.teaSellPrice(G.TEAS.milk) + ' / 咖 ' + G.teaSellPrice(G.TEAS.coffee) + ' 金）。<br>' +
         '🎁 <b>宝箱</b>：木制（直接开，10–26 金）· 铁制（钓鱼 Lv' + G.BALANCE.chest.ironLv +
         '，铁钥匙 ' + G.KEYS.iron.price + ' 金，一包物资约 80 金）· 黄金（Lv' + G.BALANCE.chest.goldLv +
         '，金钥匙 ' + G.KEYS.gold.price + ' 金，200–320 金 + 一件高级物品）。<br>' +
@@ -1848,7 +1923,7 @@
         '</b>（稀缺），作物每卖 1 件 −0.02、鱼每条 −0.015，最低 ×' + G.BALANCE.market.supplyMin +
         '（过剩）；每天睡觉销量回落 ' + Math.round((1 - G.BALANCE.market.decay) * 100) + '%。<br>' +
         '<b>↳ 那行就是「还能卖多少」</b>：同一种货一天卖太多会掉档，分品种轮着卖最划算。<br>' +
-        '反季的菜 / 非汛期的鱼卖价 <b>×' + OFF + '</b>，囤到那时候再出手翻倍 —— 但砸得太狠一样会饱和。<br>' +
+        '反季的菜 / 非汛期的鱼卖价 <b>×' + OFF + '</b>，囤到那时候再出手更值钱 —— 但砸得太狠一样会饱和。<br>' +
         '商店的<b>进价</b>也跟着市价走：缺货时进货更贵，反季进货更贵。</div>',
       '<button class="btn" data-close>关闭</button>');
   }
@@ -1879,6 +1954,7 @@
   function analysisModal() {
     const season = G.seasonOf(state.day);
     const days = G.HIST_DAYS;
+    const OFF = G.BALANCE.market.offSeason;
 
     function row(key, item, isFish) {
       const mk = isFish ? G.fishMarketInfo(state, item.name) : G.marketInfo(state, item.id);
@@ -1925,8 +2001,8 @@
       '<div class="store-sub" style="margin-top:10px">🐟 水产</div>' + fishRows +
       '<div class="shop-tip">每行三件事：<b>当前价</b>（系数 + 实际单价）、<b>销量 / 供需 / 季节</b>、<b>7 天走势</b>，' +
         '右边那条线是最近 30 天的市价系数（纵轴固定 0.5~2.8，所以不同货能直接比）。<br>' +
-        '<b>预计下季</b>是「假设一件都不卖」的下季价格：反季 / 非汛期会直接翻倍，' +
-        '看到 ×2 就说明值得囤到那时候再出手。</div>',
+        '<b>预计下季</b>是「假设一件都不卖」的下季价格：反季 / 非汛期会直接涨到 ×' + OFF + '，' +
+        '看到 ×' + OFF + ' 就说明值得囤到那时候再出手。</div>',
       '<button class="btn" data-close>关闭</button>');
   }
 
@@ -1961,15 +2037,19 @@
     const teaRows = G.TEA_LIST.map(function (t) {
       const open = state.day >= t.day;
       const have = (state.teas && state.teas[t.id]) || 0;
+      const back = G.teaSellPrice(t);
       return '<div class="store-row' + (open ? '' : ' locked') + '">' +
         '<span class="se">' + t.emoji + '</span>' +
         '<div><div class="sn">' + t.name +
           (open ? ' <b class="own">库存 ' + have + '</b>' : ' <b class="lock">第 ' + t.day + ' 天起</b>') +
-          '</div><div class="sv">' + t.price + ' 金 · 体力 +' + t.energy + ' · ' + t.desc + '</div></div>' +
+          '</div><div class="sv">' + t.price + ' 金 · 体力 +' + t.energy + ' · 半价回收 ' + back +
+            ' 金 · ' + t.desc + '</div></div>' +
         '<button class="btn mini" data-buytea="' + t.id + '"' +
           (!open || state.coins < t.price ? ' disabled' : '') + '>买1</button>' +
         (open ? '<button class="btn mini" data-buytea="' + t.id + '" data-n="3"' +
           (state.coins < t.price * 3 ? ' disabled' : '') + '>买3</button>' : '') +
+        (have ? '<button class="btn mini" data-selltea="' + t.id + '">卖1</button>' +
+          '<button class="btn mini" data-selltean="' + t.id + '">全卖</button>' : '') +
         '</div>';
     }).join('');
 
@@ -2044,7 +2124,8 @@
       ['金币', state.coins + ' 金'],
       ['体力', state.energy + ' / ' + state.maxEnergy + ' · 伙食 ' + G.mealFee(state) + ' 金/天'],
       ['土地', state.plots.length + ' 块 · 洒水器 ' + state.sprinklers + ' 个'],
-      ['设备', (state.harvester ? '自动收获器 ✅ · ' : '自动收获器 — · ') + '渔网 ' + state.nets +
+      ['设备', (state.harvester ? '自动收获器 ✅ · ' : '自动收获器 — · ') +
+        (state.seeder ? '自动播种器 ✅ · ' : '自动播种器 — · ') + '渔网 ' + state.nets +
         ' 张（已布 ' + G.netSetCount(state) + '）' +
         (state.fisher ? ' · 渔夫 Lv' + G.fisherLv(state) : '')],
       ['种田等级', 'Lv' + lv.farm + (lv.farm >= G.BALANCE.level.max ? '（满级）' :
@@ -2154,6 +2235,7 @@
       commit(r);
       if (r.ok) { toast(r.msg, 'good'); SFX.coin(); }
     },
+    seeder: function () { seederModal(); },
     shop: shopModal,
     fishshop: fishShop,
     cropshop: cropShop,
@@ -2316,6 +2398,7 @@
         const r = G.buyBait(state, buy.dataset.buy, Number(buy.dataset.n) || 1);
         commit(r);
         toast(r.ok ? r.msg : r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok && modalOpen()) shopModal();
         return;
       }
 
@@ -2498,6 +2581,24 @@
         if (modalOpen()) departModal();
         return;
       }
+      const sellTeaBtn = t.closest('[data-selltea]');
+      if (sellTeaBtn) {
+        const r = G.sellTea(state, sellTeaBtn.dataset.selltea, 1);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        if (modalOpen()) departModal();
+        return;
+      }
+      const sellTeaAll = t.closest('[data-selltean]');
+      if (sellTeaAll) {
+        const r = G.sellTea(state, sellTeaAll.dataset.selltean, 0);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        if (modalOpen()) departModal();
+        return;
+      }
       const buyKey = t.closest('[data-buykey]');
       if (buyKey && !buyKey.disabled) {
         const r = G.buyKey(state, buyKey.dataset.buykey, 1);
@@ -2593,6 +2694,33 @@
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();
         if (modalOpen()) shopModal();
+        return;
+      }
+
+      // 自动播种器：买 / 开关 / 选种子
+      const buySeeder = t.closest('[data-buyseeder]');
+      if (buySeeder && !buySeeder.disabled) {
+        const r = G.buySeeder(state);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) { SFX.coin(); seederModal(); }
+        return;
+      }
+      const togSeeder = t.closest('[data-toggleseeder]');
+      if (togSeeder) {
+        const r = G.toggleSeeder(state);
+        commit(r);
+        toast(r.msg, 'good');
+        seederModal();
+        return;
+      }
+      const autoSeedBtn = t.closest('[data-autoseed]');
+      if (autoSeedBtn) {
+        const id = autoSeedBtn.dataset.autoseed;
+        const r = G.setAutoSeed(state, state.autoSeed === id ? null : id);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        seederModal();
         return;
       }
 

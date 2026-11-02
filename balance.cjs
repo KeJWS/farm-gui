@@ -2,6 +2,7 @@
  * 跑一遍蒙特卡洛，打印钓鱼期望 / 设备回本 / 委托溢价 / 税费占比，
  * 并对明显不合理的数值报警（例如「假饵比面团还亏」「买鱼能套利」）。
  */
+require('./ensure-build.cjs')();
 const G = require('./game.js');
 
 function mulberry32(a) {

@@ -235,6 +235,42 @@
     return { ok: true, msg: '自动收获器已安装' };
   }
 
+  /* ---------------- 自动播种器 ---------------- */
+  const SEEDER_COST = BALANCE.device.seeder;
+
+  function seederUnlocked(s) { return farmLv(s) >= BALANCE.gate.seeder; }
+
+  function buySeeder(s) {
+    if (s.seeder) return { ok: false, msg: '已经有自动播种器了' };
+    if (!seederUnlocked(s)) {
+      return { ok: false, msg: '自动播种器要种田 Lv' + BALANCE.gate.seeder + ' 才解锁（现在 Lv' + farmLv(s) + '）' };
+    }
+    if (s.coins < SEEDER_COST) return { ok: false, msg: '金币不够（' + SEEDER_COST + ' 金）' };
+    s.coins -= SEEDER_COST;
+    ledger(s, '买自动播种器', 0, SEEDER_COST);
+    s.seeder = true;
+    s.seederOn = true;
+    log(s, '🌱 买了自动播种器（每天睡觉自动补 ' + BALANCE.device.seederPlots + ' 块空地，记得选种子）', 'good');
+    return { ok: true, msg: '自动播种器已安装' };
+  }
+
+  function toggleSeeder(s) {
+    if (!s.seeder) return { ok: false, msg: '还没买自动播种器' };
+    s.seederOn = !s.seederOn;
+    log(s, '🌱 自动播种器已' + (s.seederOn ? '开启' : '关闭'), 'info');
+    return { ok: true, msg: '自动播种器已' + (s.seederOn ? '开启' : '关闭'), on: s.seederOn };
+  }
+
+  /* 选自动播种用哪种种子（必须是背包里有的） */
+  function setAutoSeed(s, id) {
+    if (!s.seeder) return { ok: false, msg: '要先买自动播种器' };
+    if (id && !CROPS[id]) return { ok: false, msg: '没有这种作物' };
+    if (id && (s.seeds[id] || 0) <= 0) return { ok: false, msg: '背包里没有 ' + CROPS[id].name + ' 种子' };
+    s.autoSeed = id || null;
+    log(s, '🌱 自动播种种子设为 ' + (id ? CROPS[id].name : '不设（不播种）'), 'info');
+    return { ok: true, msg: id ? '自动播种：' + CROPS[id].name : '已关闭自动播种', seed: s.autoSeed };
+  }
+
   /* 委托手动刷新：每天一次 */
   function refreshOrders(s) {
     if (s.manualRefreshUsed) return { ok: false, msg: '今天已经手动刷新过了，明天再来' };

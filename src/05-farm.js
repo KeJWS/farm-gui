@@ -12,14 +12,15 @@
     return false;
   }
 
-  function plant(s, idx, cropId) {
+  function plant(s, idx, cropId, opts) {
+    const free = !!(opts && opts.free);          // 自动播种器：不花体力
     const p = s.plots[idx];
     const c = CROPS[cropId];
     if (!p) return { ok: false, msg: '没有这块地' };
     if (!c) return { ok: false, msg: '没有这种作物' };
     if (isWinter(s.day)) return { ok: false, msg: '冬天土地封冻了，开春再种吧' };
     if (p.crop) return { ok: false, msg: '这块地不是空地' };
-    if (s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
+    if (!free && s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
 
     // 种子只能从种子店买，播种时只消耗背包里的种子
     const owned = s.seeds[cropId] || 0;
@@ -28,7 +29,7 @@
     if (s.seeds[cropId] === 0) delete s.seeds[cropId];
 
     const off = !cropSeasonOk(cropId, s.day);
-    s.energy -= 1;
+    if (!free) s.energy -= 1;
     p.crop = cropId;
     p.off = off ? 1 : 0;
     p.growth = 0;
@@ -338,6 +339,19 @@
       if (hn) notes.push({ kind: 'harvest', text: '🤖 收获 ' + hn + ' 块（值 ' + hval + '）' });
     }
 
+    // 自动播种器：睡觉时用指定的种子补 5 块空地，不耗体力
+    if (s.seeder && s.seederOn && s.autoSeed && !isWinter(s.day)) {
+      const seed = s.autoSeed;
+      let sn = 0;
+      const cap = BALANCE.device.seederPlots;
+      for (let i = 0; i < s.plots.length && sn < cap; i++) {
+        if (s.plots[i].crop) continue;
+        if ((s.seeds[seed] || 0) <= 0) break;
+        if (plant(s, i, seed, { free: true }).ok) sn++;
+      }
+      if (sn) notes.push({ kind: 'seeder', text: '🌱 自动播种 ' + sn + ' 块 ' + CROPS[seed].name });
+    }
+
     s.plots.forEach(function (p) {
       if (p.crop && (p.phase === 'growing' || p.phase === 'regrow') && !p.watered) p.missed++;
     });
@@ -461,9 +475,11 @@
     if (prefer === 'worm' && s.bait.worm > 0) return 'worm';
     if (prefer === 'dough' && s.bait.dough > 0) return 'dough';
     if (prefer === 'lure' && s.lure.owned && s.lure.dur > 0) return 'lure';
+    if (prefer === 'lure2' && s.lure2 && s.lure2.owned && s.lure2.dur > 0) return 'lure2';
     if (s.bait.worm > 0) return 'worm';
     if (s.bait.dough > 0) return 'dough';
     if (s.lure.owned && s.lure.dur > 0) return 'lure';
+    if (s.lure2 && s.lure2.owned && s.lure2.dur > 0) return 'lure2';
     return null;
   }
 
@@ -471,6 +487,7 @@
     if (kind === 'worm') return s.bait.worm;
     if (kind === 'dough') return s.bait.dough;
     if (kind === 'lure') return s.lure.owned ? s.lure.dur : 0;
+    if (kind === 'lure2') return (s.lure2 && s.lure2.owned) ? s.lure2.dur : 0;
     return 0;
   }
 
@@ -488,6 +505,9 @@
         s.bait.worm--;
       } else if (kind === 'dough') {
         s.bait.dough--;
+      } else if (kind === 'lure2') {
+        s.lure2.dur--;
+        if (s.lure2.dur <= 0) { s.lure2.owned = false; s.lure2.dur = 0; }
       } else {
         s.lure.dur--;
         if (s.lure.dur <= 0) { s.lure.owned = false; s.lure.dur = 0; }
@@ -503,15 +523,16 @@
       return { ok: true, empty: true, entry: null, msg: '空竿了' };
     }
 
-    // 鱼种权重只由饵决定：蚯蚓多好鱼、假饵少杂物；宝箱按钓鱼等级解锁
+    // 鱼种权重只由饵决定：蚯蚓多好鱼、假饵（含高级假饵）少杂物；宝箱按钓鱼等级解锁
     const lvNow = fishLv(s);
+    const lureLike = kind === 'lure' || kind === 'lure2';
     const table = FISH.map(function (f) {
       if (f.chest && lvNow < (f.lv || 1)) return null;
       let mul = 1;
-      if (f.trash) mul = kind === 'lure' ? BALANCE.bait.lureTrash : 1;
-      else if (f.chest) mul = kind === 'lure' ? 1.4 : 1;
+      if (f.trash) mul = lureLike ? BALANCE.bait.lureTrash : 1;
+      else if (f.chest) mul = lureLike ? 1.4 : 1;
       else if (kind === 'worm') mul = BALANCE.bait.wormGood;
-      else if (kind === 'lure') mul = BALANCE.bait.lureGood;
+      else if (lureLike) mul = BALANCE.bait.lureGood;
       if (!f.trash && !f.chest) mul *= (opts.goodBonus == null ? fishGoodBonus(s) : opts.goodBonus);
       if (f.seasons) {
         mul *= f.seasons.indexOf(seasonIdx(s.day)) >= 0 ? FISH_IN_SEASON : FISH_OFF_SEASON;
@@ -519,7 +540,7 @@
       return Object.assign({}, f, { w: f.w * mul });
     }).filter(Boolean);
     const f = weighted(table, 'w');
-    const q = (f.trash || f.chest) ? null : rollQuality(kind === 'worm' ? 2 : 1);
+    const q = (f.trash || f.chest) ? null : rollQuality(kind === 'worm' ? 2 : (kind === 'lure2' ? 2 : 1));
     const value = f.trash ? 1 : (f.chest ? f.base : Math.max(1, Math.round(f.base * q.mul)));
 
     let name = f.name, emoji = f.emoji;

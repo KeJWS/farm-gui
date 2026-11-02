@@ -16,7 +16,7 @@
   /* ---------------- 数值表（BALANCE） ---------------- */
 
   const BALANCE = {
-    hook: { dough: 0.92, worm: 0.95, lure: 0.72 },
+    hook: { dough: 0.92, worm: 0.95, lure: 0.72, lure2: 0.92 },
     weatherHook: { sunny: -0.12, cloudy: 0, rain: 0.08 },
     bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.15 },
     prices: { sprinkler: 80, harvester: 200, net: 50, netMax: 9 },
@@ -32,16 +32,20 @@
     tax: { rate: 0.04, min: 30, every: 30 },
     order: { mult: 1.35, seasonStep: 0.6 },
     expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
-    device: { sprinkler: 80, harvester: 300, net: 50 },
+    device: { sprinkler: 80, harvester: 300, net: 50, seeder: 600, seederPlots: 5 },
     lure: { price: 5, dur: 25 },
+    /* 高级假饵：钓鱼 Lv6 解锁，20 金 / 100 次；咬钩率跟面团饵一样，好鱼率跟假饵一样 */
+    lure2: { price: 20, dur: 100, lv: 6 },
     shop: { priceMul: 1.3, cropPriceMul: 1.3, restock: true, sellRate: 0.8 },
-    /* 市场：供需 1.30（稀缺）→ 0.70（过剩），反季 ×2，每天睡觉回落 30% */
+    /* 茶在百货店买的，可以半价卖回去 */
+    teaSellRate: 0.5,
+    /* 市场：供需 1.30（稀缺）→ 0.70（过剩），反季 ×1.7，每天睡觉回落 30% */
     market: { supplyMax: 1.3, supplyMin: 0.7, cropStep: 0.02, fishStep: 0.015,
-              offSeason: 2.0, decay: 0.7, scarce: 1.15, glut: 0.9,
+              offSeason: 1.7, decay: 0.7, scarce: 1.15, glut: 0.9,
               /* 委托的市价溢价封顶，避免一张单顶掉整个农场 */
               orderCap: 1.6 },
-    /* 采集：3 体力一次，1~2 件当季野货，20% 额外掉一颗当季种子 */
-    forage: { energy: 3, double: 0.25, seedChance: 0.2 },
+    /* 采集：5 体力一次，100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子 */
+    forage: { energy: 5, qty2: 0.75, qty3: 0.35, seedChance: 0.25 },
     /* 小镇捐赠：三档，捐得越多加成越多（金币出口） */
     town: [
       { id: 'stall', name: '村口小摊', emoji: '🏪', need: 2000, orderBonus: 0.05,
@@ -58,8 +62,9 @@
            bands: [{ upTo: 2000, rate: 0.02 }, { upTo: 10000, rate: 0.04 }, { upTo: null, rate: 0.06 }] },
     /* 等级：每级所需经验 = 15 + 10×(级-1)，满级 10 */
     level: { max: 10, xpBase: 15, xpStep: 10 },
-    /* 等级解锁：商店设备 / 高级种子 / 特效肥 / 渔网 / 渔夫 */
-    gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2, fisher: 5 },
+    /* 等级解锁：商店设备 / 高级种子 / 特效肥 / 渔网 / 渔夫 / 高级假饵 / 自动播种器 */
+    gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2, fisher: 5,
+            seeder: 4, lure2: 6 },
     /* 宝箱：铁箱 / 金箱按钓鱼等级解锁 */
     chest: { ironLv: 4, goldLv: 7 }
   };
@@ -250,7 +255,9 @@
   const BAIT = {
     worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '好鱼概率 ×1.35 · 品质取两次较好' },
     dough: { id: 'dough', name: '面团饵', emoji: '🍞', desc: '标准钓鱼体验 · 92% 咬钩' },
-    lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 20 次 · 杂物少、品质取两次较好，但只有 72% 咬钩' }
+    lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 25 次 · 杂物少、品质取两次较好，但只有 72% 咬钩' },
+    lure2: { id: 'lure2', name: '高级假饵', emoji: '🪝',
+             desc: '耐用 100 次 · 咬钩率跟面团饵一样（92%），好鱼率跟假饵一样 · 钓鱼 Lv' + BALANCE.lure2.lv + ' 解锁' }
   };
   /* 各饵的咬钩基础概率（天气再加减） */
   const HOOK = BALANCE.hook;
@@ -672,6 +679,9 @@
       sprinklers: 0,
       harvester: false,
       harvesterOn: true,
+      seeder: false,
+      seederOn: true,
+      autoSeed: null,
       nets: 0,
       netSet: 0,
       fisher: null,
@@ -681,6 +691,7 @@
       workUsed: false,
       bait: { worm: 0, dough: 0 },
       lure: { owned: false, dur: 0 },
+      lure2: { owned: false, dur: 0 },
       teas: { green: 0, black: 0, milk: 0, coffee: 0 },
       keys: { iron: 0, gold: 0 },
       teaUsed: false,
@@ -816,14 +827,15 @@
     return false;
   }
 
-  function plant(s, idx, cropId) {
+  function plant(s, idx, cropId, opts) {
+    const free = !!(opts && opts.free);          // 自动播种器：不花体力
     const p = s.plots[idx];
     const c = CROPS[cropId];
     if (!p) return { ok: false, msg: '没有这块地' };
     if (!c) return { ok: false, msg: '没有这种作物' };
     if (isWinter(s.day)) return { ok: false, msg: '冬天土地封冻了，开春再种吧' };
     if (p.crop) return { ok: false, msg: '这块地不是空地' };
-    if (s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
+    if (!free && s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
 
     // 种子只能从种子店买，播种时只消耗背包里的种子
     const owned = s.seeds[cropId] || 0;
@@ -832,7 +844,7 @@
     if (s.seeds[cropId] === 0) delete s.seeds[cropId];
 
     const off = !cropSeasonOk(cropId, s.day);
-    s.energy -= 1;
+    if (!free) s.energy -= 1;
     p.crop = cropId;
     p.off = off ? 1 : 0;
     p.growth = 0;
@@ -1142,6 +1154,19 @@
       if (hn) notes.push({ kind: 'harvest', text: '🤖 收获 ' + hn + ' 块（值 ' + hval + '）' });
     }
 
+    // 自动播种器：睡觉时用指定的种子补 5 块空地，不耗体力
+    if (s.seeder && s.seederOn && s.autoSeed && !isWinter(s.day)) {
+      const seed = s.autoSeed;
+      let sn = 0;
+      const cap = BALANCE.device.seederPlots;
+      for (let i = 0; i < s.plots.length && sn < cap; i++) {
+        if (s.plots[i].crop) continue;
+        if ((s.seeds[seed] || 0) <= 0) break;
+        if (plant(s, i, seed, { free: true }).ok) sn++;
+      }
+      if (sn) notes.push({ kind: 'seeder', text: '🌱 自动播种 ' + sn + ' 块 ' + CROPS[seed].name });
+    }
+
     s.plots.forEach(function (p) {
       if (p.crop && (p.phase === 'growing' || p.phase === 'regrow') && !p.watered) p.missed++;
     });
@@ -1265,9 +1290,11 @@
     if (prefer === 'worm' && s.bait.worm > 0) return 'worm';
     if (prefer === 'dough' && s.bait.dough > 0) return 'dough';
     if (prefer === 'lure' && s.lure.owned && s.lure.dur > 0) return 'lure';
+    if (prefer === 'lure2' && s.lure2 && s.lure2.owned && s.lure2.dur > 0) return 'lure2';
     if (s.bait.worm > 0) return 'worm';
     if (s.bait.dough > 0) return 'dough';
     if (s.lure.owned && s.lure.dur > 0) return 'lure';
+    if (s.lure2 && s.lure2.owned && s.lure2.dur > 0) return 'lure2';
     return null;
   }
 
@@ -1275,6 +1302,7 @@
     if (kind === 'worm') return s.bait.worm;
     if (kind === 'dough') return s.bait.dough;
     if (kind === 'lure') return s.lure.owned ? s.lure.dur : 0;
+    if (kind === 'lure2') return (s.lure2 && s.lure2.owned) ? s.lure2.dur : 0;
     return 0;
   }
 
@@ -1292,6 +1320,9 @@
         s.bait.worm--;
       } else if (kind === 'dough') {
         s.bait.dough--;
+      } else if (kind === 'lure2') {
+        s.lure2.dur--;
+        if (s.lure2.dur <= 0) { s.lure2.owned = false; s.lure2.dur = 0; }
       } else {
         s.lure.dur--;
         if (s.lure.dur <= 0) { s.lure.owned = false; s.lure.dur = 0; }
@@ -1307,15 +1338,16 @@
       return { ok: true, empty: true, entry: null, msg: '空竿了' };
     }
 
-    // 鱼种权重只由饵决定：蚯蚓多好鱼、假饵少杂物；宝箱按钓鱼等级解锁
+    // 鱼种权重只由饵决定：蚯蚓多好鱼、假饵（含高级假饵）少杂物；宝箱按钓鱼等级解锁
     const lvNow = fishLv(s);
+    const lureLike = kind === 'lure' || kind === 'lure2';
     const table = FISH.map(function (f) {
       if (f.chest && lvNow < (f.lv || 1)) return null;
       let mul = 1;
-      if (f.trash) mul = kind === 'lure' ? BALANCE.bait.lureTrash : 1;
-      else if (f.chest) mul = kind === 'lure' ? 1.4 : 1;
+      if (f.trash) mul = lureLike ? BALANCE.bait.lureTrash : 1;
+      else if (f.chest) mul = lureLike ? 1.4 : 1;
       else if (kind === 'worm') mul = BALANCE.bait.wormGood;
-      else if (kind === 'lure') mul = BALANCE.bait.lureGood;
+      else if (lureLike) mul = BALANCE.bait.lureGood;
       if (!f.trash && !f.chest) mul *= (opts.goodBonus == null ? fishGoodBonus(s) : opts.goodBonus);
       if (f.seasons) {
         mul *= f.seasons.indexOf(seasonIdx(s.day)) >= 0 ? FISH_IN_SEASON : FISH_OFF_SEASON;
@@ -1323,7 +1355,7 @@
       return Object.assign({}, f, { w: f.w * mul });
     }).filter(Boolean);
     const f = weighted(table, 'w');
-    const q = (f.trash || f.chest) ? null : rollQuality(kind === 'worm' ? 2 : 1);
+    const q = (f.trash || f.chest) ? null : rollQuality(kind === 'worm' ? 2 : (kind === 'lure2' ? 2 : 1));
     const value = f.trash ? 1 : (f.chest ? f.base : Math.max(1, Math.round(f.base * q.mul)));
 
     let name = f.name, emoji = f.emoji;
@@ -1952,7 +1984,10 @@
     if (s.energy < cost) return { ok: false, msg: '体力不够（采集要 ' + cost + ' 点），先睡觉吧' };
     s.energy -= cost;
     const w = pool[Math.floor(rand() * pool.length)];
-    const n = 1 + (rand() < BALANCE.forage.double ? 1 : 0);
+    // 100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件（最多 3 件）
+    let n = 1;
+    if (rand() < BALANCE.forage.qty2) n++;
+    if (rand() < BALANCE.forage.qty3) n++;
     const q = rollQuality(1);
     addStore(s, w.id, q.id, n);
     s.stats.forages = (s.stats.forages || 0) + 1;
@@ -1988,6 +2023,18 @@
       s.lure.owned = true; s.lure.dur = dur;
       log(s, '🎣 买了一个假饵（耐用 ' + dur + ' 次）', 'info');
       return { ok: true, msg: '假饵到手' };
+    }
+    if (kind === 'lure2') {
+      const L = BALANCE.lure2;
+      if (fishLv(s) < BALANCE.gate.lure2) {
+        return { ok: false, msg: '高级假饵要钓鱼 Lv' + BALANCE.gate.lure2 + ' 才解锁（现在 Lv' + fishLv(s) + '）' };
+      }
+      if (s.lure2.owned) return { ok: false, msg: '高级假饵一次只能持 1 个' };
+      if (s.coins < L.price) return { ok: false, msg: '金币不够（' + L.price + ' 金）' };
+      s.coins -= L.price; ledger(s, '买高级假饵', 0, L.price);
+      s.lure2.owned = true; s.lure2.dur = L.dur;
+      log(s, '🪝 买了一个高级假饵（耐用 ' + L.dur + ' 次，咬钩同面团饵、好鱼同假饵）', 'info');
+      return { ok: true, msg: '高级假饵到手' };
     }
     return { ok: false, msg: '这种饵料买不到' };
   }
@@ -2037,6 +2084,26 @@
     s.teas[id] = (s.teas[id] || 0) + qty;
     log(s, t.emoji + ' 买了' + t.name + ' ×' + qty + '（-' + cost + ' 金）', 'info');
     return { ok: true, msg: t.name + ' ×' + qty, qty: qty, cost: cost };
+  }
+
+  /* 茶可以半价卖回百货店（成就奖励的茶也算） */
+  function teaSellPrice(t) {
+    return Math.max(1, Math.floor(t.price * BALANCE.teaSellRate));
+  }
+
+  function sellTea(s, id, n) {
+    const t = TEAS[id];
+    if (!t) return { ok: false, msg: '没有这种茶' };
+    const have = (s.teas && s.teas[id]) || 0;
+    if (!have) return { ok: false, msg: '没有' + t.name };
+    const qty = n ? Math.min(Math.max(1, Math.floor(n)), have) : have;
+    const unit = teaSellPrice(t);
+    const gain = qty * unit;
+    s.teas[id] = have - qty;
+    if (s.teas[id] <= 0) delete s.teas[id];
+    addCoins(s, gain, '卖' + t.name + ' ×' + qty);
+    log(s, '💰 卖出' + t.name + ' ×' + qty + '，+' + gain + ' 金（半价）', 'good');
+    return { ok: true, msg: '卖出 ' + qty + ' 杯' + t.name + '，+' + gain + ' 金', qty: qty, income: gain };
   }
 
   function keyUnlocked(s, id) {
@@ -2483,6 +2550,42 @@
     return { ok: true, msg: '自动收获器已安装' };
   }
 
+  /* ---------------- 自动播种器 ---------------- */
+  const SEEDER_COST = BALANCE.device.seeder;
+
+  function seederUnlocked(s) { return farmLv(s) >= BALANCE.gate.seeder; }
+
+  function buySeeder(s) {
+    if (s.seeder) return { ok: false, msg: '已经有自动播种器了' };
+    if (!seederUnlocked(s)) {
+      return { ok: false, msg: '自动播种器要种田 Lv' + BALANCE.gate.seeder + ' 才解锁（现在 Lv' + farmLv(s) + '）' };
+    }
+    if (s.coins < SEEDER_COST) return { ok: false, msg: '金币不够（' + SEEDER_COST + ' 金）' };
+    s.coins -= SEEDER_COST;
+    ledger(s, '买自动播种器', 0, SEEDER_COST);
+    s.seeder = true;
+    s.seederOn = true;
+    log(s, '🌱 买了自动播种器（每天睡觉自动补 ' + BALANCE.device.seederPlots + ' 块空地，记得选种子）', 'good');
+    return { ok: true, msg: '自动播种器已安装' };
+  }
+
+  function toggleSeeder(s) {
+    if (!s.seeder) return { ok: false, msg: '还没买自动播种器' };
+    s.seederOn = !s.seederOn;
+    log(s, '🌱 自动播种器已' + (s.seederOn ? '开启' : '关闭'), 'info');
+    return { ok: true, msg: '自动播种器已' + (s.seederOn ? '开启' : '关闭'), on: s.seederOn };
+  }
+
+  /* 选自动播种用哪种种子（必须是背包里有的） */
+  function setAutoSeed(s, id) {
+    if (!s.seeder) return { ok: false, msg: '要先买自动播种器' };
+    if (id && !CROPS[id]) return { ok: false, msg: '没有这种作物' };
+    if (id && (s.seeds[id] || 0) <= 0) return { ok: false, msg: '背包里没有 ' + CROPS[id].name + ' 种子' };
+    s.autoSeed = id || null;
+    log(s, '🌱 自动播种种子设为 ' + (id ? CROPS[id].name : '不设（不播种）'), 'info');
+    return { ok: true, msg: id ? '自动播种：' + CROPS[id].name : '已关闭自动播种', seed: s.autoSeed };
+  }
+
   /* 委托手动刷新：每天一次 */
   function refreshOrders(s) {
     if (s.manualRefreshUsed) return { ok: false, msg: '今天已经手动刷新过了，明天再来' };
@@ -2859,6 +2962,9 @@
     merged.lure = Object.assign({ owned: false, dur: 0 }, s.lure || {});
     merged.lure.dur = Math.round(num(merged.lure.dur, 0, 0, BALANCE.lure.dur));
     merged.lure.owned = !!merged.lure.owned && merged.lure.dur > 0;
+    merged.lure2 = Object.assign({ owned: false, dur: 0 }, s.lure2 || {});
+    merged.lure2.dur = Math.round(num(merged.lure2.dur, 0, 0, BALANCE.lure2.dur));
+    merged.lure2.owned = !!merged.lure2.owned && merged.lure2.dur > 0;
     merged.fishBook = Object.assign({ count: 0, entries: [], best: null, priciest: null }, s.fishBook || {});
     merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0 }, s.stats || {});
     merged.teas = Object.assign({ green: 0, black: 0, milk: 0, coffee: 0 }, s.teas || {});
@@ -2967,6 +3073,9 @@
     merged.sprinklers = Math.round(num(s.sprinklers, 0, 0, 40));
     merged.harvester = !!s.harvester;
     merged.harvesterOn = s.harvesterOn !== false;
+    merged.seeder = !!s.seeder;
+    merged.seederOn = s.seederOn !== false;
+    merged.autoSeed = (s.autoSeed && CROPS[s.autoSeed] && !CROPS[s.autoSeed].wild) ? s.autoSeed : null;
     merged.nets = Math.round(num(s.nets, 0, 0, NET_MAX));
     // 老存档没有 netSet：默认所有渔网都已布置好
     merged.netSet = Math.round(num(s.netSet == null ? merged.nets : s.netSet, merged.nets, 0, merged.nets));
@@ -3121,6 +3230,8 @@
     useFert: useFert, buyFertItem: buyFertItem, sellFert: sellFert, fertSellPrice: fertSellPrice,
     FERT_SELL_RATE: FERT_SELL_RATE, buySprinkler: buySprinkler, SPRINKLER_COST: SPRINKLER_COST,
     buyHarvester: buyHarvester, HARVESTER_COST: HARVESTER_COST, refreshOrders: refreshOrders,
+    seederUnlocked: seederUnlocked, buySeeder: buySeeder, toggleSeeder: toggleSeeder,
+    setAutoSeed: setAutoSeed, SEEDER_COST: SEEDER_COST,
     toggleHarvester: toggleHarvester, buyNet: buyNet, netCatch: netCatch,
     resetNets: resetNets, netSetCount: netSetCount, netPending: netPending, netResetCost: netResetCost,
     hireFisher: hireFisher, fireFisher: fireFisher,
@@ -3154,7 +3265,7 @@
     nextSeasonIdx: nextSeasonIdx, HIST_DAYS: HIST_DAYS,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather,
     TEAS: TEAS, TEA_LIST: TEA_LIST, teaList: teaList, teaStock: teaStock, teaById: teaById,
-    teaUnlocked: teaUnlocked, buyTea: buyTea,
+    teaUnlocked: teaUnlocked, buyTea: buyTea, sellTea: sellTea, teaSellPrice: teaSellPrice,
     KEYS: KEYS, CHESTS: CHESTS, keyUnlocked: keyUnlocked, buyKey: buyKey,
     sellJunk: sellJunk, openChest: openChest, fishIsJunk: fishIsJunk
   };

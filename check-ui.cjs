@@ -1,6 +1,7 @@
 /* 静态检查：ui.js 里用到的 id / data-act 是否都在 index.html 里存在
  * node check-ui.cjs
  */
+require('./ensure-build.cjs')();
 const fs = require('fs');
 const path = require('path');
 
