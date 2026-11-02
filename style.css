@@ -695,6 +695,9 @@ button{ font-family:inherit; }
 
 /* ---------- nets / dark mode ---------- */
 .net-line{ margin-top:8px; font-size:11.5px; font-weight:600; color:var(--ink-3); text-align:center; }
+.net-tools{ display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  margin:3px 0; flex-wrap:wrap; }
+.net-ok{ color:var(--green-d); font-weight:700; }
 :root[data-theme="dark"]{
   --bg:#14161a; --bg2:#191c21; --panel:#1e2228; --panel-2:#23272e;
   --ink:#e9e5db; --ink-2:#b9b3a6; --ink-3:#8a8578;

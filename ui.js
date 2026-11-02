@@ -334,20 +334,35 @@
         : (state.harvesterOn ? '已开启 · 点击关闭' : '已关闭 · 点击开启'));
     const netLine = $('#net-line');
     if (netLine) {
+      const fisherLine = function () {
+        if (state.fisher) {
+          return '<br>🧑‍🌾 渔夫在岗 · 每天自动甩 ' + G.BALANCE.fisher.casts + ' 杆 + 重布渔网 · 工资 ' +
+            G.BALANCE.fisher.wage + ' 金/天';
+        }
+        return G.fisherUnlocked(state)
+          ? '<br>🧑‍🌾 可以雇个渔夫了（渔具店 ' + G.BALANCE.fisher.hire + ' 金 + 每天 ' +
+            G.BALANCE.fisher.wage + ' 金工资）'
+          : '';
+      };
       if (!G.netUnlocked(state)) {
         netLine.innerHTML = '🕸️ 渔网要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b>解锁（渔具店 ' +
-          G.NET_COST + ' 金/张）';
+          G.NET_COST + ' 金/张）' + fisherLine();
       } else if (state.nets > 0) {
         const setN = G.netSetCount(state), pend = G.netPending(state);
+        const auto = !!state.netAuto;
         netLine.innerHTML = '🕸️ 已布 <b>' + setN + '</b>/' + state.nets + ' 张 · 每天耗 ' + setN +
-          ' 份面团饵，' + Math.round(G.NET_CHANCE * 100) + '% 概率各上 1 条 · 不缴维护费' +
-          (pend
-            ? '<br><b class="lock">' + pend + ' 张网里有鱼要收，重布 ' + G.netResetCost(state) + ' 体力</b> ' +
-              '<button class="btn mini" data-resetnets' + (state.energy < 1 ? ' disabled' : '') + '>🕸️ 重新布置</button>'
-            : '');
+          ' 份面团饵，' + Math.round(G.NET_CHANCE * 100) + '% 概率各上 1 条<br>' +
+          '<span class="net-tools">' +
+            (pend
+              ? '<b class="lock">' + pend + ' 张待重布（' + G.netResetCost(state) + ' 体力）</b>' +
+                '<button class="btn mini" data-resetnets' + (state.energy < 1 ? ' disabled' : '') + '>重新布置</button>'
+              : '<span class="net-ok">全部布好了</span>') +
+            '<button class="btn mini' + (auto ? ' primary' : '') + '" data-netauto title="每天睡觉时自动花体力补网">' +
+              '自动重布：' + (auto ? '开' : '关') + '</button>' +
+          '</span>' + fisherLine();
       } else {
         netLine.innerHTML = '🕸️ 河边还没放渔网（渔具店 ' + G.NET_COST + ' 金/张，现在最多 ' +
-          G.netMax(state) + ' 张）';
+          G.netMax(state) + ' 张）' + fisherLine();
       }
     }
 
@@ -473,15 +488,17 @@
       ? '<div class="store-sub">🐟 渔获 · ' + fishCount + ' 条</div>' +
         fish.map(function (g) {
           const desc = G.fishDesc(g.name);
-          const mk = g.chest ? { total: 1, tag: '宝箱' } : G.fishMarketInfo(state, g.name);
+          // 杂物 / 宝箱不吃市价，别再挂「市价 ×1.30 · 稀缺」
+          const priced = !g.junk && !g.chest;
+          const mk = priced ? G.fishMarketInfo(state, g.name) : null;
           return '<div class="store-row">' +
             '<span class="se">' + g.emoji + '</span>' +
             '<div><div class="sn">' + g.name + ' ×' + g.count +
-              (g.chest ? '' : ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b>') + '</div>' +
+              (priced ? ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b>' : '') + '</div>' +
             '<div class="sv">' +
               (desc ? '<span class="sf-note">' + desc + '</span> · ' : '') +
               fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) + ' 金/条' +
-              (g.chest ? '' : ' · ' + mk.tag) + '</div></div>' +
+              (priced ? ' · ' + mk.tag : (g.chest ? ' · 宝箱' : ' · 原价，不吃市价')) + '</div></div>' +
             '<span class="sp">' + g.total + ' 金</span>' +
             '<button class="btn mini" data-boxfish="' + g.key + '" title="整批放进收购箱，原价结算">📦</button>' +
           '</div>';
@@ -565,6 +582,7 @@
             ' · 报酬 ' + lo.reward + ' 金</div>' +
           '<div class="os">' + (lo.kind === 'fish' ? '渔获' : '仓库') + ' ' +
             Math.min(have, lo.qty) + '/' + lo.qty + ' · 还剩 ' + left + ' 天 · 2 倍价' +
+            (lo.mul && Math.abs(lo.mul - 1) > 0.01 ? '（含市价 ×' + lo.mul.toFixed(2) + '）' : '') +
             (bonus ? ' · <b style="color:var(--green-d)">今天交 +' + bonus + ' 金</b>' : '') + '</div>' +
         '</div>' +
         '<button class="btn mini" data-long="1"' + (full ? '' : ' disabled') + '>交付</button>' +
@@ -580,6 +598,7 @@
           '<div class="on">' + o.name + ' ×' + o.qty + ' · 报酬 ' + o.reward + ' 金</div>' +
           '<div class="os">' + (o.done ? '✅ 已完成' : thing + ' ' + Math.min(have, o.qty) + '/' + o.qty +
             ' · 约 ' + Math.round(o.reward / o.qty) + ' 金/个' +
+            (o.mul && Math.abs(o.mul - 1) > 0.01 ? ' · 含市价 ×' + o.mul.toFixed(2) : '') +
             (o.kind === 'fish' ? '（交最便宜的）' : '')) + '</div>' +
         '</div>' +
         (o.done ? '' :
@@ -825,7 +844,7 @@
 
     const tip = '💡 现在是' + G.seasonOf(state.day) + '季：当季作物正常，' +
       '<b>反季也能种</b>——种子贵 ' + Math.round((offMul - 1) * 100) + '%、第一茬多 ' + offDays +
-      ' 天（南瓜/西瓜翻倍）、少 ' + offPen + ' 个，但收成卖价 ×' + marketMul + '。' +
+      ' 天（南瓜/西瓜翻倍）、每茬少 ' + offPen + ' 个，但收成卖价 ×' + marketMul + '。' +
       (batch ? '选一种会按库存把所有空地依次种上；种子用完就停。' : '播种只消耗背包里的种子。');
 
     openModal(batch ? '🌱 全部播种 · 选一种作物' : '🌱 第 ' + (i + 1) + ' 号地 · 播种',
@@ -898,8 +917,9 @@
       '<div class="shop-list">' + rows + '</div>' +
       '<div class="store-sub" style="margin-top:10px">🧪 肥料 · 买回来放仓库，施肥时消耗</div>' +
       '<div class="shop-list">' + fertRows + '</div>' +
-      '<div class="shop-tip">反季种子<b>也能种</b>：第一茬多花 ' + offDays + ' 天（南瓜 / 西瓜直接翻倍）、少结 1 个，' +
-        '但反季的收成卖价 ×' + G.BALANCE.market.offSeason + ' —— 想赌一把就囤着晚卖。<br>' +
+      '<div class="shop-tip">反季种子<b>也能种</b>：第一茬多花 ' + offDays + ' 天（南瓜 / 西瓜直接翻倍）、' +
+        '少结 1 个（黄瓜 / 葡萄 / 草莓<b>每茬都少</b>），但反季的收成卖价 ×' +
+        G.BALANCE.market.offSeason + ' —— 想赌一把就囤着晚卖。<br>' +
         '冬天土地封冻，什么都不能种。肥料在「全部施肥」或地块详情里使用。</div>',
       '<button class="btn" data-sellallseeds>卖出全部种子</button>' +
       '<button class="btn" data-close>关闭</button>');
@@ -969,7 +989,7 @@
         '<button class="btn mini" data-sellwormn="1"' + (worms ? '' : ' disabled') + '>卖</button>' +
         '<span class="bc-tip">现有 ' + worms + ' 条</span>' +
       '</div>' +
-      '<div class="store-sub" style="margin-top:10px">🕸️ 渔网 · 放到河边每天自动抓鱼（不收维护费）</div>' +
+      '<div class="store-sub" style="margin-top:10px">🕸️ 渔网 · 放到河边每天自动抓鱼</div>' +
       '<div class="store-row' + (netLock ? ' locked' : '') + '">' +
         '<span class="se">🕸️</span>' +
         '<div><div class="sn">渔网 <b class="own">已布 ' + G.netSetCount(state) + '</b> / 共 ' +
@@ -982,16 +1002,26 @@
         '<button class="btn mini" data-buynet' +
         ((netLock || state.nets >= netCap || state.coins < G.NET_COST) ? ' disabled' : '') + '>放一张</button>' +
       '</div>' +
-      (G.netPending(state)
-        ? '<div class="store-row">' +
-            '<span class="se">🌀</span>' +
-            '<div><div class="sn">有 <b class="lock">' + G.netPending(state) + '</b> 张网没收</div>' +
-            '<div class="sv">重布要 ' + G.netResetCost(state) + ' 体力（每张 ' +
-              G.BALANCE.netReset.energy + '）</div></div>' +
-            '<button class="btn mini" data-resetnets' + (state.energy < 1 ? ' disabled' : '') +
-              '>重新布置</button>' +
-          '</div>'
-        : '');
+      '<div class="store-sub" style="margin-top:10px">🧑‍🌾 雇个渔夫 · 替你重布渔网 + 每天自动甩杆</div>' +
+      '<div class="store-row' + (G.fisherUnlocked(state) ? '' : ' locked') + '">' +
+        '<span class="se">🧑‍🌾</span>' +
+        '<div><div class="sn">渔夫 ' +
+          (state.fisher ? '<b class="own">在岗</b>' : '<b class="own">待雇</b>') +
+          (G.fisherUnlocked(state) ? '' : ' <b class="lock">需钓鱼 Lv' + G.BALANCE.gate.fisher + '</b>') +
+          '</div>' +
+        '<div class="sv">' + (G.fisherUnlocked(state)
+          ? (state.fisher
+            ? '每天：重布全部渔网（免费）+ 自动甩 ' + G.BALANCE.fisher.casts + ' 杆（耗你的面团饵）· 工资 ' +
+              G.BALANCE.fisher.wage + ' 金/天'
+            : '雇佣费 ' + G.BALANCE.fisher.hire + ' 金 · 之后每天工资 ' + G.BALANCE.fisher.wage +
+              ' 金 · 他每天重布渔网 + 自动甩 ' + G.BALANCE.fisher.casts + ' 杆')
+          : '钓鱼等级到 Lv' + G.BALANCE.gate.fisher + ' 才招得到人') + '</div></div>' +
+        (state.fisher
+          ? '<button class="btn mini" data-firefisher>辞退</button>'
+          : '<button class="btn mini" data-hirefisher' +
+            ((!G.fisherUnlocked(state) || state.coins < G.BALANCE.fisher.hire) ? ' disabled' : '') +
+            '>雇佣</button>') +
+      '</div>';
     openModal('🛒 渔具店', body, '<button class="btn" data-close>关闭</button>');
   }
 
@@ -1029,9 +1059,9 @@
         '<h4>🍂 季节</h4>' +
         '<p>每 <b>30 天</b>换一季：<b>春（1–30）/ 夏（31–60）/ 秋（61–90）/ 冬（91–120）</b>，然后循环。<br>' +
         '当季的种子按<b>原价</b>卖；<b>反季的种子也卖，但贵 ×' + G.BALANCE.seed.offSeasonMul + '</b>，' +
-        '种下去第一茬多花 ' + G.BALANCE.seed.offSeasonDays + ' 天（南瓜 / 西瓜直接翻倍）、少结 ' +
+        '种下去第一茬多花 ' + G.BALANCE.seed.offSeasonDays + ' 天（南瓜 / 西瓜直接翻倍）、每茬少结 ' +
         G.BALANCE.seed.offSeasonYield + ' 个 —— 换来的好处是反季的收成卖价 <b>×' +
-        G.BALANCE.market.offSeason + '</b>。<br>' +
+        G.BALANCE.market.offSeason + '</b>（多收作物每茬都少 1 个）。<br>' +
         '<b>冬天土地封冻、河面结冰</b>——不能播种、不能钓鱼（渔网也收不了），种子店歇业，只能打工、卖库存、交委托。<br>' +
         '已经种下的作物不受换季影响，该熟还会熟。</p>' +
         '<table class="rule-table"><tr><th>季节</th><th>特点</th></tr>' +
@@ -1049,10 +1079,15 @@
         '鲫鱼 春·秋 / 鲤鱼 春夏秋 / 鳜鱼 春·夏 / 鲈鱼 夏·秋 / 河豚 秋 / 锦鲤 春。<br>' +
         '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15、耐用 ' +
         G.BALANCE.lure.dur + ' 次。<br>' +
-        '🕸️ 渔网：<b>' + G.NET_COST + ' 金/张，不缴维护费</b>。晚上耗 1 份面团饵，<b>70%</b> 网到 1 条标准及以下的普通鱼，' +
+        '🕸️ 渔网：<b>' + G.NET_COST + ' 金/张，不缴维护费</b>。晚上耗 1 份面团饵，<b>' +
+        Math.round(G.NET_CHANCE * 100) + '%</b> 网到 1 条标准及以下的普通鱼，' +
         '<b>不会出杂物和宝箱</b>；要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b> 解锁，上限 = 2 + 钓鱼等级（最多 ' + G.NET_MAX + ' 张）。<br>' +
         '网到鱼就得下水把鱼取下来，<b>这张网要花 ' + G.BALANCE.netReset.energy + ' 体力重新布置</b>（没布置的网当晚不出货）；' +
-        '在河边或渔具店点「重新布置」一次补齐。<br>' +
+        '河边有「重新布置」按钮，也能开<b>自动重布</b>让睡觉时自动补（照样花体力）。<br>' +
+        '🧑‍🌾 <b>渔夫</b>（钓鱼 Lv' + G.BALANCE.gate.fisher + '）：花 ' + G.BALANCE.fisher.hire +
+        ' 金雇一个，之后每天 <b>' + G.BALANCE.fisher.wage + ' 金</b>工资，他每天替你<b>重布全部渔网</b>' +
+        '（不花你的体力）+ <b>自动甩 ' + G.BALANCE.fisher.casts + ' 杆</b>（耗你的面团饵，不给经验）；' +
+        '没钱发工资就罢工，冬天他也休息。<br>' +
         '渔获先进仓库：<b>鱼</b>去水产店卖或进收购箱；<b>杂物和宝箱</b>水产店不收，去<b>百货店</b>回收或开箱。<br>' +
         '🎁 宝箱按钓鱼等级掉落（木制随便掉、铁制 Lv' + G.BALANCE.chest.ironLv + '、黄金 Lv' +
         G.BALANCE.chest.goldLv + '），开箱奖励见「百货店」。</p>' +
@@ -1144,7 +1179,9 @@
         '委托池按天数逐档解锁（D1 / D3 / D5 / D7 / D9 / D12 / D15），并且<b>只会要你当前等级买得到的作物</b>；' +
         '<b>每天第一张单固定是「买得到的最贵作物」</b>，剩下随机；' +
         '贵的作物一次要 2–3 个，单张报酬<b>最低 40 金</b>；鱼单单价随季节涨（11 → 15 → 19 → 23）。<br>' +
-        '📜 <b>长期订单</b>：5 天期限、数量大、<b>2 倍报酬</b>，完成后自动换下一张（过期也会换）。' +
+        '<b>市价溢价</b>：指定作物的单子按<b>该作物当前市价</b>结算（反季 / 稀缺时合同价更高），' +
+        '面板上会写「含市价 ×1.30」；「任意鱼」的单子不指定品种，价格固定。<br>' +
+        '📜 <b>长期订单</b>：5 天期限、数量大、<b>2 倍报酬</b>（同样吃市价溢价），完成后自动换下一张（过期也会换）。' +
         '<b>提前交货有额外奖励</b>：每提前 1 天 +10%，最多 +50%。<br>' +
         '交委托先扣<b>品质差的</b>，交鱼先交最便宜的；杂物、宝箱不算数。</p>' +
       '</div>' +
@@ -1157,7 +1194,7 @@
         '（咬钩最多 +10%、好鱼最多 +22.5%）。<br>' +
         '解锁：洒水器 Lv' + G.BALANCE.gate.sprinkler + ' · 特效肥 Lv' + G.BALANCE.gate.specialFert +
         ' · 自动收获器 Lv' + G.BALANCE.gate.harvester + '（均为种田等级）；渔网 钓鱼 Lv' + G.BALANCE.gate.net +
-        '，上限随钓鱼等级提高。</p>' +
+        '，上限随钓鱼等级提高；渔夫 钓鱼 Lv' + G.BALANCE.gate.fisher + '。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -1759,7 +1796,8 @@
       ['体力', state.energy + ' / ' + state.maxEnergy + ' · 伙食 ' + G.mealFee(state) + ' 金/天'],
       ['土地', state.plots.length + ' 块 · 洒水器 ' + state.sprinklers + ' 个'],
       ['设备', (state.harvester ? '自动收获器 ✅ · ' : '自动收获器 — · ') + '渔网 ' + state.nets +
-        ' 张（已布 ' + G.netSetCount(state) + '）'],
+        ' 张（已布 ' + G.netSetCount(state) + (state.netAuto ? '，自动重布' : '') + '）' +
+        (state.fisher ? ' · 渔夫 ✅' : '')],
       ['种田等级', 'Lv' + lv.farm + (lv.farm >= G.BALANCE.level.max ? '（满级）' :
         '（' + lv.farmXp + '/' + G.levelNeed(lv.farm) + '）') + ' · ' + G.levelEffectText('farm', lv.farm)],
       ['钓鱼等级', 'Lv' + lv.fish + (lv.fish >= G.BALANCE.level.max ? '（满级）' :
@@ -2294,6 +2332,34 @@
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();
+        if (modalOpen()) shopModal();
+        return;
+      }
+
+      // 自动重布开关
+      const netAutoBtn = t.closest('[data-netauto]');
+      if (netAutoBtn) {
+        const r = G.toggleNetAuto(state);
+        commit(r);
+        toast(r.msg, 'good');
+        return;
+      }
+
+      // 雇佣 / 辞退渔夫
+      const hireBtn = t.closest('[data-hirefisher]');
+      if (hireBtn && !hireBtn.disabled) {
+        const r = G.hireFisher(state);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        if (modalOpen()) shopModal();
+        return;
+      }
+      const fireBtn = t.closest('[data-firefisher]');
+      if (fireBtn) {
+        const r = G.fireFisher(state);
+        commit(r);
+        toast(r.msg, 'warn');
         if (modalOpen()) shopModal();
         return;
       }

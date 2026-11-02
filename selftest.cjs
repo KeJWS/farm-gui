@@ -821,8 +821,20 @@ ok(typeof fx.perfect === 'number', '图鉴记录完美品质条数');
 G.setRng(mulberry32(5));
 const ord = G.makeOrders({ day: 66 }).filter(function (o) { return o.kind === 'crop'; })[0];
 const direct = ord.qty * G.CROPS[ord.crop].price;
-ok(Math.abs(ord.reward - Math.round(direct * 1.35)) <= 1, '委托报酬稳定在直售的 135%',
-   { reward: ord.reward, direct: direct });
+ok(ord.mul > 0 && Math.abs(ord.reward - Math.round(direct * 1.35 * ord.mul)) <= 1,
+  '委托报酬 = 直售 ×1.35 × 市价溢价', { reward: ord.reward, direct: direct, mul: ord.mul });
+ok(Math.abs(ord.reward - Math.round(direct * 1.35)) > 1, '市价溢价真的进账（不再等于裸 135%）');
+{
+  // 同一张单：把市场砸饱和，报酬应该跟着降
+  const st = G.createState();
+  st.day = 66;
+  G.setRng(mulberry32(5));
+  const a = G.makeOrders(st).filter(function (o) { return o.kind === 'crop'; })[0];
+  G.addSupply(st, a.crop, 40);
+  G.setRng(mulberry32(5));
+  const b = G.makeOrders(st).filter(function (o) { return o.kind === 'crop'; })[0];
+  ok(b.mul < a.mul && b.reward < a.reward, '卖太多之后委托价跟着掉', [a.mul, b.mul]);
+}
 
 // 设备维护费（渔网不缴维护费）
 s = G.createState(); s.sprinklers = 3; s.nets = 2; s.harvester = true;
@@ -926,7 +938,7 @@ for (let i = 0; i < 40; i++) {
 ok(netCatches > 0 && netJunk === 0, '渔网不会网到杂物/宝箱', netJunk);
 ok(netHigh === 0, '渔网只出标准及以下品质', netHigh);
 const rate = netCatches / netUsed;
-ok(rate > 0.6 && rate < 0.8, '渔网上鱼率约 70%', (rate * 100).toFixed(0) + '%');
+ok(rate > 0.7 && rate < 0.9, '渔网上鱼率约 80%', (rate * 100).toFixed(0) + '%');
 
 G.setRng(mulberry32(9)); const t1 = avgTier(1);
 G.setRng(mulberry32(9)); const t2 = avgTier(2);
@@ -1671,6 +1683,95 @@ ok(G.marketMul(v28pl, 'chili') > G.marketMul(v28pl2, 'chili'), '反季辣椒比�
 
 /* 商店售价整体降了 */
 ok(G.BALANCE.shop.priceMul === 1.3 && G.BALANCE.shop.cropPriceMul === 1.3, '水产店 / 农产品店进价系数 1.3');
+
+/* ---------- 5k. v2.9 渔夫 / 自动重布 / 委托市价溢价 ---------- */
+section('v2.9 渔夫与自动重布');
+
+/* 多收作物：反季每茬都 −1 */
+const v29m = G.createState();
+v29m.day = 1;                                    // 春，黄瓜（夏）是反季
+v29m.seeds = { cucumber: 1 };
+G.plant(v29m, 0, 'cucumber');
+const v29p = v29m.plots[0];
+v29p.phase = 'regrow'; v29p.hits = 1;
+ok(G.expectedYield(v29m, v29p) === Math.max(1, G.CROPS.cucumber.regrowQty - 1),
+  '反季多收：后续茬也 −1', G.expectedYield(v29m, v29p));
+v29p.phase = 'growing'; v29p.hits = 0;
+ok(G.expectedYield(v29m, v29p) === Math.max(1, G.CROPS.cucumber.firstQty - 1),
+  '反季多收：第一茬 −1', G.expectedYield(v29m, v29p));
+const v29in = G.createState();
+v29in.day = 31; v29in.seeds = { cucumber: 1 };
+G.plant(v29in, 0, 'cucumber');
+ok(G.expectedYield(v29in, v29in.plots[0]) === G.CROPS.cucumber.firstQty, '当季多收不减产');
+
+/* 渔网 80% */
+ok(Math.abs(G.NET_CHANCE - 0.8) < 1e-9, '渔网上鱼率 80%', G.NET_CHANCE);
+
+/* 渔夫：等级门槛 / 雇佣 / 代钓 */
+const v29f = G.createState();
+v29f.coins = 5000; v29f.levels.fish = G.BALANCE.gate.fisher - 1;
+ok(!G.hireFisher(v29f).ok, '钓鱼等级不够雇不到渔夫');
+v29f.levels.fish = G.BALANCE.gate.fisher;
+const v29hire = G.hireFisher(v29f);
+ok(v29hire.ok && v29f.fisher && v29f.coins === 5000 - G.BALANCE.fisher.hire,
+  '够等级就能雇，扣雇佣费', v29f.coins);
+ok(!G.hireFisher(v29f).ok, '不能重复雇佣');
+ok(G.fireFisher(v29f).ok && !v29f.fisher, '可以辞退渔夫');
+
+const v29c = G.createState();
+v29c.levels.fish = 5; v29c.bait.dough = 20; v29c.energy = 0;
+const v29xp0 = v29c.levels.fishXp;
+G.setRng(function () { return 0.1; });
+const v29fc = G.fisherCatch(v29c);
+ok(v29fc.casts === G.BALANCE.fisher.casts && v29c.bait.dough === 20 - G.BALANCE.fisher.casts,
+  '渔夫甩满 8 杆、吃掉 8 份面团饵', [v29fc.casts, v29c.bait.dough]);
+ok(v29fc.got > 0, '渔夫真的钓到鱼', v29fc.got);
+ok(v29c.energy === 0, '渔夫不耗玩家体力');
+ok(v29c.levels.fishXp === v29xp0 && v29c.levels.fish === 5, '渔夫代钓不给经验');
+
+/* 睡觉：扣伙食 + 工资 + 重布渔网 */
+const v29w = G.createState();
+v29w.coins = 1000; v29w.day = 2; v29w.levels.fish = G.BALANCE.gate.fisher;
+G.hireFisher(v29w);
+v29w.nets = 2; v29w.netSet = 0; v29w.bait.dough = 0; v29w.energy = 0;
+G.sleep(v29w);
+ok(v29w.coins === 1000 - G.BALANCE.fisher.hire - G.mealFee(v29w) - G.BALANCE.fisher.wage,
+  '睡觉扣伙食 + 渔夫工资', v29w.coins);
+ok(v29w.netSet === 2, '渔夫替你把渔网全重布了', v29w.netSet);
+
+/* 发不出工资就罢工 */
+const v29b = G.createState();
+v29b.coins = 10; v29b.fisher = true; v29b.bait.dough = 8;
+G.sleep(v29b);
+ok(v29b.fishBag.length === 0, '发不出工资，渔夫罢工不钓鱼', v29b.coins);
+
+/* 冬天渔夫休息、不发工资 */
+const v29wt = G.createState();
+v29wt.day = 90; v29wt.coins = 500; v29wt.fisher = true; v29wt.bait.dough = 8;
+G.sleep(v29wt);
+ok(G.isWinter(v29wt.day) && v29wt.coins === 500 - G.mealFee(v29wt) && v29wt.fishBag.length === 0,
+  '冬天渔夫休息、不发工资', v29wt.coins);
+
+/* 自动重布：睡觉时自动花体力补网 */
+const v29a = G.createState();
+v29a.day = 2; v29a.nets = 3; v29a.netSet = 0; v29a.bait.dough = 0;
+ok(!v29a.netAuto, '自动重布默认关闭');
+G.toggleNetAuto(v29a);
+ok(v29a.netAuto, '自动重布能打开');
+G.sleep(v29a);
+ok(v29a.netSet === 3 && v29a.energy === v29a.maxEnergy - 3, '睡觉时自动重布、花 3 体力',
+  [v29a.netSet, v29a.energy]);
+
+/* 委托市价溢价：长期订单也吃 */
+const v29L = G.createState();
+G.setRng(mulberry32(9));
+const v29lo = G.makeLongOrder(v29L);
+if (v29lo.kind === 'crop') {
+  ok(v29lo.mul > 0 && v29lo.reward === Math.round(v29lo.qty * G.CROPS[v29lo.crop].price * 2 * v29lo.mul),
+    '长期订单报酬也含市价溢价', v29lo.mul);
+} else {
+  ok(v29lo.kind === 'fish', '这次摇到鱼单（跳过作物市价断言）');
+}
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');

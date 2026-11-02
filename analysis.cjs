@@ -320,7 +320,8 @@ console.log('\n== 反季种植（种子 ×' + G.BALANCE.seed.offSeasonMul + '、
     const add = (fert && !c.big) ? G.FERT.normal.add : 0;
     const pen = off ? G.BALANCE.seed.offSeasonYield : 0;
     const slow = off ? G.BALANCE.seed.offSeasonDays : 0;
-    const qty = c.multi ? Math.max(1, c.firstQty - pen) + c.regrowTimes * c.regrowQty
+    const qty = c.multi
+      ? Math.max(1, c.firstQty - pen) + c.regrowTimes * Math.max(1, c.regrowQty - pen)
       : (c.big ? c.base : Math.max(1, c.base + add + bonus - pen));
     const days = c.multi ? (c.days + slow) + c.regrowTimes * c.regrowDays
       : (c.big ? (off ? c.days * 2 : c.days) : c.days + slow);
@@ -356,4 +357,22 @@ console.log('\n== 渔网（' + G.NET_COST + ' 金/张，不缴维护费，抓完
   console.log('   满配 9 张：每天约 ' + (9 * perNet).toFixed(1) + ' 金 · 耗 9 份饵 · 重布约 ' +
     (9 * G.NET_CHANCE).toFixed(1) + ' 体力 · 回本 ' +
     Math.round(G.NET_COST / perNet) + ' 天/张');
+}
+
+/* ---------- 12. 雇佣渔夫 ---------- */
+console.log('\n== 雇佣渔夫（钓鱼 Lv' + G.BALANCE.gate.fisher + ' 解锁）==');
+{
+  const F = G.BALANCE.fisher;
+  G.setRng(mulberry32(7));
+  const perCast = evBait('dough', 'cloudy', 5, 4000).ev;       // 渔夫用面团饵
+  const gross = F.casts * perCast;
+  const cost = F.casts * 1 + F.wage;                            // 饵 1 金/份 + 工资
+  const net = gross - cost;
+  console.log('   雇佣费 ' + F.hire + ' 金 · 工资 ' + F.wage + ' 金/天 · 每天甩 ' + F.casts +
+    ' 杆（耗你的面团饵，不耗体力、不给经验）');
+  console.log('   每天毛 ' + gross.toFixed(1) + ' − 饵 ' + F.casts + ' − 工资 ' + F.wage +
+    ' = 净 ' + net.toFixed(1) + ' 金/天');
+  console.log('   回本 ' + Math.round(F.hire / net) + ' 天 · 另外他每天免费重布渔网（省 ' +
+    (9 * G.NET_CHANCE * G.BALANCE.netReset.energy).toFixed(1) + ' 体力 ≈ ' +
+    (9 * G.NET_CHANCE * G.BALANCE.netReset.energy * perCast / 2).toFixed(0) + ' 金）');
 }

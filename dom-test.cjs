@@ -98,6 +98,10 @@ const G = require('./game.js');
   G.addStore(st, 'carrot', 'std', 12);
   st.fishBag.push({ name: '鲫鱼', emoji: '🐟', q: 'std', v: 3, d: 1 });
   st.fishBag.push({ name: '木制宝箱', emoji: '🪵', q: null, v: 8, d: 1, no: true, chest: 'wood' });
+  st.fishBag.push({ name: '水草', emoji: '🌿', q: null, v: 1, d: 1, no: true, trash: true });
+  st.nets = 2;
+  st.netSet = 2;
+  st.levels.fish = 2;
   st.teas.green = 2;
   G.addStore(st, 'cabbage', 'std', 5);
   G.boxPutCrop(st, 'cabbage');                 // 收购箱里放一批，便于测取出
@@ -130,7 +134,33 @@ ok(text('#farm-lv').indexOf('Lv') >= 0 && text('#fish-lv').indexOf('Lv') >= 0,
 ok(text('#store-sum').indexOf('总价') >= 0, '仓库显示总价值', text('#store-sum'));
 ok(html('#store-list').indexOf('去水产店卖') < 0, '仓库渔获不再写「去水产店卖」');
 ok(html('#store-list').indexOf('脆生生') >= 0, '仓库作物显示简述');
+/* 杂物行不能挂「市价 / 稀缺」 */
+(function junkRow() {
+  const h = html('#store-list');
+  const i = h.indexOf('水草');
+  const row = i < 0 ? '' : h.slice(i, i + 260);
+  ok(i >= 0 && row.indexOf('市价 ×') < 0 && row.indexOf('稀缺') < 0,
+     '仓库杂物不显示市价 / 稀缺');
+  ok(row.indexOf('原价，不吃市价') >= 0, '杂物行写明不吃市价');
+})();
+/* 河边渔网行：自动重布开关 */
+ok(html('#net-line').indexOf('自动重布') >= 0 && html('#net-line').indexOf('data-netauto') >= 0,
+   '河边有「自动重布」开关');
+ok(html('#net-line').indexOf('不缴维护费') < 0, '河边不再写「不缴维护费」');
+
+/* 真的点一下开关 */
+function clickAttr(sel) {
+  const btn = { dataset: {}, disabled: false };
+  const target = { closest: function (s) { return s === sel ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+}
+ok(html('#net-line').indexOf('自动重布：关') >= 0, '自动重布默认关闭', html('#net-line').slice(-80));
+clickAttr('[data-netauto]');
+ok(html('#net-line').indexOf('自动重布：开') >= 0, '点一下能打开自动重布', html('#net-line').slice(-80));
+clickAttr('[data-netauto]');
+ok(html('#net-line').indexOf('自动重布：关') >= 0, '再点一下关闭');
 ok(html('#order-list').indexOf('报酬') >= 0 && html('#order-list').indexOf('交付') >= 0, '委托面板渲染出报酬与交付按钮');
+ok(html('#order-list').indexOf('含市价') >= 0, '委托面板标出市价溢价');
 ok(html('#order-list').indexOf('长期') >= 0, '委托面板显示长期订单');
 ok(html('#ledger').indexOf('D1') >= 0, '账本渲染出 D1');
 ok(html('#log').indexOf('D1') >= 0, '日志渲染出 D1');
@@ -196,6 +226,10 @@ ok(html('#modal-root').indexOf('耐用 25 次') >= 0, '渔具店显示假饵耐�
 clickAct('shop');
 ok(html('#modal-root').indexOf('渔具店') >= 0 && html('#modal-root').indexOf('渔网') >= 0,
    '渔具店弹窗（含渔网）能打开');
+ok(html('#modal-root').indexOf('渔夫') >= 0 && html('#modal-root').indexOf('data-hirefisher') >= 0,
+   '渔具店有雇佣渔夫入口');
+ok(html('#modal-root').indexOf('不收维护费') < 0, '渔具店不再写「不收维护费」');
+ok(html('#modal-root').indexOf('data-resetnets') < 0, '渔具店没有「重新布置」按钮');
 clickAct('fertilizeAll');
 const toastText = document.querySelector('#toast-root')._text || '';
 ok(toastText.indexOf('没有可施肥') >= 0 || html('#modal-root').indexOf('全部施肥') >= 0,

@@ -12,9 +12,11 @@
     weatherHook: { sunny: -0.12, cloudy: 0, rain: 0.08 },
     bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.15 },
     prices: { sprinkler: 80, harvester: 200, net: 50, netMax: 9 },
-    netChance: 0.7,
-    /* 渔网抓完鱼要重新布置：每张 1 体力 */
+    netChance: 0.8,
+    /* 渔网抓完鱼要重新布置：每张 1 体力；河边可以开「自动重布」每天自动补 */
     netReset: { energy: 1 },
+    /* 雇佣渔夫：钓鱼 Lv5（gate.fisher）解锁，一次性雇佣费 + 每日工资；替你重布渔网、每天自动甩几杆 */
+    fisher: { hire: 800, wage: 20, casts: 8 },
     work: { full: 2.0, half: 1.2 },
     upkeep: { plotPerWeek: 3, plotMid: 6, plotHigh: 14, free: 5, sprinkle: 3, net: 0, harvester: 5 },
     tax: { rate: 0.04, min: 30, every: 30 },
@@ -33,8 +35,8 @@
            bands: [{ upTo: 2000, rate: 0.02 }, { upTo: 10000, rate: 0.04 }, { upTo: null, rate: 0.06 }] },
     /* 等级：每级所需经验 = 15 + 10×(级-1)，满级 10 */
     level: { max: 10, xpBase: 15, xpStep: 10 },
-    /* 等级解锁：商店设备 / 高级种子 / 特效肥 / 渔网 */
-    gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2 },
+    /* 等级解锁：商店设备 / 高级种子 / 特效肥 / 渔网 / 渔夫 */
+    gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2, fisher: 5 },
     /* 宝箱：铁箱 / 金箱按钓鱼等级解锁 */
     chest: { ironLv: 4, goldLv: 7 }
   };
@@ -628,6 +630,8 @@
       harvesterOn: true,
       nets: 0,
       netSet: 0,
+      netAuto: false,
+      fisher: false,
       codex: { fish: {}, crops: {} },
       manualRefreshUsed: false,
       workUsed: false,
@@ -731,7 +735,7 @@
   function expectedYield(s, p) {
     const c = CROPS[p.crop];
     if (!c) return 0;
-    const offPen = (p.off && p.hits === 0) ? BALANCE.seed.offSeasonYield : 0;
+    const offPen = p.off ? BALANCE.seed.offSeasonYield : 0;
     if (c.multi) return Math.max(1, (p.hits === 0 ? c.firstQty : c.regrowQty) - offPen);
     if (c.big) return Math.max(1, c.base - p.missed);
     return Math.max(1, c.base + farmYieldBonus(s) + fertBonus(p) - p.missed - offPen);
@@ -1140,6 +1144,27 @@
       if (n) notes.push({ kind: 'water', text: '🚿 洒水器浇 ' + n + ' 块' + (ripe ? '，熟 ' + ripe : '') });
     }
 
+    // 渔夫：发工资 → 替你重布渔网 → 自动甩几杆（不耗玩家体力、不给经验）
+    if (s.fisher && !isWinter(s.day)) {
+      const wage = BALANCE.fisher.wage;
+      if ((s.coins || 0) >= wage) {
+        addCoins(s, -wage, '渔夫工资');
+        if (s.nets > 0) s.netSet = s.nets;
+        const fr = fisherCatch(s);
+        notes.push({ kind: 'fisher', text: '🧑‍🌾 渔夫 ' + fr.got + '/' + fr.casts + ' 条（值 ' + fr.value +
+          '）· 工资 -' + wage + (fr.short ? ' · 面团饵不够' : '') });
+      } else {
+        notes.push({ kind: 'fisher', text: '🧑‍🌾 渔夫没领到工资，今天罢工' });
+      }
+    }
+
+    // 自动重布渔网（花自己的体力；雇了渔夫就不用操心）
+    const pendingNet = netPending(s);
+    if (s.netAuto && pendingNet > 0) {
+      const rr = resetNets(s);
+      if (rr.ok) notes.push({ kind: 'net', text: '🕸️ 自动重布 ' + rr.n + ' 张（-' + rr.spent + ' 体力）' });
+    }
+
     // 渔网：只算布置好的那些，每天消耗面团饵，有概率上鱼
     if (s.nets > 0) {
       const nr = netCatch(s);
@@ -1285,9 +1310,10 @@
     const entry = { day: s.day, fish: name, emoji: emoji, quality: q, price: value,
                     base: f.base, bait: kind, trash: !!f.trash, chest: f.chest || null, noOrder: noOrder };
     s.fishBook.count++;
-    // 经验：每 2 杆 1 点，完美品质额外 +1
-    const xpGain = (q && q.id === 'perfect') ? 2 : ((s.stats.casts % 2 === 0) ? 1 : 0);
-    const levelUp = addLevelXp(s, 'fish', xpGain);
+    // 经验：每 2 杆 1 点，完美品质额外 +1（渔夫代钓不给经验）
+    const xpGain = opts.noXp ? 0
+      : ((q && q.id === 'perfect') ? 2 : ((s.stats.casts % 2 === 0) ? 1 : 0));
+    const levelUp = xpGain ? addLevelXp(s, 'fish', xpGain) : false;
     s.fishBook.entries.unshift(entry);
     if (s.fishBook.entries.length > 40) s.fishBook.entries.length = 40;
     if (!f.trash && !f.chest) {
@@ -2081,6 +2107,53 @@
     return { ok: true, msg: '布置好 ' + can + ' 张渔网', n: can, spent: can * per };
   }
 
+  /* 河边「自动重布」开关：每天睡觉时自动花体力把渔网补好 */
+  function toggleNetAuto(s) {
+    s.netAuto = !s.netAuto;
+    log(s, '🕸️ 渔网自动重布已' + (s.netAuto ? '开启' : '关闭'), 'info');
+    return { ok: true, on: !!s.netAuto, msg: '自动重布已' + (s.netAuto ? '开启' : '关闭') };
+  }
+
+  /* ---------------- 雇佣渔夫 ---------------- */
+
+  function fisherUnlocked(s) { return fishLv(s) >= BALANCE.gate.fisher; }
+
+  function hireFisher(s) {
+    if (!fisherUnlocked(s)) {
+      return { ok: false, msg: '渔夫要钓鱼 Lv' + BALANCE.gate.fisher + ' 才肯来（现在 Lv' + fishLv(s) + '）' };
+    }
+    if (s.fisher) return { ok: false, msg: '已经雇了渔夫' };
+    if ((s.coins || 0) < BALANCE.fisher.hire) {
+      return { ok: false, msg: '金币不够（雇佣费 ' + BALANCE.fisher.hire + ' 金）' };
+    }
+    s.coins -= BALANCE.fisher.hire;
+    ledger(s, '雇佣渔夫', 0, BALANCE.fisher.hire);
+    s.fisher = true;
+    log(s, '🧑‍🌾 雇了一位渔夫：每天替你重布渔网、自动甩 ' + BALANCE.fisher.casts +
+      ' 杆，工资 ' + BALANCE.fisher.wage + ' 金/天', 'good');
+    return { ok: true, msg: '渔夫上岗了', cost: BALANCE.fisher.hire };
+  }
+
+  function fireFisher(s) {
+    if (!s.fisher) return { ok: false, msg: '还没雇渔夫' };
+    s.fisher = false;
+    log(s, '🧑‍🌾 把渔夫辞了（不用再发工资）', 'info');
+    return { ok: true, msg: '渔夫已辞退' };
+  }
+
+  /* 渔夫代钓：不耗玩家体力、不给经验，只消耗面团饵 */
+  function fisherCatch(s) {
+    const max = BALANCE.fisher.casts;
+    const dough = Math.max(0, s.bait.dough || 0);
+    const n = Math.min(max, dough);
+    let got = 0, value = 0;
+    for (let i = 0; i < n; i++) {
+      const r = fish(s, 'dough', { free: true, quiet: true, noXp: true });
+      if (r.ok && r.entry) { got++; value += r.entry.price; }
+    }
+    return { casts: n, got: got, value: value, short: dough < max };
+  }
+
   function netCatchOne(s) {
     const pool = FISH.filter(function (f) { return !f.trash && !f.noOrder; }).map(function (f) {
       const off = (f.seasons && f.seasons.indexOf(seasonIdx(s.day)) < 0) ? FISH_OFF_SEASON : 1;
@@ -2322,10 +2395,12 @@
     function pushCrop(c) {
       used.push(c.id);
       const qty = Math.max(1, Math.round((c.price >= 20 ? randInt(2, 3) : randInt(3, 6)) * mult));
-      const reward = Math.max(40, Math.round(qty * c.price * BALANCE.order.mult));
+      // 市价溢价：合同价跟着该作物当前市价走（反季 / 稀缺时更值钱）
+      const mk = marketMul(s, c.id);
+      const reward = Math.max(40, Math.round(qty * c.price * BALANCE.order.mult * mk));
       orders.push({
         id: 'd' + day + '-c' + orders.length, kind: 'crop', crop: c.id, name: c.name, emoji: c.emoji,
-        qty: qty, reward: reward, done: false, flagship: orders.length === 0
+        qty: qty, reward: reward, mul: mk, done: false, flagship: orders.length === 0
       });
     }
 
@@ -2365,8 +2440,10 @@
     }
     const c = pool[Math.floor(rand() * pool.length)];
     const qty = Math.max(6, Math.round((c.price >= 40 ? randInt(6, 10) : randInt(12, 20)) * (1 + season * 0.3)));
+    const mk = marketMul(s, c.id);
     return { id: 'L' + day, kind: 'crop', crop: c.id, name: c.name, emoji: c.emoji,
-             qty: qty, reward: Math.round(qty * c.price * 2), deadline: day + 5, done: false };
+             qty: qty, reward: Math.round(qty * c.price * 2 * mk), mul: mk,
+             deadline: day + 5, done: false };
   }
 
   function deliverLong(s) {
@@ -2441,6 +2518,7 @@
         emoji: o.kind === 'crop' ? CROPS[o.crop].emoji : '🐟',
         qty: Math.round(num(o.qty, 1, 1, 99)),
         reward: Math.round(num(o.reward, 10, 1, 9999)),
+        mul: (o.kind === 'crop' && o.mul != null) ? num(o.mul, 1, 0.5, 3) : 0,
         done: !!o.done
       });
     });
@@ -2631,6 +2709,8 @@
     merged.nets = Math.round(num(s.nets, 0, 0, NET_MAX));
     // 老存档没有 netSet：默认所有渔网都已布置好
     merged.netSet = Math.round(num(s.netSet == null ? merged.nets : s.netSet, merged.nets, 0, merged.nets));
+    merged.netAuto = !!s.netAuto;
+    merged.fisher = !!s.fisher;
     merged.codex = {
       fish: (s.codex && s.codex.fish && typeof s.codex.fish === 'object') ? s.codex.fish : {},
       crops: (s.codex && s.codex.crops && typeof s.codex.crops === 'object') ? s.codex.crops : {}
@@ -2761,6 +2841,8 @@
     buyHarvester: buyHarvester, HARVESTER_COST: HARVESTER_COST, refreshOrders: refreshOrders,
     toggleHarvester: toggleHarvester, buyNet: buyNet, netCatch: netCatch,
     resetNets: resetNets, netSetCount: netSetCount, netPending: netPending, netResetCost: netResetCost,
+    toggleNetAuto: toggleNetAuto, hireFisher: hireFisher, fireFisher: fireFisher,
+    fisherUnlocked: fisherUnlocked, fisherCatch: fisherCatch,
     seedOffSeason: seedOffSeason, marketTag: marketTag, fishByName: fishByName, fishById: fishById,
     NET_COST: NET_COST, NET_MAX: NET_MAX, NET_CHANCE: NET_CHANCE, plotUpkeep: plotUpkeep,
     storeTotal: storeTotal, taxDue: taxDue, buyFish: buyFish, fishBuyPrice: fishBuyPrice, deviceUpkeep: deviceUpkeep, HOOK: HOOK,
