@@ -446,11 +446,14 @@
           const mixTxt = mix.map(function (m) {
             return '<span style="color:' + m.color + '">' + m.name + ' ' + m.n + '</span>';
           }).join(' · ');
+          const mk = G.marketInfo(state, id);
           return '<div class="store-row">' +
             '<span class="se">' + c.emoji + '</span>' +
-            '<div><div class="sn">' + c.name + ' ×' + n + '</div>' +
+            '<div><div class="sn">' + c.name + ' ×' + n +
+              ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b>' +
+              (mk.inSeason ? ' <b class="own">当季</b>' : ' <b class="lock">反季</b>') + '</div>' +
             '<div class="sv"><span class="sf-note">' + (c.desc || '') + '</span> · ' + mixTxt +
-              ' · 均 ' + (val / n).toFixed(1) + ' 金</div></div>' +
+              ' · 均 ' + (val / n).toFixed(1) + ' 金 · ' + mk.tag + '</div></div>' +
             '<span class="sp">' + val + ' 金</span>' +
             '<button class="btn mini" data-boxcrop="' + id + '" title="整批放进收购箱，原价结算">📦</button>' +
           '</div>';
@@ -961,9 +964,13 @@
     const body =
       '<div class="rule-sec">' +
         '<h4>🌤️ 天气</h4>' +
-        '<table class="rule-table"><tr><th>天气</th><th>概率</th><th>效果</th></tr>' +
+        '<table class="rule-table"><tr><th>天气</th><th>出现季节</th><th>效果</th></tr>' +
         G.WEATHER_LIST.map(function (w) {
-          return '<tr><td>' + w.emoji + ' ' + w.name + '</td><td>' + w.w + '%</td><td>' + w.note + '</td></tr>';
+          const who = G.SEASONS.filter(function (_, i) {
+            const t = G.SEASON_WEATHER[i] || {};
+            return (t[w.id] || 0) > 0;
+          }).join(' / ');
+          return '<tr><td>' + w.emoji + ' ' + w.name + '</td><td>' + (who || '—') + '</td><td>' + w.note + '</td></tr>';
         }).join('') + '</table>' +
       '</div>' +
 
@@ -983,6 +990,12 @@
         '每种作物只在<b>特定季节</b>能种、能买（见表里的「季节」列）；<b>冬天土地封冻、河面结冰</b>——' +
         '不能播种、不能钓鱼（渔网也收不了），只能打工、卖库存、交委托。<br>' +
         '已经种下的作物不受换季影响，该熟还会熟。</p>' +
+        '<table class="rule-table"><tr><th>季节</th><th>特点</th></tr>' +
+        '<tr><td>🌱 春</td><td><b>多雨</b>（雨天 50%，自动浇水）</td></tr>' +
+        '<tr><td>☀️ 夏</td><td><b>多晴</b>（晴天 60%）· <b>浇水要 2 体力</b>（其他季节 1 点）</td></tr>' +
+        '<tr><td>🍂 秋</td><td><b>丰收</b>：普通作物每次收获 <b>+1 个</b>（大作物不算）</td></tr>' +
+        '<tr><td>❄️ 冬</td><td>会<b>下雪</b>（45%，化雪等于自动浇水）· 不能种也不能钓</td></tr>' +
+        '</table>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -1007,7 +1020,12 @@
 
       '<div class="rule-sec">' +
         '<h4>🧺 农产品店</h4>' +
-        '<p>作物在这里直接卖，同样 <b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>；仓库不再直接出售任何东西。<br>' +
+        '<p>作物在这里直接卖，同样 <b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>，再乘<b>市价系数</b>；仓库不再直接出售任何东西。<br>' +
+        '<b>市价</b> = 供需 × 季节：<br>' +
+        '· <b>供需</b>：最近卖得越多越便宜（每件 −2%，最低 ×0.75），隔天回落 20%；卖得少就是 ×1.15（稀缺）<br>' +
+        '· <b>季节</b>：当季 <b>×1.15</b>（当令好卖），反季 <b>×0.90</b>（放久了不新鲜）<br>' +
+        '· 两相乘就是最终系数，界面上直接显示「市价 ×1.18 · 当季 · 平稳」<br>' +
+        '所以：<b>别一次性把同一种菜全砸出去</b>，分几天卖或者换季再卖更划算。<br>' +
         '店里每天同样进一批作物（一般品质），买价是售价的 ' + G.BALANCE.shop.cropPriceMul +
         ' 倍，转手必亏，只在凑委托或应急时买。<br>' +
         '南瓜 <b>D' + G.CROP_UNLOCK.pumpkin + '</b> 起、西瓜 <b>D' + G.CROP_UNLOCK.watermelon + '</b> 起才进货。</p>' +
@@ -1324,12 +1342,15 @@
       const n = G.storeCount(state, id);
       const val = G.storeValue(state, id);
       const mix = G.storeMix(state, id);
+      const mk = G.marketInfo(state, id);
       return '<div class="store-row">' +
         '<span class="se">' + c.emoji + '</span>' +
-        '<div><div class="sn">' + c.name + ' ×' + n + '</div>' +
+        '<div><div class="sn">' + c.name + ' ×' + n +
+          ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b>' +
+          (mk.inSeason ? ' <b class="own">当季</b>' : ' <b class="lock">反季</b>') + '</div>' +
         '<div class="sv">' + mix.map(function (m) {
           return '<span style="color:' + m.color + '">' + m.name + ' ' + m.n + '</span>';
-        }).join(' · ') + ' · 均 ' + (val / n).toFixed(1) + ' 金</div></div>' +
+        }).join(' · ') + ' · 均 ' + (val / n).toFixed(1) + ' 金 · ' + mk.tag + '</div></div>' +
         '<span class="sp">' + val + ' 金</span>' +
         '<button class="btn mini" data-sellcrop="' + id + '">卖出</button>' +
       '</div>';
@@ -1541,36 +1562,34 @@
           (!open || state.coins < k.price ? ' disabled' : '') + '>买1</button></div>';
     }).join('');
 
-    const junk = G.fishGroups(state, 'junk');
+    // 百货店只收宝箱，杂物一律不收（只能进收购箱）
+    const junk = G.fishGroups(state, 'junk').filter(function (g) { return g.chest; });
     const CHECK = {
       wood: '开箱 10–26 金',
       iron: '开箱：肥料×6–9 / 种子×8–12 / 面团×12–18 / 蚯蚓×12–18',
       gold: '开箱：200–320 金 + 特效肥×3–5 / 稀有种子×2–3 / 蚯蚓×14–18'
     };
     const junkRows = junk.length ? junk.map(function (g) {
-      const isChest = !!g.chest;
-      const k = isChest ? G.CHESTS[g.chest] : null;
-      const needKey = isChest && k && k.key;
+      const k = G.CHESTS[g.chest];
+      const needKey = k && k.key;
       const keys = (state.keys && state.keys[needKey]) || 0;
-      const loot = isChest ? (CHECK[g.chest] || '') : '';
+      const loot = CHECK[g.chest] || '';
       return '<div class="store-row">' +
         '<span class="se">' + g.emoji + '</span>' +
         '<div><div class="sn">' + g.name + ' ×' + g.count + '</div>' +
-        '<div class="sv">' + (isChest
-          ? (needKey ? '要' + G.KEYS[needKey].name + '（持有 ' + keys + '）· ' : '直接开 · ') +
-            loot + ' · 回收 ' + G.shopValue(g.v) + ' 金/个'
-          : '回收 ' + G.shopValue(g.v) + ' 金/个') + '</div></div>' +
-        (isChest ? '<button class="btn mini primary" data-openchest="' + g.key + '"' +
-          (needKey && !keys ? ' disabled' : '') + '>开箱</button>' : '') +
+        '<div class="sv">' + (needKey ? '要' + G.KEYS[needKey].name + '（持有 ' + keys + '）· ' : '直接开 · ') +
+          loot + ' · 回收 ' + G.shopValue(g.v) + ' 金/个</div></div>' +
+        '<button class="btn mini primary" data-openchest="' + g.key + '"' +
+          (needKey && !keys ? ' disabled' : '') + '>开箱</button>' +
         '<button class="btn mini" data-selljunk="' + g.key + '">回收</button></div>';
-    }).join('') : '<div class="store-empty">还没有杂物和宝箱，去河边多甩两杆</div>';
+    }).join('') : '<div class="store-empty">还没有宝箱，去河边捞一捞</div>';
 
     openModal('🏬 百货店',
       '<div class="shop-head">💰 <b>' + state.coins + '</b> 金</div>' +
       '<div class="store-sub">🍵 茶叶 · 买回去喝下午茶</div>' + teaRows +
       '<div class="store-sub" style="margin-top:10px">🗝️ 钥匙 · 钓鱼 Lv' + G.KEYS.iron.lv + ' / Lv' +
         G.KEYS.gold.lv + ' 解锁</div>' + keyRows +
-      '<div class="store-sub" style="margin-top:10px">♻️ 回收站 · 杂物与宝箱（水产店不收）</div>' + junkRows +
+      '<div class="store-sub" style="margin-top:10px">♻️ 宝箱回收 · 只收宝箱，杂物不收</div>' + junkRows +
       '<div class="shop-tip">宝箱按钓鱼等级掉落：木制随便掉、铁制 <b>Lv' + G.BALANCE.chest.ironLv +
         '</b> 起、黄金 <b>Lv' + G.BALANCE.chest.goldLv + '</b> 起后两者要用钥匙开。<br>' +
         '对照：铁箱一包物资（约 80 金），钥匙 40；金箱 200–320 金 + 一件高级物品，钥匙 120 —— <b>开箱比回收划算</b>，钥匙不够就先攒着。<br>' +

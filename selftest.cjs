@@ -184,14 +184,16 @@ s = G.createState();
 s.bait.worm = 20; G.addStore(s, 'carrot', 'std', 2);
 for (let i = 0; i < 3; i++) { s.energy = 10; G.fish(s, 'worm'); }
 const beforeAll = s.coins;
+const expectAll = G.shopSellValue(s, 'carrot');
 const rAll = G.sellAll(s);
-ok(rAll.ok && s.coins === beforeAll + 6 && s.fishBag.length > 0 && Object.keys(s.store).length === 0,
-   '仓库「全部卖出」只卖作物（8 折），渔获留给水产店', { coins: s.coins - beforeAll, fish: s.fishBag.length });
+ok(rAll.ok && s.coins === beforeAll + expectAll && s.fishBag.length > 0 && Object.keys(s.store).length === 0,
+   '仓库「全部卖出」只卖作物（8 折 × 市价），渔获留给水产店', { coins: s.coins - beforeAll, fish: s.fishBag.length });
 
 /* 天气只影响上钩概率，不影响售价 */
 section('天气 → 上钩概率');
 const wIds = Object.keys(G.WEATHER);
-ok(wIds.length === 3 && !wIds.includes('storm'), '天气只有 晴/阴/雨 三种', wIds);
+ok(wIds.length === 4 && wIds.includes('sunny') && wIds.includes('snow') && !wIds.includes('storm'),
+  '天气有 晴/阴/雨/雪 四种', wIds);
 ok(G.WEATHER.sunny.w + G.WEATHER.cloudy.w + G.WEATHER.rain.w === 100, '天气概率合计 100%',
    [G.WEATHER.sunny.w, G.WEATHER.cloudy.w, G.WEATHER.rain.w]);
 ok(G.WEATHER.sunny.hookMod === -0.12 && G.WEATHER.cloudy.hookMod === 0 && G.WEATHER.rain.hookMod === 0.08,
@@ -562,7 +564,8 @@ G.addStore(s, 'carrot', 'legend', 1);
 const vAll = 2 * G.unitValue('carrot', 'bad') + G.unitValue('carrot', 'legend');
 ok(G.storeValue(s, 'carrot') === vAll && G.storeCount(s, 'carrot') === 3, '仓库估值按品质累加', G.storeValue(s, 'carrot'));
 const coinsQ = s.coins;
-ok(G.sellOne(s, 'carrot').ok && s.coins - coinsQ === G.shopValue(vAll) && !s.store.carrot, '单卖按品质结算（8 折）');
+const expectQ = G.shopSellValue(s, 'carrot');
+ok(G.sellOne(s, 'carrot').ok && s.coins - coinsQ === expectQ && !s.store.carrot, '单卖按品质结算（8 折 × 市价）');
 ok(G.storeMix(s, 'carrot').length === 0, '卖空后仓库不留空桶');
 
 s = G.createState();
@@ -1123,15 +1126,17 @@ section('v1.9 收购箱与统计');
 G.setRng(mulberry32(99));
 let bs = G.createState(); bs.coins = 100;
 G.addStore(bs, 'carrot', 'std', 10);                       // 原价 40 金
-ok(G.shopSellValue(bs, 'carrot') === 32, '商店直接收购 8 折', G.shopSellValue(bs, 'carrot'));
+const mktCarrot = G.marketMul(bs, 'carrot');
+ok(G.shopSellValue(bs, 'carrot') === Math.round(32 * mktCarrot), '商店直接收购 8 折 × 市价', G.shopSellValue(bs, 'carrot'));
+const boxExpect = Math.round(40 * mktCarrot);
 ok(G.boxPutCrop(bs, 'carrot').ok && G.boxCount(bs) === 1 && G.storeCount(bs, 'carrot') === 0,
   '作物整批放进收购箱');
-ok(G.boxValue(bs) === 40, '收购箱按原价估值', G.boxValue(bs));
+ok(G.boxValue(bs) === boxExpect, '收购箱按原价 × 市价估值', [G.boxValue(bs), boxExpect]);
 
 const beforeShip = bs.coins, shipFee = G.mealFee(bs);
 G.sleep(bs);
-ok(G.boxCount(bs) === 0 && bs.coins === beforeShip + 40 - shipFee, '睡觉时按原价结清收购箱',
-  { coins: bs.coins, expect: beforeShip + 40 - shipFee });
+ok(G.boxCount(bs) === 0 && bs.coins === beforeShip + boxExpect - shipFee, '睡觉时按原价结清收购箱',
+  { coins: bs.coins, expect: beforeShip + boxExpect - shipFee });
 
 let bf = G.createState();
 bf.fishBag = [{ name: '鲫鱼', emoji: '🐟', q: 'std', v: 3, d: 1 }];
@@ -1210,7 +1215,8 @@ ok(G.achPts(ab) === 7 && G.sellBonus(ab) === 1, '不足 10 点没有加成', [G.
 ab.ach.fish7 = 1;                                                                     // +5 → 12
 ok(G.achPts(ab) === 12 && Math.abs(G.sellBonus(ab) - 1.01) < 1e-9, '满 10 点 +1% 售价', G.sellBonus(ab));
 G.addStore(ab, 'carrot', 'std', 100);          // 原价 400
-ok(G.shopSellValue(ab, 'carrot') === 323, '售价加成作用于商店收购', G.shopSellValue(ab, 'carrot'));
+ok(G.shopSellValue(ab, 'carrot') === Math.round(400 * 0.8 * 1.01 * G.marketMul(ab, 'carrot')),
+  '售价加成作用于商店收购', G.shopSellValue(ab, 'carrot'));
 
 /* ---------- v2.2 维护费 / 委托优化 / 收购箱 ---------- */
 section('v2.2 维护费与委托');
@@ -1420,6 +1426,66 @@ ok(v24nr.got === 0 && v24Net.bait.dough === 5, '冬天渔网不工作、也不�
 
 ok(G.TEAS.green.day === 1 && G.TEAS.coffee.day === 16, '茶提前到 D1 / D5 / D10 / D16',
   [G.TEAS.green.day, G.TEAS.black.day, G.TEAS.milk.day, G.TEAS.coffee.day]);
+
+/* ---------- 5g. v2.5 四季特点 / 市场价格 ---------- */
+section('v2.5 四季与市场');
+
+G.setRng(mulberry32(77));
+const wSpring = { sunny: 0, cloudy: 0, rain: 0, snow: 0 };
+for (let i = 0; i < 4000; i++) wSpring[G.rollWeather(15)]++;
+ok(wSpring.rain > wSpring.sunny && wSpring.snow === 0, '春天雨天最多、不下雪', wSpring);
+
+const wSummer = { sunny: 0, cloudy: 0, rain: 0, snow: 0 };
+for (let i = 0; i < 4000; i++) wSummer[G.rollWeather(45)]++;
+ok(wSummer.sunny > wSummer.rain * 2, '夏天晴天明显更多', wSummer);
+
+const wWinter = { sunny: 0, cloudy: 0, rain: 0, snow: 0 };
+for (let i = 0; i < 4000; i++) wWinter[G.rollWeather(100)]++;
+ok(wWinter.snow > 0 && wWinter.rain === 0, '冬天下雪、不下雨', wWinter);
+
+/* 夏天浇水 2 体力 */
+const v25w = G.createState();
+v25w.day = 31; v25w.energy = 10; v25w.seeds = { potato: 1 };
+G.plant(v25w, 0, 'potato');
+G.water(v25w, 0);
+ok(v25w.energy === 7, '夏天浇水花 2 体力（种下 1 + 浇水 2）', v25w.energy);
+const v25w2 = G.createState();
+v25w2.day = 1; v25w2.energy = 10; v25w2.seeds = { potato: 1 };
+G.plant(v25w2, 0, 'potato');
+G.water(v25w2, 0);
+ok(v25w2.energy === 8, '春天浇水花 1 体力（种下 1 + 浇水 1）', v25w2.energy);
+
+/* 秋天收获 +1 */
+function v25harvest(day) {
+  G.setRng(mulberry32(42));
+  const st = G.createState();
+  st.day = day; st.energy = 10; st.seeds = { carrot: 1 };
+  G.plant(st, 0, 'carrot');
+  st.plots[0].phase = 'ripe';
+  st.plots[0].ripeDay = st.day - 1;
+  return G.harvest(st, 0).qty;
+}
+ok(v25harvest(61) === v25harvest(1) + 1, '秋天收获 +1 个', [v25harvest(1), v25harvest(61)]);
+
+/* 市场：供需 + 季节 */
+const v25m = G.createState();
+const v25base = G.marketMul(v25m, 'carrot');
+ok(Math.abs(v25base - 1.05 * 1.05) < 1e-9, '没人卖过：稀缺 ×1.05 × 当季 ×1.05', v25base);
+G.addSupply(v25m, 'carrot', 15);
+ok(G.marketMul(v25m, 'carrot') < v25base, '卖得越多越便宜', G.marketMul(v25m, 'carrot'));
+G.addSupply(v25m, 'carrot', 60);
+ok(Math.abs(G.marketInfo(v25m, 'carrot').supply - 0.75) < 1e-9, '供给有 0.75 下限');
+ok(Math.abs(G.marketInfo(v25m, 'watermelon').season - 0.9) < 1e-9, '反季作物 ×0.90');
+
+/* 睡觉后销量衰减 20% */
+const v25d = G.createState();
+v25d.coins = 500;
+G.addStore(v25d, 'carrot', 'std', 10);
+G.sellOne(v25d, 'carrot');
+const v25sold = v25d.market.carrot.sold;
+G.sleep(v25d);
+ok(!v25d.market.carrot || Math.abs(v25d.market.carrot.sold - v25sold * 0.8) < 1e-9,
+  '睡觉后市场销量衰减 20%', v25sold);
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');

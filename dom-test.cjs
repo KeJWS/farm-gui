@@ -202,7 +202,7 @@ ok(html('#modal-root').indexOf('百货店') >= 0 && html('#modal-root').indexOf(
    '百货店弹窗能打开');
 ok(html('#modal-root').indexOf('data-buytea="green"') >= 0, '百货店能买茶');
 ok(html('#modal-root').indexOf('钓鱼 Lv4 解锁') >= 0, '铁钥匙按钓鱼等级锁定');
-ok(html('#modal-root').indexOf('水产店不收') >= 0, '百货店说明水产店不收杂物');
+ok(html('#modal-root').indexOf('只收宝箱') >= 0, '百货店只收宝箱、不收杂物');
 ok(html('#modal-root').indexOf('data-openchest') >= 0 && html('#modal-root').indexOf('木制宝箱') >= 0,
    '百货店能开仓里的宝箱');
 

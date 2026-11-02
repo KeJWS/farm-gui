@@ -164,9 +164,19 @@
     cloudy: { id: 'cloudy', name: '阴天',   emoji: '⛅', w: 30, hookMod: 0,     wormMod: 1,
               note: '咬钩率默认 · 挖蚯蚓 +1 份' },
     rain:   { id: 'rain',   name: '雨天',   emoji: '🌧️', w: 25, hookMod: 0.08,  wormMod: 1, autoWater: true,
-              note: '自动浇水 · 咬钩率 +8% · 挖蚯蚓 +1 份' }
+              note: '自动浇水 · 咬钩率 +8% · 挖蚯蚓 +1 份' },
+    snow:   { id: 'snow',   name: '雪天',   emoji: '❄️', w: 0,  hookMod: -0.3,  wormMod: -1, autoWater: true,
+              note: '自动浇水（化雪）· 河面结冰，冬天本来就钓不了鱼' }
   };
   const WEATHER_LIST = Object.keys(WEATHER).map(function (k) { return WEATHER[k]; });
+
+  /* 四季天气权重：春天多雨、夏天多晴、秋天温和、冬天有雪 */
+  const SEASON_WEATHER = [
+    { sunny: 25, cloudy: 25, rain: 50, snow: 0 },   // 春
+    { sunny: 60, cloudy: 25, rain: 15, snow: 0 },   // 夏
+    { sunny: 45, cloudy: 30, rain: 25, snow: 0 },   // 秋
+    { sunny: 25, cloudy: 30, rain: 0,  snow: 45 }   // 冬
+  ];
 
   const BAIT = {
     worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '好鱼概率 ×1.35 · 品质取两次较好' },
@@ -424,7 +434,13 @@
     return ss.map(function (i) { return SEASONS[i]; }).join('·');
   }
 
-  function rollWeather() { return weighted(WEATHER_LIST, 'w').id; }
+  /* 天气按季节抽：权重表见 SEASON_WEATHER（冬天会下雪） */
+  function seasonWeatherTable(day) {
+    const t = SEASON_WEATHER[seasonIdx(day)] || SEASON_WEATHER[0];
+    return Object.keys(t).filter(function (id) { return t[id] > 0 && WEATHER[id]; })
+      .map(function (id) { return { id: id, w: t[id] }; });
+  }
+  function rollWeather(day) { return weighted(seasonWeatherTable(day || 1), 'w').id; }
 
   /* 多次取最好：boost = true 滚 2 次（蚯蚓），数字则滚 N 次（施肥） */
   function rollQuality(boost) {
@@ -574,6 +590,7 @@
       store: {},
       box: [],
       fishBag: [],
+      market: {},
       ferts: { normal: 0, special: 0 },
       sprinklers: 0,
       harvester: false,
@@ -745,13 +762,17 @@
     return { ok: true, msg: c.name + ' 种下了' };
   }
 
+  /* 季节特性：夏天浇水更费体力（2 点），其他季节 1 点 */
+  function waterCost(s) { return seasonIdx(s.day) === 1 ? 2 : 1; }
+
   function water(s, idx) {
     const p = s.plots[idx];
     if (!p || !p.crop) return { ok: false, msg: '这块地还没种东西' };
     if (p.phase === 'ripe') return { ok: false, msg: '已经成熟，快点收获吧' };
     if (p.watered) return { ok: false, msg: '今天已经浇过水了' };
-    if (s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
-    s.energy -= 1;
+    const cost = waterCost(s);
+    if (s.energy < cost) return { ok: false, msg: '体力不够（浇水要 ' + cost + ' 点），先睡觉吧' };
+    s.energy -= cost;
     p.watered = true;
     const ripe = grow(p, s);
     log(s, '💧 ' + (idx + 1) + ' 号地浇水 ' + CROPS[p.crop].name +
@@ -785,6 +806,8 @@
     if (c.multi) qty = p.hits === 0 ? c.firstQty : c.regrowQty;
     else if (c.big) qty = clamp(c.base - p.missed, 1, 9);
     else qty = clamp(c.base + farmYieldBonus(s) + randInt(-1, 1) - p.missed + fertBonus(p), 1, 99);
+    // 季节特性：秋天大丰收，普通作物（含多次收）每收一次 +1
+    if (seasonIdx(s.day) === 2 && !c.big) qty += 1;
 
     // 作物也有品质：施肥会多滚一次取最好的（普通肥 / 特效肥都是取 2 次最好）
     const q = rollQuality(p.fert > 0 ? 2 : 1);
@@ -854,6 +877,7 @@
       const gain = shopSellValue(s, id);
       income += gain; count += n;
       parts.push(CROPS[id].name + '×' + n + ' = ' + gain + ' 金');
+      addSupply(s, id, n);
       delete s.store[id];
     });
     s.stats.cropsSold = (s.stats.cropsSold || 0) + count;
@@ -879,7 +903,8 @@
     const qty = Math.max(1, Math.min(have, Math.floor(n || have)));
     const t = takeStoreN(s, id, qty);
     const raw = t.parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
-    const gain = Math.max(1, Math.round(shopValue(raw) * sellBonus(s)));
+    const gain = Math.max(1, Math.round(shopValue(raw) * sellBonus(s) * marketMul(s, id)));
+    addSupply(s, id, qty);
     s.stats.cropsSold = (s.stats.cropsSold || 0) + qty;
     addCoins(s, gain, '农产品店 · 卖 ' + CROPS[id].name + '×' + qty);
     log(s, '💰 农产品店收购 ' + CROPS[id].name + '×' + qty + '，+' + gain + ' 金（8 折）', 'good');
@@ -890,6 +915,7 @@
     const n = storeCount(s, id);
     if (!n) return { ok: false, msg: '没有可卖的' };
     const gain = shopSellValue(s, id);
+    addSupply(s, id, n);
     delete s.store[id];
     s.stats.cropsSold = (s.stats.cropsSold || 0) + n;
     addCoins(s, gain, '农产品店 · 卖 ' + CROPS[id].name);
@@ -903,7 +929,6 @@
     const f = FERT[kind];
     if (!p || !p.crop) return { ok: false, msg: '这块地还没种东西' };
     if (!f) return { ok: false, msg: '没有这种肥料' };
-    if (CROPS[p.crop].big) return { ok: false, msg: '南瓜、西瓜不吃肥料' };
     if (p.fert) return { ok: false, msg: '这块地已经施过肥了' };
     if (p.phase === 'ripe') return { ok: false, msg: '都熟了，别浪费肥料' };
     if ((s.ferts[kind] || 0) < 1) return { ok: false, msg: '肥料用完了，去种子店买' };
@@ -911,7 +936,9 @@
     s.ferts[kind]--;
     s.energy -= 1;
     p.fert = f.add;
-    log(s, '🧪 ' + (idx + 1) + ' 号地施了' + f.name + '（产量 +' + f.add + '、品质取更优）', 'good');
+    const big = !!CROPS[p.crop].big;
+    log(s, '🧪 ' + (idx + 1) + ' 号地施了' + f.name +
+      (big ? '（大作物只提品质）' : '（产量 +' + f.add + '、品质取更优）'), 'good');
     return { ok: true, msg: f.name + ' 施用成功' };
   }
 
@@ -967,7 +994,6 @@
   function canFert(s, idx) {
     const p = s.plots[idx];
     if (!p || !p.crop) return false;
-    if (CROPS[p.crop].big) return false;
     if (p.fert) return false;
     if (p.phase === 'ripe') return false;
     return true;
@@ -984,7 +1010,7 @@
     const f = FERT[kind];
     if (!f) return { ok: false, msg: '没有这种肥料' };
     const targets = fertTargets(s);
-    if (!targets.length) return { ok: false, msg: '没有可施肥的地块（大作物、已施肥、已成熟都不行）' };
+    if (!targets.length) return { ok: false, msg: '没有可施肥的地块（已施肥、已成熟都不行）' };
 
     let n = 0, stop = null;
     for (let k = 0; k < targets.length; k++) {
@@ -1039,7 +1065,16 @@
     s.day++;
     s.teaUsed = false;
     s.workUsed = false;
-    s.weather = rollWeather();
+
+    // 市场冷却：昨天的销量今天只算 80%
+    s.market = s.market || {};
+    Object.keys(s.market).forEach(function (id) {
+      const m = s.market[id];
+      if (!m) return;
+      m.sold = Math.round((m.sold || 0) * 8) / 10;
+      if (m.sold < 0.5) delete s.market[id];
+    });
+    s.weather = rollWeather(s.day);
     const w = WEATHER[s.weather];
     notes.push({ kind: 'weather', text: w.emoji + ' ' + w.name });
 
@@ -1373,9 +1408,34 @@
     return n - left;
   }
 
+  /* ---------------- 市场价格 ----------------
+   * 供给：最近卖得越多越便宜（1.15 → 0.75，每件 -0.02，睡觉衰减 20%）
+   * 季节：当季 +15%（当令最好卖），反季 -10%（放久了不新鲜）
+   */
+  function marketOf(s, id) {
+    s.market = s.market || {};
+    if (!s.market[id]) s.market[id] = { sold: 0 };
+    return s.market[id];
+  }
+  function marketSold(s, id) { return (s.market && s.market[id] && s.market[id].sold) || 0; }
+
+  function marketInfo(s, id) {
+    const sold = marketSold(s, id);
+    const supply = clamp(1.05 - 0.02 * sold, 0.75, 1.05);
+    const inSeason = CROPS[id] ? cropSeasonOk(id, s.day) : true;
+    const season = inSeason ? 1.05 : 0.9;
+    const total = supply * season;
+    const tag = supply >= 1.0 ? '稀缺' : (supply <= 0.85 ? '过剩' : '平稳');
+    return { sold: sold, supply: supply, season: season, inSeason: inSeason, total: total, tag: tag };
+  }
+  function marketMul(s, id) { return marketInfo(s, id).total; }
+  function addSupply(s, id, n) { marketOf(s, id).sold += Math.max(0, n || 0); }
+
   /* 商店直接收购只给 8 折；想卖原价就放收购箱，等第二天结算 */
   function shopValue(v) { return Math.max(1, Math.round((v || 0) * BALANCE.shop.sellRate)); }
-  function shopSellValue(s, id) { return Math.max(1, Math.round(shopValue(storeValue(s, id)) * sellBonus(s))); }
+  function shopSellValue(s, id) {
+    return Math.max(1, Math.round(shopValue(storeValue(s, id)) * sellBonus(s) * marketMul(s, id)));
+  }
 
   function sellFishGroup(s, key) {
     const g = fishGroups(s, 'fish').filter(function (x) { return x.key === key; })[0];
@@ -1432,7 +1492,8 @@
     const c = CROPS[id];
     const t = takeStoreN(s, id, qty);
     const raw = t.parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
-    const v = Math.max(1, Math.round(raw * sellBonus(s)));
+    const v = Math.max(1, Math.round(raw * sellBonus(s) * marketMul(s, id)));
+    addSupply(s, id, qty);
     s.box = s.box || [];
     s.box.push({ kind: 'crop', id: id, name: c.name, emoji: c.emoji, n: qty, parts: t.parts, v: v });
     log(s, '📦 ' + c.name + '×' + qty + ' 放进收购箱（原价 ' + v + ' 金，明天结算）', 'info');
@@ -2380,6 +2441,14 @@
       if (out.chest && !CHESTS[out.chest]) delete out.chest;
       return out;
     }).filter(Boolean) : [];
+    // 市场：只保留认识的作物，销量限个范围
+    merged.market = {};
+    const rawMarket = s.market && typeof s.market === 'object' ? s.market : {};
+    Object.keys(rawMarket).forEach(function (id) {
+      if (!CROPS[id]) return;
+      const sold = num(rawMarket[id] && rawMarket[id].sold, 0, 0, 9999);
+      if (sold > 0) merged.market[id] = { sold: Math.round(sold * 10) / 10 };
+    });
     merged.ferts = Object.assign({ normal: 0, special: 0 }, s.ferts || {});
     merged.ferts.normal = Math.round(num(merged.ferts.normal, 0, 0, 999));
     merged.ferts.special = Math.round(num(merged.ferts.special, 0, 0, 999));
@@ -2491,6 +2560,8 @@
     WEATHER: WEATHER, WEATHER_LIST: WEATHER_LIST, BAIT: BAIT, SAVE_VERSION: SAVE_VERSION,
     setRng: setRng, seasonOf: seasonOf, SEASONS: SEASONS,
     seasonIdx: seasonIdx, isWinter: isWinter, cropSeasonOk: cropSeasonOk, seasonText: seasonText,
+    waterCost: waterCost, seasonWeatherTable: seasonWeatherTable, SEASON_WEATHER: SEASON_WEATHER,
+    marketInfo: marketInfo, marketMul: marketMul, addSupply: addSupply,
     createState: createState, serialize: serialize, deserialize: deserialize,
     ledgerByDay: ledgerByDay, logByDay: logByDay,
     makeOrders: makeOrders, deliverOrder: deliverOrder, orderHave: orderHave, orderPool: orderPool,
