@@ -150,14 +150,15 @@ const junkEntries = s.fishBook.entries.filter(e => e.trash);
 const junkOk = junkEntries.length > 0 && junkEntries.every(e =>
   e.quality === null && e.price === 1 && ['易拉罐', '旧靴子', '水草'].includes(e.fish));
 ok(junkOk, '垃圾无品质、固定 1 金、名字来自三种杂物', junkEntries.slice(0, 2));
-const fishWithoutQuality = s.fishBook.entries.filter(e => !e.trash).every(e => e.quality && e.quality.mul);
+const fishWithoutQuality = s.fishBook.entries.filter(e => !e.trash && !e.chest).every(e => e.quality && e.quality.mul);
 ok(fishWithoutQuality, '非垃圾鱼都带品质');
 
 /* 卖鱼 */
 const bagBefore = s.fishBag.slice();
+const fishOnly = bagBefore.filter(e => !e.trash && !e.chest).reduce((n, e) => n + e.v, 0);
 const soldAll = G.sellAllFish(s);
-ok(soldAll.ok && soldAll.income === G.shopValue(total) && s.coins === coinsAtStart + G.shopValue(total) && s.fishBag.length === 0,
-   '全部卖鱼：按 8 折结算', { gain: soldAll.income, full: total });
+ok(soldAll.ok && soldAll.income === G.shopValue(fishOnly) && s.coins === coinsAtStart + G.shopValue(fishOnly) && s.fishBag.every(e => e.trash || e.chest),
+   '全部卖鱼：按 8 折结算，杂物和宝箱留下', { gain: soldAll.income, full: fishOnly });
 
 /* 分组出售 */
 s.bait.worm = 100;
@@ -167,11 +168,11 @@ for (let i = 0; i < 60 && got12 < 12; i++) {
   const rr = G.fish(s, 'worm');
   if (rr.ok && rr.entry) got12++;
 }
-const groups = G.fishGroups(s);
+const groups = G.fishGroups(s, "fish");
 ok(groups.length >= 1 && groups.reduce((n, g) => n + g.count, 0) === 12, '渔获按鱼种+品质分组', groups.length);
 const g0 = groups[0], coinsBeforeGroup = s.coins;
 const rGroup = G.sellFishGroup(s, g0.key);
-ok(rGroup.ok && s.coins === coinsBeforeGroup + G.shopValue(g0.v * g0.count) && s.fishBag.length === 12 - g0.count,
+ok(rGroup.ok && s.coins === coinsBeforeGroup + G.shopValue(g0.v * g0.count) && G.fishGroups(s, "fish").reduce((n, g) => n + g.count, 0) === 12 - g0.count,
    '卖一组鱼结算正确（8 折）', { key: g0.key, gain: rGroup.income });
 
 /* 全部卖出（作物 + 渔获） */
@@ -291,7 +292,7 @@ ok(wr.ok && s.energy === 0 && s.coins === 6, '刚好够半天：消耗 5、赚 6
 section('种子店');
 ok(G.seedBuyPrice(G.CROPS.carrot) === 5 && G.seedSellPrice(G.CROPS.carrot) === 2, '萝卜：买 5 金 / 卖 2 金');
 ok(G.seedSellPrice(G.CROPS.corn) === 7, '玉米买 14 → 卖 7（向下取整）');
-ok(G.seedSellPrice(G.CROPS.watermelon) === 16, '西瓜买 32 → 卖 16');
+ok(G.seedSellPrice(G.CROPS.watermelon) === 18, '西瓜买 36 → 卖 18');
 
 s = G.createState();                       // 50 金
 s.levels.farm = 3;                                  // 玉米种子要种田 Lv2
@@ -435,8 +436,8 @@ function profitPerDay(c) {
   return (revenue - c.seed) / days;
 }
 const ppd = G.CROP_LIST.map(function (c) { return { name: c.name, v: profitPerDay(c) }; });
-ok(ppd.every(function (x) { return x.v > 2 && x.v < 10; }),
-   '所有作物利润/天落在 2~10 金', ppd.map(function (x) { return x.name + ' ' + x.v.toFixed(1); }).join(' / '));
+ok(ppd.every(function (x) { return x.v > 2 && x.v < 30; }),
+   '所有作物利润/天落在 2~30 金', ppd.map(function (x) { return x.name + ' ' + x.v.toFixed(1); }).join(' / '));
 ok(ppd[0].name === '萝卜' && ppd[0].v === Math.min.apply(null, ppd.map(function (x) { return x.v; })),
    '萝卜仍是最低收益（3.5/天）');
 
@@ -916,7 +917,7 @@ ok(rate > 0.6 && rate < 0.8, '渔网上鱼率约 70%', (rate * 100).toFixed(0) +
 
 G.setRng(mulberry32(9)); const t1 = avgTier(1);
 G.setRng(mulberry32(9)); const t2 = avgTier(2);
-ok(Math.abs(t1 - t2) < 0.06, '普通肥与特效肥的品质加成一致', [t1.toFixed(2), t2.toFixed(2)]);
+ok(t2 > t1 + 0.15, '特效肥品质明显优于普通肥（3 次 vs 2 次）', [t1.toFixed(2), t2.toFixed(2)]);
 ok(t1 > 0.3, '施肥仍然提升品质', t1.toFixed(2));
 
 s = G.createState(); s.coins = 1000;
@@ -992,7 +993,7 @@ section('v1.7 农产品店与等级');
 G.setRng(mulberry32(77));
 let cs = G.createState();
 cs.coins = 1000;
-ok(G.cropBuyPrice('carrot') === 7 && G.cropBuyPrice('pumpkin') === 108, '农产品买价 = 售价 ×1.8',
+ok(G.cropBuyPrice('carrot') === 7 && G.cropBuyPrice('pumpkin') === 198, '农产品买价 = 售价 ×1.8',
   [G.cropBuyPrice('carrot'), G.cropBuyPrice('pumpkin')]);
 ok(G.cropBuyPrice('tomato') > Math.round(G.CROPS.tomato.price * G.BALANCE.order.mult),
   '买农产品凑委托必亏（买价 > 委托价）');
@@ -1032,8 +1033,8 @@ ok(G.expectedYield(G.createState(), lvPlot) === 3, 'Lv1 萝卜预计产量 3');
 let lvF = G.createState();
 ok(G.fishHookBonus(lvF) === 0 && G.fishGoodBonus(lvF) === 1, 'Lv1 没有钓鱼加成');
 G.addLevelXp(lvF, 'fish', 1e6);
-ok(lvF.levels.fish === 10 && Math.abs(G.fishHookBonus(lvF) - 0.08) < 1e-9, '满级钓鱼咬钩 +8%');
-ok(Math.abs(G.fishGoodBonus(lvF) - 1.18) < 1e-9, '满级好鱼权重 +18%', G.fishGoodBonus(lvF).toFixed(2));
+ok(lvF.levels.fish === 10 && Math.abs(G.fishHookBonus(lvF) - 0.099) < 1e-9, '满级钓鱼咬钩 +9.9%');
+ok(Math.abs(G.fishGoodBonus(lvF) - 1.225) < 1e-9, '满级好鱼权重 +22.5%', G.fishGoodBonus(lvF).toFixed(2));
 
 ok(G.checkAchievements(lvS).some(x => x.id === 'farmLv3'), '等级成就可解锁');
 
@@ -1051,7 +1052,7 @@ let lureS = G.createState(); lureS.coins = 100;
 G.buyBait(lureS, 'lure', 1);
 ok(lureS.lure.dur === 25 && lureS.coins === 95, '假饵 5 金 · 耐用 25 次', lureS.lure.dur);
 
-ok(G.ACH.length === 39, '成就总数 39', G.ACH.length);
+ok(G.ACH.length === 43, '成就总数 43', G.ACH.length);
 
 const retro = G.deserialize({ plots: [], coins: 100, day: 20, stats: { harvests: 100, casts: 300 } });
 ok(retro.levels.farm > 1 && retro.levels.fish > 1, '老存档按历史次数补等级',
@@ -1207,8 +1208,8 @@ ok(G.shopSellValue(ab, 'carrot') === 323, '售价加成作用于商店收购', G
 
 /* ---------- v2.2 维护费 / 委托优化 / 收购箱 ---------- */
 section('v2.2 维护费与委托');
-ok(G.plotUpkeep(10) === 15 && G.plotUpkeep(20) === 45 && G.plotUpkeep(25) === 75 && G.plotUpkeep(36) === 165,
-  '土地维护费分段 3 / 6 / 10',
+ok(G.plotUpkeep(10) === 15 && G.plotUpkeep(20) === 45 && G.plotUpkeep(25) === 75 && G.plotUpkeep(36) === 189,
+  '土地维护费分段 3 / 6 / 14',
   [G.plotUpkeep(10), G.plotUpkeep(20), G.plotUpkeep(25), G.plotUpkeep(36)]);
 
 let ordS = G.createState(); ordS.day = 60; ordS.levels.farm = 8;
@@ -1245,6 +1246,130 @@ const boxAch = G.checkAchievements(Object.assign(G.createState(),
   { stats: { boxItems: 500, boxIncome: 5000 } }));
 ok(boxAch.some(function (x) { return x.id === 'box100'; }) &&
    boxAch.some(function (x) { return x.id === 'boxval5k'; }), '收购箱成就能解锁');
+
+/* ---------- 5d. v2.3 大作物 / 等级 / 委托保底 ---------- */
+section('v2.3 大作物与等级');
+
+ok(G.CROPS.pumpkin.base === 1 && G.CROPS.pumpkin.price === 110 && G.CROPS.pumpkin.seed === 26,
+  '南瓜改成 1 个/株 · 110 金 · 种子 26', [G.CROPS.pumpkin.base, G.CROPS.pumpkin.price, G.CROPS.pumpkin.seed]);
+ok(G.CROPS.watermelon.base === 1 && G.CROPS.watermelon.price === 140 && G.CROPS.watermelon.seed === 36,
+  '西瓜改成 1 个/株 · 140 金 · 种子 36', [G.CROPS.watermelon.base, G.CROPS.watermelon.price, G.CROPS.watermelon.seed]);
+
+/* 大作物：固定 1 个，只吃肥料品质加成 */
+const v23bigS = G.createState();
+const v23bigP = { crop: 'watermelon', phase: 'grow', missed: 0, fert: 2, hits: 0 };
+ok(G.expectedYield(v23bigS, v23bigP) === 1, '大作物固定 1 个（肥料不加量）', G.expectedYield(v23bigS, v23bigP));
+v23bigS.levels.farm = 10;
+ok(G.expectedYield(v23bigS, v23bigP) === 1, '大作物不吃等级加成（Lv10 仍是 1 个）', G.expectedYield(v23bigS, v23bigP));
+ok(G.fertBonus(v23bigP) === 0, '大作物肥料加成为 0', G.fertBonus(v23bigP));
+
+/* 普通作物：每 4 级 +1 */
+const v23lvS = G.createState();
+const v23normP = { crop: 'eggplant', phase: 'grow', missed: 0, fert: 0, hits: 0 };
+const v23yAt = (lv) => { v23lvS.levels.farm = lv; return G.expectedYield(v23lvS, v23normP); };
+ok(v23yAt(3) === 2 && v23yAt(4) === 3 && v23yAt(7) === 3 && v23yAt(8) === 4,
+  '产量曲线 floor(lv/4)：Lv3=2 / Lv4=3 / Lv7=3 / Lv8=4',
+  [v23yAt(3), v23yAt(4), v23yAt(7), v23yAt(8)]);
+ok(G.levelEffectText('farm', 8) === '收获产量 +2', '等级文案同步 floor(lv/4)', G.levelEffectText('farm', 8));
+
+/* 委托保底：第一张单是最贵的可买作物 */
+const v23fo = G.createState();
+v23fo.day = 40; v23fo.levels.farm = 6;
+G.setRng(mulberry32(31));
+const v23fOrders = G.makeOrders(v23fo);
+const v23fPool = G.orderPool(40, 6).filter(c => (c.lv || 1) <= 6);
+const v23fTop = v23fPool.slice().sort((a, b) => b.price - a.price)[0];
+ok(v23fOrders[0].flagship === true && v23fOrders[0].crop === v23fTop.id,
+  '委托保底：第一张单是最贵可买作物', { got: v23fOrders[0].crop, want: v23fTop.id });
+let v23flagshipOk = true;
+for (let i = 0; i < 20; i++) {
+  G.setRng(mulberry32(200 + i));
+  const oo = G.makeOrders(v23fo);
+  if (!oo[0].flagship || oo[0].crop !== v23fTop.id) { v23flagshipOk = false; break; }
+}
+ok(v23flagshipOk, '委托保底 20 次随机都成立');
+
+/* 钓鱼等级：每 2 杆 1 点经验 */
+const v23xpS = G.createState();
+v23xpS.energy = 400; v23xpS.maxEnergy = 400; v23xpS.bait.dough = 400;
+G.setRng(mulberry32(5));
+const v23xp0 = v23xpS.levels.fishXp + (v23xpS.levels.fish - 1) * 0;
+let v23xpGain = 0;
+for (let i = 0; i < 10; i++) { const before = v23xpS.levels.fishXp; const r = G.fish(v23xpS, 'dough'); v23xpGain += (v23xpS.levels.fishXp - before) + (v23xpS.levels.fish > 1 ? 0 : 0); }
+ok(v23xpGain >= 3 && v23xpGain <= 6, '10 杆大约 +5 点经验（2 杆 1 点）', v23xpGain);
+
+/* ---------- 5e. v2.3 百货店：茶 / 钥匙 / 宝箱 ---------- */
+section('v2.3 百货店');
+
+let v23tS = G.createState();
+v23tS.coins = 200;
+const v23buyG = G.buyTea(v23tS, 'green', 3);
+ok(v23buyG.ok && v23tS.coins === 164 && v23tS.teas.green === 3, '买 3 份绿茶 -36 金', { coins: v23tS.coins, teas: v23tS.teas });
+v23tS.energy = 5; v23tS.maxEnergy = 20;
+const v23drinkG = G.tea(v23tS, 'green');
+ok(v23drinkG.ok && v23tS.energy === 9 && v23tS.teas.green === 2 && v23tS.coins === 164,
+  '下午茶消耗茶、不再扣金币', { energy: v23tS.energy, teas: v23tS.teas.green, coins: v23tS.coins });
+ok(v23tS.stats.teas === 1, '下午茶计入统计', v23tS.stats.teas);
+ok(!G.tea(v23tS, 'green').ok, '一天只能喝一杯');
+const v23tS2 = G.createState();
+v23tS2.energy = 5;
+ok(!G.tea(v23tS2, 'green').ok, '没有茶就喝不了');
+
+const v23keyS = G.createState();
+v23keyS.coins = 500;
+v23keyS.levels.fish = 3;
+ok(!G.buyKey(v23keyS, 'iron', 1).ok, '钓鱼 Lv3 买不到铁钥匙');
+v23keyS.levels.fish = 4;
+ok(G.buyKey(v23keyS, 'iron', 1).ok && v23keyS.keys.iron === 1 && v23keyS.coins === 460, 'Lv4 解锁铁钥匙 40 金', v23keyS.keys);
+ok(!G.buyKey(v23keyS, 'gold', 1).ok, '金钥匙要 Lv7');
+v23keyS.levels.fish = 7;
+ok(G.buyKey(v23keyS, 'gold', 1).ok && v23keyS.keys.gold === 1, 'Lv7 解锁金钥匙');
+
+/* 宝箱：木箱直接开、铁箱要钥匙 */
+const v23chS = G.createState();
+v23chS.fishBag.push({ name: '木制宝箱', emoji: '🪵', q: null, v: 8, d: 1, no: true, chest: 'wood' });
+v23chS.fishBag.push({ name: '铁制宝箱', emoji: '🧰', q: null, v: 34, d: 1, no: true, chest: 'iron' });
+const v23woodKey = G.fishGroups(v23chS, 'junk').filter(g => g.chest === 'wood')[0].key;
+const v23ironKey = G.fishGroups(v23chS, 'junk').filter(g => g.chest === 'iron')[0].key;
+const v23coinsBeforeChest = v23chS.coins;
+const v23rWood = G.openChest(v23chS, v23woodKey);
+ok(v23rWood.ok && v23chS.coins > v23coinsBeforeChest && v23chS.stats.chests === 1,
+  '木制宝箱直接开、给金币', { gain: v23chS.coins - v23coinsBeforeChest });
+ok(!G.openChest(v23chS, v23ironKey).ok, '没有铁钥匙开不了铁箱');
+v23chS.keys.iron = 1;
+const v23rIron = G.openChest(v23chS, v23ironKey);
+ok(v23rIron.ok && v23chS.keys.iron === 0 && v23chS.stats.chests === 2, '用掉一把钥匙开铁箱', v23rIron.msg);
+ok(v23chS.fishBag.length === 0, '开完的宝箱从仓库移除', v23chS.fishBag.length);
+
+/* 水产店不收杂物和宝箱，收购箱收 */
+const v23jS = G.createState();
+v23jS.fishBag.push({ name: '易拉罐', emoji: '🥫', q: null, v: 1, d: 1, no: true, trash: true });
+v23jS.fishBag.push({ name: '鲤鱼', emoji: '🐟', q: 'std', v: 6, d: 1 });
+ok(G.fishGroups(v23jS, 'fish').length === 1 && G.fishGroups(v23jS, 'junk').length === 1, '渔获分组可分鱼 / 杂物', null);
+const v23boxJunk = G.boxPutFish(v23jS, G.fishKey(v23jS.fishBag[0]), 1);
+ok(v23boxJunk.ok, '杂物可以放进收购箱', v23boxJunk);
+const v23boxTaken = G.boxTake(v23jS);
+ok(v23boxTaken.ok && v23jS.fishBag.some(function (e) { return e.trash && !e.chest; }),
+  '杂物从收购箱取回后仍是杂物（不会被当成鱼）', v23jS.fishBag);
+const v23junkKey = G.fishGroups(v23jS, 'junk')[0].key;
+const v23rJunk = G.sellJunk(v23jS, v23junkKey);
+ok(v23rJunk.ok && v23jS.fishBag.length === 1, '百货店能回收杂物', v23rJunk.msg);
+
+/* 全体力钓鱼 */
+const v23allS = G.createState();
+v23allS.energy = 21; v23allS.maxEnergy = 100; v23allS.bait.dough = 50;
+G.setRng(mulberry32(11));
+const v23rAllFish = G.fishAll(v23allS, 'dough');
+ok(v23rAllFish.ok && v23rAllFish.count === 10 && v23allS.energy === 1, '全体力钓鱼：21 体力甩 10 杆', { n: v23rAllFish.count, e: v23allS.energy });
+ok(Array.isArray(v23rAllFish.entries) && v23rAllFish.entries.length <= 12, '全体力钓鱼返回最近渔获', v23rAllFish.entries.length);
+const v23noBait = G.createState();
+v23noBait.energy = 20;
+ok(!G.fishAll(v23noBait, 'dough').ok, '没饵时全体力钓鱼直接失败');
+
+/* 新成就 */
+const v23achNew = G.checkAchievements(Object.assign(G.createState(), { stats: { teas: 10, chests: 10 } }));
+ok(v23achNew.some(x => x.id === 'tea10') && v23achNew.some(x => x.id === 'chest10'), '下午茶 / 开箱成就能解锁');
+ok(G.ACH.length === 43, '成就总数 43', G.ACH.length);
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');

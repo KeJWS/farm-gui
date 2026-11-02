@@ -340,10 +340,14 @@
     }
 
     const teaBtn = $('[data-act="tea"]');
-    teaBtn.disabled = state.teaUsed || state.energy >= state.maxEnergy;
+    const teaHave = G.teaStock(state);
+    const teaBest = teaHave.slice().sort(function (a, b) { return b.energy - a.energy; })[0];
+    teaBtn.disabled = state.teaUsed || state.energy >= state.maxEnergy || !teaHave.length;
     $('#tea-txt').textContent = state.teaUsed
       ? '今天喝过了'
-      : (state.energy >= state.maxEnergy ? '体力已满' : '3 金 · +5 体力');
+      : (!teaHave.length ? '没有茶了' :
+        (state.energy >= state.maxEnergy ? '体力已满'
+          : teaBest.emoji + ' ' + teaBest.name + ' · +' + teaBest.energy + ' 体力'));
 
     $('[data-act="dig"]').disabled = state.energy < 3;
     $('[data-act="work"]').disabled = state.workUsed || state.energy <= 0;
@@ -399,7 +403,7 @@
           '<span class="ce">' + e.emoji + '</span>' +
           '<span class="cn2">' + e.fish + '</span>' +
           '<span class="cq2" style="color:' + col + '">' +
-            (e.quality ? e.quality.emoji + ' ' + e.quality.name : '杂物') + '</span>' +
+            (e.quality ? e.quality.emoji + ' ' + e.quality.name : (e.chest ? '宝箱' : '杂物')) + '</span>' +
           '<span class="cp2">值 ' + e.price + '</span>' +
         '</div>';
       }).join('') + '</div>';
@@ -947,7 +951,9 @@
         '<h4>🌱 作物</h4>' +
         '<table class="rule-table"><tr><th>作物</th><th>种子</th><th>生长</th><th>产量/块</th><th>单果</th><th>解锁</th></tr>' +
         cropRows + '</table>' +
-        '<p>生长按浇水天数推进，成熟当天不能收、<b>次日</b>才能收；产量 = 基础 ±1 − 漏浇 + 施肥（最低 1）。<br>' +
+        '<p>生长按浇水天数推进，成熟当天不能收、<b>次日</b>才能收。<br>' +
+        '普通作物产量 = 基础 ±1 − 漏浇 + 施肥 + 等级加成（每 4 级 +1，最低 1）；' +
+        '<b>南瓜 / 西瓜固定 1 个</b>，不吃等级和产量肥料，只有<b>肥料品质加成</b>（见「肥料」）。<br>' +
         '高级种子要<b>种田等级</b>解锁：玉米 Lv2、茄子/番茄 Lv3、黄瓜/草莓 Lv4、南瓜 Lv5、西瓜 Lv6。</p>' +
       '</div>' +
 
@@ -958,12 +964,14 @@
         G.BALANCE.lure.dur + ' 次。<br>' +
         '🕸️ 渔网：每天耗 1 份面团饵，<b>70%</b> 网到 1 条标准及以下的普通鱼，<b>不会出杂物和宝箱</b>；' +
         '要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b> 解锁，上限 = 2 + 钓鱼等级（最多 ' + G.NET_MAX + ' 张）。<br>' +
-        '渔获先进仓库，<b>只能去水产店卖</b>；杂物和宝箱不能交委托，水产店也买不到宝箱。</p>' +
+        '渔获先进仓库：<b>鱼</b>去水产店卖或进收购箱；<b>杂物和宝箱</b>水产店不收，去<b>百货店</b>回收或开箱。<br>' +
+        '🎁 宝箱按钓鱼等级掉落（木制随便掉、铁制 Lv' + G.BALANCE.chest.ironLv + '、黄金 Lv' +
+        G.BALANCE.chest.goldLv + '），开箱奖励见「百货店」。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
         '<h4>🐟 水产店</h4>' +
-        '<p>渔获在这里直接卖，<b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>结算。<br>' +
+        '<p>渔获在这里直接卖，<b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>结算；<b>不收杂物和宝箱</b>（那些去百货店）。<br>' +
         '店里每天<b>进一批水产</b>（一般品质），每种数量随机、<b>睡觉后补货</b>，卖完只能等明天；' +
         '买价是基础价的 ' + G.BALANCE.shop.priceMul + ' 倍，买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。<br>' +
         '河豚 <b>D' + G.FISH_UNLOCK.puffer + '</b> 起、锦鲤 <b>D' + G.FISH_UNLOCK.koi + '</b> 起才进货。</p>' +
@@ -979,9 +987,10 @@
 
       '<div class="rule-sec">' +
         '<h4>📦 收购箱</h4>' +
-        '<p>在仓库点每行的 <b>📦</b>，把整批或自定义数量的作物 / 渔获放进收购箱，<b>下次睡觉时按原价（100%）结算</b>；放错了可以「全部取出」。<br>' +
+        '<p>在仓库点每行的 <b>📦</b>，把整批或自定义数量的<b>作物 / 鱼 / 杂物 / 宝箱</b>放进收购箱，<b>下次睡觉时按原价（100%）结算</b>；放错了可以「全部取出」。<br>' +
         '直接卖给水产店 / 农产品店只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) +
-        '%，所以：<b>急用钱走商店，不急就进收购箱</b>。箱子里的货也计入税金基数，不能用来避税。</p>' +
+        '%，所以：<b>急用钱走商店，不急就进收购箱</b>。箱子里的货也计入税金基数，不能用来避税。<br>' +
+        '宝箱也可以直接进箱子换钱（原价），但<b>开箱通常更划算</b>。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -995,14 +1004,14 @@
 
       '<div class="rule-sec">' +
         '<h4>🧪 肥料</h4>' +
-        '<table class="rule-table"><tr><th>肥料</th><th>买价</th><th>半价回收</th><th>效果</th></tr>' +
+        '<table class="rule-table"><tr><th>肥料</th><th>买价</th><th>半价回收</th><th>普通作物</th><th>品质</th></tr>' +
         ['normal', 'special'].map(function (k) {
           const f = G.FERT[k];
           return '<tr><td>' + f.emoji + ' ' + f.name + '</td><td>' + f.cost + ' 金</td><td>' +
-            G.fertSellPrice(k) + ' 金</td><td>+' + f.add + ' 产量、品质取更优</td></tr>';
+            G.fertSellPrice(k) + ' 金</td><td>+' + f.add + ' 产量</td><td>取 ' + (k === 'special' ? 3 : 2) + ' 次最好</td></tr>';
         }).join('') + '</table>' +
-        '<p>肥料在<b>种子店</b>购买，买回来进仓库，施肥时消耗；大作物不吃肥，多收作物只提质不加量。<br>' +
-        '普通肥 +1 产量、特效肥 +2 产量，<b>两者的品质加成完全一致</b>（都是取两次较好）；' +
+        '<p>肥料在<b>种子店</b>购买，买回来进仓库，施肥时消耗；多收作物（黄瓜 / 草莓）只提质不加量。<br>' +
+        '<b>南瓜 / 西瓜只吃品质加成</b>：数量永远是 1 个，但施肥后品质档位明显更高——这是它们唯一的施肥收益。<br>' +
         '特效肥要<b>种田 Lv' + G.FERT.special.lv + '</b> 才解锁。</p>' +
       '</div>' +
 
@@ -1018,8 +1027,8 @@
         '）：睡觉时自动收走成熟作物，不耗体力<br>' +
         '· 💰 税：每 30 天按（金币 + 仓库价值）<b>累进</b>收一次——前 2000 收 2%、2000~1 万收 4%、1 万以上收 6%，最低 ' +
         G.BALANCE.tax.min + ' 金（当前约 ' + G.taxDue(state) + ' 金）<br>' +
-        '· 🧾 维护费：每 7 天收一次，土地 ' + G.plotUpkeep(state.plots.length) + ' 金（6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 10 金/周）' +
-        ' + 设备 ' + G.deviceUpkeep(state) + ' 金<br>' +
+        '· 🧾 维护费：每 7 天收一次，土地 ' + G.plotUpkeep(state.plots.length) + ' 金（6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 ' +
+        G.BALANCE.upkeep.plotHigh + ' 金/周） + 设备 ' + G.deviceUpkeep(state) + ' 金<br>' +
         '· 没钱吃饭只恢复到体力上限的 30%（至少 5 点），不会扣掉已有的体力<br>' +
         '· 种子 / 肥料都在种子店买卖（半价回收），肥料也只能在种子店卖；蚯蚓只能在渔具店卖（' + G.WORM_VALUE + ' 金/条）</p>' +
       '</div>' +
@@ -1029,6 +1038,7 @@
         '<p>每天 2 个作物单 + 1 个鱼单，<b>每天自动换新</b>，另外还能<b>手动刷新一次</b>。<br>' +
         '报酬约为直接卖的 ' + (G.BALANCE.order.mult * 100).toFixed(0) + '%，没交不罚；季节越往后要的量越多。<br>' +
         '委托池按天数逐档解锁（D1 / D3 / D5 / D7 / D9 / D12 / D15），并且<b>只会要你当前等级买得到的作物</b>；' +
+        '<b>每天第一张单固定是「买得到的最贵作物」</b>，剩下随机；' +
         '贵的作物一次要 2–3 个，单张报酬<b>最低 40 金</b>；鱼单单价随季节涨（11 → 15 → 19 → 23）。<br>' +
         '📜 <b>长期订单</b>：5 天期限、数量大、<b>2 倍报酬</b>，完成后自动换下一张（过期也会换）。<br>' +
         '交委托先扣<b>品质差的</b>，交鱼先交最便宜的；杂物、宝箱不算数。</p>' +
@@ -1036,12 +1046,28 @@
 
       '<div class="rule-sec">' +
         '<h4>⭐ 等级</h4>' +
-        '<p>收获作物涨<b>种田经验</b>，钓到鱼涨<b>钓鱼经验</b>（完美品质 +3），每级所需 ' +
+        '<p>收获普通作物涨<b>种田经验</b>（大作物也涨），钓到鱼涨<b>钓鱼经验</b>（<b>每 2 杆 1 点</b>，完美品质 +2），每级所需 ' +
         G.levelNeed(1) + ' + 10×(级−1)，满级 ' + G.BALANCE.level.max + '。<br>' +
-        '种田等级每 5 级 +1 产量（Lv5 / Lv10）；钓鱼等级每级咬钩 +1%、好鱼权重 +2%（咬钩最多 +8%）。<br>' +
+        '种田等级<b>每 4 级 +1 产量</b>（Lv4 / Lv8，大作物不吃）；钓鱼等级每级咬钩 +1.1%、好鱼权重 +2.5%' +
+        '（咬钩最多 +10%、好鱼最多 +22.5%）。<br>' +
         '解锁：洒水器 Lv' + G.BALANCE.gate.sprinkler + ' · 特效肥 Lv' + G.BALANCE.gate.specialFert +
         ' · 自动收获器 Lv' + G.BALANCE.gate.harvester + '（均为种田等级）；渔网 钓鱼 Lv' + G.BALANCE.gate.net +
         '，上限随钓鱼等级提高。</p>' +
+      '</div>' +
+
+      '<div class="rule-sec">' +
+        '<h4>🏬 百货店</h4>' +
+        '<p>三块业务：<b>茶叶</b>、<b>钥匙</b>、<b>回收站</b>（杂物与宝箱，水产店不收这些）。<br>' +
+        '🍵 <b>下午茶</b>一天一杯，<b>消耗一份茶</b>（不再扣金币，只回体力）：' +
+        G.TEA_LIST.map(function (t) {
+          return t.name + ' ' + t.price + ' 金/+' + t.energy;
+        }).join(' · ') + '：D' + G.TEA_LIST.map(function (t) { return t.day; }).join(' / D') +
+        ' 上架，<b>大杯单价更便宜</b>。<br>' +
+        '🎁 <b>宝箱</b>：木制（直接开，10–26 金）· 铁制（钓鱼 Lv' + G.BALANCE.chest.ironLv +
+        '，铁钥匙 ' + G.KEYS.iron.price + ' 金，一包物资约 80 金）· 黄金（Lv' + G.BALANCE.chest.goldLv +
+        '，金钥匙 ' + G.KEYS.gold.price + ' 金，200–320 金 + 一件高级物品）。<br>' +
+        '🗝️ 钥匙也在百货店买，<b>按钓鱼等级解锁</b>；开箱比回收划算，钥匙不够就先攒着。<br>' +
+        '回收价 = 原价的 ' + Math.round(G.BALANCE.shop.sellRate * 100) + '%（和商店一致）。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -1071,7 +1097,7 @@
 
   function codexModal() {
     const fx = state.codex.fish || {}, cx = state.codex.crops || {};
-    const species = G.FISH.filter(function (f) { return !f.trash; });
+    const species = G.FISH.filter(function (f) { return !f.trash && !f.chest; });
     const got = species.filter(function (f) { return fx[f.id] && fx[f.id].n > 0; }).length;
     const perfect = species.reduce(function (a, f) { return a + ((fx[f.id] && fx[f.id].perfect) || 0); }, 0);
     const fishValue = Object.keys(fx).reduce(function (a, k) { return a + (fx[k].value || 0); }, 0);
@@ -1084,17 +1110,25 @@
       '<div><b>' + cropValue + '</b><span>作物总价值</span></div>' +
     '</div>';
 
-    const fishRows = G.FISH.map(function (f) {
-      const c = fx[f.id] || { n: 0, best: null, first: null, perfect: 0, value: 0 };
-      const q = G.qualityById(c.best);
+    const bookRow = function (item, rec, emptyText) {
+      const q = G.qualityById(rec.best);
       return '<div class="book-row">' +
-        '<span class="be">' + f.emoji + '</span>' +
-        '<span class="bn2">' + f.name + '</span>' +
+        '<span class="be">' + item.emoji + '</span>' +
+        '<span class="bn2">' + item.name + '</span>' +
         '<span class="bq" style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
-          (q ? q.emoji + ' ' + q.name : (c.n ? '—' : '未捕获')) + '</span>' +
-        '<span class="bd">' + (c.first ? 'D' + c.first : '—') + '</span>' +
-        '<span class="bp">' + c.n + '</span>' +
-        '<span class="bv">' + (c.value || 0) + '</span></div>';
+          (q ? q.emoji + ' ' + q.name : (rec.n ? '—' : emptyText)) + '</span>' +
+        '<span class="bd">' + (rec.first ? 'D' + rec.first : '—') + '</span>' +
+        '<span class="bp">' + rec.n + '</span>' +
+        '<span class="bv">' + (rec.value || 0) + '</span></div>';
+    };
+    const emptyRec = { n: 0, best: null, first: null, perfect: 0, value: 0 };
+
+    const fishRows = species.map(function (f) {
+      return bookRow(f, fx[f.id] || emptyRec, '未捕获');
+    }).join('');
+
+    const chestRows = G.FISH.filter(function (f) { return f.chest; }).map(function (f) {
+      return bookRow(f, fx[f.id] || emptyRec, '未捞到');
     }).join('');
 
     const cropRows = G.CROP_LIST.map(function (c) {
@@ -1112,6 +1146,7 @@
 
     openModal('📖 图鉴', stat +
       '<div class="store-sub">🐟 鱼类 · 首次 / 次数 / 累计价值</div>' + fishRows +
+      '<div class="store-sub" style="margin-top:10px">🎁 宝箱 · 首次 / 数量 / 累计价值</div>' + chestRows +
       '<div class="store-sub" style="margin-top:10px">🌱 作物 · 首次 / 数量 / 累计价值</div>' + cropRows,
       '<button class="btn" data-close>关闭</button>');
   }
@@ -1354,7 +1389,7 @@
   }
 
   function fishShop() {
-    const groups = G.fishGroups(state);
+    const groups = G.fishGroups(state, 'fish');
     const total = groups.reduce(function (n, g) { return n + g.count; }, 0);
     const sellRows = groups.length ? groups.map(function (g) {
       const q = G.qualityById(g.q);
@@ -1419,6 +1454,102 @@
 
   function statsPlaceholder() {}
 
+  /* ---------------- 下午茶 ---------------- */
+
+  function teaModal() {
+    const canDrink = !state.teaUsed && state.energy < state.maxEnergy;
+    const rows = G.TEA_LIST.map(function (t) {
+      const have = (state.teas && state.teas[t.id]) || 0;
+      const open = state.day >= t.day;
+      return '<div class="store-row' + (have ? '' : ' sold-out') + (open ? '' : ' locked') + '">' +
+        '<span class="se">' + t.emoji + '</span>' +
+        '<div><div class="sn">' + t.name +
+          ' <b class="own">库存 ' + have + '</b></div>' +
+        '<div class="sv">体力 +' + t.energy + ' · ' + t.desc +
+          (open ? '' : ' · 第 ' + t.day + ' 天起供应') + '</div></div>' +
+        '<button class="btn mini" data-tea="' + t.id + '"' +
+          (!have || !canDrink ? ' disabled' : '') + '>喝</button></div>';
+    }).join('');
+
+    openModal('🍵 下午茶',
+      '<div class="shop-head">🔥 体力 <b>' + state.energy + '</b> / ' + state.maxEnergy + '</div>' +
+      '<div class="store-sub">一天只能喝一杯 · 消耗一份茶' +
+        (state.teaUsed ? '（今天已经喝过了）' : '') + '</div>' + rows +
+      '<div class="shop-tip">茶在<b>百货店</b>买；不同的茶回体力不一样，贵的更划算。<br>' +
+        '还没买的茶显示库存 0。</div>',
+      '<button class="btn" data-act="depart">🏬 去百货店买茶</button>' +
+      '<button class="btn" data-close>关闭</button>');
+  }
+
+  /* ---------------- 百货店 ---------------- */
+
+  function departModal() {
+    const teaRows = G.TEA_LIST.map(function (t) {
+      const open = state.day >= t.day;
+      const have = (state.teas && state.teas[t.id]) || 0;
+      return '<div class="store-row' + (open ? '' : ' locked') + '">' +
+        '<span class="se">' + t.emoji + '</span>' +
+        '<div><div class="sn">' + t.name +
+          (open ? ' <b class="own">库存 ' + have + '</b>' : ' <b class="lock">第 ' + t.day + ' 天起</b>') +
+          '</div><div class="sv">' + t.price + ' 金 · 体力 +' + t.energy + ' · ' + t.desc + '</div></div>' +
+        '<button class="btn mini" data-buytea="' + t.id + '"' +
+          (!open || state.coins < t.price ? ' disabled' : '') + '>买1</button>' +
+        (open ? '<button class="btn mini" data-buytea="' + t.id + '" data-n="3"' +
+          (state.coins < t.price * 3 ? ' disabled' : '') + '>买3</button>' : '') +
+        '</div>';
+    }).join('');
+
+    const keyRows = Object.keys(G.KEYS).map(function (id) {
+      const k = G.KEYS[id];
+      const open = G.keyUnlocked(state, id);
+      const have = (state.keys && state.keys[id]) || 0;
+      return '<div class="store-row' + (open ? '' : ' locked') + '">' +
+        '<span class="se">' + k.emoji + '</span>' +
+        '<div><div class="sn">' + k.name +
+          (open ? ' <b class="own">持有 ' + have + '</b>' : ' <b class="lock">钓鱼 Lv' + k.lv + ' 解锁</b>') +
+          '</div><div class="sv">' + (open ? k.price + ' 金 · 开' + k.opens :
+            '钓鱼等级到 Lv' + k.lv + ' 才上架') + '</div></div>' +
+        '<button class="btn mini" data-buykey="' + id + '"' +
+          (!open || state.coins < k.price ? ' disabled' : '') + '>买1</button></div>';
+    }).join('');
+
+    const junk = G.fishGroups(state, 'junk');
+    const CHECK = {
+      wood: '开箱 10–26 金',
+      iron: '开箱：肥料×6–9 / 种子×8–12 / 面团×12–18 / 蚯蚓×12–18',
+      gold: '开箱：200–320 金 + 特效肥×3–5 / 稀有种子×2–3 / 蚯蚓×14–18'
+    };
+    const junkRows = junk.length ? junk.map(function (g) {
+      const isChest = !!g.chest;
+      const k = isChest ? G.CHESTS[g.chest] : null;
+      const needKey = isChest && k && k.key;
+      const keys = (state.keys && state.keys[needKey]) || 0;
+      const loot = isChest ? (CHECK[g.chest] || '') : '';
+      return '<div class="store-row">' +
+        '<span class="se">' + g.emoji + '</span>' +
+        '<div><div class="sn">' + g.name + ' ×' + g.count + '</div>' +
+        '<div class="sv">' + (isChest
+          ? (needKey ? '要' + G.KEYS[needKey].name + '（持有 ' + keys + '）· ' : '直接开 · ') +
+            loot + ' · 回收 ' + G.shopValue(g.v) + ' 金/个'
+          : '回收 ' + G.shopValue(g.v) + ' 金/个') + '</div></div>' +
+        (isChest ? '<button class="btn mini primary" data-openchest="' + g.key + '"' +
+          (needKey && !keys ? ' disabled' : '') + '>开箱</button>' : '') +
+        '<button class="btn mini" data-selljunk="' + g.key + '">回收</button></div>';
+    }).join('') : '<div class="store-empty">还没有杂物和宝箱，去河边多甩两杆</div>';
+
+    openModal('🏬 百货店',
+      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金</div>' +
+      '<div class="store-sub">🍵 茶叶 · 买回去喝下午茶</div>' + teaRows +
+      '<div class="store-sub" style="margin-top:10px">🗝️ 钥匙 · 钓鱼 Lv' + G.KEYS.iron.lv + ' / Lv' +
+        G.KEYS.gold.lv + ' 解锁</div>' + keyRows +
+      '<div class="store-sub" style="margin-top:10px">♻️ 回收站 · 杂物与宝箱（水产店不收）</div>' + junkRows +
+      '<div class="shop-tip">宝箱按钓鱼等级掉落：木制随便掉、铁制 <b>Lv' + G.BALANCE.chest.ironLv +
+        '</b> 起、黄金 <b>Lv' + G.BALANCE.chest.goldLv + '</b> 起后两者要用钥匙开。<br>' +
+        '对照：铁箱一包物资（约 80 金），钥匙 40；金箱 200–320 金 + 一件高级物品，钥匙 120 —— <b>开箱比回收划算</b>，钥匙不够就先攒着。<br>' +
+        '杂物和宝箱也能放进<b>收购箱</b>按原价结算，但通常没有开箱值。</div>',
+      '<button class="btn" data-close>关闭</button>');
+  }
+
   function settingsModal() {
     openModal('⚙️ 设置',
       '<div class="action-grid">' +
@@ -1452,6 +1583,15 @@
         G.BALANCE.tax.min + '）'],
       ['仓库总价', G.storeTotal(state) + ' 金'],
       ['收购箱', G.boxCount(state) + ' 批 · ' + G.boxValue(state) + ' 金（睡觉结算）'],
+      ['茶叶', (function () {
+        const list = G.teaStock(state);
+        return list.length ? list.map(function (t) { return t.emoji + t.name + '×' + state.teas[t.id]; }).join(' · ')
+          : '没有茶了（百货店有卖）';
+      })()],
+      ['钥匙', '🗝️ 铁 ×' + ((state.keys && state.keys.iron) || 0) + ' · 🔑 金 ×' + ((state.keys && state.keys.gold) || 0)],
+      ['宝箱', '已开 ' + (state.stats.chests || 0) + ' 个 · 待开 ' +
+        G.fishGroups(state, 'junk').filter(function (g) { return g.chest; })
+          .reduce(function (n, g) { return n + g.count; }, 0) + ' 个'],
       ['累计播种', state.stats.planted + ' 次'],
       ['累计收获', state.stats.harvests + ' 次'],
       ['累计钓鱼', state.stats.casts + ' 次'],
@@ -1502,11 +1642,8 @@
       commit(r);
       if (r.ok) { toast(r.msg, 'good'); SFX.plant(); floatAt(ev, '🪱 +' + r.n, 'green'); }
     },
-    tea: function (ev) {
-      const r = G.tea(state);
-      commit(r);
-      if (r.ok) { toast(r.msg, 'good'); SFX.good(); floatAt(ev, '🔋 +5', 'green'); }
-    },
+    tea: teaModal,
+    depart: departModal,
     work: function (ev) {
       const r = G.workAuto(state);
       commit(r);
@@ -1565,6 +1702,14 @@
       if (!r.ok) return;
       const got = r.results.filter(function (x) { return x.ok && x.entry; }).map(function (x) { return x.entry; });
       setCatchBatch(got);
+      toast(r.msg, 'good');
+      SFX.catch();
+    },
+    castAll: function () {
+      const r = G.fishAll(state, baitSel);
+      commit(r);
+      if (!r.ok) return;
+      setCatchBatch(r.entries || []);
       toast(r.msg, 'good');
       SFX.catch();
     }
@@ -1848,6 +1993,54 @@
         return;
       }
 
+      // 下午茶：喝哪一杯
+      const drink = t.closest('[data-tea]');
+      if (drink && !drink.disabled) {
+        const r = G.tea(state, drink.dataset.tea);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) { SFX.good(); if (modalOpen()) teaModal(); }
+        return;
+      }
+
+      // 百货店：买茶 / 买钥匙 / 回收 / 开箱
+      const buyTea = t.closest('[data-buytea]');
+      if (buyTea && !buyTea.disabled) {
+        const r = G.buyTea(state, buyTea.dataset.buytea, Number(buyTea.dataset.n) || 1);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        if (modalOpen()) departModal();
+        return;
+      }
+      const buyKey = t.closest('[data-buykey]');
+      if (buyKey && !buyKey.disabled) {
+        const r = G.buyKey(state, buyKey.dataset.buykey, 1);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        if (modalOpen()) departModal();
+        return;
+      }
+      const sellJunk = t.closest('[data-selljunk]');
+      if (sellJunk && !sellJunk.disabled) {
+        const r = G.sellJunk(state, sellJunk.dataset.selljunk);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        if (modalOpen()) departModal();
+        return;
+      }
+      const openChestBtn = t.closest('[data-openchest]');
+      if (openChestBtn && !openChestBtn.disabled) {
+        const r = G.openChest(state, openChestBtn.dataset.openchest);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.good();
+        if (modalOpen()) departModal();
+        return;
+      }
+
       // 长期订单
       const longBtn = t.closest('[data-long]');
       if (longBtn && !longBtn.disabled) {
@@ -1857,7 +2050,6 @@
         if (r.ok) SFX.coin();
         return;
       }
-
       // 交付委托
       const orderBtn = t.closest('[data-order]');
       if (orderBtn && !orderBtn.disabled) {

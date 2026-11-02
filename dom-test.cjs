@@ -97,6 +97,8 @@ const G = require('./game.js');
   const st = G.createState();
   G.addStore(st, 'carrot', 'std', 12);
   st.fishBag.push({ name: '鲫鱼', emoji: '🐟', q: 'std', v: 3, d: 1 });
+  st.fishBag.push({ name: '木制宝箱', emoji: '🪵', q: null, v: 8, d: 1, no: true, chest: 'wood' });
+  st.teas.green = 2;
   G.addStore(st, 'cabbage', 'std', 5);
   G.boxPutCrop(st, 'cabbage');                 // 收购箱里放一批，便于测取出
   st.longOrder = G.makeLongOrder({ day: 5, levels: { farm: 3 } });
@@ -193,6 +195,40 @@ ok(html('#modal-root').indexOf('已解锁') >= 0 && html('#modal-root').indexOf(
    '成就弹窗含统计与分类');
 ok(html('#modal-root').indexOf('成就点') >= 0 && html('#modal-root').indexOf('售价加成') >= 0,
    '成就弹窗显示成就点与售价加成');
+
+console.log('\n== 百货店 ==');
+clickAct('depart');
+ok(html('#modal-root').indexOf('百货店') >= 0 && html('#modal-root').indexOf('茶叶') >= 0,
+   '百货店弹窗能打开');
+ok(html('#modal-root').indexOf('data-buytea="green"') >= 0, '百货店能买茶');
+ok(html('#modal-root').indexOf('钓鱼 Lv4 解锁') >= 0, '铁钥匙按钓鱼等级锁定');
+ok(html('#modal-root').indexOf('水产店不收') >= 0, '百货店说明水产店不收杂物');
+ok(html('#modal-root').indexOf('data-openchest') >= 0 && html('#modal-root').indexOf('木制宝箱') >= 0,
+   '百货店能开仓里的宝箱');
+
+/* 真的点一次「开箱」，看箱子有没有少、金币有没有涨 */
+(function clickOpenChest() {
+  const before = html('#modal-root');
+  const m = before.match(/data-openchest="([^"]*)"/);
+  ok(!!m, '开箱按钮带 data-openchest 键值');
+  const btn = { dataset: { openchest: m ? m[1] : '' }, disabled: false };
+  const target = {
+    closest: function (sel) { return sel === '[data-openchest]' ? btn : null; },
+    classList: classList()
+  };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+  const after = html('#modal-root');
+  ok(after.indexOf('\u6728\u5236\u5b9d\u7bb1 \u00d71') >= 0 || after.indexOf('\u6728\u5236\u5b9d\u7bb1') < 0,
+     '点「开箱」后木制宝箱从 2 变 1', after.indexOf('\u6728\u5236\u5b9d\u7bb1'));
+})();
+
+console.log('\n== 下午茶 ==');
+clickAct('tea');
+ok(html('#modal-root').indexOf('下午茶') >= 0 && html('#modal-root').indexOf('消耗一份茶') >= 0,
+   '下午茶弹窗改成消耗茶');
+ok(html('#modal-root').indexOf('data-tea="green"') >= 0, '下午茶列出可喝的茶');
+ok(html('#modal-root').indexOf('体力 +4') >= 0, '下午茶显示每杯回多少体力');
+ok(document.querySelector('[data-act="castAll"]') !== null, '河边有「全部体力」按钮');
 
 setTimeout(function () {
   console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));

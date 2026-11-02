@@ -31,15 +31,17 @@ const pad = function (s, n) { s = String(s); while (s.length < n) s += ' '; retu
 
 /* ---------- 1. 种田 ---------- */
 function farmRows(level) {
-  const bonus = Math.floor(level / 5);
+  const bonus = Math.floor(level / 4);
   return G.CROP_LIST.map(function (c) {
-    const fert = !c.big && !c.multi;
-    const add = fert ? G.FERT.normal.add : 0;
-    const qty = c.big ? 1 : (c.multi ? c.firstQty + c.regrowTimes * c.regrowQty : c.base + add + bonus);
+    const fert = !c.multi;                         // 大作物只吃肥料的品质加成
+    const add = (fert && !c.big) ? G.FERT.normal.add : 0;
+    const qty = c.multi ? c.firstQty + c.regrowTimes * c.regrowQty
+                        : (c.big ? c.base : c.base + add + bonus);
+    const rolls = fert ? 2 : 1;                    // 施肥后品质取两次较好
     const days = c.multi ? c.days + c.regrowTimes * c.regrowDays : c.days;
     const harvests = c.multi ? c.regrowTimes + 1 : 1;
     const energy = 1 + days + harvests;
-    const gross = qty * c.price * qEV(fert ? 2 : 1);
+    const gross = qty * c.price * qEV(rolls);
     const net = gross - c.seed - (fert ? G.FERT.normal.cost : 0);
     return { name: c.name, qty: qty, net: net, days: days, energy: energy,
              perE: net / energy, perDay: net / days, fert: fert };
@@ -248,7 +250,7 @@ console.log('\n== 维护费 ==');
     '周费 ' + pad(week + ' 金', 8) + '= ' + (week / 7).toFixed(1) + ' 金/天' +
     '（土地 ' + land + ' + 设备 ' + dev + '）');
 });
-console.log('   土地：6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 10 金/周；' +
+console.log('   土地：6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 ' + G.BALANCE.upkeep.plotHigh + ' 金/周；' +
   '洒水器 3/周、渔网 3/周、收获器 5/周');
 console.log('   参考：36 地图后期日毛收入约 1073，维护费占 ' +
-  (305 / 7 / 1073 * 100).toFixed(1) + '%');
+  ((G.plotUpkeep(36) + 36 * 3 + 9 * 3 + 5) / 7 / 1073 * 100).toFixed(1) + '%');
