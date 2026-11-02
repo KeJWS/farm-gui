@@ -11,7 +11,13 @@ function ok(cond, label, extra) {
 }
 
 function classList() {
-  return { add() {}, remove() {}, toggle() {}, contains() { return false; } };
+  const set = new Set();
+  return {
+    add(c) { set.add(c); },
+    remove(c) { set.delete(c); },
+    toggle(c) { if (set.has(c)) { set.delete(c); return false; } set.add(c); return true; },
+    contains(c) { return set.has(c); }
+  };
 }
 
 class El {
@@ -105,6 +111,7 @@ const G = require('./game.js');
   st.fisher = { lv: 3, xp: 4 };
   st.teas.green = 2;
   G.addStore(st, 'cabbage', 'std', 5);
+  G.addStore(st, 'mushroom', 'good', 3);
   G.boxPutCrop(st, 'cabbage');                 // 收购箱里放一批，便于测取出
   st.longOrder = G.makeLongOrder({ day: 5, levels: { farm: 3 } });
   st.coins = 500;
@@ -135,6 +142,7 @@ ok(text('#farm-lv').indexOf('Lv') >= 0 && text('#fish-lv').indexOf('Lv') >= 0,
 ok(text('#store-sum').indexOf('总价') >= 0, '仓库显示总价值', text('#store-sum'));
 ok(html('#store-list').indexOf('去水产店卖') < 0, '仓库渔获不再写「去水产店卖」');
 ok(html('#store-list').indexOf('脆生生') >= 0, '仓库作物显示简述');
+ok(html('#store-list').indexOf('松茸') >= 0, '仓库能显示采集来的野货');
 /* 杂物行不能挂「市价 / 稀缺」 */
 (function junkRow() {
   const h = html('#store-list');
@@ -142,7 +150,7 @@ ok(html('#store-list').indexOf('脆生生') >= 0, '仓库作物显示简述');
   const row = i < 0 ? '' : h.slice(i, i + 260);
   ok(i >= 0 && row.indexOf('市价 ×') < 0 && row.indexOf('稀缺') < 0,
      '仓库杂物不显示市价 / 稀缺');
-  ok(row.indexOf('原价，不吃市价') >= 0, '杂物行写明不吃市价');
+  ok(row.indexOf('· 原价') < 0 && row.indexOf('不吃市价') < 0, '杂物行不再写「· 原价，不吃市价」');
 })();
 /* 河边用「小队卡」显示渔网 / 渔夫 */
 ok(html('#crew-row').indexOf('渔网') >= 0 && html('#crew-row').indexOf('cc-dots') >= 0,
@@ -210,6 +218,10 @@ ok(html('#modal-root').indexOf('汛期 ×1') >= 0 || html('#modal-root').indexOf
    '行情显示鱼的汛期系数');
 ok(html('#modal-root').indexOf('×1.30') >= 0 && html('#modal-root').indexOf('回落 30%') >= 0,
    '行情说明稀缺上限与回落幅度');
+ok(html('#modal-root').indexOf('再卖') >= 0 && html('#modal-root').indexOf('掉到') >= 0,
+   '行情标注「还能卖多少」');
+ok(html('#modal-root').indexOf('野货') >= 0 && html('#modal-root').indexOf('松茸') >= 0,
+   '行情包含野货');
 
 console.log('\n== 收购箱 ==');
 document.querySelector('#btn-box').fire('click', { target: {} });
@@ -272,6 +284,26 @@ ok(html('#modal-root').indexOf('data-openchest') >= 0 && html('#modal-root').ind
   ok(after.indexOf('\u6728\u5236\u5b9d\u7bb1 \u00d71') >= 0 || after.indexOf('\u6728\u5236\u5b9d\u7bb1') < 0,
      '点「开箱」后木制宝箱从 2 变 1', after.indexOf('\u6728\u5236\u5b9d\u7bb1'));
 })();
+
+console.log('\n== 采集 ==');
+ok(document.querySelector('[data-act="forage"]').disabled === false, '采集按钮可用');
+clickAct('forage');
+ok(html('#store-list').indexOf('荠菜') >= 0, '采集把当季野货（春·荠菜）放进仓库');
+
+console.log('\n== 小镇 ==');
+document.querySelector('#btn-town').fire('click', { target: {} });
+ok(html('#modal-root').indexOf('小镇') >= 0 && html('#modal-root').indexOf('村口小摊') >= 0,
+   '小镇面板能打开');
+ok(html('#modal-root').indexOf('data-donate') >= 0 && html('#modal-root').indexOf('镇上有名') >= 0,
+   '小镇列出三档捐赠');
+(function donateOnce() {
+  const btn = { dataset: { donate: '500' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-donate]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+ok(html('#modal-root').indexOf('累计捐出 <b>500</b>') >= 0, '捐 500 金后累计数更新');
+ok(html('#modal-root').indexOf('25%') >= 0 || html('#modal-root').indexOf('还差 1500 金') >= 0,
+   '小镇显示下一档进度');
 
 console.log('\n== 下午茶 ==');
 clickAct('tea');

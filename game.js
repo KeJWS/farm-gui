@@ -29,7 +29,20 @@
     shop: { priceMul: 1.3, cropPriceMul: 1.3, restock: true, sellRate: 0.8 },
     /* 市场：供需 1.30（稀缺）→ 0.70（过剩），反季 ×2，每天睡觉回落 30% */
     market: { supplyMax: 1.3, supplyMin: 0.7, cropStep: 0.02, fishStep: 0.015,
-              offSeason: 2.0, decay: 0.7, scarce: 1.15, glut: 0.9 },
+              offSeason: 2.0, decay: 0.7, scarce: 1.15, glut: 0.9,
+              /* 委托的市价溢价封顶，避免一张单顶掉整个农场 */
+              orderCap: 1.6 },
+    /* 采集：3 体力一次，1~2 件当季野货，20% 额外掉一颗当季种子 */
+    forage: { energy: 3, double: 0.25, seedChance: 0.2 },
+    /* 小镇捐赠：三档，捐得越多加成越多（金币出口） */
+    town: [
+      { id: 'stall', name: '村口小摊', emoji: '🏪', need: 2000, orderBonus: 0.05,
+        desc: '委托报酬 +5%' },
+      { id: 'fame', name: '镇上有名', emoji: '🏅', need: 8000, shopCut: 0.10,
+        desc: '商店进价 −10%' },
+      { id: 'guild', name: '商会会员', emoji: '🎖️', need: 20000, marketBonus: 0.08,
+        desc: '所有买卖市价 +8%' }
+    ],
     /* 反季种子：价格 ×1.8；反季播种生长 +2 天、产量 −1（大作物只慢不减个数） */
     seed: { offSeasonMul: 1.8, offSeasonDays: 2, offSeasonYield: 1 },
     /* 累进税：0~2000 收 2%、2000~10000 收 4%、10000 以上收 6%，最低 30 金 */
@@ -77,10 +90,24 @@
                   desc: '一串一串地结，越摘越有' },
     strawberry: { name: '草莓', emoji: '🍓', seed: 22, days: 3, price: 9,  multi: true, lv: 4,
                   seasons: [0], firstQty: 3, regrowDays: 1, regrowQty: 2, regrowTimes: 3,
-                  desc: '娇气，但一直能摘' }
+                  desc: '娇气，但一直能摘' },
+
+    /* 野货：只能靠「采集」拿到，不进种子店 / 委托池 / 农产品店进货 */
+    shepherd:   { name: '荠菜', emoji: '🌿', price: 12, wild: true, seasons: [0],
+                  desc: '田埂上一抓一把，包饺子最香' },
+    berry:      { name: '野莓', emoji: '🫐', price: 18, wild: true, seasons: [1],
+                  desc: '灌木丛里一串串，酸甜' },
+    mushroom:   { name: '松茸', emoji: '🍄', price: 24, wild: true, seasons: [2],
+                  desc: '雨后林子里的宝贝，城里人抢着要' },
+    frozenpear: { name: '冻梨', emoji: '🍐', price: 22, wild: true, seasons: [3],
+                  desc: '冻得梆硬，化开了甜到心里' }
   };
   Object.keys(CROPS).forEach(function (k) { CROPS[k].id = k; });
-  const CROP_LIST = Object.keys(CROPS).map(function (k) { return CROPS[k]; });
+  /* CROP_LIST 只放能种的；WILD_LIST 是采集产物，只进仓库 / 市场 / 收购箱 */
+  const CROP_LIST = Object.keys(CROPS).filter(function (k) { return !CROPS[k].wild; })
+    .map(function (k) { return CROPS[k]; });
+  const WILD_LIST = Object.keys(CROPS).filter(function (k) { return CROPS[k].wild; })
+    .map(function (k) { return CROPS[k]; });
 
   const FERT = {
     normal:  { id: 'normal',  name: '普通肥料', emoji: '🧪', cost: 8,  add: 1, lv: 1 },
@@ -633,6 +660,7 @@
       nets: 0,
       netSet: 0,
       fisher: null,
+      townDonated: 0,
       codex: { fish: {}, crops: {} },
       manualRefreshUsed: false,
       workUsed: false,
@@ -651,7 +679,7 @@
       ach: {},
       fishBook: { count: 0, entries: [], best: null, priciest: null },
       stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0,
-               longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0 }
+               longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0 }
     };
     return s;
   }
@@ -1522,7 +1550,7 @@
     const supply = clamp(M.supplyMax - M.cropStep * sold, M.supplyMin, M.supplyMax);
     const inSeason = CROPS[id] ? cropSeasonOk(id, s.day) : true;
     const season = inSeason ? 1 : M.offSeason;
-    const total = supply * season;
+    const total = supply * season * (1 + townBonus(s, 'marketBonus'));
     return { sold: sold, supply: supply, season: season, inSeason: inSeason, total: total,
              tag: marketTag(supply) };
   }
@@ -1542,12 +1570,64 @@
     const f = fishByName(name);
     const inRun = f && f.seasons ? f.seasons.indexOf(seasonIdx(s.day)) >= 0 : true;
     const season = inRun ? 1 : M.offSeason;
-    const total = supply * season;
+    const total = supply * season * (1 + townBonus(s, 'marketBonus'));
     return { sold: sold, supply: supply, season: season, inRun: inRun, total: total,
              tag: marketTag(supply) };
   }
   function fishMarketMul(s, name) { return fishMarketInfo(s, name).total; }
   function addFishSupply(s, name, n) { fishMarketOf(s, name).sold += Math.max(0, n || 0); }
+
+  /* ---------------- 小镇声望（捐钱换永久加成，后期金币出口） ---------------- */
+  function townTier(s) {
+    const T = BALANCE.town;
+    let t = 0;
+    for (let i = 0; i < T.length; i++) if ((s.townDonated || 0) >= T[i].need) t = i + 1;
+    return t;
+  }
+  /* 已解锁档位的某项加成之和 */
+  function townBonus(s, key) {
+    const T = BALANCE.town, t = townTier(s);
+    let v = 0;
+    for (let i = 0; i < t; i++) v += (T[i][key] || 0);
+    return v;
+  }
+  function townNext(s) {
+    const t = townTier(s);
+    return t >= BALANCE.town.length ? null : BALANCE.town[t];
+  }
+  function donate(s, amount) {
+    const amt = Math.max(1, Math.floor(amount || 0));
+    if ((s.coins || 0) < amt) return { ok: false, msg: '金币不够（要捐 ' + amt + ' 金）' };
+    const before = townTier(s);
+    s.coins -= amt;
+    s.townDonated = (s.townDonated || 0) + amt;
+    ledger(s, '捐赠小镇', 0, amt);
+    const after = townTier(s);
+    const up = after > before ? BALANCE.town[after - 1] : null;
+    log(s, '🏘️ 给小镇捐了 ' + amt + ' 金' + (up ? '，解锁「' + up.name + '」：' + up.desc : ''), 'good');
+    return { ok: true, msg: up ? '解锁「' + up.name + '」：' + up.desc : '捐了 ' + amt + ' 金',
+             tier: after, unlocked: !!up };
+  }
+
+  /* ---------------- 还能卖多少（行情面板提示） ---------------- */
+  function headroomOf(sold, step) {
+    const M = BALANCE.market;
+    const supply = clamp(M.supplyMax - step * sold, M.supplyMin, M.supplyMax);
+    const toCalm = supply > M.scarce
+      ? Math.max(0, Math.ceil((M.supplyMax - M.scarce) / step - sold - 1e-9)) : 0;
+    const toGlut = supply > M.glut
+      ? Math.max(0, Math.ceil((M.supplyMax - M.glut) / step - sold - 1e-9)) : 0;
+    const toFloor = Math.max(0, Math.ceil((M.supplyMax - M.supplyMin) / step - sold - 1e-9));
+    return { supply: supply, toCalm: toCalm, toGlut: toGlut, toFloor: toFloor,
+             atFloor: supply <= M.supplyMin + 1e-9 };
+  }
+  function marketHeadroom(s, id) {
+    return headroomOf(marketSold(s, id), BALANCE.market.cropStep);
+  }
+  function fishMarketHeadroom(s, name) {
+    const sold = (s.marketF && s.marketF[name] && s.marketF[name].sold) || 0;
+    return headroomOf(sold, BALANCE.market.fishStep);
+  }
 
   /* 从渔获袋里按「品质差的先出」取 n 条同名鱼，返回 parts */
   function takeFishN(s, key, n) {
@@ -1771,6 +1851,46 @@
     s.stats.dug++;
     log(s, '🪱 挖到蚯蚓 ×' + n + '（现有 ' + s.bait.worm + '）', 'good');
     return { ok: true, msg: '挖到蚯蚓 ×' + n, n: n };
+  }
+
+  /* ---------------- 采集：去后山捡当季野货 ---------------- */
+
+  function foragePool(day) {
+    const si = seasonIdx(day);
+    return WILD_LIST.filter(function (w) { return w.seasons.indexOf(si) >= 0; });
+  }
+
+  /* 当季、当前等级买得到的作物（采集的小彩蛋：掉一颗种子） */
+  function forageSeedPool(s) {
+    return CROP_LIST.filter(function (c) {
+      return cropSeasonOk(c.id, s.day) && (c.lv || 1) <= farmLv(s);
+    });
+  }
+
+  function forage(s) {
+    const cost = BALANCE.forage.energy;
+    const pool = foragePool(s.day);
+    if (!pool.length) return { ok: false, msg: '这个季节后山没什么可采的' };
+    if (s.energy < cost) return { ok: false, msg: '体力不够（采集要 ' + cost + ' 点），先睡觉吧' };
+    s.energy -= cost;
+    const w = pool[Math.floor(rand() * pool.length)];
+    const lucky = rand() < BALANCE.forage.double || s.weather === 'rain';
+    const n = 1 + (lucky ? 1 : 0);
+    const q = rollQuality(1);
+    addStore(s, w.id, q.id, n);
+    s.stats.forages = (s.stats.forages || 0) + 1;
+    let seedTxt = '';
+    if (rand() < BALANCE.forage.seedChance) {
+      const cand = forageSeedPool(s);
+      if (cand.length) {
+        const c = cand[Math.floor(rand() * cand.length)];
+        s.seeds[c.id] = (s.seeds[c.id] || 0) + 1;
+        seedTxt = '，顺手摘到 ' + c.name + '种子 ×1';
+      }
+    }
+    log(s, '🌿 采集：' + w.emoji + ' ' + w.name + ' ×' + n + '（' + q.name + '）' + seedTxt, 'good');
+    return { ok: true, msg: '采到 ' + w.name + ' ×' + n, wild: w.id, qty: n, q: q.id,
+             seed: seedTxt ? true : false };
   }
 
   function buyBait(s, kind, n) {
@@ -2017,7 +2137,8 @@
     const f = FISH.filter(function (x) { return x.id === id; })[0];
     if (!f) return 0;
     const mkt = s ? fishMarketMul(s, f.name) : 1;
-    return Math.max(3, Math.round(f.base * BALANCE.shop.priceMul * mkt));
+    const cut = s ? (1 - townBonus(s, 'shopCut')) : 1;
+    return Math.max(3, Math.round(f.base * BALANCE.shop.priceMul * mkt * cut));
   }
 
   /* 今日库存（0 表示卖完 / 没进到货） */
@@ -2052,7 +2173,8 @@
     const c = CROPS[id];
     if (!c) return 0;
     const mkt = s ? marketMul(s, id) : 1;
-    return Math.max(2, Math.round(c.price * BALANCE.shop.cropPriceMul * mkt));
+    const cut = s ? (1 - townBonus(s, 'shopCut')) : 1;
+    return Math.max(2, Math.round(c.price * BALANCE.shop.cropPriceMul * mkt * cut));
   }
 
   function cropShopStock(s, id) {
@@ -2447,9 +2569,10 @@
     function pushCrop(c) {
       used.push(c.id);
       const qty = Math.max(1, Math.round((c.price >= 20 ? randInt(2, 3) : randInt(3, 6)) * mult));
-      // 市价溢价：合同价跟着该作物当前市价走（反季 / 稀缺时更值钱）
-      const mk = marketMul(s, c.id);
-      const reward = Math.max(40, Math.round(qty * c.price * BALANCE.order.mult * mk));
+      // 市价溢价：合同价跟着该作物当前市价走（反季 / 稀缺时更值钱），但有封顶
+      const mk = Math.min(BALANCE.market.orderCap, marketMul(s, c.id));
+      const reward = Math.max(40, Math.round(qty * c.price * BALANCE.order.mult * mk *
+        (1 + townBonus(s, 'orderBonus'))));
       orders.push({
         id: 'd' + day + '-c' + orders.length, kind: 'crop', crop: c.id, name: c.name, emoji: c.emoji,
         qty: qty, reward: reward, mul: mk, done: false, flagship: orders.length === 0
@@ -2492,9 +2615,10 @@
     }
     const c = pool[Math.floor(rand() * pool.length)];
     const qty = Math.max(6, Math.round((c.price >= 40 ? randInt(6, 10) : randInt(12, 20)) * (1 + season * 0.3)));
-    const mk = marketMul(s, c.id);
+    const mk = Math.min(BALANCE.market.orderCap, marketMul(s, c.id));
     return { id: 'L' + day, kind: 'crop', crop: c.id, name: c.name, emoji: c.emoji,
-             qty: qty, reward: Math.round(qty * c.price * 2 * mk), mul: mk,
+             qty: qty, reward: Math.round(qty * c.price * 2 * mk *
+               (1 + townBonus(s, 'orderBonus'))), mul: mk,
              deadline: day + 5, done: false };
   }
 
@@ -2761,6 +2885,7 @@
     merged.nets = Math.round(num(s.nets, 0, 0, NET_MAX));
     // 老存档没有 netSet：默认所有渔网都已布置好
     merged.netSet = Math.round(num(s.netSet == null ? merged.nets : s.netSet, merged.nets, 0, merged.nets));
+    merged.townDonated = Math.round(num(s.townDonated, 0, 0, 1e9));
     // 渔夫：老存档是 true（没有等级），补成 Lv1
     merged.fisher = s.fisher
       ? { lv: Math.round(num(s.fisher.lv, 1, 1, BALANCE.fisher.max)),
@@ -2867,7 +2992,8 @@
   /* ---------------- 导出 ---------------- */
 
   const API = {
-    BALANCE: BALANCE, CROPS: CROPS, CROP_LIST: CROP_LIST, FERT: FERT, QUALITY: QUALITY, FISH: FISH,
+    BALANCE: BALANCE, CROPS: CROPS, CROP_LIST: CROP_LIST, WILD_LIST: WILD_LIST,
+    FERT: FERT, QUALITY: QUALITY, FISH: FISH,
     WEATHER: WEATHER, WEATHER_LIST: WEATHER_LIST, BAIT: BAIT, SAVE_VERSION: SAVE_VERSION,
     setRng: setRng, seasonOf: seasonOf, SEASONS: SEASONS,
     seasonIdx: seasonIdx, isWinter: isWinter, cropSeasonOk: cropSeasonOk, seasonText: seasonText,
@@ -2920,6 +3046,9 @@
     achPts: achPts, sellBonus: sellBonus, makeLongOrder: makeLongOrder, deliverLong: deliverLong,
     fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
     fishMany: fishMany, fishAll: fishAll, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,
+    forage: forage, foragePool: foragePool, forageSeedPool: forageSeedPool,
+    donate: donate, townTier: townTier, townBonus: townBonus, townNext: townNext,
+    marketHeadroom: marketHeadroom, fishMarketHeadroom: fishMarketHeadroom,
     expand: expand, upgrade: upgrade, rollWeather: rollWeather,
     TEAS: TEAS, TEA_LIST: TEA_LIST, teaList: teaList, teaStock: teaStock, teaById: teaById,
     teaUnlocked: teaUnlocked, buyTea: buyTea,

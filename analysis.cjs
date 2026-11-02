@@ -401,3 +401,38 @@ console.log('\n== 雇佣渔夫（钓鱼 Lv' + G.BALANCE.gate.fisher + ' 解锁�
   console.log('   另外他每天免费重布渔网（省 ' + (9 * G.NET_CHANCE).toFixed(1) + ' 体力 ≈ ' +
     resetVal.toFixed(0) + ' 金），Lv1 算上这个约 ' + (10.5 + resetVal).toFixed(0) + ' 金/天');
 }
+
+/* ---------- 13. 采集 ---------- */
+console.log('\n== 采集（' + G.BALANCE.forage.energy + ' 体力一次，按季节出不同野货）==');
+{
+  const qe = qEV(1);
+  const avgQty = 1 + G.BALANCE.forage.double;
+  let best = null;
+  G.WILD_LIST.forEach(function (w) {
+    const per = w.price * qe * avgQty;
+    const perE = per / G.BALANCE.forage.energy;
+    if (!best || perE > best.perE) best = { perE: perE, name: w.name };
+    console.log('   ' + pad(w.name, 4) + pad(G.seasonText(w.id) + '季', 6) +
+      pad(w.price + ' 金/件', 10) + '期望 ' + per.toFixed(1) + ' 金/次 · ' +
+      perE.toFixed(2) + ' 金/体力');
+  });
+  console.log('   期望件数 ' + avgQty.toFixed(2) + '（' + Math.round(G.BALANCE.forage.double * 100) +
+    '% 双份 / 雨天必双份）· 还有 ' + Math.round(G.BALANCE.forage.seedChance * 100) + '% 掉一颗当季种子');
+  console.log('   最好的季节是「' + best.name + '」' + best.perE.toFixed(2) +
+    ' 金/体力 · 面团饵钓鱼 2.81 金/体力 → 采集是冬天的体力出口');
+}
+
+/* ---------- 14. 小镇（金币出口） ---------- */
+console.log('\n== 小镇捐赠（后期金币出口）==');
+{
+  let total = 0, prev = 0;
+  G.BALANCE.town.forEach(function (t) {
+    total = t.need;
+    console.log('   ' + t.emoji + ' ' + pad(t.name, 6) + '捐满 ' + pad(t.need + ' 金', 8) +
+      '（本档 ' + (t.need - prev) + ' 金）→ ' + t.desc);
+    prev = t.need;
+  });
+  console.log('   三档捐满共 ' + total + ' 金 —— 36 块地图后期日净约 1000，约 ' +
+    Math.ceil(total / 1000) + ' 天存款就能买完');
+  console.log('   加成：委托 +5% / 商店进价 −10% / 买卖市价 +8%（可叠加）');
+}

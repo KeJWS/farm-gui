@@ -1792,6 +1792,85 @@ ok(G.fisherLv(G.deserialize(v29old)) === 1, '老存档渔夫迁移成 Lv1');
 /* 自动重布已经删掉 */
 ok(!('toggleNetAuto' in G), '自动重布开关已移除');
 
+/* ---------- 5l. v2.11 采集 / 小镇 / 委托封顶 ---------- */
+section('v2.11 采集与小镇');
+
+/* 采集：每个季节不同的野货 */
+ok(G.CROP_LIST.length === 14 && G.WILD_LIST.length === 4, '14 种作物 + 4 种野货',
+  [G.CROP_LIST.length, G.WILD_LIST.length]);
+ok(G.WILD_LIST.every(function (w) { return w.seed == null; }), '野货没有种子，种不了');
+ok(G.orderPool(99, 10).every(function (c) { return !c.wild; }), '委托池不含野货');
+ok(Object.keys(G.rollCropStock(99)).every(function (id) { return !G.CROPS[id].wild; }),
+  '农产品店不进野货');
+
+const v31 = G.createState();
+v31.energy = 50;
+const v31r1 = G.forage(v31);
+ok(v31r1.ok && v31r1.wild === 'shepherd', '春天采到荠菜', v31r1.wild);
+ok(v31.energy === 47 && G.storeCount(v31, 'shepherd') === v31r1.qty, '采集扣 3 体力并进仓库',
+  [v31.energy, G.storeCount(v31, 'shepherd')]);
+v31.day = 31;
+ok(G.forage(v31).wild === 'berry', '夏天采到野莓');
+v31.day = 61;
+ok(G.forage(v31).wild === 'mushroom', '秋天采到松茸');
+v31.day = 91;
+ok(G.forage(v31).wild === 'frozenpear', '冬天也能采（冻梨）');
+const v31no = G.createState();
+v31no.energy = 2;
+ok(!G.forage(v31no).ok, '体力不够采不了');
+ok(G.marketInfo(v31, 'mushroom').total > 0, '野货也有市价');
+
+/* 委托市价溢价封顶 */
+const v31o = G.createState();
+v31o.day = 30; v31o.levels.farm = 10;
+G.setRng(mulberry32(11));
+let v31max = 0;
+for (let i = 0; i < 40; i++) {
+  G.makeOrders(v31o).forEach(function (o) { if (o.mul > v31max) v31max = o.mul; });
+}
+ok(v31max > 1 && v31max <= G.BALANCE.market.orderCap + 1e-9, '委托市价溢价有封顶',
+  [v31max, G.BALANCE.market.orderCap]);
+
+/* 小镇捐赠 */
+const v31t = G.createState();
+v31t.coins = 40000;
+ok(G.townTier(v31t) === 0 && !!G.townNext(v31t), '开局没有声望，有下一档');
+ok(G.donate(v31t, 2000).ok && G.townTier(v31t) === 1 &&
+   Math.abs(G.townBonus(v31t, 'orderBonus') - 0.05) < 1e-9, '捐 2000 解锁村口小摊（委托 +5%）');
+G.donate(v31t, 6000);
+ok(G.townTier(v31t) === 2 && Math.abs(G.townBonus(v31t, 'shopCut') - 0.10) < 1e-9,
+  '再捐 6000 解锁镇上有名（进价 −10%）');
+G.donate(v31t, 12000);
+ok(G.townTier(v31t) === 3 && Math.abs(G.townBonus(v31t, 'marketBonus') - 0.08) < 1e-9,
+  '捐满 20000 解锁商会会员（市价 +8%）');
+ok(G.townNext(v31t) === null, '三档全解锁后没有下一档');
+ok(!G.donate(G.createState(), 1e6).ok, '钱不够捐不了');
+
+const v31e = G.createState();
+const v31buy0 = G.cropBuyPrice('pumpkin', v31e);
+const v31mk0 = G.marketMul(v31e, 'pumpkin');
+v31e.townDonated = 20000;
+ok(G.cropBuyPrice('pumpkin', v31e) < v31buy0, '小镇加成让进价变便宜',
+  [v31buy0, G.cropBuyPrice('pumpkin', v31e)]);
+ok(G.marketMul(v31e, 'pumpkin') > v31mk0, '商会会员让市价 +8%',
+  [v31mk0, G.marketMul(v31e, 'pumpkin')]);
+
+const v31o1 = G.createState(); v31o1.day = 30; v31o1.levels.farm = 10;
+const v31o2 = G.createState(); v31o2.day = 30; v31o2.levels.farm = 10; v31o2.townDonated = 2000;
+G.setRng(mulberry32(5));
+const v31ord1 = G.makeOrders(v31o1).filter(function (o) { return o.kind === 'crop'; })[0];
+G.setRng(mulberry32(5));
+const v31ord2 = G.makeOrders(v31o2).filter(function (o) { return o.kind === 'crop'; })[0];
+ok(v31ord2.reward > v31ord1.reward, '村口小摊让委托更值钱', [v31ord1.reward, v31ord2.reward]);
+
+/* 行情「还能卖多少」 */
+const v31h = G.createState();
+const v31h0 = G.marketHeadroom(v31h, 'carrot');
+ok(v31h0.toCalm === 8 && v31h0.toFloor === 30, '行情提示：再卖 8 件掉档、30 件到底',
+  [v31h0.toCalm, v31h0.toFloor]);
+G.addSupply(v31h, 'carrot', 30);
+ok(G.marketHeadroom(v31h, 'carrot').atFloor, '卖到底价时提示已到底');
+
 /* 委托市价溢价：长期订单也吃 */
 const v29L = G.createState();
 G.setRng(mulberry32(9));
