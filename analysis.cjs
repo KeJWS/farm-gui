@@ -254,3 +254,25 @@ console.log('   土地：6–20 块 3 金/周、21–30 块 6 金/周、31 块�
   '洒水器 3/周、渔网 3/周、收获器 5/周');
 console.log('   参考：36 地图后期日毛收入约 1073，维护费占 ' +
   ((G.plotUpkeep(36) + 36 * 3 + 9 * 3 + 5) / 7 / 1073 * 100).toFixed(1) + '%');
+
+/* ---------- 9. 市场价格 ---------- */
+console.log('\n== 市场价格 ==');
+console.log('   作物价格系数 = 供需 × 季节');
+console.log('   供需：1.05 - 0.02 × 最近销量（下限 0.75，睡觉回落 20%）→ 卖 3 件就跌破 1.00');
+console.log('   季节：当季 ×1.00 / 反季 ×1.20');
+{
+  const supply = function (sold) { return Math.max(0.75, Math.min(1.05, 1.05 - 0.02 * sold)); };
+  console.log('   ' + pad('最近销量', 10) + pad('当季', 10) + pad('反季', 10) + '状态');
+  [0, 3, 10, 20, 40].forEach(function (sold) {
+    console.log('   ' + pad(sold + ' 件', 10) +
+      pad((supply(sold) * 1.0).toFixed(2), 10) + pad((supply(sold) * 1.2).toFixed(2), 10) +
+      (supply(sold) >= 1 ? '稀缺' : (supply(sold) <= 0.85 ? '过剩' : '平稳')));
+  });
+  const e = G.CROPS.eggplant;
+  const base = (e.base + 1) * e.price / e.days;   // Lv5 一株
+  console.log('   例：茄子（Lv5，约 ' + base.toFixed(1) + ' 金/地/天）');
+  console.log('     当季刚上市 ×1.05 → ' + (base * 1.05).toFixed(1) +
+    ' · 当季卖到饱和 ×0.75 → ' + (base * 0.75).toFixed(1) +
+    ' · 反季新鲜 ×1.26 → ' + (base * 1.26).toFixed(1));
+  console.log('   鱼：1.05 - 0.015 × 最近销量（下限 0.75）→ 卖 4 条跌破 1.00；鱼没有季节因子');
+}

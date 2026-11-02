@@ -1564,6 +1564,7 @@ button{ color:inherit; font:inherit; }
       box: [],
       fishBag: [],
       market: {},
+      marketF: {},
       ferts: { normal: 0, special: 0 },
       sprinklers: 0,
       harvester: false,
@@ -2047,6 +2048,13 @@ button{ color:inherit; font:inherit; }
       m.sold = Math.round((m.sold || 0) * 8) / 10;
       if (m.sold < 0.5) delete s.market[id];
     });
+    s.marketF = s.marketF || {};
+    Object.keys(s.marketF).forEach(function (name) {
+      const m = s.marketF[name];
+      if (!m) return;
+      m.sold = Math.round((m.sold || 0) * 8) / 10;
+      if (m.sold < 0.5) delete s.marketF[name];
+    });
     s.weather = rollWeather(s.day);
     const w = WEATHER[s.weather];
     notes.push({ kind: 'weather', text: w.emoji + ' ' + w.name });
@@ -2275,7 +2283,8 @@ button{ color:inherit; font:inherit; }
 
   /* ---------------- 卖鱼 ---------------- */
 
-  function fishKey(e) { return e.name + '|' + (e.q || '-') + '|' + e.v; }
+  /* 渔获按「鱼名」分组（不同品质合并成一组，和仓库里的作物一样），杂物 / 宝箱按名字 + 种类 */
+  function fishKey(e) { return e.name + (e.chest ? '|' + e.chest : ''); }
 
   /* 仓库渔获的一句话简述（鱼和杂物都有） */
   function fishDesc(name) {
@@ -2292,7 +2301,8 @@ button{ color:inherit; font:inherit; }
     return TRASH_NAMES.indexOf(e.name) >= 0;
   }
 
-  /* 渔获分组：mode='fish' 只看鱼 / 'junk' 只看杂物和宝箱 / 不传就是全部 */
+  /* 渔获分组：mode='fish' 只看鱼 / 'junk' 只看杂物和宝箱 / 不传就是全部
+   * 同一鱼种的不同品质合并成一行，mix 里带品质构成（界面上直接显示） */
   function fishGroups(s, mode) {
     const map = new Map();
     (s.fishBag || []).forEach(function (e) {
@@ -2303,13 +2313,30 @@ button{ color:inherit; font:inherit; }
       const key = fishKey(e);
       let g = map.get(key);
       if (!g) {
-        g = { key: key, name: e.name, emoji: e.emoji, q: e.q, v: e.v, count: 0,
-              junk: junk, chest: e.chest || null };
+        g = { key: key, name: e.name, emoji: e.emoji, count: 0, total: 0,
+              junk: junk, chest: e.chest || null, mix: [], q: null, v: 0 };
         map.set(key, g);
       }
       g.count++;
+      g.total += e.v || 0;
+      const q = qualityById(e.q);
+      let m = g.mix.filter(function (x) { return x.id === (e.q || '-'); })[0];
+      if (!m) {
+        m = { id: e.q || '-', n: 0, v: e.v || 0,
+              name: q ? q.name : '杂物', emoji: q ? q.emoji : '🗑️',
+              color: q ? q.color : 'var(--ink-3)' };
+        g.mix.push(m);
+      }
+      m.n++;
+      if (q && (!g.q || QUALITY.indexOf(q) > QUALITY.indexOf(qualityById(g.q)))) g.q = e.q;
     });
-    return Array.from(map.values()).sort(function (a, b) { return b.v * b.count - a.v * a.count; });
+    map.forEach(function (g) {
+      g.v = Math.round(g.total / Math.max(1, g.count));
+      g.mix.sort(function (a, b) {
+        return QUALITY.indexOf(qualityById(b.id)) - QUALITY.indexOf(qualityById(a.id));
+      });
+    });
+    return Array.from(map.values()).sort(function (a, b) { return b.total - a.total; });
   }
 
   const qualityById = function (id) {
@@ -2396,13 +2423,50 @@ button{ color:inherit; font:inherit; }
     const sold = marketSold(s, id);
     const supply = clamp(1.05 - 0.02 * sold, 0.75, 1.05);
     const inSeason = CROPS[id] ? cropSeasonOk(id, s.day) : true;
-    const season = inSeason ? 1.05 : 0.9;
+    const season = inSeason ? 1.0 : 1.2;        // 反季稀缺，卖得更贵
     const total = supply * season;
     const tag = supply >= 1.0 ? '稀缺' : (supply <= 0.85 ? '过剩' : '平稳');
     return { sold: sold, supply: supply, season: season, inSeason: inSeason, total: total, tag: tag };
   }
   function marketMul(s, id) { return marketInfo(s, id).total; }
   function addSupply(s, id, n) { marketOf(s, id).sold += Math.max(0, n || 0); }
+
+  /* ---------------- 鱼的市场（只按供需，没有季节） ---------------- */
+  function fishMarketOf(s, name) {
+    s.marketF = s.marketF || {};
+    if (!s.marketF[name]) s.marketF[name] = { sold: 0 };
+    return s.marketF[name];
+  }
+  function fishMarketInfo(s, name) {
+    const sold = (s.marketF && s.marketF[name] && s.marketF[name].sold) || 0;
+    const supply = clamp(1.05 - 0.015 * sold, 0.75, 1.05);
+    const tag = supply >= 1.0 ? '稀缺' : (supply <= 0.85 ? '过剩' : '平稳');
+    return { sold: sold, supply: supply, total: supply, tag: tag };
+  }
+  function fishMarketMul(s, name) { return fishMarketInfo(s, name).total; }
+  function addFishSupply(s, name, n) { fishMarketOf(s, name).sold += Math.max(0, n || 0); }
+
+  /* 从渔获袋里按「品质差的先出」取 n 条同名鱼，返回 parts */
+  function takeFishN(s, key, n) {
+    const idx = [];
+    (s.fishBag || []).forEach(function (e, i) { if (fishKey(e) === key) idx.push(i); });
+    idx.sort(function (a, b) {
+      const qa = QUALITY.indexOf(qualityById(s.fishBag[a].q));
+      const qb = QUALITY.indexOf(qualityById(s.fishBag[b].q));
+      return qa - qb;
+    });
+    const picked = idx.slice(0, Math.max(0, Math.min(idx.length, n)));
+    const set = picked.map(function (i) { return s.fishBag[i]; });
+    const parts = [];
+    set.forEach(function (e) {
+      const qid = e.q || '-';
+      let p = parts.filter(function (x) { return x.q === qid && x.unit === e.v; })[0];
+      if (!p) { p = { q: qid, n: 0, unit: e.v || 0 }; parts.push(p); }
+      p.n++;
+    });
+    s.fishBag = (s.fishBag || []).filter(function (e) { return set.indexOf(e) < 0; });
+    return parts;
+  }
 
   /* 商店直接收购只给 8 折；想卖原价就放收购箱，等第二天结算 */
   function shopValue(v) { return Math.max(1, Math.round((v || 0) * BALANCE.shop.sellRate)); }
@@ -2413,19 +2477,23 @@ button{ color:inherit; font:inherit; }
   function sellFishGroup(s, key) {
     const g = fishGroups(s, 'fish').filter(function (x) { return x.key === key; })[0];
     if (!g) return { ok: false, msg: '仓库里没有这种鱼' };
-    const gain = Math.round(shopValue(g.v * g.count) * sellBonus(s));
+    const gain = Math.max(1, Math.round(shopValue(g.total) * sellBonus(s) * fishMarketMul(s, g.name)));
     s.fishBag = s.fishBag.filter(function (e) { return fishKey(e) !== key; });
+    addFishSupply(s, g.name, g.count);
     addCoins(s, gain, '卖鱼 ' + g.name);
     log(s, '💰 卖出 ' + g.emoji + ' ' + g.name + ' ×' + g.count + '，+' + gain + ' 金（8 折）', 'good');
     return { ok: true, msg: '卖出 ' + g.name + '×' + g.count + '，+' + gain + ' 金', income: gain };
   }
 
   function sellAllFish(s) {
-    const bag = (s.fishBag || []).filter(function (e) { return !fishIsJunk(e); });
-    if (!bag.length) return { ok: false, msg: '仓库里没有鱼（杂物和宝箱要去百货店）' };
-    const full = bag.reduce(function (n, e) { return n + e.v; }, 0);
-    const gain = Math.round(shopValue(full) * sellBonus(s));
-    const n = bag.length;
+    const groups = fishGroups(s, 'fish');
+    if (!groups.length) return { ok: false, msg: '仓库里没有鱼（杂物和宝箱要去百货店）' };
+    let gain = 0, n = 0;
+    groups.forEach(function (g) {
+      gain += Math.max(1, Math.round(shopValue(g.total) * sellBonus(s) * fishMarketMul(s, g.name)));
+      addFishSupply(s, g.name, g.count);
+      n += g.count;
+    });
     s.fishBag = (s.fishBag || []).filter(function (e) { return fishIsJunk(e); });
     addCoins(s, gain, '卖鱼');
     log(s, '💰 卖出全部渔获 ' + n + ' 条，+' + gain + ' 金（8 折）', 'good');
@@ -2473,52 +2541,49 @@ button{ color:inherit; font:inherit; }
     return { ok: true, msg: c.name + '×' + qty + ' 已入箱', v: v, n: qty };
   }
 
-  /* 放进收购箱：鱼、杂物、宝箱都收，按原价（含成就售价加成），第二天睡觉时结算 */
+  /* 放进收购箱：鱼、杂物、宝箱都收，按原价 × 市价（含成就售价加成），第二天睡觉时结算 */
   function boxPutFish(s, key, n) {
     const g = fishGroups(s).filter(function (x) { return x.key === key; })[0];
     if (!g) return { ok: false, msg: '没有这种渔获' };
     const qty = Math.max(1, Math.min(g.count, Math.floor(n || g.count)));
-    let left = qty;
-    const kept = [];
-    (s.fishBag || []).forEach(function (e) {
-      if (fishKey(e) === key && left > 0) { left--; return; }
-      kept.push(e);
-    });
-    s.fishBag = kept;
-    const v = Math.max(1, Math.round(g.v * qty * sellBonus(s)));
+    const parts = takeFishN(s, key, qty);
+    const raw = parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
+    const mkt = g.chest ? 1 : fishMarketMul(s, g.name);
+    const v = Math.max(1, Math.round(raw * sellBonus(s) * mkt));
+    if (!g.chest) addFishSupply(s, g.name, qty);
     s.box = s.box || [];
-    s.box.push({ kind: 'fish', name: g.name, emoji: g.emoji, q: g.q, n: qty, v: v,
+    s.box.push({ kind: 'fish', name: g.name, emoji: g.emoji, n: qty, parts: parts, v: v,
                  chest: g.chest || undefined, junk: g.junk || undefined,
                  trash: (g.junk && !g.chest) ? true : undefined });
     log(s, '📦 ' + g.emoji + ' ' + g.name + '×' + qty + ' 放进收购箱（原价 ' + v + ' 金，明天结算）', 'info');
     return { ok: true, msg: g.name + '×' + qty + ' 已入箱', v: v, n: qty };
   }
 
-  /* 从某一批里取回 take 件（就地修改 entry） */
+  /* 从某一批里取回 take 件（就地修改 entry，鱼和作物共用 parts） */
   function takeFromEntry(s, e, take) {
     const total = e.n || 1;
     const t = Math.min(total, take);
-    if (e.kind === 'crop') {
-      const parts = (e.parts && e.parts.length)
-        ? e.parts : [{ q: 'std', n: total, unit: Math.max(1, Math.round((e.v || 1) / total)) }];
-      let remain = t;
-      const kept = [];
-      parts.forEach(function (p) {
-        if (remain <= 0) { kept.push({ q: p.q, n: p.n, unit: p.unit }); return; }
-        const cut = Math.min(p.n, remain);
-        remain -= cut;
-        addStore(s, e.id, p.q, cut);
-        if (p.n - cut > 0) kept.push({ q: p.q, n: p.n - cut, unit: p.unit });
-      });
-      e.parts = kept;
-    } else {
-      const unit = Math.max(1, Math.round((e.v || 1) / total));
-      for (let i = 0; i < t; i++) {
-        s.fishBag.push({ name: e.name, emoji: e.emoji, q: e.q || null, v: unit, d: s.day,
-                         no: e.junk || undefined, chest: e.chest || undefined,
-                         trash: e.trash || undefined });
+    const parts = (e.parts && e.parts.length)
+      ? e.parts.map(function (p) { return { q: p.q, n: p.n, unit: p.unit }; })
+      : [{ q: 'std', n: total, unit: Math.max(1, Math.round((e.v || 1) / total)) }];
+    let remain = t;
+    const kept = [];
+    parts.forEach(function (p) {
+      if (remain <= 0) { kept.push({ q: p.q, n: p.n, unit: p.unit }); return; }
+      const cut = Math.min(p.n, remain);
+      remain -= cut;
+      if (e.kind === 'crop') {
+        if (e.id) addStore(s, e.id, p.q, cut);
+      } else {
+        for (let i = 0; i < cut; i++) {
+          s.fishBag.push({ name: e.name, emoji: e.emoji, q: (p.q && p.q !== '-') ? p.q : null,
+                           v: p.unit, d: s.day, no: e.junk || undefined,
+                           chest: e.chest || undefined, trash: e.trash || undefined });
+        }
       }
-    }
+      if (p.n - cut > 0) kept.push({ q: p.q, n: p.n - cut, unit: p.unit });
+    });
+    e.parts = kept;
     e.n = total - t;
     e.v = Math.max(1, Math.round((e.v || 1) * e.n / total));
     return t;
@@ -2566,19 +2631,15 @@ button{ color:inherit; font:inherit; }
     return { n: n, value: value };
   }
 
-  /* 水产店：自定义卖 n 条 */
+  /* 水产店：自定义卖 n 条（同一鱼种的不同品质合并，按品质差的先卖） */
   function sellFishGroupN(s, key, n) {
     const g = fishGroups(s, 'fish').filter(function (x) { return x.key === key; })[0];
     if (!g) return { ok: false, msg: '仓库里没有这种鱼' };
     const qty = Math.max(1, Math.min(g.count, Math.floor(n || g.count)));
-    let left = qty;
-    const kept = [];
-    (s.fishBag || []).forEach(function (e) {
-      if (fishKey(e) === key && left > 0) { left--; return; }
-      kept.push(e);
-    });
-    s.fishBag = kept;
-    const gain = Math.max(1, Math.round(shopValue(g.v * qty) * sellBonus(s)));
+    const parts = takeFishN(s, key, qty);
+    const raw = parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
+    const gain = Math.max(1, Math.round(shopValue(raw) * sellBonus(s) * fishMarketMul(s, g.name)));
+    addFishSupply(s, g.name, qty);
     addCoins(s, gain, '卖鱼 ' + g.name);
     log(s, '💰 卖出 ' + g.emoji + ' ' + g.name + ' ×' + qty + '，+' + gain + ' 金（8 折）', 'good');
     return { ok: true, msg: '卖出 ' + g.name + '×' + qty + '，+' + gain + ' 金', income: gain, count: qty };
@@ -3200,11 +3261,17 @@ button{ color:inherit; font:inherit; }
     } else {
       takeStoreN(s, o.crop, o.qty);
     }
-    addCoins(s, o.reward, '长期订单 · ' + o.name + '×' + o.qty);
-    log(s, '📜 长期订单完成：' + o.emoji + ' ' + o.name + ' ×' + o.qty + '，+' + o.reward + ' 金', 'good');
+    // 提前交货：每提前一天 +10%，最多 +50%
+    const early = Math.max(0, (o.deadline || 0) - s.day);
+    const bonus = Math.round(o.reward * Math.min(0.5, 0.1 * early));
+    const total = o.reward + bonus;
+    addCoins(s, total, '长期订单 · ' + o.name + '×' + o.qty);
+    log(s, '📜 长期订单完成：' + o.emoji + ' ' + o.name + ' ×' + o.qty + '，+' + total + ' 金' +
+      (bonus ? '（提前 ' + early + ' 天，额外 +' + bonus + '）' : ''), 'good');
     s.longOrder = null;
     s.stats.longOrders = (s.stats.longOrders || 0) + 1;
-    return { ok: true, msg: '长期订单完成，+' + o.reward + ' 金', reward: o.reward };
+    return { ok: true, msg: '长期订单完成，+' + total + ' 金' + (bonus ? '（含提前奖励 +' + bonus + '）' : ''),
+             reward: o.reward, bonus: bonus, early: early };
   }
 
   /* 委托进度：作物看仓库，鱼看渔获袋 */
@@ -3358,6 +3425,13 @@ button{ color:inherit; font:inherit; }
           return { q: p.q, n: Math.round(num(p.n, 1, 1, 9999)), unit: Math.round(num(p.unit, 1, 0, 9999)) };
         }) : null;
       }
+      if (e.kind === 'fish') {
+        out.parts = Array.isArray(e.parts) ? e.parts.filter(function (p) {
+          return p && p.n > 0 && (p.q === '-' || Q_IDS.indexOf(p.q) >= 0);
+        }).map(function (p) {
+          return { q: p.q, n: Math.round(num(p.n, 1, 1, 9999)), unit: Math.round(num(p.unit, 1, 0, 9999)) };
+        }) : null;
+      }
       if (e.kind === 'fish' && Q_IDS.indexOf(e.q) >= 0) out.q = e.q;
       if (e.kind === 'fish' && e.chest && CHESTS[e.chest]) out.chest = e.chest;
       if (e.kind === 'fish' && e.junk) out.junk = true;
@@ -3421,6 +3495,12 @@ button{ color:inherit; font:inherit; }
       if (!CROPS[id]) return;
       const sold = num(rawMarket[id] && rawMarket[id].sold, 0, 0, 9999);
       if (sold > 0) merged.market[id] = { sold: Math.round(sold * 10) / 10 };
+    });
+    merged.marketF = {};
+    const rawMarketF = s.marketF && typeof s.marketF === 'object' ? s.marketF : {};
+    Object.keys(rawMarketF).forEach(function (name) {
+      const sold = num(rawMarketF[name] && rawMarketF[name].sold, 0, 0, 9999);
+      if (sold > 0 && String(name).length <= 12) merged.marketF[name] = { sold: Math.round(sold * 10) / 10 };
     });
     merged.ferts = Object.assign({ normal: 0, special: 0 }, s.ferts || {});
     merged.ferts.normal = Math.round(num(merged.ferts.normal, 0, 0, 999));
@@ -3548,6 +3628,7 @@ button{ color:inherit; font:inherit; }
     addStore: addStore, storeCount: storeCount, storeValue: storeValue, storeMix: storeMix,
     takeStore: takeStore, unitValue: unitValue,
     fishGroups: fishGroups, fishKey: fishKey, sellFishGroup: sellFishGroup, sellAllFish: sellAllFish,
+    fishMarketInfo: fishMarketInfo, fishMarketMul: fishMarketMul, addFishSupply: addFishSupply, takeFishN: takeFishN,
     sellWorms: sellWorms, WORM_VALUE: WORM_VALUE,
     qualityById: qualityById,
     buySeed: buySeed, seedBuyPrice: seedBuyPrice, seedSellPrice: seedSellPrice,
@@ -4051,17 +4132,17 @@ button{ color:inherit; font:inherit; }
     const fishHtml = fishCount
       ? '<div class="store-sub">🐟 渔获 · ' + fishCount + ' 条</div>' +
         fish.map(function (g) {
-          const q = G.qualityById(g.q);
-          const col = q ? q.color : 'var(--ink-3)';
           const desc = G.fishDesc(g.name);
+          const mk = g.chest ? { total: 1, tag: '宝箱' } : G.fishMarketInfo(state, g.name);
           return '<div class="store-row">' +
             '<span class="se">' + g.emoji + '</span>' +
-            '<div><div class="sn">' + g.name + ' ×' + g.count + '</div>' +
+            '<div><div class="sn">' + g.name + ' ×' + g.count +
+              (g.chest ? '' : ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b>') + '</div>' +
             '<div class="sv">' +
               (desc ? '<span class="sf-note">' + desc + '</span> · ' : '') +
-              '<span style="color:' + col + '">' + (q ? q.emoji + ' ' + q.name : '杂物') + '</span>' +
-              ' · ' + g.v + ' 金/条</div></div>' +
-            '<span class="sp">' + (g.v * g.count) + ' 金</span>' +
+              fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) + ' 金/条' +
+              (g.chest ? '' : ' · ' + mk.tag) + '</div></div>' +
+            '<span class="sp">' + g.total + ' 金</span>' +
             '<button class="btn mini" data-boxfish="' + g.key + '" title="整批放进收购箱，原价结算">📦</button>' +
           '</div>';
         }).join('')
@@ -4136,13 +4217,15 @@ button{ color:inherit; font:inherit; }
       const have = G.orderHave(state, lo);
       const full = have >= lo.qty;
       const left = Math.max(0, (lo.deadline || 0) - state.day);
+      const bonus = Math.round(lo.reward * Math.min(0.5, 0.1 * left));
       return '<div class="order-row long">' +
         '<span class="oe">📜</span>' +
         '<div class="oi">' +
           '<div class="on">长期 · ' + lo.emoji + ' ' + lo.name + ' ×' + lo.qty +
             ' · 报酬 ' + lo.reward + ' 金</div>' +
           '<div class="os">' + (lo.kind === 'fish' ? '渔获' : '仓库') + ' ' +
-            Math.min(have, lo.qty) + '/' + lo.qty + ' · 还剩 ' + left + ' 天 · 2 倍价</div>' +
+            Math.min(have, lo.qty) + '/' + lo.qty + ' · 还剩 ' + left + ' 天 · 2 倍价' +
+            (bonus ? ' · <b style="color:var(--green-d)">今天交 +' + bonus + ' 金</b>' : '') + '</div>' +
         '</div>' +
         '<button class="btn mini" data-long="1"' + (full ? '' : ' disabled') + '>交付</button>' +
       '</div>';
@@ -4600,7 +4683,9 @@ button{ color:inherit; font:inherit; }
 
       '<div class="rule-sec">' +
         '<h4>🐟 水产店</h4>' +
-        '<p>渔获在这里直接卖，<b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>结算；<b>不收杂物和宝箱</b>（那些去百货店）。<br>' +
+        '<p>渔获在这里直接卖，<b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>再乘<b>市价</b>；<b>不收杂物和宝箱</b>（那些去百货店）。<br>' +
+        '<b>同一种鱼的不同品质会合并成一行</b>（和仓库里的作物一样），显示品质构成和均价；卖出时<b>先卖品质差的</b>。<br>' +
+        '<b>鱼也受市场影响</b>：每卖 1 条 −1.5%（最低 ×0.75），隔天回落 20%；鱼没有季节差价。<br>' +
         '店里每天<b>进一批水产</b>（一般品质），每种数量随机、<b>睡觉后补货</b>，卖完只能等明天；' +
         '买价是基础价的 ' + G.BALANCE.shop.priceMul + ' 倍，买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。<br>' +
         '河豚 <b>D' + G.FISH_UNLOCK.puffer + '</b> 起、锦鲤 <b>D' + G.FISH_UNLOCK.koi + '</b> 起才进货。</p>' +
@@ -4610,10 +4695,10 @@ button{ color:inherit; font:inherit; }
         '<h4>🧺 农产品店</h4>' +
         '<p>作物在这里直接卖，同样 <b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>，再乘<b>市价系数</b>；仓库不再直接出售任何东西。<br>' +
         '<b>市价</b> = 供需 × 季节：<br>' +
-        '· <b>供需</b>：最近卖得越多越便宜（每件 −2%，最低 ×0.75），隔天回落 20%；卖得少就是 ×1.15（稀缺）<br>' +
-        '· <b>季节</b>：当季 <b>×1.15</b>（当令好卖），反季 <b>×0.90</b>（放久了不新鲜）<br>' +
-        '· 两相乘就是最终系数，界面上直接显示「市价 ×1.18 · 当季 · 平稳」<br>' +
-        '所以：<b>别一次性把同一种菜全砸出去</b>，分几天卖或者换季再卖更划算。<br>' +
+        '· <b>供需</b>：最近卖得越多越便宜（每件 −2%，最低 ×0.75），隔天回落 20%；卖得少就是 ×1.05（稀缺）<br>' +
+        '· <b>季节</b>：<b>反季 ×1.20</b>（过季稀缺、卖得贵），<b>当季 ×1.00</b>（满大街都是）<br>' +
+        '· 两相乘就是最终系数，界面上直接显示「市价 ×1.18 · 反季 · 平稳」<br>' +
+        '所以：<b>别一次性把同一种菜全砸出去</b>；囤到反季再卖，价格会更高。<br>' +
         '店里每天同样进一批作物（一般品质），买价是售价的 ' + G.BALANCE.shop.cropPriceMul +
         ' 倍，转手必亏，只在凑委托或应急时买。<br>' +
         '南瓜 <b>D' + G.CROP_UNLOCK.pumpkin + '</b> 起、西瓜 <b>D' + G.CROP_UNLOCK.watermelon + '</b> 起才进货。</p>' +
@@ -4674,7 +4759,8 @@ button{ color:inherit; font:inherit; }
         '委托池按天数逐档解锁（D1 / D3 / D5 / D7 / D9 / D12 / D15），并且<b>只会要你当前等级买得到的作物</b>；' +
         '<b>每天第一张单固定是「买得到的最贵作物」</b>，剩下随机；' +
         '贵的作物一次要 2–3 个，单张报酬<b>最低 40 金</b>；鱼单单价随季节涨（11 → 15 → 19 → 23）。<br>' +
-        '📜 <b>长期订单</b>：5 天期限、数量大、<b>2 倍报酬</b>，完成后自动换下一张（过期也会换）。<br>' +
+        '📜 <b>长期订单</b>：5 天期限、数量大、<b>2 倍报酬</b>，完成后自动换下一张（过期也会换）。' +
+        '<b>提前交货有额外奖励</b>：每提前 1 天 +10%，最多 +50%。<br>' +
         '交委托先扣<b>品质差的</b>，交鱼先交最便宜的；杂物、宝箱不算数。</p>' +
       '</div>' +
 
@@ -4992,10 +5078,10 @@ button{ color:inherit; font:inherit; }
     const total = G.boxValue(state);
     const rows = list.length ? list.map(function (e) {
       let sub = '原价 ' + e.v + ' 金';
-      if (e.kind === 'crop' && e.parts && e.parts.length) {
+      if (e.parts && e.parts.length) {
         sub = e.parts.map(function (p) {
           const q = G.qualityById(p.q);
-          return (q ? q.name : '?') + ' ' + p.n;
+          return (q ? q.emoji + q.name : '杂物') + ' ' + p.n;
         }).join(' · ') + ' · 原价 ' + e.v + ' 金';
       }
       return '<div class="store-row">' +
@@ -5025,19 +5111,25 @@ button{ color:inherit; font:inherit; }
       '<button class="btn" data-close>关闭</button>');
   }
 
+  /* 渔获品质构成（和作物仓库一个写法） */
+  function fishMix(g) {
+    return g.mix.map(function (m) {
+      return '<span style="color:' + m.color + '">' + m.emoji + ' ' + m.name + ' ' + m.n + '</span>';
+    }).join(' · ');
+  }
+
   function fishShop() {
     const groups = G.fishGroups(state, 'fish');
     const total = groups.reduce(function (n, g) { return n + g.count; }, 0);
     const sellRows = groups.length ? groups.map(function (g) {
-      const q = G.qualityById(g.q);
+      const mk = G.fishMarketInfo(state, g.name);
       return '<div class="store-row">' +
         '<span class="se">' + g.emoji + '</span>' +
-        '<div><div class="sn">' + g.name + ' ×' + g.count + '</div>' +
-        '<div class="sv">' +
-          (g.q ? '<span style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
-            (q ? q.emoji + q.name : '杂物') + '</span> · ' : '杂物 · ') +
-          g.v + ' 金/条</div></div>' +
-        '<span class="sp">' + (g.v * g.count) + ' 金</span>' +
+        '<div><div class="sn">' + g.name + ' ×' + g.count +
+          ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b></div>' +
+        '<div class="sv">' + fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) +
+          ' 金/条 · ' + mk.tag + '</div></div>' +
+        '<span class="sp">' + g.total + ' 金</span>' +
         '<button class="btn mini" data-sellfish="' + g.key + '">卖出</button>' +
       '</div>';
     }).join('') : '<div class="store-empty">还没有渔获，先去河边甩两杆</div>';
@@ -5073,9 +5165,7 @@ button{ color:inherit; font:inherit; }
       (groups.length
         ? '<div class="buy-custom"><span>🧮 自定义卖出</span>' +
             '<select id="fish-sell-id">' + groups.map(function (g) {
-              const q = G.qualityById(g.q);
-              return '<option value="' + g.key + '">' + g.emoji + ' ' + g.name + ' ×' + g.count +
-                (q ? '（' + q.name + '）' : '') + '</option>';
+              return '<option value="' + g.key + '">' + g.emoji + ' ' + g.name + ' ×' + g.count + '</option>';
             }).join('') + '</select>' +
             '<input id="fish-sell-n" type="number" min="1" step="1" value="1" inputmode="numeric">' +
             '<button class="btn mini" data-sellfishn="1">卖出</button>' +

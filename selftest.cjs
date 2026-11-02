@@ -156,11 +156,12 @@ const fishWithoutQuality = s.fishBook.entries.filter(e => !e.trash && !e.chest).
 ok(fishWithoutQuality, '非垃圾鱼都带品质');
 
 /* 卖鱼 */
-const bagBefore = s.fishBag.slice();
-const fishOnly = bagBefore.filter(e => !G.fishIsJunk(e)).reduce((n, e) => n + e.v, 0);
+const groupsBefore = G.fishGroups(s, 'fish');
+const expectFishSale = groupsBefore.reduce((a, g) =>
+  a + Math.max(1, Math.round(G.shopValue(g.total) * G.sellBonus(s) * G.fishMarketMul(s, g.name))), 0);
 const soldAll = G.sellAllFish(s);
-ok(soldAll.ok && soldAll.income === G.shopValue(fishOnly) && s.coins === coinsAtStart + G.shopValue(fishOnly) && s.fishBag.every(e => G.fishIsJunk(e)),
-   '全部卖鱼：按 8 折结算，杂物和宝箱留下', { gain: soldAll.income, full: fishOnly });
+ok(soldAll.ok && soldAll.income === expectFishSale && s.coins === coinsAtStart + expectFishSale && s.fishBag.every(e => G.fishIsJunk(e)),
+   '全部卖鱼：按 8 折 × 市价结算，杂物和宝箱留下', { gain: soldAll.income, expect: expectFishSale });
 
 /* 分组出售 */
 s.bait.worm = 100;
@@ -173,11 +174,12 @@ for (let i = 0; i < 60 && got12 < 12; i++) {
 const fishLeft = () => s.fishBag.filter(e => !G.fishIsJunk(e)).length;
 const fishN0 = fishLeft();
 const groups = G.fishGroups(s, "fish");
-ok(groups.length >= 1 && groups.reduce((n, g) => n + g.count, 0) === fishN0, '渔获按鱼种+品质分组', groups.length);
+ok(groups.length >= 1 && groups.reduce((n, g) => n + g.count, 0) === fishN0, '渔获按鱼种分组（不同品质合并）', groups.length);
 const g0 = groups[0], coinsBeforeGroup = s.coins;
+const expectGroup = Math.max(1, Math.round(G.shopValue(g0.total) * G.sellBonus(s) * G.fishMarketMul(s, g0.name)));
 const rGroup = G.sellFishGroup(s, g0.key);
-ok(rGroup.ok && s.coins === coinsBeforeGroup + G.shopValue(g0.v * g0.count) && fishLeft() === fishN0 - g0.count,
-   '卖一组鱼结算正确（8 折）', { key: g0.key, gain: rGroup.income });
+ok(rGroup.ok && s.coins === coinsBeforeGroup + expectGroup && fishLeft() === fishN0 - g0.count,
+   '卖一组鱼结算正确（8 折 × 市价）', { key: g0.key, gain: rGroup.income });
 
 /* 全部卖出（作物 + 渔获） */
 s = G.createState();
@@ -1470,12 +1472,12 @@ ok(v25harvest(61) === v25harvest(1) + 1, '秋天收获 +1 个', [v25harvest(1), 
 /* 市场：供需 + 季节 */
 const v25m = G.createState();
 const v25base = G.marketMul(v25m, 'carrot');
-ok(Math.abs(v25base - 1.05 * 1.05) < 1e-9, '没人卖过：稀缺 ×1.05 × 当季 ×1.05', v25base);
+ok(Math.abs(v25base - 1.05) < 1e-9, '没人卖过：稀缺 ×1.05 × 当季 ×1.0', v25base);
 G.addSupply(v25m, 'carrot', 15);
 ok(G.marketMul(v25m, 'carrot') < v25base, '卖得越多越便宜', G.marketMul(v25m, 'carrot'));
 G.addSupply(v25m, 'carrot', 60);
 ok(Math.abs(G.marketInfo(v25m, 'carrot').supply - 0.75) < 1e-9, '供给有 0.75 下限');
-ok(Math.abs(G.marketInfo(v25m, 'watermelon').season - 0.9) < 1e-9, '反季作物 ×0.90');
+ok(Math.abs(G.marketInfo(v25m, 'watermelon').season - 1.2) < 1e-9, '反季作物 ×1.20');
 
 /* 睡觉后销量衰减 20% */
 const v25d = G.createState();
@@ -1486,6 +1488,56 @@ const v25sold = v25d.market.carrot.sold;
 G.sleep(v25d);
 ok(!v25d.market.carrot || Math.abs(v25d.market.carrot.sold - v25sold * 0.8) < 1e-9,
   '睡觉后市场销量衰减 20%', v25sold);
+
+/* ---------- 5h. v2.6 渔获合并 / 鱼市价 / 长期订单提前奖励 ---------- */
+section('v2.6 渔获合并与鱼市价');
+
+const v26f = G.createState();
+v26f.fishBag.push({ name: '鲫鱼', emoji: '🐟', q: 'good', v: 4, d: 1 });
+v26f.fishBag.push({ name: '鲫鱼', emoji: '🐟', q: 'std', v: 3, d: 1 });
+v26f.fishBag.push({ name: '鲫鱼', emoji: '🐟', q: 'bad', v: 1, d: 1 });
+v26f.fishBag.push({ name: '鲤鱼', emoji: '🐟', q: 'std', v: 6, d: 1 });
+const v26g = G.fishGroups(v26f, 'fish');
+ok(v26g.length === 2, '同名不同品质合并成一组', v26g.map(function (g) { return g.name + '×' + g.count; }));
+const v26cru = v26g.filter(function (g) { return g.name === '鲫鱼'; })[0];
+ok(v26cru.count === 3 && v26cru.total === 8 && v26cru.mix.length === 3, '合并组带品质构成与总价',
+  { n: v26cru.count, total: v26cru.total, mix: v26cru.mix.length });
+
+/* 卖出时品质差的先出 */
+const v26sell = G.sellFishGroupN(v26f, G.fishKey(v26f.fishBag[0]), 2);
+const v26left = v26f.fishBag.filter(function (e) { return e.name === '鲫鱼'; });
+ok(v26sell.ok && v26sell.count === 2 && v26left.length === 1 && v26left[0].q === 'good',
+  '同组卖出先卖差的品质', v26left.map(function (e) { return e.q; }));
+
+/* 鱼市价：卖多了降价 */
+const v26m = G.createState();
+const v26base = G.fishMarketMul(v26m, '鲫鱼');
+G.addFishSupply(v26m, '鲫鱼', 20);
+ok(G.fishMarketMul(v26m, '鲫鱼') < v26base, '鱼卖得多也会降价', G.fishMarketMul(v26m, '鲫鱼'));
+
+/* 反季溢价 */
+const v26season = G.marketInfo(G.createState(), 'watermelon');
+ok(Math.abs(v26season.season - 1.2) < 1e-9 && !v26season.inSeason, '反季作物 ×1.20', v26season.season);
+const v26in = G.marketInfo(Object.assign(G.createState(), { day: 31 }), 'watermelon');
+ok(v26in.inSeason && Math.abs(v26in.season - 1) < 1e-9, '当季作物 ×1.00', v26in.season);
+
+/* 长期订单提前奖励 */
+function v26long(daysLeft) {
+  const st = G.createState();
+  st.day = 40;
+  st.longOrder = { id: 'L1', kind: 'crop', crop: 'carrot', name: '萝卜', emoji: '🥕',
+                   qty: 1, reward: 100, deadline: 40 + daysLeft, done: false };
+  G.addStore(st, 'carrot', 'std', 5);
+  const before = st.coins;
+  const r = G.deliverLong(st);
+  return { gain: st.coins - before, bonus: r.bonus || 0 };
+}
+const v26onTime = v26long(0);
+ok(v26onTime.gain === 100 && v26onTime.bonus === 0, '卡点交付没有额外奖励', v26onTime);
+const v26early = v26long(3);
+ok(v26early.gain === 130 && v26early.bonus === 30, '提前 3 天 +30%', v26early);
+const v26max = v26long(9);
+ok(v26max.gain === 150 && v26max.bonus === 50, '提前奖励封顶 +50%', v26max);
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');

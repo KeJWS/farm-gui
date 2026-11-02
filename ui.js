@@ -463,17 +463,17 @@
     const fishHtml = fishCount
       ? '<div class="store-sub">🐟 渔获 · ' + fishCount + ' 条</div>' +
         fish.map(function (g) {
-          const q = G.qualityById(g.q);
-          const col = q ? q.color : 'var(--ink-3)';
           const desc = G.fishDesc(g.name);
+          const mk = g.chest ? { total: 1, tag: '宝箱' } : G.fishMarketInfo(state, g.name);
           return '<div class="store-row">' +
             '<span class="se">' + g.emoji + '</span>' +
-            '<div><div class="sn">' + g.name + ' ×' + g.count + '</div>' +
+            '<div><div class="sn">' + g.name + ' ×' + g.count +
+              (g.chest ? '' : ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b>') + '</div>' +
             '<div class="sv">' +
               (desc ? '<span class="sf-note">' + desc + '</span> · ' : '') +
-              '<span style="color:' + col + '">' + (q ? q.emoji + ' ' + q.name : '杂物') + '</span>' +
-              ' · ' + g.v + ' 金/条</div></div>' +
-            '<span class="sp">' + (g.v * g.count) + ' 金</span>' +
+              fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) + ' 金/条' +
+              (g.chest ? '' : ' · ' + mk.tag) + '</div></div>' +
+            '<span class="sp">' + g.total + ' 金</span>' +
             '<button class="btn mini" data-boxfish="' + g.key + '" title="整批放进收购箱，原价结算">📦</button>' +
           '</div>';
         }).join('')
@@ -548,13 +548,15 @@
       const have = G.orderHave(state, lo);
       const full = have >= lo.qty;
       const left = Math.max(0, (lo.deadline || 0) - state.day);
+      const bonus = Math.round(lo.reward * Math.min(0.5, 0.1 * left));
       return '<div class="order-row long">' +
         '<span class="oe">📜</span>' +
         '<div class="oi">' +
           '<div class="on">长期 · ' + lo.emoji + ' ' + lo.name + ' ×' + lo.qty +
             ' · 报酬 ' + lo.reward + ' 金</div>' +
           '<div class="os">' + (lo.kind === 'fish' ? '渔获' : '仓库') + ' ' +
-            Math.min(have, lo.qty) + '/' + lo.qty + ' · 还剩 ' + left + ' 天 · 2 倍价</div>' +
+            Math.min(have, lo.qty) + '/' + lo.qty + ' · 还剩 ' + left + ' 天 · 2 倍价' +
+            (bonus ? ' · <b style="color:var(--green-d)">今天交 +' + bonus + ' 金</b>' : '') + '</div>' +
         '</div>' +
         '<button class="btn mini" data-long="1"' + (full ? '' : ' disabled') + '>交付</button>' +
       '</div>';
@@ -1012,7 +1014,9 @@
 
       '<div class="rule-sec">' +
         '<h4>🐟 水产店</h4>' +
-        '<p>渔获在这里直接卖，<b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>结算；<b>不收杂物和宝箱</b>（那些去百货店）。<br>' +
+        '<p>渔获在这里直接卖，<b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>再乘<b>市价</b>；<b>不收杂物和宝箱</b>（那些去百货店）。<br>' +
+        '<b>同一种鱼的不同品质会合并成一行</b>（和仓库里的作物一样），显示品质构成和均价；卖出时<b>先卖品质差的</b>。<br>' +
+        '<b>鱼也受市场影响</b>：每卖 1 条 −1.5%（最低 ×0.75），隔天回落 20%；鱼没有季节差价。<br>' +
         '店里每天<b>进一批水产</b>（一般品质），每种数量随机、<b>睡觉后补货</b>，卖完只能等明天；' +
         '买价是基础价的 ' + G.BALANCE.shop.priceMul + ' 倍，买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。<br>' +
         '河豚 <b>D' + G.FISH_UNLOCK.puffer + '</b> 起、锦鲤 <b>D' + G.FISH_UNLOCK.koi + '</b> 起才进货。</p>' +
@@ -1022,10 +1026,10 @@
         '<h4>🧺 农产品店</h4>' +
         '<p>作物在这里直接卖，同样 <b>' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折</b>，再乘<b>市价系数</b>；仓库不再直接出售任何东西。<br>' +
         '<b>市价</b> = 供需 × 季节：<br>' +
-        '· <b>供需</b>：最近卖得越多越便宜（每件 −2%，最低 ×0.75），隔天回落 20%；卖得少就是 ×1.15（稀缺）<br>' +
-        '· <b>季节</b>：当季 <b>×1.15</b>（当令好卖），反季 <b>×0.90</b>（放久了不新鲜）<br>' +
-        '· 两相乘就是最终系数，界面上直接显示「市价 ×1.18 · 当季 · 平稳」<br>' +
-        '所以：<b>别一次性把同一种菜全砸出去</b>，分几天卖或者换季再卖更划算。<br>' +
+        '· <b>供需</b>：最近卖得越多越便宜（每件 −2%，最低 ×0.75），隔天回落 20%；卖得少就是 ×1.05（稀缺）<br>' +
+        '· <b>季节</b>：<b>反季 ×1.20</b>（过季稀缺、卖得贵），<b>当季 ×1.00</b>（满大街都是）<br>' +
+        '· 两相乘就是最终系数，界面上直接显示「市价 ×1.18 · 反季 · 平稳」<br>' +
+        '所以：<b>别一次性把同一种菜全砸出去</b>；囤到反季再卖，价格会更高。<br>' +
         '店里每天同样进一批作物（一般品质），买价是售价的 ' + G.BALANCE.shop.cropPriceMul +
         ' 倍，转手必亏，只在凑委托或应急时买。<br>' +
         '南瓜 <b>D' + G.CROP_UNLOCK.pumpkin + '</b> 起、西瓜 <b>D' + G.CROP_UNLOCK.watermelon + '</b> 起才进货。</p>' +
@@ -1086,7 +1090,8 @@
         '委托池按天数逐档解锁（D1 / D3 / D5 / D7 / D9 / D12 / D15），并且<b>只会要你当前等级买得到的作物</b>；' +
         '<b>每天第一张单固定是「买得到的最贵作物」</b>，剩下随机；' +
         '贵的作物一次要 2–3 个，单张报酬<b>最低 40 金</b>；鱼单单价随季节涨（11 → 15 → 19 → 23）。<br>' +
-        '📜 <b>长期订单</b>：5 天期限、数量大、<b>2 倍报酬</b>，完成后自动换下一张（过期也会换）。<br>' +
+        '📜 <b>长期订单</b>：5 天期限、数量大、<b>2 倍报酬</b>，完成后自动换下一张（过期也会换）。' +
+        '<b>提前交货有额外奖励</b>：每提前 1 天 +10%，最多 +50%。<br>' +
         '交委托先扣<b>品质差的</b>，交鱼先交最便宜的；杂物、宝箱不算数。</p>' +
       '</div>' +
 
@@ -1404,10 +1409,10 @@
     const total = G.boxValue(state);
     const rows = list.length ? list.map(function (e) {
       let sub = '原价 ' + e.v + ' 金';
-      if (e.kind === 'crop' && e.parts && e.parts.length) {
+      if (e.parts && e.parts.length) {
         sub = e.parts.map(function (p) {
           const q = G.qualityById(p.q);
-          return (q ? q.name : '?') + ' ' + p.n;
+          return (q ? q.emoji + q.name : '杂物') + ' ' + p.n;
         }).join(' · ') + ' · 原价 ' + e.v + ' 金';
       }
       return '<div class="store-row">' +
@@ -1437,19 +1442,25 @@
       '<button class="btn" data-close>关闭</button>');
   }
 
+  /* 渔获品质构成（和作物仓库一个写法） */
+  function fishMix(g) {
+    return g.mix.map(function (m) {
+      return '<span style="color:' + m.color + '">' + m.emoji + ' ' + m.name + ' ' + m.n + '</span>';
+    }).join(' · ');
+  }
+
   function fishShop() {
     const groups = G.fishGroups(state, 'fish');
     const total = groups.reduce(function (n, g) { return n + g.count; }, 0);
     const sellRows = groups.length ? groups.map(function (g) {
-      const q = G.qualityById(g.q);
+      const mk = G.fishMarketInfo(state, g.name);
       return '<div class="store-row">' +
         '<span class="se">' + g.emoji + '</span>' +
-        '<div><div class="sn">' + g.name + ' ×' + g.count + '</div>' +
-        '<div class="sv">' +
-          (g.q ? '<span style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
-            (q ? q.emoji + q.name : '杂物') + '</span> · ' : '杂物 · ') +
-          g.v + ' 金/条</div></div>' +
-        '<span class="sp">' + (g.v * g.count) + ' 金</span>' +
+        '<div><div class="sn">' + g.name + ' ×' + g.count +
+          ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b></div>' +
+        '<div class="sv">' + fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) +
+          ' 金/条 · ' + mk.tag + '</div></div>' +
+        '<span class="sp">' + g.total + ' 金</span>' +
         '<button class="btn mini" data-sellfish="' + g.key + '">卖出</button>' +
       '</div>';
     }).join('') : '<div class="store-empty">还没有渔获，先去河边甩两杆</div>';
@@ -1485,9 +1496,7 @@
       (groups.length
         ? '<div class="buy-custom"><span>🧮 自定义卖出</span>' +
             '<select id="fish-sell-id">' + groups.map(function (g) {
-              const q = G.qualityById(g.q);
-              return '<option value="' + g.key + '">' + g.emoji + ' ' + g.name + ' ×' + g.count +
-                (q ? '（' + q.name + '）' : '') + '</option>';
+              return '<option value="' + g.key + '">' + g.emoji + ' ' + g.name + ' ×' + g.count + '</option>';
             }).join('') + '</select>' +
             '<input id="fish-sell-n" type="number" min="1" step="1" value="1" inputmode="numeric">' +
             '<button class="btn mini" data-sellfishn="1">卖出</button>' +
