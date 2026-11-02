@@ -25,31 +25,33 @@
     tax: { min: 30, every: 30,
            bands: [{ upTo: 2000, rate: 0.02 }, { upTo: 10000, rate: 0.04 }, { upTo: null, rate: 0.06 }] },
     /* 等级：每级所需经验 = 15 + 10×(级-1)，满级 10 */
-    level: { max: 10, xpBase: 15, xpStep: 10 }
+    level: { max: 10, xpBase: 15, xpStep: 10 },
+    /* 等级解锁：商店设备 / 高级种子 / 特效肥 / 渔网 */
+    gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2 }
   };
 
   /* ---------------- 静态数据 ---------------- */
 
   const CROPS = {
-    carrot:     { name: '萝卜', emoji: '🥕', seed: 5,  days: 2, base: 3, price: 4,  big: false },
-    cabbage:    { name: '白菜', emoji: '🥬', seed: 7,  days: 2, base: 2, price: 8,  big: false },
-    potato:     { name: '土豆', emoji: '🥔', seed: 9,  days: 3, base: 3, price: 8,  big: false },
-    corn:       { name: '玉米', emoji: '🌽', seed: 14, days: 3, base: 2, price: 16, big: false },
-    eggplant:   { name: '茄子', emoji: '🍆', seed: 17, days: 4, base: 2, price: 22, big: false },
-    tomato:     { name: '番茄', emoji: '🍅', seed: 19, days: 4, base: 3, price: 16, big: false },
-    pumpkin:    { name: '南瓜', emoji: '🎃', seed: 24, days: 5, base: 1, price: 60, big: true  },
-    watermelon: { name: '西瓜', emoji: '🍉', seed: 32, days: 5, base: 1, price: 76, big: true  },
-    cucumber:   { name: '黄瓜', emoji: '🥒', seed: 19, days: 3, price: 13, multi: true,
+    carrot:     { name: '萝卜', emoji: '🥕', seed: 5,  days: 2, base: 3, price: 4,  big: false, lv: 1 },
+    cabbage:    { name: '白菜', emoji: '🥬', seed: 7,  days: 2, base: 2, price: 8,  big: false, lv: 1 },
+    potato:     { name: '土豆', emoji: '🥔', seed: 9,  days: 3, base: 3, price: 8,  big: false, lv: 1 },
+    corn:       { name: '玉米', emoji: '🌽', seed: 14, days: 3, base: 2, price: 16, big: false, lv: 2 },
+    eggplant:   { name: '茄子', emoji: '🍆', seed: 17, days: 4, base: 2, price: 22, big: false, lv: 3 },
+    tomato:     { name: '番茄', emoji: '🍅', seed: 19, days: 4, base: 3, price: 16, big: false, lv: 3 },
+    pumpkin:    { name: '南瓜', emoji: '🎃', seed: 24, days: 5, base: 1, price: 60, big: true,  lv: 5 },
+    watermelon: { name: '西瓜', emoji: '🍉', seed: 32, days: 5, base: 1, price: 76, big: true,  lv: 6 },
+    cucumber:   { name: '黄瓜', emoji: '🥒', seed: 19, days: 3, price: 13, multi: true, lv: 4,
                   firstQty: 2, regrowDays: 2, regrowQty: 2, regrowTimes: 2 },
-    strawberry: { name: '草莓', emoji: '🍓', seed: 22, days: 3, price: 9,  multi: true,
+    strawberry: { name: '草莓', emoji: '🍓', seed: 22, days: 3, price: 9,  multi: true, lv: 4,
                   firstQty: 3, regrowDays: 1, regrowQty: 2, regrowTimes: 3 }
   };
   Object.keys(CROPS).forEach(function (k) { CROPS[k].id = k; });
   const CROP_LIST = Object.keys(CROPS).map(function (k) { return CROPS[k]; });
 
   const FERT = {
-    normal:  { id: 'normal',  name: '普通肥料', emoji: '🧪', cost: 8,  add: 1 },
-    special: { id: 'special', name: '特效肥料', emoji: '💊', cost: 18, add: 2 }
+    normal:  { id: 'normal',  name: '普通肥料', emoji: '🧪', cost: 8,  add: 1, lv: 1 },
+    special: { id: 'special', name: '特效肥料', emoji: '💊', cost: 18, add: 2, lv: 4 }
   };
   const FERT_SELL_RATE = 0.5;
   const SPRINKLER_COST = BALANCE.device.sprinkler;
@@ -91,9 +93,13 @@
 
   /* 水产店每日进货量：[最少, 最多]；越稀有的鱼进得越少 */
   const SHOP_STOCK = {
-    crucian: [2, 4], carp: [2, 4], mandarin: [1, 3],
-    bass: [1, 3], puffer: [0, 2], koi: [0, 1]
+    crucian: [3, 6], carp: [3, 6], mandarin: [2, 4],
+    bass: [2, 4], puffer: [1, 3], koi: [0, 2]
   };
+  /* 高级水产中后期才进货 */
+  const FISH_UNLOCK = { puffer: 20, koi: 30 };
+  /* 高级作物中后期才进货 */
+  const CROP_UNLOCK = { pumpkin: 18, watermelon: 24 };
 
   const Q_IDS = QUALITY.map(function (q) { return q.id; });
 
@@ -323,9 +329,9 @@
 
   function levelEffectText(kind, lv) {
     if (kind === 'fish') {
-      return '咬钩 +' + Math.min(12, (lv - 1) * 1.5).toFixed(1) + '% · 好鱼 +' + ((lv - 1) * 3) + '%';
+      return '咬钩 +' + Math.min(8, (lv - 1) * 1).toFixed(1) + '% · 好鱼 +' + Math.min(18, (lv - 1) * 2) + '%';
     }
-    return '收获产量 +' + Math.floor(lv / 3);
+    return '收获产量 +' + Math.floor(lv / 5);
   }
 
   /* 加经验，返回升了几级 */
@@ -350,16 +356,40 @@
     return ups;
   }
 
-  /* 种田等级：每 3 级 +1 产量（普通作物） */
+  /* 种田等级：每 5 级 +1 产量（普通作物） */
   function farmYieldBonus(s) {
-    return Math.floor((((s.levels && s.levels.farm) || 1)) / 3);
+    return Math.floor((((s.levels && s.levels.farm) || 1)) / 5);
   }
-  /* 钓鱼等级：咬钩率 +1.5%/级（最多 +12%），好鱼权重 +3%/级 */
+  /* 钓鱼等级：咬钩率 +1%/级（最多 +8%），好鱼权重 +2%/级（最多 +18%） */
   function fishHookBonus(s) {
-    return Math.min(0.12, 0.015 * ((((s.levels && s.levels.fish) || 1)) - 1));
+    return Math.min(0.08, 0.01 * ((((s.levels && s.levels.fish) || 1)) - 1));
   }
   function fishGoodBonus(s) {
-    return 1 + 0.03 * ((((s.levels && s.levels.fish) || 1)) - 1);
+    return 1 + Math.min(0.18, 0.02 * ((((s.levels && s.levels.fish) || 1)) - 1));
+  }
+
+  /* ---------------- 等级解锁 ---------------- */
+
+  function farmLv(s) { return (s.levels && s.levels.farm) || 1; }
+  function fishLv(s) { return (s.levels && s.levels.fish) || 1; }
+
+  /* 种子：高级种子要种田等级 */
+  function seedUnlocked(s, id) {
+    const c = CROPS[id];
+    return !!c && farmLv(s) >= (c.lv || 1);
+  }
+  /* 肥料：特效肥要种田等级 */
+  function fertUnlocked(s, kind) {
+    const f = FERT[kind];
+    return !!f && farmLv(s) >= (f.lv || 1);
+  }
+  function sprinklerUnlocked(s) { return farmLv(s) >= BALANCE.gate.sprinkler; }
+  function harvesterUnlocked(s) { return farmLv(s) >= BALANCE.gate.harvester; }
+  function netUnlocked(s) { return fishLv(s) >= BALANCE.gate.net; }
+  /* 渔网上限随钓鱼等级提高：钓鱼 Lv2 可放 4 张，Lv7 起封顶 9 张 */
+  function netMax(s) {
+    if (!netUnlocked(s)) return 0;
+    return Math.min(NET_MAX, BALANCE.gate.netBase + fishLv(s));
   }
 
   /* ---------------- 状态 ---------------- */
@@ -371,11 +401,13 @@
              ripeDay: null, hits: 0, phase: 'idle' };
   }
 
-  /* 水产店每日进货：每种鱼随机一个库存量 */
-  function rollShopStock() {
+  /* 水产店每日进货：每种鱼随机一个库存量；高级水产要等中后期 */
+  function rollShopStock(day) {
+    const d = day || 1;
     const stock = {};
     FISH.forEach(function (f) {
       if (f.trash || f.noOrder) return;
+      if (d < (FISH_UNLOCK[f.id] || 1)) { stock[f.id] = 0; return; }
       const r = SHOP_STOCK[f.id] || [1, 2];
       stock[f.id] = randInt(r[0], r[1]);
     });
@@ -383,20 +415,27 @@
   }
 
   function makeShop(day) {
-    return { day: day || 1, stock: rollShopStock() };
+    return { day: day || 1, stock: rollShopStock(day || 1) };
   }
 
-  /* 农产品店每日进货：便宜的菜进得多，贵菜不一定有 */
-  function rollCropStock() {
+  /* 农产品店每日进货：便宜菜进得多，贵菜不一定有；南瓜/西瓜中后期才有 */
+  function cropStockCap(c) {
+    return c.price >= 40 ? 3 : (c.price >= 16 ? 4 : 7);
+  }
+
+  function rollCropStock(day) {
+    const d = day || 1;
     const stock = {};
     CROP_LIST.forEach(function (c) {
-      const r = c.price >= 40 ? [0, 1] : (c.price >= 16 ? [0, 2] : [1, 4]);
-      stock[c.id] = randInt(r[0], r[1]);
+      if (d < (CROP_UNLOCK[c.id] || 1)) { stock[c.id] = 0; return; }
+      const cap = cropStockCap(c);
+      const low = c.price >= 40 ? 1 : (c.price >= 16 ? 2 : 3);
+      stock[c.id] = randInt(low, cap);
     });
     return stock;
   }
   function makeCropShop(day) {
-    return { day: day || 1, stock: rollCropStock() };
+    return { day: day || 1, stock: rollCropStock(day || 1) };
   }
 
   function createState() {
@@ -729,6 +768,9 @@
   function buyFertItem(s, kind, n) {
     const f = FERT[kind];
     if (!f) return { ok: false, msg: '没有这种肥料' };
+    if (!fertUnlocked(s, kind)) {
+      return { ok: false, msg: f.name + '要种田 Lv' + f.lv + ' 才解锁（现在 Lv' + farmLv(s) + '）' };
+    }
     const qty = Math.max(1, Math.floor(n || 1));
     const cost = f.cost * qty;
     if (s.coins < cost) return { ok: false, msg: '金币不够（需要 ' + cost + ' 金）' };
@@ -754,6 +796,9 @@
 
   /* 洒水器：每个每天自动浇 1 块地 */
   function buySprinkler(s) {
+    if (!sprinklerUnlocked(s)) {
+      return { ok: false, msg: '洒水器要种田 Lv' + BALANCE.gate.sprinkler + ' 才解锁（现在 Lv' + farmLv(s) + '）' };
+    }
     if (s.coins < SPRINKLER_COST) return { ok: false, msg: '金币不够（' + SPRINKLER_COST + ' 金）' };
     if (s.sprinklers >= s.plots.length) return { ok: false, msg: '每块地一个就够了（现有 ' + s.plots.length + ' 块地）' };
     s.coins -= SPRINKLER_COST;
@@ -1351,7 +1396,13 @@
   }
 
   function buyNet(s) {
-    if (s.nets >= NET_MAX) return { ok: false, msg: '最多放 ' + NET_MAX + ' 张渔网' };
+    if (!netUnlocked(s)) {
+      return { ok: false, msg: '渔网要钓鱼 Lv' + BALANCE.gate.net + ' 才解锁（现在 Lv' + fishLv(s) + '）' };
+    }
+    const max = netMax(s);
+    if (s.nets >= max) {
+      return { ok: false, msg: '钓鱼 Lv' + fishLv(s) + ' 最多放 ' + max + ' 张渔网' };
+    }
     if (s.coins < NET_COST) return { ok: false, msg: '金币不够（' + NET_COST + ' 金）' };
     s.coins -= NET_COST;
     ledger(s, '买渔网', 0, NET_COST);
@@ -1369,6 +1420,9 @@
 
   function buyHarvester(s) {
     if (s.harvester) return { ok: false, msg: '已经有自动收获器了' };
+    if (!harvesterUnlocked(s)) {
+      return { ok: false, msg: '自动收获器要种田 Lv' + BALANCE.gate.harvester + ' 才解锁（现在 Lv' + farmLv(s) + '）' };
+    }
     if (s.coins < HARVESTER_COST) return { ok: false, msg: '金币不够（' + HARVESTER_COST + ' 金）' };
     s.coins -= HARVESTER_COST;
     ledger(s, '买自动收获器', 0, HARVESTER_COST);
@@ -1407,6 +1461,9 @@
   function buySeed(s, id, n) {
     const c = CROPS[id];
     if (!c) return { ok: false, msg: '没有这种种子' };
+    if (!seedUnlocked(s, id)) {
+      return { ok: false, msg: c.name + '种子要种田 Lv' + c.lv + ' 才解锁（现在 Lv' + farmLv(s) + '）' };
+    }
     const qty = Math.max(1, Math.floor(n || 1));
     const cost = seedBuyPrice(c) * qty;
     if (s.coins < cost) return { ok: false, msg: '金币不够（需要 ' + cost + ' 金）' };
@@ -1757,8 +1814,7 @@
     if (rawCropShop && rawCropShop.stock && typeof rawCropShop.stock === 'object') {
       merged.cropShop = { day: merged.day, stock: {} };
       CROP_LIST.forEach(function (c) {
-        const cap = c.price >= 40 ? 1 : (c.price >= 16 ? 2 : 4);
-        merged.cropShop.stock[c.id] = Math.round(num(rawCropShop.stock[c.id], 0, 0, cap));
+        merged.cropShop.stock[c.id] = Math.round(num(rawCropShop.stock[c.id], 0, 0, cropStockCap(c)));
       });
     } else {
       merged.cropShop = makeCropShop(merged.day);
@@ -1828,7 +1884,10 @@
     storeTotal: storeTotal, taxDue: taxDue, buyFish: buyFish, fishBuyPrice: fishBuyPrice, deviceUpkeep: deviceUpkeep, HOOK: HOOK,
     fishDesc: fishDesc, shopStock: shopStock, rollShopStock: rollShopStock, makeShop: makeShop, SHOP_STOCK: SHOP_STOCK,
     cropBuyPrice: cropBuyPrice, cropShopStock: cropShopStock, buyCrop: buyCrop, makeCropShop: makeCropShop,
-    rollCropStock: rollCropStock,
+    rollCropStock: rollCropStock, cropStockCap: cropStockCap, FISH_UNLOCK: FISH_UNLOCK, CROP_UNLOCK: CROP_UNLOCK,
+    seedUnlocked: seedUnlocked, fertUnlocked: fertUnlocked,
+    sprinklerUnlocked: sprinklerUnlocked, harvesterUnlocked: harvesterUnlocked,
+    netUnlocked: netUnlocked, netMax: netMax, farmLv: farmLv, fishLv: fishLv,
     levelNeed: levelNeed, addLevelXp: addLevelXp, levelEffectText: levelEffectText,
     farmYieldBonus: farmYieldBonus, fishHookBonus: fishHookBonus, fishGoodBonus: fishGoodBonus,
     taxBase: taxBase, taxInDays: taxInDays, orderWeight: orderWeight, ORDER_TIERS: ORDER_TIERS,

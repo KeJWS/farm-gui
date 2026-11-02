@@ -119,16 +119,22 @@ console.log('\n== 弹窗 ==');
 clickAct('seedshop');
 ok(html('#modal-root').indexOf('种子店') >= 0 && html('#modal-root').indexOf('肥料') >= 0,
    '种子店弹窗（含肥料）能打开');
+ok(html('#modal-root').indexOf('需种田 Lv2') >= 0 && html('#modal-root').indexOf('需种田 Lv4') >= 0,
+   '种子店按等级锁定高级种子与特效肥');
 clickAct('fishshop');
 ok(html('#modal-root').indexOf('水产店') >= 0 && html('#modal-root').indexOf('不能交委托') >= 0,
    '水产店弹窗能打开，并提示买来的鱼不能交委托');
 ok(html('#modal-root').indexOf('今日') >= 0 && html('#modal-root').indexOf('一般品质') >= 0,
    '水产店显示每日库存与「一般品质」');
+ok(html('#modal-root').indexOf('D20 起进货') >= 0 && html('#modal-root').indexOf('D30 起进货') >= 0,
+   '水产店高级鱼按天数锁定');
 clickAct('cropshop');
 ok(html('#modal-root').indexOf('农产品店') >= 0 && html('#modal-root').indexOf('全部卖出') >= 0,
    '农产品店弹窗能打开');
 ok(html('#modal-root').indexOf('今日') >= 0 && html('#modal-root').indexOf('一般品质') >= 0,
    '农产品店显示每日库存与「一般品质」');
+ok(html('#modal-root').indexOf('D18 起进货') >= 0 && html('#modal-root').indexOf('D24 起进货') >= 0,
+   '农产品店高级作物按天数锁定');
 clickAct('shop');
 ok(html('#modal-root').indexOf('面团饵自定义数量') >= 0 && html('#modal-root').indexOf('dough-qty') >= 0,
    '渔具店有面团饵自定义数量输入');

@@ -295,6 +295,7 @@ ok(G.seedSellPrice(G.CROPS.corn) === 7, '玉米买 14 → 卖 7（向下取整�
 ok(G.seedSellPrice(G.CROPS.watermelon) === 16, '西瓜买 32 → 卖 16');
 
 s = G.createState();                       // 50 金
+s.levels.farm = 3;                                  // 玉米种子要种田 Lv2
 let rb = G.buySeed(s, 'corn', 2);
 ok(rb.ok && s.coins === 22 && s.seeds.corn === 2, '买 2 颗玉米种子：-28 金', { coins: s.coins, seeds: s.seeds });
 ok(!G.buySeed(s, 'watermelon', 1).ok, '金币不够时买不了', s.coins);
@@ -624,7 +625,7 @@ ok(G.orderPool(3).length === 4 && G.orderPool(30).length === 10, '委托池随�
 section('v1.1.0 新功能');
 G.setRng(mulberry32(55));
 
-s = G.createState(); s.coins = 400;
+s = G.createState(); s.coins = 400; s.levels.farm = 2;
 ok(G.buySprinkler(s).ok && s.sprinklers === 1 && s.coins === 320, '洒水器 80 金/个', { c: s.coins });
 s.coins = 100000;
 while (G.buySprinkler(s).ok) { /* 买满 */ }
@@ -672,7 +673,7 @@ ok(minRain === 2 && maxRain === 4, '雨天挖蚯蚓 2~4 条', minRain + '~' + ma
 section('v1.2.0 新功能');
 G.setRng(mulberry32(33));
 
-s = G.createState(); s.coins = 500;
+s = G.createState(); s.coins = 500; s.levels.farm = 6;
 ok(G.buyHarvester(s).ok && s.harvester === true && s.coins === 200, '自动收获器 300 金');
 ok(!G.buyHarvester(s).ok, '只能装一个');
 
@@ -708,7 +709,7 @@ ok(G.storeTotal(s) === 8 + 5 + 6 + 4, '仓库总价把作物/鱼/蚯蚓/肥料�
 section('v1.3.0 新功能');
 G.setRng(mulberry32(88));
 
-s = G.createState(); s.coins = 1000;
+s = G.createState(); s.coins = 1000; s.levels.farm = 6;
 G.buyHarvester(s);
 ok(s.harvester && s.harvesterOn === true, '买到自动收获器默认开启');
 ok(G.toggleHarvester(s).ok && s.harvesterOn === false, '自动收获器可以关闭');
@@ -722,7 +723,7 @@ ok(G.storeCount(s, 'carrot') > 0, '开启后睡觉自动收');
 
 // 渔网
 G.setRng(function () { return 0.1; });
-s = G.createState(); s.coins = 500; s.nets = 2; s.bait.dough = 2;
+s = G.createState(); s.coins = 500; s.nets = 2; s.bait.dough = 2; s.levels.fish = 3;
 G.sleep(s);
 ok(s.bait.dough === 0 && s.fishBag.length === 2, '渔网每天耗面团饵并上鱼', { dough: s.bait.dough, n: s.fishBag.length });
 ok(G.buyNet(s).ok && s.nets === 3, '渔具店能买渔网');
@@ -853,7 +854,7 @@ ok(G.buyFish(s, 'crucian', 1).ok && s.coins === 100 - bp && s.fishBag.length ===
 ok(!G.buyFish(s, 'trash', 1).ok, '杂物买不到');
 ok(G.fishBuyPrice('koi') === 45, '锦鲤买价 45 金', G.fishBuyPrice('koi'));
 
-s = G.createState(); s.coins = 1e6;
+s = G.createState(); s.coins = 1e6; s.levels.fish = 7;
 while (G.buyNet(s).ok) { /* 买满 */ }
 ok(s.nets === 9 && G.NET_MAX === 9, '渔网最多 9 张', s.nets);
 
@@ -868,8 +869,8 @@ ok(G.orderHave(s, { kind: 'fish' }) === 0, '买来的水产不算委托进度', 
 ok(!G.deliverOrder(s, 't').ok, '买来的鱼交不了鱼单');
 
 const st2 = G.createState(); st2.weather = 'cloudy'; st2.energy = 1e9; st2.bait.dough = 1e9;
-for (let i = 0; i < 40; i++) { const rr = G.fish(st2, 'dough'); if (rr.entry) break; }
-ok(G.orderHave(st2, { kind: 'fish' }) === 1, '自己钓的鱼可以交');
+for (let i = 0; i < 60 && G.orderHave(st2, { kind: 'fish' }) === 0; i++) G.fish(st2, 'dough');
+ok(G.orderHave(st2, { kind: 'fish' }) >= 1, '自己钓的鱼可以交');
 
 function evBait(kind, weather, n) {
   const s2 = G.createState(); s2.weather = weather; s2.maxEnergy = 1e9; s2.coins = 0;
@@ -1021,16 +1022,18 @@ ok(G.addLevelXp(lvS, 'farm', 15) === 1 && lvS.levels.farm === 2 && lvS.levels.fa
   '15 点经验升到 Lv2');
 G.addLevelXp(lvS, 'farm', 25);
 ok(lvS.levels.farm === 3, '再 25 点升到 Lv3');
-ok(G.farmYieldBonus(lvS) === 1, 'Lv3 产量 +1');
+G.addLevelXp(lvS, 'farm', 35 + 45);
+ok(lvS.levels.farm === 5, '再 80 点升到 Lv5');
+ok(G.farmYieldBonus(lvS) === 1, 'Lv5 产量 +1');
 const lvPlot = { crop: 'carrot', phase: 'growing', growth: 1, fert: 0, missed: 0 };
-ok(G.expectedYield(lvS, lvPlot) === 4, 'Lv3 萝卜预计产量 3+1', G.expectedYield(lvS, lvPlot));
+ok(G.expectedYield(lvS, lvPlot) === 4, 'Lv5 萝卜预计产量 3+1', G.expectedYield(lvS, lvPlot));
 ok(G.expectedYield(G.createState(), lvPlot) === 3, 'Lv1 萝卜预计产量 3');
 
 let lvF = G.createState();
 ok(G.fishHookBonus(lvF) === 0 && G.fishGoodBonus(lvF) === 1, 'Lv1 没有钓鱼加成');
 G.addLevelXp(lvF, 'fish', 1e6);
-ok(lvF.levels.fish === 10 && Math.abs(G.fishHookBonus(lvF) - 0.12) < 1e-9, '满级钓鱼咬钩 +12%');
-ok(G.fishGoodBonus(lvF) > 1.2, '满级好鱼权重明显提升', G.fishGoodBonus(lvF).toFixed(2));
+ok(lvF.levels.fish === 10 && Math.abs(G.fishHookBonus(lvF) - 0.08) < 1e-9, '满级钓鱼咬钩 +8%');
+ok(Math.abs(G.fishGoodBonus(lvF) - 1.18) < 1e-9, '满级好鱼权重 +18%', G.fishGoodBonus(lvF).toFixed(2));
 
 ok(G.checkAchievements(lvS).some(x => x.id === 'farmLv3'), '等级成就可解锁');
 
@@ -1053,6 +1056,60 @@ ok(G.ACH.length === 32, '成就总数 32', G.ACH.length);
 const retro = G.deserialize({ plots: [], coins: 100, day: 20, stats: { harvests: 100, casts: 300 } });
 ok(retro.levels.farm > 1 && retro.levels.fish > 1, '老存档按历史次数补等级',
   [retro.levels.farm, retro.levels.fish]);
+
+/* ---------- v1.8 等级解锁 / 商店库存 ---------- */
+section('v1.8 等级解锁与库存');
+G.setRng(mulberry32(88));
+let gateS = G.createState(); gateS.coins = 10000;
+ok(!G.buySeed(gateS, 'corn', 1).ok, 'Lv1 买不了玉米种子');
+ok(!G.buySeed(gateS, 'watermelon', 1).ok, 'Lv1 买不了西瓜种子');
+ok(G.buySeed(gateS, 'carrot', 1).ok, 'Lv1 能买萝卜种子');
+gateS.levels.farm = 6;
+ok(G.buySeed(gateS, 'watermelon', 1).ok, '种田 Lv6 能买西瓜种子');
+ok(G.seedUnlocked(gateS, 'pumpkin') && G.seedUnlocked(gateS, 'strawberry'), '高级种子按等级解锁');
+
+ok(!G.fertUnlocked(G.createState(), 'special'), 'Lv1 特效肥未解锁');
+gateS.levels.farm = 4;
+ok(G.fertUnlocked(gateS, 'special'), '种田 Lv4 解锁特效肥');
+ok(G.buyFertItem(gateS, 'special', 1).ok, '解锁后能买特效肥');
+
+let devS = G.createState(); devS.coins = 10000;
+ok(!G.sprinklerUnlocked(devS) && !G.buySprinkler(devS).ok, '洒水器要种田 Lv2');
+devS.levels.farm = 2;
+ok(G.buySprinkler(devS).ok, 'Lv2 能买洒水器');
+ok(!G.harvesterUnlocked(devS) && !G.buyHarvester(devS).ok, '自动收获器要种田 Lv6');
+devS.levels.farm = 6;
+ok(G.buyHarvester(devS).ok, 'Lv6 能买自动收获器');
+
+let netS = G.createState(); netS.coins = 10000;
+ok(!G.netUnlocked(netS) && !G.buyNet(netS).ok, '渔网要钓鱼 Lv2');
+netS.levels.fish = 2;
+ok(G.netMax(netS) === 4 && G.buyNet(netS).ok, '钓鱼 Lv2 解锁渔网，上限 4 张', G.netMax(netS));
+netS.levels.fish = 7;
+ok(G.netMax(netS) === 9, '钓鱼 Lv7 上限 9 张', G.netMax(netS));
+netS.levels.fish = 10;
+ok(G.netMax(netS) === 9, '满级也不会超过 9 张', G.netMax(netS));
+
+/* 库存变大 */
+ok(G.SHOP_STOCK.crucian[1] === 6 && G.SHOP_STOCK.carp[1] === 6, '水产店库存上限提高');
+ok(G.cropStockCap(G.CROPS.carrot) === 7 && G.cropStockCap(G.CROPS.corn) === 4, '农产品店库存上限提高');
+
+/* 高级水产 / 作物中后期才进货 */
+const fishD1 = G.rollShopStock(1);
+ok(fishD1.puffer === 0 && fishD1.koi === 0 && fishD1.crucian > 0, 'D1 水产店不进高级鱼', fishD1);
+let lateFish = 0;
+for (let i = 0; i < 30; i++) lateFish += G.rollShopStock(30).koi;
+ok(lateFish > 0, 'D30 起才进锦鲤', lateFish);
+
+const cropD1 = G.rollCropStock(1);
+ok(cropD1.pumpkin === 0 && cropD1.watermelon === 0 && cropD1.carrot > 0, 'D1 农产品店不进南瓜/西瓜', cropD1);
+let lateCrop = 0;
+for (let i = 0; i < 30; i++) lateCrop += G.rollCropStock(24).watermelon;
+ok(lateCrop > 0, 'D24 起才进西瓜', lateCrop);
+
+/* 老存档读过之后，渔网数量不会被上限打回 */
+const netSave = G.deserialize({ plots: [], coins: 100, day: 40, nets: 9, levels: { farm: 8, fish: 10, farmXp: 0, fishXp: 0 } });
+ok(netSave.nets === 9, '高等级存档的渔网数量保留', netSave.nets);
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');

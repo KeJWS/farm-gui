@@ -785,3 +785,9 @@ button{ color:inherit; font:inherit; }
   background:transparent; color:var(--ink); font:inherit; font-weight:800; text-align:center; }
 .buy-custom .bc-tip{ color:var(--ink-3); font-weight:600; }
 @media (max-width:560px){ .shop-four{ grid-template-columns:1fr !important; } }
+
+/* ---------- v1.8: 等级解锁 ---------- */
+.shop-row.locked, .store-row.locked{ opacity:.62; }
+.lock{ font-size:10px; font-weight:800; color:#a9701a; background:rgba(217,159,43,.16);
+  border-radius:6px; padding:1px 6px; }
+:root[data-theme="dark"] .lock{ color:#e0b352; }

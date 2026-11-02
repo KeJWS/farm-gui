@@ -306,16 +306,24 @@
     }
     $('#expand-txt').textContent = '第 ' + (state.plots.length + 1) + ' 块 · ' + G.expandCost(state) + ' 金';
     $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + 5) + ' · ' + G.upgradeCost(state) + ' 金';
-    $('#sprinkler-txt').textContent = '已有 ' + state.sprinklers + ' 个 · ' + G.SPRINKLER_COST + ' 金/个';
-    $('#harvester-txt').textContent = !state.harvester
-      ? G.HARVESTER_COST + ' 金 · 睡觉时自动收'
-      : (state.harvesterOn ? '已开启 · 点击关闭' : '已关闭 · 点击开启');
+    const sprLock = !G.sprinklerUnlocked(state);
+    $('#sprinkler-txt').textContent = sprLock
+      ? '需种田 Lv' + G.BALANCE.gate.sprinkler + ' 解锁'
+      : '已有 ' + state.sprinklers + ' 个 · ' + G.SPRINKLER_COST + ' 金/个';
+    const harvLock = !G.harvesterUnlocked(state);
+    $('#harvester-txt').textContent = harvLock
+      ? '需种田 Lv' + G.BALANCE.gate.harvester + ' 解锁'
+      : (!state.harvester
+        ? G.HARVESTER_COST + ' 金 · 睡觉时自动收'
+        : (state.harvesterOn ? '已开启 · 点击关闭' : '已关闭 · 点击开启'));
     const netLine = $('#net-line');
     if (netLine) {
-      netLine.innerHTML = state.nets > 0
-        ? '🕸️ 河边有 <b>' + state.nets + '</b> 张渔网 · 每天耗 ' + state.nets + ' 份面团饵，' +
-          Math.round(G.NET_CHANCE * 100) + '% 概率各上 1 条'
-        : '🕸️ 河边还没放渔网（渔具店 ' + G.NET_COST + ' 金/张，最多 ' + G.NET_MAX + ' 张）';
+      netLine.innerHTML = !G.netUnlocked(state)
+        ? '🕸️ 渔网要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b>解锁（渔具店 ' + G.NET_COST + ' 金/张）'
+        : (state.nets > 0
+          ? '🕸️ 河边有 <b>' + state.nets + '</b> / ' + G.netMax(state) + ' 张渔网 · 每天耗 ' + state.nets +
+            ' 份面团饵，' + Math.round(G.NET_CHANCE * 100) + '% 概率各上 1 条'
+          : '🕸️ 河边还没放渔网（渔具店 ' + G.NET_COST + ' 金/张，现在最多 ' + G.netMax(state) + ' 张）');
     }
 
     const teaBtn = $('[data-act="tea"]');
@@ -328,8 +336,9 @@
     $('[data-act="work"]').disabled = state.workUsed || state.energy <= 0;
     $('[data-act="expand"]').disabled = state.coins < G.expandCost(state);
     $('[data-act="upgrade"]').disabled = state.coins < G.upgradeCost(state);
-    $('[data-act="sprinkler"]').disabled = state.coins < G.SPRINKLER_COST || state.sprinklers >= state.plots.length;
-    $('[data-act="harvester"]').disabled = !state.harvester && state.coins < G.HARVESTER_COST;
+    $('[data-act="sprinkler"]').disabled = sprLock ||
+      state.coins < G.SPRINKLER_COST || state.sprinklers >= state.plots.length;
+    $('[data-act="harvester"]').disabled = harvLock || (!state.harvester && state.coins < G.HARVESTER_COST);
   }
 
   /* ---------------- 钓鱼 ---------------- */
@@ -752,15 +761,20 @@
       const owned = state.seeds[c.id] || 0;
       const bp = G.seedBuyPrice(c);
       const sp = G.seedSellPrice(c);
-      return '<div class="shop-row">' +
+      const lock = !G.seedUnlocked(state, c.id);
+      return '<div class="shop-row' + (lock ? ' locked' : '') + '">' +
         '<span class="se">' + c.emoji + '</span>' +
         '<div class="sinfo">' +
           '<div class="sn">' + c.name +
-            (owned ? ' <b class="own">库存 ' + owned + '</b>' : '') + '</div>' +
-          '<div class="sv">买 ' + bp + ' 金 · 卖 ' + sp + ' 金 · ' + c.days + ' 天成熟</div>' +
+            (owned ? ' <b class="own">库存 ' + owned + '</b>' : '') +
+            (lock ? ' <b class="lock">需种田 Lv' + c.lv + '</b>' : '') + '</div>' +
+          '<div class="sv">' + (lock ? '等级不够，种子还没解锁'
+            : '买 ' + bp + ' 金 · 卖 ' + sp + ' 金 · ' + c.days + ' 天成熟') + '</div>' +
         '</div>' +
-        '<button class="btn mini" data-buyseed="' + c.id + '" data-n="1"' + (state.coins < bp ? ' disabled' : '') + '>买1</button>' +
-        '<button class="btn mini" data-buyseed="' + c.id + '" data-n="5"' + (state.coins < bp * 5 ? ' disabled' : '') + '>买5</button>' +
+        '<button class="btn mini" data-buyseed="' + c.id + '" data-n="1"' +
+          (lock || state.coins < bp ? ' disabled' : '') + '>买1</button>' +
+        '<button class="btn mini" data-buyseed="' + c.id + '" data-n="5"' +
+          (lock || state.coins < bp * 5 ? ' disabled' : '') + '>买5</button>' +
         '<button class="btn mini" data-sellseed="' + c.id + '"' +
           (owned <= 0 ? ' disabled' : '') +
           ' title="' + (owned ? '卖出全部，+' + owned * sp + ' 金' : '没有库存') + '">卖光</button>' +
@@ -771,12 +785,17 @@
       const f = G.FERT[k];
       const own = state.ferts[k] || 0;
       const sp = G.fertSellPrice(k);
-      return '<div class="store-row">' +
+      const lock = !G.fertUnlocked(state, k);
+      return '<div class="store-row' + (lock ? ' locked' : '') + '">' +
         '<span class="se">' + f.emoji + '</span>' +
-        '<div><div class="sn">' + f.name + (own ? ' <b class="own">库存 ' + own + '</b>' : '') + '</div>' +
-        '<div class="sv">买 ' + f.cost + ' 金 · 卖 ' + sp + ' 金 · +' + f.add + ' 产量、品质更优</div></div>' +
-        '<button class="btn mini" data-fertbuy="' + k + '" data-n="1"' + (state.coins < f.cost ? ' disabled' : '') + '>买1</button>' +
-        '<button class="btn mini" data-fertbuy="' + k + '" data-n="5"' + (state.coins < f.cost * 5 ? ' disabled' : '') + '>买5</button>' +
+        '<div><div class="sn">' + f.name + (own ? ' <b class="own">库存 ' + own + '</b>' : '') +
+          (lock ? ' <b class="lock">需种田 Lv' + f.lv + '</b>' : '') + '</div>' +
+        '<div class="sv">' + (lock ? '等级不够，还没解锁'
+          : '买 ' + f.cost + ' 金 · 卖 ' + sp + ' 金 · +' + f.add + ' 产量、品质更优') + '</div></div>' +
+        '<button class="btn mini" data-fertbuy="' + k + '" data-n="1"' +
+          (lock || state.coins < f.cost ? ' disabled' : '') + '>买1</button>' +
+        '<button class="btn mini" data-fertbuy="' + k + '" data-n="5"' +
+          (lock || state.coins < f.cost * 5 ? ' disabled' : '') + '>买5</button>' +
         '<button class="btn mini" data-fertsell="' + k + '"' + (own <= 0 ? ' disabled' : '') + '>卖光</button>' +
       '</div>';
     }).join('');
@@ -823,6 +842,8 @@
     const worms = state.bait.worm || 0;
     const dough = state.bait.dough || 0;
     const lure = G.BALANCE.lure;
+    const netLock = !G.netUnlocked(state);
+    const netCap = G.netMax(state);
     const body =
       '<dl class="kv"><dt>🍞 面团饵</dt><dd>1 金/份 · 现有 ' + dough + ' 份 · 标准收获</dd>' +
       '<dt>🎣 假饵</dt><dd>' + lure.price + ' 金/个 · 耐用 ' + lure.dur + ' 次 · 持有上限 1</dd>' +
@@ -848,13 +869,15 @@
         '<button class="btn mini" data-sellworm' + (worms ? '' : ' disabled') + '>全部卖出</button>' +
       '</div>' +
       '<div class="store-sub" style="margin-top:10px">🕸️ 渔网 · 放到河边每天自动抓鱼</div>' +
-      '<div class="store-row">' +
+      '<div class="store-row' + (netLock ? ' locked' : '') + '">' +
         '<span class="se">🕸️</span>' +
-        '<div><div class="sn">渔网 ×' + state.nets + ' / ' + G.NET_MAX + '</div>' +
-        '<div class="sv">' + G.NET_COST + ' 金/张 · 每天耗 1 面团饵 · ' +
-        Math.round(G.NET_CHANCE * 100) + '% 概率上 1 条</div></div>' +
+        '<div><div class="sn">渔网 ×' + state.nets + ' / ' + (netLock ? '—' : netCap) +
+          (netLock ? ' <b class="lock">需钓鱼 Lv' + G.BALANCE.gate.net + '</b>' : '') + '</div>' +
+        '<div class="sv">' + (netLock ? '钓鱼等级不够，还没解锁'
+          : G.NET_COST + ' 金/张 · 每天耗 1 面团饵 · ' + Math.round(G.NET_CHANCE * 100) +
+            '% 概率上 1 条 · Lv' + G.fishLv(state) + ' 上限 ' + netCap + ' 张') + '</div></div>' +
         '<button class="btn mini" data-buynet' +
-        ((state.nets >= G.NET_MAX || state.coins < G.NET_COST) ? ' disabled' : '') + '>放一张</button>' +
+        ((netLock || state.nets >= netCap || state.coins < G.NET_COST) ? ' disabled' : '') + '>放一张</button>' +
       '</div>';
     openModal('🛒 渔具店', body, '<button class="btn" data-close>关闭</button>');
   }
@@ -863,7 +886,7 @@
     const cropRows = G.CROP_LIST.map(function (c) {
       return '<tr><td>' + c.emoji + ' ' + c.name + '</td><td>' + c.seed + ' 金</td><td>' + c.days + ' 天</td>' +
         '<td>' + (c.multi ? '首次 ' + c.firstQty + ' 个' : (c.big ? '1 个（固定）' : c.base + ' ±1')) + '</td>' +
-        '<td>' + c.price + ' 金</td></tr>';
+        '<td>' + c.price + ' 金</td><td>Lv' + (c.lv || 1) + '</td></tr>';
     }).join('');
 
     const body =
@@ -877,9 +900,10 @@
 
       '<div class="rule-sec">' +
         '<h4>🌱 作物</h4>' +
-        '<table class="rule-table"><tr><th>作物</th><th>种子</th><th>生长</th><th>产量/块</th><th>单果</th></tr>' +
+        '<table class="rule-table"><tr><th>作物</th><th>种子</th><th>生长</th><th>产量/块</th><th>单果</th><th>解锁</th></tr>' +
         cropRows + '</table>' +
-        '<p>生长按浇水天数推进，成熟当天不能收、<b>次日</b>才能收；产量 = 基础 ±1 − 漏浇 + 施肥（最低 1）。</p>' +
+        '<p>生长按浇水天数推进，成熟当天不能收、<b>次日</b>才能收；产量 = 基础 ±1 − 漏浇 + 施肥（最低 1）。<br>' +
+        '高级种子要<b>种田等级</b>解锁：玉米 Lv2、茄子/番茄 Lv3、黄瓜/草莓 Lv4、南瓜 Lv5、西瓜 Lv6。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -887,7 +911,8 @@
         '<p>2 体力 + 1 份饵甩一杆。<b>先判定咬钩</b>：面团饵 92%、蚯蚓 95%、假饵 72%，晴天 −12%、雨天 +8%。<br>' +
         '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15、耐用 ' +
         G.BALANCE.lure.dur + ' 次。<br>' +
-        '🕸️ 渔网：每天耗 1 份面团饵，<b>70%</b> 网到 1 条标准及以下的普通鱼，<b>不会出杂物和宝箱</b>。<br>' +
+        '🕸️ 渔网：每天耗 1 份面团饵，<b>70%</b> 网到 1 条标准及以下的普通鱼，<b>不会出杂物和宝箱</b>；' +
+        '要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b> 解锁，上限 = 2 + 钓鱼等级（最多 ' + G.NET_MAX + ' 张）。<br>' +
         '渔获先进仓库，<b>只能去水产店卖</b>；杂物和宝箱不能交委托，水产店也买不到宝箱。</p>' +
       '</div>' +
 
@@ -895,14 +920,16 @@
         '<h4>🐟 水产店</h4>' +
         '<p>自己的渔获在这里卖，价格就是渔获的价值。<br>' +
         '店里每天<b>进一批水产</b>（一般品质），每种数量随机、<b>睡觉后补货</b>，卖完只能等明天；' +
-        '买价是基础价的 ' + G.BALANCE.shop.priceMul + ' 倍，买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。</p>' +
+        '买价是基础价的 ' + G.BALANCE.shop.priceMul + ' 倍，买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。<br>' +
+        '河豚 <b>D' + G.FISH_UNLOCK.puffer + '</b> 起、锦鲤 <b>D' + G.FISH_UNLOCK.koi + '</b> 起才进货。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
         '<h4>🧺 农产品店</h4>' +
         '<p>作物<b>只能在这里卖</b>，价格 = 单价 × 品质倍率；仓库不再直接出售任何东西。<br>' +
         '店里每天同样进一批作物（一般品质），买价是售价的 ' + G.BALANCE.shop.cropPriceMul +
-        ' 倍，转手必亏，只在凑委托或应急时买。</p>' +
+        ' 倍，转手必亏，只在凑委托或应急时买。<br>' +
+        '南瓜 <b>D' + G.CROP_UNLOCK.pumpkin + '</b> 起、西瓜 <b>D' + G.CROP_UNLOCK.watermelon + '</b> 起才进货。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -923,7 +950,8 @@
             G.fertSellPrice(k) + ' 金</td><td>+' + f.add + ' 产量、品质取更优</td></tr>';
         }).join('') + '</table>' +
         '<p>肥料在<b>种子店</b>购买，买回来进仓库，施肥时消耗；大作物不吃肥，多收作物只提质不加量。<br>' +
-        '普通肥 +1 产量、特效肥 +2 产量，<b>两者的品质加成完全一致</b>（都是取两次较好）。</p>' +
+        '普通肥 +1 产量、特效肥 +2 产量，<b>两者的品质加成完全一致</b>（都是取两次较好）；' +
+        '特效肥要<b>种田 Lv' + G.FERT.special.lv + '</b> 才解锁。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -932,8 +960,10 @@
         '· 开局体力上限 <b>15</b>，强化 +5/级（成本每级 ×1.2）<br>' +
         '· 打零工：<b>每天只能打一次</b>，全天 ×2.0 金/体力、半天 ×1.2，不够半天就把剩下的体力用光<br>' +
         '· 强化体力 ' + G.upgradeCost(state) + ' 金 · 扩张土地 ' + G.expandCost(state) + ' 金<br>' +
-        '· 🚿 洒水器 ' + G.SPRINKLER_COST + ' 金/个：每天自动浇 1 块地，不耗体力（雨天自动浇，不叠加）<br>' +
-        '· 🤖 自动收获器 ' + G.HARVESTER_COST + ' 金：睡觉时自动收走成熟作物，不耗体力<br>' +
+        '· 🚿 洒水器 ' + G.SPRINKLER_COST + ' 金/个（需种田 Lv' + G.BALANCE.gate.sprinkler +
+        '）：每天自动浇 1 块地，不耗体力（雨天自动浇，不叠加）<br>' +
+        '· 🤖 自动收获器 ' + G.HARVESTER_COST + ' 金（需种田 Lv' + G.BALANCE.gate.harvester +
+        '）：睡觉时自动收走成熟作物，不耗体力<br>' +
         '· 💰 税：每 30 天按（金币 + 仓库价值）<b>累进</b>收一次——前 2000 收 2%、2000~1 万收 4%、1 万以上收 6%，最低 ' +
         G.BALANCE.tax.min + ' 金（当前约 ' + G.taxDue(state) + ' 金）<br>' +
         '· 🧾 维护费：每 7 天收一次，土地 ' + G.plotUpkeep(state.plots.length) + ' 金 + 设备 ' +
@@ -955,7 +985,10 @@
         '<h4>⭐ 等级</h4>' +
         '<p>收获作物涨<b>种田经验</b>，钓到鱼涨<b>钓鱼经验</b>（完美品质 +3），每级所需 ' +
         G.levelNeed(1) + ' + 10×(级−1)，满级 ' + G.BALANCE.level.max + '。<br>' +
-        '种田等级每 3 级 +1 产量（Lv3 / 6 / 9）；钓鱼等级每级咬钩 +1.5%、好鱼权重 +3%（最多 +12%）。</p>' +
+        '种田等级每 5 级 +1 产量（Lv5 / Lv10）；钓鱼等级每级咬钩 +1%、好鱼权重 +2%（咬钩最多 +8%）。<br>' +
+        '解锁：洒水器 Lv' + G.BALANCE.gate.sprinkler + ' · 特效肥 Lv' + G.BALANCE.gate.specialFert +
+        ' · 自动收获器 Lv' + G.BALANCE.gate.harvester + '（均为种田等级）；渔网 钓鱼 Lv' + G.BALANCE.gate.net +
+        '，上限随钓鱼等级提高。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -1186,16 +1219,22 @@
     const buyRows = G.CROP_LIST.map(function (c) {
       const bp = G.cropBuyPrice(c.id);
       const st = G.cropShopStock(state, c.id);
-      const cap = c.price >= 40 ? 1 : (c.price >= 16 ? 2 : 4);
-      const soldOut = st <= 0;
-      return '<div class="store-row' + (soldOut ? ' sold-out' : '') + '">' +
+      const cap = G.cropStockCap(c);
+      const unlock = G.CROP_UNLOCK[c.id] || 1;
+      const locked = state.day < unlock;
+      const soldOut = !locked && st <= 0;
+      return '<div class="store-row' + (soldOut ? ' sold-out' : '') + (locked ? ' locked' : '') + '">' +
         '<span class="se">' + c.emoji + '</span>' +
-        '<div><div class="sn">' + c.name + ' <b class="own">今日 ' + st + '/' + cap + '</b></div>' +
-        '<div class="sv">一般品质 · 买 ' + bp + ' 金/个 · 卖回去只值 ' + c.price + ' 金</div></div>' +
+        '<div><div class="sn">' + c.name +
+          (locked ? ' <b class="lock">D' + unlock + ' 起进货</b>' : ' <b class="own">今日 ' + st + '/' + cap + '</b>') +
+          '</div>' +
+        '<div class="sv">' + (locked ? '中后期才进这种作物'
+          : '一般品质 · 买 ' + bp + ' 金/个 · 卖回去只值 ' + c.price + ' 金') + '</div></div>' +
         '<button class="btn mini" data-buycrop="' + c.id + '" data-n="1"' +
-          (soldOut || state.coins < bp ? ' disabled' : '') + '>' + (soldOut ? '售罄' : '买1') + '</button>' +
+          (locked || soldOut || state.coins < bp ? ' disabled' : '') + '>' +
+          (locked ? '未解锁' : (soldOut ? '售罄' : '买1')) + '</button>' +
         '<button class="btn mini" data-buycrop="' + c.id + '" data-n="3"' +
-          (st < 3 || state.coins < bp * 3 ? ' disabled' : '') + '>买3</button>' +
+          (locked || st < 3 || state.coins < bp * 3 ? ' disabled' : '') + '>买3</button>' +
       '</div>';
     }).join('');
 
@@ -1232,18 +1271,22 @@
       const bp = G.fishBuyPrice(f.id);
       const st = G.shopStock(state, f.id);
       const cap = (G.SHOP_STOCK[f.id] || [1, 2])[1];
-      if (!st) outOfStock++;
-      const soldOut = st <= 0;
-      return '<div class="store-row' + (soldOut ? ' sold-out' : '') + '">' +
+      const unlock = G.FISH_UNLOCK[f.id] || 1;
+      const locked = state.day < unlock;
+      if (!locked && !st) outOfStock++;
+      const soldOut = !locked && st <= 0;
+      return '<div class="store-row' + (soldOut ? ' sold-out' : '') + (locked ? ' locked' : '') + '">' +
         '<span class="se">' + f.emoji + '</span>' +
         '<div><div class="sn">' + f.name +
-          ' <b class="own">今日 ' + st + '/' + cap + '</b></div>' +
-        '<div class="sv">一般品质 · 买 ' + bp + ' 金/条 · ' + G.fishDesc(f.name) + '</div></div>' +
+          (locked ? ' <b class="lock">D' + unlock + ' 起进货</b>' : ' <b class="own">今日 ' + st + '/' + cap + '</b>') +
+          '</div>' +
+        '<div class="sv">' + (locked ? '中后期才进这种水产' :
+          '一般品质 · 买 ' + bp + ' 金/条 · ' + G.fishDesc(f.name)) + '</div></div>' +
         '<button class="btn mini" data-buyfish="' + f.id + '" data-n="1"' +
-          (soldOut || state.coins < bp ? ' disabled' : '') + '>' +
-          (soldOut ? '售罄' : '买1') + '</button>' +
+          (locked || soldOut || state.coins < bp ? ' disabled' : '') + '>' +
+          (locked ? '未解锁' : (soldOut ? '售罄' : '买1')) + '</button>' +
         '<button class="btn mini" data-buyfish="' + f.id + '" data-n="3"' +
-          (st < 3 || state.coins < bp * 3 ? ' disabled' : '') + '>买3</button>' +
+          (locked || st < 3 || state.coins < bp * 3 ? ' disabled' : '') + '>买3</button>' +
       '</div>';
     }).join('');
 
