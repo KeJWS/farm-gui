@@ -240,7 +240,7 @@ console.log('   鱼单：' + osFish.qty + ' 条 → ' + osFish.reward + ' 金（
 console.log('\n== 维护费 ==');
 [[10, 0, 0, 0], [20, 10, 3, 1], [36, 36, 9, 1]].forEach(function (row) {
   const plots = row[0], sp = row[1], nets = row[2], harv = !!row[3];
-  const land = Math.max(0, plots - G.BALANCE.upkeep.free) * G.BALANCE.upkeep.plotPerWeek;
+  const land = G.plotUpkeep(plots);
   const dev = sp * G.BALANCE.upkeep.sprinkle + nets * G.BALANCE.upkeep.net +
     (harv ? G.BALANCE.upkeep.harvester : 0);
   const week = land + dev;
@@ -248,6 +248,7 @@ console.log('\n== 维护费 ==');
     '周费 ' + pad(week + ' 金', 8) + '= ' + (week / 7).toFixed(1) + ' 金/天' +
     '（土地 ' + land + ' + 设备 ' + dev + '）');
 });
-console.log('   土地 = (地块数 − 5) × 3/周；洒水器 3/周、渔网 3/周、收获器 5/周');
+console.log('   土地：6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 10 金/周；' +
+  '洒水器 3/周、渔网 3/周、收获器 5/周');
 console.log('   参考：36 地图后期日毛收入约 1073，维护费占 ' +
-  (233 / 7 / 1073 * 100).toFixed(1) + '%');
+  (305 / 7 / 1073 * 100).toFixed(1) + '%');
