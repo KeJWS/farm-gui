@@ -127,6 +127,33 @@ console.log('   水产店买入：基础价 ×' + G.BALANCE.shop.priceMul + '（
 console.log('   农产品店买入：售价 ×' + G.BALANCE.shop.cropPriceMul + '（转卖亏 ' +
   Math.round((1 / G.BALANCE.shop.cropPriceMul - 1) * -100) + '%）');
 
+console.log('\n== 卖货渠道（1000 金货值）==');
+const saleRows = [
+  ['委托', G.BALANCE.order.mult, '立刻（每天 2 作物单 + 1 鱼单）'],
+  ['收购箱', 1, '下次睡觉结算'],
+  ['水产店 / 农产品店', G.BALANCE.shop.sellRate, '立刻']
+];
+saleRows.forEach(function (r) {
+  console.log('   ' + pad(r[0], 20) + Math.round(r[1] * 100) + '% → ' +
+    Math.round(1000 * r[1]) + ' 金 · ' + r[2]);
+});
+
+/* ---------- 4.2 委托池 vs 种子等级 ---------- */
+console.log('\n== 委托池 vs 种子等级（能否买到）==');
+function levelAt(harvests) {
+  let lv = 1, xp = harvests;
+  while (lv < G.BALANCE.level.max && xp >= G.levelNeed(lv)) { xp -= G.levelNeed(lv); lv++; }
+  return lv;
+}
+G.ORDER_TIERS.forEach(function (t) {
+  const pool = G.orderPool(t.day);
+  const need = pool.reduce(function (a, c) { return Math.max(a, c.lv || 1); }, 1);
+  const lv = levelAt(t.day * 4);          // 粗估：每天 4 次收获
+  const bad = pool.filter(function (c) { return (c.lv || 1) > lv; });
+  console.log('   D' + pad(t.day, 3) + pool.length + ' 种 · 最高需 Lv' + need +
+    ' · 同期约 Lv' + lv + ' · 买不到：' + (bad.length ? bad.map(function (c) { return c.name; }).join('/') : '—'));
+});
+
 /* ---------- 4.5 设备回本 ---------- */
 const fishPerE = evBait('dough', 'cloudy', 10, 4000).ev / 2;   // 1 点体力的钓鱼价值（算上饵）
 console.log('\n== 设备回本（按 1 点体力 = ' + fishPerE.toFixed(2) + ' 金 折算）==');
