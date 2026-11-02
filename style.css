@@ -783,6 +783,9 @@ button{ color:inherit; font:inherit; }
   flex-wrap:wrap; }
 .buy-custom input{ width:76px; padding:4px 8px; border-radius:8px; border:1px solid var(--line-2);
   background:transparent; color:var(--ink); font:inherit; font-weight:800; text-align:center; }
+.buy-custom select{ padding:4px 8px; border-radius:8px; border:1px solid var(--line-2);
+  background:transparent; color:var(--ink); font:inherit; font-weight:800; max-width:140px; }
+.order-row.long{ border-color:rgba(217,159,43,.45); background:rgba(217,159,43,.08); }
 .buy-custom .bc-tip{ color:var(--ink-3); font-weight:600; }
 @media (max-width:560px){ .shop-four{ grid-template-columns:1fr !important; } }
 

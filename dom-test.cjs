@@ -91,6 +91,16 @@ window.AudioContext = function () {
 
 /* 加载逻辑层 + 界面层（ui.js 会立即 boot） */
 const G = require('./game.js');
+
+/* 播一个带作物 + 长期订单的存档，方便测仓库 / 委托 / 收购箱 */
+(function seedSave() {
+  const st = G.createState();
+  G.addStore(st, 'carrot', 'std', 12);
+  st.longOrder = G.makeLongOrder({ day: 5, levels: { farm: 3 } });
+  st.coins = 500;
+  localStorage.setItem('farm-gui-save-v1', G.serialize(st));
+})();
+
 require('./ui.js');
 
 function html(sel) { return document.querySelector(sel).innerHTML; }
@@ -112,7 +122,9 @@ ok(html('#plot-grid').indexOf('class="plot') >= 0 && (html('#plot-grid').match(/
 ok(text('#hud-plots').indexOf('5 块') >= 0, 'HUD 显示 5 块地', text('#hud-plots'));
 ok(text('#store-sum').indexOf('总价') >= 0, '仓库显示总价值', text('#store-sum'));
 ok(html('#store-list').indexOf('去水产店卖') < 0, '仓库渔获不再写「去水产店卖」');
+ok(html('#store-list').indexOf('脆生生') >= 0, '仓库作物显示简述');
 ok(html('#order-list').indexOf('报酬') >= 0 && html('#order-list').indexOf('交付') >= 0, '委托面板渲染出报酬与交付按钮');
+ok(html('#order-list').indexOf('长期') >= 0, '委托面板显示长期订单');
 ok(html('#ledger').indexOf('D1') >= 0, '账本渲染出 D1');
 ok(html('#log').indexOf('D1') >= 0, '日志渲染出 D1');
 
@@ -142,11 +154,13 @@ ok(html('#modal-root').indexOf('D18 起进货') >= 0 && html('#modal-root').inde
 ok(html('#modal-root').indexOf('data-buycrop="watermelon" data-n="3"') < 0,
    '未解锁的作物不显示「买3」');
 ok(html('#modal-root').indexOf('脆生生') >= 0, '农产品店显示作物简述');
+ok(html('#modal-root').indexOf('crop-sell-id') >= 0, '农产品店有自定义卖出选择框');
 
 console.log('\n== 收购箱 ==');
 document.querySelector('#btn-box').fire('click', { target: {} });
 ok(html('#modal-root').indexOf('收购箱') >= 0 && html('#modal-root').indexOf('原价') >= 0,
    '收购箱弹窗能打开并说明原价结算');
+ok(html('#modal-root').indexOf('全部取出') >= 0, '收购箱有「全部取出」');
 clickAct('shop');
 ok(html('#modal-root').indexOf('面团饵自定义数量') >= 0 && html('#modal-root').indexOf('dough-qty') >= 0,
    '渔具店有面团饵自定义数量输入');
@@ -170,6 +184,8 @@ ok(html('#modal-root').indexOf('成就') >= 0 && html('#modal-root').indexOf('�
    '成就弹窗能打开并列出条目');
 ok(html('#modal-root').indexOf('已解锁') >= 0 && html('#modal-root').indexOf('种田') >= 0,
    '成就弹窗含统计与分类');
+ok(html('#modal-root').indexOf('成就点') >= 0 && html('#modal-root').indexOf('售价加成') >= 0,
+   '成就弹窗显示成就点与售价加成');
 
 setTimeout(function () {
   console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));

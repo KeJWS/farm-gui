@@ -57,8 +57,7 @@ ok(G.storeCount(s, 'carrot') === r.qty && s.store.carrot[r.quality.id] === r.qty
 
 r = G.sellAll(s);
 ok(r.ok && G.storeCount(s, 'carrot') === 0, '卖出清空仓库');
-ok(s.coins > 42, '卖出后金币增加', s.coins);
-
+ok(s.coins > 40, '卖出后金币增加（8 折）', s.coins);
 /* ---------- 2. 漏浇减产 ---------- */
 section('漏浇减产');
 G.setRng(mulberry32(11));
@@ -958,13 +957,14 @@ ok(G.checkAchievements(achs).length === 0, '开局不会白送成就');
 achs.stats.harvests = 1;
 const achC0 = achs.coins;
 const achUn1 = G.checkAchievements(achs);
-ok(achUn1.some(x => x.id === 'harvest1') && achs.coins === achC0 + 15, '收获 1 次解锁成就并发 +15 金', achUn1);
+ok(achUn1.some(x => x.id === 'harvest1') && achs.coins === achC0, '收获 1 次解锁成就（不再直接发金币）', achUn1);
+ok(G.achPts(achs) === 1, '解锁后获得 1 点成就点', G.achPts(achs));
 ok(G.checkAchievements(achs).length === 0, '同一成就不会重复发奖');
 
 achs.fishBook.count = 1;
 const achD0 = achs.bait.dough;
 const achUn2 = G.checkAchievements(achs);
-ok(achUn2.some(x => x.id === 'fish1') && achs.bait.dough === achD0 + 5, '钓到第一条鱼奖励 5 份面团饵', achUn2);
+ok(achUn2.some(x => x.id === 'fish1') && achs.bait.dough === achD0, '钓到第一条鱼只给成就点，不发饵料', achUn2);
 
 achs.coins = 100000;
 while (achs.plots.length < 10) G.expand(achs);
@@ -992,7 +992,7 @@ section('v1.7 农产品店与等级');
 G.setRng(mulberry32(77));
 let cs = G.createState();
 cs.coins = 1000;
-ok(G.cropBuyPrice('carrot') === 9 && G.cropBuyPrice('pumpkin') === 132, '农产品买价 = 售价 ×2.2',
+ok(G.cropBuyPrice('carrot') === 7 && G.cropBuyPrice('pumpkin') === 108, '农产品买价 = 售价 ×1.8',
   [G.cropBuyPrice('carrot'), G.cropBuyPrice('pumpkin')]);
 ok(G.cropBuyPrice('tomato') > Math.round(G.CROPS.tomato.price * G.BALANCE.order.mult),
   '买农产品凑委托必亏（买价 > 委托价）');
@@ -1146,6 +1146,54 @@ ok(wk.stats.works === 1, '打零工计入统计');
 const sleepNotes = G.sleep(G.createState()).notes.map(n => n.kind);
 ok(sleepNotes.indexOf('order') < 0 && sleepNotes.indexOf('shop') < 0,
   '睡觉播报不再提示委托换新 / 商店补货', sleepNotes);
+
+/* ---------- v2.0 长期订单 / 收购箱 / 成就点 ---------- */
+section('v2.0 长期订单 / 收购箱 / 成就点');
+G.setRng(mulberry32(202));
+
+/* 委托池按等级裁剪 */
+ok(G.orderPool(18, 1).length === 4, 'Lv1 时委托池只有买得到的 4 种', G.orderPool(18, 1).length);
+ok(G.orderPool(18, 10).length === 10, 'Lv10 时委托池全开', G.orderPool(18, 10).length);
+let os2 = G.createState(); os2.day = 18; os2.levels.farm = 3;
+G.setRng(mulberry32(5));
+const osList = G.makeOrders(os2);
+ok(osList.filter(function (o) { return o.kind === 'crop'; })
+   .every(function (o) { return (G.CROPS[o.crop].lv || 1) <= 4; }),
+   '委托只会要玩家买得到的作物', osList.map(function (o) { return o.name; }));
+
+/* 长期订单 */
+let ls = G.createState(); ls.day = 10; ls.levels.farm = 4;
+G.setRng(mulberry32(31));
+const lo = G.makeLongOrder(ls);
+ok(lo && lo.deadline === 15 && lo.qty >= 6 && lo.reward > 0, '长期订单 5 天期限', lo);
+ls.longOrder = lo;
+if (lo.kind === 'crop') G.addStore(ls, lo.crop, 'std', lo.qty + 2);
+else for (let i = 0; i < lo.qty + 2; i++) ls.fishBag.push({ name: '鲫鱼', emoji: '🐟', q: 'std', v: 3, d: 1 });
+const dl = G.deliverLong(ls);
+ok(dl.ok && ls.longOrder === null && ls.stats.longOrders === 1, '长期订单可交付并清空', dl);
+
+/* 收购箱：部分放入 / 取出 / 加成 */
+let bx = G.createState();
+G.addStore(bx, 'carrot', 'std', 10);
+const p1 = G.boxPutCrop(bx, 'carrot', 3);
+ok(p1.ok && p1.n === 3 && G.storeCount(bx, 'carrot') === 7 && G.boxCount(bx) === 1, '收购箱可放自定义数量');
+const tk = G.boxTake(bx);
+ok(tk.ok && G.boxCount(bx) === 0 && G.storeCount(bx, 'carrot') === 10, '收购箱可取回仓库', G.storeCount(bx, 'carrot'));
+
+/* 自定义卖出 */
+let sc = G.createState(); G.addStore(sc, 'carrot', 'std', 10);
+const s5 = G.sellCropN(sc, 'carrot', 4);
+ok(s5.ok && s5.count === 4 && G.storeCount(sc, 'carrot') === 6, '农产品店可自定义卖出', s5);
+
+/* 成就点 → 售价加成 */
+let ab = G.createState();
+ab.ach = {};
+['harvest1', 'harvest50', 'harvest200'].forEach(function (id) { ab.ach[id] = 1; });   // 7 点
+ok(G.achPts(ab) === 7 && G.sellBonus(ab) === 1, '不足 10 点没有加成', [G.achPts(ab), G.sellBonus(ab)]);
+ab.ach.fish7 = 1;                                                                     // +5 → 12
+ok(G.achPts(ab) === 12 && Math.abs(G.sellBonus(ab) - 1.01) < 1e-9, '满 10 点 +1% 售价', G.sellBonus(ab));
+G.addStore(ab, 'carrot', 'std', 100);          // 原价 400
+ok(G.shopSellValue(ab, 'carrot') === 323, '售价加成作用于商店收购', G.shopSellValue(ab, 'carrot'));
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');
