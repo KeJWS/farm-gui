@@ -758,6 +758,15 @@ button{ color:inherit; font:inherit; }
 #stat-canvas{ width:100%; max-width:100%; height:auto; display:block; margin:4px 0 8px; border-radius:10px; background:var(--card); border:1px solid var(--line); }
 @media (max-width:560px){ .shop-two{ grid-template-columns:1fr !important; } }
 
+/* ---------- v1.5.1: stats categories / toast wrap ---------- */
+.stat-cats{ display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 2px; }
+.cat-chip{ display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:8px;
+  background:var(--card); border:1px solid var(--line); font-size:11px; font-weight:700; }
+.cat-chip i{ font-style:normal; }
+.cat-in{ color:#3d8b4f; }
+.cat-out{ color:#c9554a; }
+.toast-root .toast, .toast{ max-width:min(560px, 88vw); white-space:normal; line-height:1.5; text-align:left; }
+
 </style>
 </head>
 <body>
@@ -917,6 +926,22 @@ button{ color:inherit; font:inherit; }
 (function (root) {
   'use strict';
 
+  /* ---------------- 数值表（BALANCE） ---------------- */
+
+  const BALANCE = {
+    hook: { dough: 0.92, worm: 0.95, lure: 0.72 },
+    weatherHook: { sunny: -0.12, cloudy: 0, rain: 0.08 },
+    bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.6 },
+    prices: { sprinkler: 80, harvester: 200, net: 80, netMax: 9 },
+    netChance: 0.65,
+    work: { full: 2.0, half: 1.2 },
+    upkeep: { plotPerWeek: 3, free: 5, sprinkle: 3, net: 3, harvester: 5 },
+    tax: { rate: 0.04, min: 30, every: 30 },
+    order: { mult: 1.35, seasonStep: 0.6 },
+    expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
+    device: { sprinkler: 80, harvester: 200, net: 80 }
+  };
+
   /* ---------------- 静态数据 ---------------- */
 
   const CROPS = {
@@ -941,7 +966,7 @@ button{ color:inherit; font:inherit; }
     special: { id: 'special', name: '特效肥料', emoji: '💊', cost: 18, add: 2 }
   };
   const FERT_SELL_RATE = 0.5;
-  const SPRINKLER_COST = 60;
+  const SPRINKLER_COST = BALANCE.device.sprinkler;
 
   const TRASH = [
     { name: '易拉罐', emoji: '🥫' },
@@ -985,10 +1010,10 @@ button{ color:inherit; font:inherit; }
   const BAIT = {
     worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '好鱼概率 ×1.35 · 品质取两次较好' },
     dough: { id: 'dough', name: '面团饵', emoji: '🍞', desc: '标准钓鱼体验 · 92% 咬钩' },
-    lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 20 次 · 杂物少好鱼多，但只有 72% 咬钩' }
+    lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 20 次 · 杂物少、品质取两次较好，但只有 72% 咬钩' }
   };
   /* 各饵的咬钩基础概率（天气再加减） */
-  const HOOK = { dough: 0.92, worm: 0.95, lure: 0.72 };
+  const HOOK = BALANCE.hook;
 
   /* ---------------- 随机 ---------------- */
 
@@ -1092,25 +1117,28 @@ button{ color:inherit; font:inherit; }
   }
 
   /* 零工单价：体力 1 点 = 2 金（全天）/ 1.2 金（半天） */
-  const WORK_RATE_FULL = 2.0;
-  const WORK_RATE_HALF = 1.2;
+  const WORK_RATE_FULL = BALANCE.work.full;
+  const WORK_RATE_HALF = BALANCE.work.half;
 
   function mealFee(s) { return Math.max(1, 3 + (s.maxEnergy - 10) / 5); }
 
   /* 5 块地之后，每周要交土地维护费（每多一块 3 金/周） */
-  function plotUpkeep(plots) { return Math.max(0, plots - 5) * 3; }
+  function plotUpkeep(plots) { return Math.max(0, plots - BALANCE.upkeep.free) * BALANCE.upkeep.plotPerWeek; }
 
   /* 设备每周维护费：洒水器 2、渔网 2、自动收获器 4 */
   function deviceUpkeep(s) {
-    return (s.sprinklers || 0) * 3 + (s.nets || 0) * 3 + (s.harvester ? 5 : 0);
+    return (s.sprinklers || 0) * BALANCE.upkeep.sprinkle +
+           (s.nets || 0) * BALANCE.upkeep.net +
+           (s.harvester ? BALANCE.upkeep.harvester : 0);
   }
 
   function expandCost(s) {
     const n = s.plots.length;
-    if (n < 25) return Math.max(25, 25 + 15 * (n - 4));
-    // 25 块之后每块价格是上一块的 2.2 倍
-    let c = 25 + 15 * 20;
-    for (let k = 25; k < n; k++) c = Math.round(c * 1.6);
+    const B = BALANCE.expand;
+    if (n < B.steepFrom) return Math.max(B.base, B.base + B.step * (n - B.from));
+    // 25 块之后每块价格逐级上涨
+    let c = B.base + B.step * (B.steepFrom - 1 - B.from);
+    for (let k = B.steepFrom; k < n; k++) c = Math.round(c * B.steepMul);
     return c;
   }
   /* 强化体力：成本超线性增长（每级 ×1.2），避免「无脑升级」把上限堆到几百 */
@@ -1294,11 +1322,10 @@ button{ color:inherit; font:inherit; }
     return { ok: true, msg: '收了 ' + plots + ' 块地，共 ' + total + ' 个' };
   }
 
+  /* 仓库「全部卖出」只卖作物；渔获只能去水产店卖 */
   function sellAll(s) {
     const ids = Object.keys(s.store).filter(function (k) { return storeCount(s, k) > 0; });
-    const fishTotal = (s.fishBag || []).reduce(function (n, e) { return n + e.v; }, 0);
-    const fishCount = (s.fishBag || []).length;
-    if (!ids.length && !fishCount) return { ok: false, msg: '仓库里没东西可卖' };
+    if (!ids.length) return { ok: false, msg: '仓库里没有作物可卖' };
 
     let income = 0;
     const parts = [];
@@ -1309,11 +1336,6 @@ button{ color:inherit; font:inherit; }
       parts.push(CROPS[id].name + '×' + n + ' = ' + gain + ' 金');
       delete s.store[id];
     });
-    if (fishCount) {
-      income += fishTotal;
-      parts.push('渔获×' + fishCount + ' = ' + fishTotal + ' 金');
-      s.fishBag = [];
-    }
     addCoins(s, income, '卖仓库');
     log(s, '💰 卖出 ' + parts.join('、') + '，收入 ' + income + ' 金', 'good');
     return { ok: true, msg: '卖出全部，+' + income + ' 金', income: income };
@@ -1447,13 +1469,13 @@ button{ color:inherit; font:inherit; }
     const notes = [];
     if (s.coins >= fee) {
       addCoins(s, -fee, '伙食费');
-      notes.push('🍖 伙食费 -' + fee + ' 金');
+      notes.push({ kind: 'meal', text: '🍖 伙食 -' + fee });
       s.energy = s.maxEnergy;
     } else {
       // 没钱只恢复到「上限的 30%，至少 5 点」，但不会扣掉已有的体力
       const floor = Math.max(5, Math.round(s.maxEnergy * 0.3));
       s.energy = Math.max(s.energy, Math.min(floor, s.maxEnergy));
-      notes.push('😵 没钱吃饭，只恢复到 ' + floor + ' 点体力');
+      notes.push({ kind: 'meal', text: '😵 没钱吃饭，只回 ' + floor + ' 体力' });
     }
 
     // 自动收获器：睡觉时把能收的地块收掉，不耗体力
@@ -1464,7 +1486,7 @@ button{ color:inherit; font:inherit; }
         const hr = harvest(s, i, true);
         if (hr.ok) { hn++; hval += hr.qty * hr.unit; }
       });
-      if (hn) notes.push('🤖 自动收获器收了 ' + hn + ' 块地（值 ' + hval + ' 金）');
+      if (hn) notes.push({ kind: 'harvest', text: '🤖 收获 ' + hn + ' 块（值 ' + hval + '）' });
     }
 
     s.plots.forEach(function (p) {
@@ -1477,7 +1499,7 @@ button{ color:inherit; font:inherit; }
     s.workUsed = false;
     s.weather = rollWeather();
     const w = WEATHER[s.weather];
-    notes.push(w.emoji + ' 第 ' + s.day + ' 天 · ' + w.name);
+    notes.push({ kind: 'weather', text: w.emoji + ' ' + w.name });
 
     if (w.autoWater) {
       let n = 0, ripe = 0;
@@ -1485,7 +1507,7 @@ button{ color:inherit; font:inherit; }
         if (!p.crop || p.phase === 'ripe') return;
         if (!p.watered) { if (grow(p, s)) ripe++; p.watered = true; n++; }
       });
-      if (n) notes.push('🌧️ 自动浇水 ' + n + ' 块地' + (ripe ? '，' + ripe + ' 块成熟' : ''));
+      if (n) notes.push({ kind: 'water', text: '🌧️ 自动浇 ' + n + ' 块' + (ripe ? '，熟 ' + ripe : '') });
     } else if (s.sprinklers > 0) {
       // 洒水器：每天自动浇前 N 块没浇的地，不耗体力
       let n = 0, ripe = 0;
@@ -1496,13 +1518,13 @@ button{ color:inherit; font:inherit; }
         p.watered = true;
         n++;
       });
-      if (n) notes.push('🚿 洒水器浇了 ' + n + ' 块地' + (ripe ? '，' + ripe + ' 块成熟' : ''));
+      if (n) notes.push({ kind: 'water', text: '🚿 洒水器浇 ' + n + ' 块' + (ripe ? '，熟 ' + ripe : '') });
     }
 
     // 渔网：每天消耗面团饵，有概率上鱼
     if (s.nets > 0) {
       const nr = netCatch(s);
-      if (nr.used) notes.push('🕸️ 渔网用掉 ' + nr.used + ' 份面团饵，网上 ' + nr.got + ' 条鱼');
+      if (nr.used) notes.push({ kind: 'net', text: '🕸️ 渔网 ' + nr.got + '/' + nr.used + ' 条' });
     }
 
     // 5 块地之后每周要交土地维护费
@@ -1513,7 +1535,7 @@ button{ color:inherit; font:inherit; }
       const pay = Math.min(up, s.coins);
       s.coins -= pay;
       ledger(s, '维护费（周）', 0, pay);
-      notes.push('🧾 本周维护费 -' + pay + ' 金（土地 ' + landFee + ' + 设备 ' + devFee + '）');
+      notes.push({ kind: 'upkeep', text: '🧾 维护 -' + pay + '（土地 ' + landFee + ' + 设备 ' + devFee + '）' });
     }
 
     // 月度税金：每 30 天按金币 5% 收
@@ -1522,11 +1544,15 @@ button{ color:inherit; font:inherit; }
       const pay = Math.min(tax, s.coins);
       s.coins -= pay;
       ledger(s, '月度税金', 0, pay);
-      notes.push('🏛️ 月度税金 -' + pay + ' 金');
+      notes.push({ kind: 'tax', text: '🏛️ 税 -' + pay + '（4%）' });
     }
 
+    const head = '🌙 第 ' + s.day + ' 天 · ' + w.name;
+    const body = notes.filter(function (n) { return n.kind !== 'weather'; })
+                      .map(function (n) { return n.text; }).join(' · ');
     log(s, '🌙 睡觉 → 第 ' + s.day + ' 天 · ' + w.name, 'sys');
-    return { ok: true, msg: '新的一天', day: s.day, notes: notes, weather: s.weather };
+    return { ok: true, msg: '新的一天', day: s.day, notes: notes, weather: s.weather,
+             summary: body ? head + ' ｜ ' + body : head };
   }
 
   function pickBait(s, prefer) {
@@ -1576,13 +1602,13 @@ button{ color:inherit; font:inherit; }
     // 鱼种权重只由饵决定：蚯蚓多好鱼、假饵少杂物
     const table = FISH.map(function (f) {
       let mul = 1;
-      if (f.trash) mul = kind === 'lure' ? 0.3 : 1;
-      else if (kind === 'worm') mul = 1.35;
-      else if (kind === 'lure') mul = 1.15;
+      if (f.trash) mul = kind === 'lure' ? BALANCE.bait.lureTrash : 1;
+      else if (kind === 'worm') mul = BALANCE.bait.wormGood;
+      else if (kind === 'lure') mul = BALANCE.bait.lureGood;
       return Object.assign({}, f, { w: f.w * mul });
     });
     const f = weighted(table, 'w');
-    const q = f.trash ? null : rollQuality(kind === 'worm');
+    const q = f.trash ? null : rollQuality(kind === 'worm' || kind === 'lure' ? 2 : 1);
     const value = f.trash ? 1 : Math.max(1, Math.round(f.base * q.mul));
 
     let name = f.name, emoji = f.emoji;
@@ -1843,13 +1869,16 @@ button{ color:inherit; font:inherit; }
   }
 
   /* 自动收获器：睡觉时免费收成熟作物 */
-  const HARVESTER_COST = 200;
-  const NET_COST = 80;
-  const NET_MAX = 9;
-  const NET_CHANCE = 0.65;
+  const HARVESTER_COST = BALANCE.device.harvester;
+  const NET_COST = BALANCE.device.net;
+  const NET_MAX = BALANCE.prices.netMax;
+  const NET_CHANCE = BALANCE.netChance;
 
-  /* 月度税金：按金币 5% 收，最低 20 金 */
-  function taxDue(s) { return Math.max(20, Math.round((s.coins || 0) * 0.05)); }
+  /* 月度税金：按（金币 + 仓库价值）× 4%，最低 30 金 */
+  function taxDue(s) {
+    const base = Math.max(0, s.coins || 0) + storeTotal(s);
+    return Math.max(BALANCE.tax.min, Math.round(base * BALANCE.tax.rate));
+  }
 
   /* 水产店售价：基础价的 1.8 倍 */
   function fishBuyPrice(id) {
@@ -1866,7 +1895,7 @@ button{ color:inherit; font:inherit; }
     s.coins -= cost;
     ledger(s, '买水产 ' + f.name + ' ×' + qty, 0, cost);
     for (let i = 0; i < qty; i++) {
-      s.fishBag.push({ name: f.name, emoji: f.emoji, q: 'std', v: f.base, d: s.day });
+      s.fishBag.push({ name: f.name, emoji: f.emoji, q: 'std', v: f.base, d: s.day, bought: true });
     }
     log(s, '🐟 买进 ' + f.emoji + ' ' + f.name + ' ×' + qty + '（-' + cost + ' 金）', 'info');
     return { ok: true, qty: qty, cost: cost, msg: '买到 ' + f.name + ' ×' + qty };
@@ -2033,7 +2062,7 @@ button{ color:inherit; font:inherit; }
     const pool = orderPool(day);
     const used = [];
     const orders = [];
-    const mult = 1 + Math.floor((day - 1) / 30) * 0.6;    // 春 1 / 夏 1.6 / 秋 2.2 / 冬 2.8
+    const mult = 1 + Math.floor((day - 1) / 30) * BALANCE.order.seasonStep;    // 春 1 / 夏 1.6 / 秋 2.2 / 冬 2.8
 
     for (let i = 0; i < 2 && pool.length; i++) {
       let c = null;
@@ -2044,7 +2073,7 @@ button{ color:inherit; font:inherit; }
       if (!c) c = pool[i % pool.length];
       used.push(c.id);
       const qty = Math.max(1, Math.round((c.price >= 20 ? randInt(1, 2) : randInt(3, 6)) * mult));
-      const reward = Math.max(6, Math.round(qty * c.price * 1.35));
+      const reward = Math.max(6, Math.round(qty * c.price * BALANCE.order.mult));
       orders.push({
         id: 'd' + day + '-c' + i, kind: 'crop', crop: c.id, name: c.name, emoji: c.emoji,
         qty: qty, reward: reward, done: false
@@ -2062,7 +2091,8 @@ button{ color:inherit; font:inherit; }
   /* 委托进度：作物看仓库，鱼看渔获袋 */
   /* 杂物、宝箱不算委托的鱼 */
   function orderFish(s) {
-    return (s.fishBag || []).filter(function (e) { return e && e.q && !e.no; });
+    // 买来的水产（bought）不能拿去交委托，避免套利
+    return (s.fishBag || []).filter(function (e) { return e && e.q && !e.no && !e.bought; });
   }
 
   function orderHave(s, o) {
@@ -2254,7 +2284,7 @@ button{ color:inherit; font:inherit; }
   /* ---------------- 导出 ---------------- */
 
   const API = {
-    CROPS: CROPS, CROP_LIST: CROP_LIST, FERT: FERT, QUALITY: QUALITY, FISH: FISH,
+    BALANCE: BALANCE, CROPS: CROPS, CROP_LIST: CROP_LIST, FERT: FERT, QUALITY: QUALITY, FISH: FISH,
     WEATHER: WEATHER, WEATHER_LIST: WEATHER_LIST, BAIT: BAIT, SAVE_VERSION: SAVE_VERSION,
     setRng: setRng, seasonOf: seasonOf, SEASONS: SEASONS,
     createState: createState, serialize: serialize, deserialize: deserialize,
@@ -2796,6 +2826,7 @@ button{ color:inherit; font:inherit; }
         '<div class="oi">' +
           '<div class="on">' + o.name + ' ×' + o.qty + ' · 报酬 ' + o.reward + ' 金</div>' +
           '<div class="os">' + (o.done ? '✅ 已完成' : thing + ' ' + Math.min(have, o.qty) + '/' + o.qty +
+            ' · 约 ' + Math.round(o.reward / o.qty) + ' 金/个' +
             (o.kind === 'fish' ? '（交最便宜的）' : '')) + '</div>' +
         '</div>' +
         (o.done ? '' :
@@ -3273,20 +3304,48 @@ button{ color:inherit; font:inherit; }
   }
 
   function statsModal() {
-    const days = G.ledgerByDay(state).slice().reverse().slice(-14);
+    const days = G.ledgerByDay(state).slice().reverse().slice(-30);
     const inc = days.reduce(function (a, d) { return a + d.income; }, 0);
     const exp = days.reduce(function (a, d) { return a + d.expense; }, 0);
     const net = inc - exp;
     const best = days.slice().sort(function (a, b) {
       return (b.income - b.expense) - (a.income - a.expense);
     })[0];
+
+    const cat = {};
+    function put(k, inc, exp) {
+      cat[k] = cat[k] || { inc: 0, exp: 0 };
+      cat[k].inc += inc; cat[k].exp += exp;
+    }
+    function catOf(label) {
+      if (/委托/.test(label)) return '委托';
+      if (/卖鱼|水产|卖蚯蚓/.test(label)) return '渔获';
+      if (/卖仓库|卖 /.test(label)) return '作物';
+      if (/零工/.test(label)) return '打工';
+      if (/伙食/.test(label)) return '伙食';
+      if (/税/.test(label)) return '税金';
+      if (/维护/.test(label)) return '维护';
+      if (/买/.test(label)) return '采购';
+      return '其他';
+    }
+    days.forEach(function (d) {
+      d.items.forEach(function (it) { put(catOf(it.label), it.income || 0, it.expense || 0); });
+    });
+    const catHtml = '<div class="stat-cats">' + Object.keys(cat).map(function (k) {
+      const c = cat[k];
+      const net2 = c.inc - c.exp;
+      return '<span class="cat-chip"><b>' + k + '</b>' +
+        (c.inc ? '<i class="cat-in">+' + c.inc + '</i>' : '') +
+        (c.exp ? '<i class="cat-out">-' + c.exp + '</i>' : '') +
+        '</span>';
+    }).join('') + '</div>';
     openModal('📈 收益统计',
       '<div class="codex-stat" style="grid-template-columns:repeat(3,1fr)">' +
         '<div><b>' + inc + '</b><span>总收入</span></div>' +
         '<div><b>' + exp + '</b><span>总支出</span></div>' +
         '<div><b>' + (net >= 0 ? '+' : '') + net + '</b><span>净收益</span></div>' +
       '</div>' +
-      '<canvas id="stat-canvas" width="640" height="220"></canvas>' +
+      '<canvas id="stat-canvas" width="640" height="220"></canvas>' + catHtml +
       '<div class="shop-tip">最近 ' + days.length + ' 天 · 绿=收入、红=支出' +
         (best ? ' · 最赚的一天 D' + best.day + '（' + (best.income - best.expense) + ' 金）' : '') + '</div>',
       '<button class="btn" data-close>关闭</button>');
@@ -3343,7 +3402,7 @@ button{ color:inherit; font:inherit; }
       return '<div class="store-row">' +
         '<span class="se">' + f.emoji + '</span>' +
         '<div><div class="sn">' + f.name + '</div>' +
-        '<div class="sv">买 ' + bp + ' 金/条 · 基础值 ' + f.base + ' 金</div></div>' +
+        '<div class="sv">买 ' + bp + ' 金/条 · 基础值 ' + f.base + ' 金 · 不能交委托</div></div>' +
         '<button class="btn mini" data-buyfish="' + f.id + '" data-n="1"' +
           (state.coins < bp ? ' disabled' : '') + '>买1</button>' +
         '<button class="btn mini" data-buyfish="' + f.id + '" data-n="3"' +
@@ -3427,10 +3486,8 @@ button{ color:inherit; font:inherit; }
       const r = G.sleep(state);
       commit(r);
       SFX.sleep();
-      // 逐条播报：伙食费 / 天气 / 自动浇水 / 委托刷新
-      r.notes.slice(0, 6).forEach(function (n, i) {
-        setTimeout(function () { toast(n, i === 0 ? 'good' : ''); }, i * 380);
-      });
+      // 合并成一条播报，不再截断
+      toast(r.summary, 'good');
     },
     dig: function (ev) {
       const r = G.digWorms(state);

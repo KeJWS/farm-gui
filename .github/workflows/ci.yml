@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 逻辑自测
+        run: node selftest.cjs
+      - name: 界面绑定检查
+        run: node check-ui.cjs
+      - name: DOM 冒烟测试
+        run: node dom-test.cjs
+      - name: 数值体检
+        run: node balance.cjs
+      - name: 单文件打包
+        run: node build-single.cjs

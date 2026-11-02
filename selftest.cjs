@@ -181,8 +181,8 @@ s.bait.worm = 20; G.addStore(s, 'carrot', 'std', 2);
 for (let i = 0; i < 3; i++) { s.energy = 10; G.fish(s, 'worm'); }
 const beforeAll = s.coins;
 const rAll = G.sellAll(s);
-ok(rAll.ok && s.coins > beforeAll && s.fishBag.length === 0 && Object.keys(s.store).length === 0,
-   '「全部卖出」同时清掉作物和渔获', rAll);
+ok(rAll.ok && s.coins === beforeAll + 8 && s.fishBag.length > 0 && Object.keys(s.store).length === 0,
+   '仓库「全部卖出」只卖作物，渔获留给水产店', { coins: s.coins - beforeAll, fish: s.fishBag.length });
 
 /* 天气只影响上钩概率，不影响售价 */
 section('天气 → 上钩概率');
@@ -622,7 +622,7 @@ section('v1.1.0 新功能');
 G.setRng(mulberry32(55));
 
 s = G.createState(); s.coins = 400;
-ok(G.buySprinkler(s).ok && s.sprinklers === 1 && s.coins === 340, '洒水器 60 金/个', { c: s.coins });
+ok(G.buySprinkler(s).ok && s.sprinklers === 1 && s.coins === 320, '洒水器 80 金/个', { c: s.coins });
 s.coins = 100000;
 while (G.buySprinkler(s).ok) { /* 买满 */ }
 ok(s.sprinklers === s.plots.length, '洒水器最多每块地一个', s.sprinklers);
@@ -829,13 +829,13 @@ section('v1.5.0 税金与水产店');
 G.setRng(mulberry32(321));
 
 s = G.createState(); s.coins = 0;
-ok(G.taxDue(s) === 20, '税金最低 20 金', G.taxDue(s));
+ok(G.taxDue(s) === 30, '税金最低 30 金', G.taxDue(s));
 s.coins = 1000;
-ok(G.taxDue(s) === 50, '税金 = 金币 5%', G.taxDue(s));
+ok(G.taxDue(s) === 40, '税金 = (金币+仓库) × 4%', G.taxDue(s));
 
 s = G.createState(); s.coins = 1000; s.day = 29;
 G.sleep(s);
-ok(s.day === 30 && s.coins === 1000 - 3 - 50, '第 30 天结算月税（税前 997 → 税 50）', s.coins);
+ok(s.day === 30 && s.coins === 1000 - 3 - 40, '第 30 天结算月税（税前 997 → 税 40）', s.coins);
 
 s = G.createState(); s.coins = 100; s.fishBag = [];
 const bp = G.fishBuyPrice('crucian');
@@ -847,6 +847,42 @@ ok(G.fishBuyPrice('koi') === 45, '锦鲤买价 45 金', G.fishBuyPrice('koi'));
 s = G.createState(); s.coins = 1e6;
 while (G.buyNet(s).ok) { /* 买满 */ }
 ok(s.nets === 9 && G.NET_MAX === 9, '渔网最多 9 张', s.nets);
+
+/* ---------- 5r. v1.5.1: 买鱼套利 / 假饵 / 播报合并 ---------- */
+section('v1.5.1 修复与平衡');
+G.setRng(mulberry32(11));
+
+s = G.createState(); s.coins = 1000; s.bait = { worm: 0, dough: 0 }; s.lure = { owned: false, dur: 0 };
+s.orders = [{ id: 't', kind: 'fish', qty: 2, reward: 22, name: '任意鱼', done: false }];
+G.buyFish(s, 'crucian', 2);
+ok(G.orderHave(s, { kind: 'fish' }) === 0, '买来的水产不算委托进度', G.orderHave(s, { kind: 'fish' }));
+ok(!G.deliverOrder(s, 't').ok, '买来的鱼交不了鱼单');
+
+const st2 = G.createState(); st2.weather = 'cloudy'; st2.energy = 1e9; st2.bait.dough = 1e9;
+for (let i = 0; i < 40; i++) { const rr = G.fish(st2, 'dough'); if (rr.entry) break; }
+ok(G.orderHave(st2, { kind: 'fish' }) === 1, '自己钓的鱼可以交');
+
+function evBait(kind, weather, n) {
+  const s2 = G.createState(); s2.weather = weather; s2.maxEnergy = 1e9; s2.coins = 0;
+  if (kind === 'worm') s2.bait.worm = 1e9; else if (kind === 'dough') s2.bait.dough = 1e9;
+  else s2.lure = { owned: true, dur: 1e9 };
+  let sum = 0;
+  for (let i = 0; i < n; i++) { s2.energy = 1e9; const rr = G.fish(s2, kind); if (rr.entry) sum += rr.entry.price; }
+  return sum / n;
+}
+G.setRng(mulberry32(77)); const evD = evBait('dough', 'cloudy', 4000);
+G.setRng(mulberry32(77)); const evL = evBait('lure', 'cloudy', 4000);
+ok(evL > evD, '假饵期望已高于面团饵', [evD.toFixed(2), evL.toFixed(2)]);
+
+s = G.createState(); s.day = 29; s.coins = 1000;
+const sr = G.sleep(s);
+ok(typeof sr.summary === 'string' && sr.summary.indexOf('🌙 第 30 天') === 0 && sr.summary.indexOf('税') >= 0,
+   '睡觉播报合并成一条且包含税金', sr.summary.slice(0, 50));
+ok(Array.isArray(sr.notes) && sr.notes.every(function (n) { return n && n.kind && n.text; }),
+   '播报已改成结构化 {kind,text}');
+
+ok(G.BALANCE && G.BALANCE.tax.rate === 0.04 && G.BALANCE.prices.sprinkler === 80 && G.BALANCE.hook.dough === 0.92,
+   '数值表 BALANCE 对外导出');
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');

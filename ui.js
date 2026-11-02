@@ -503,6 +503,7 @@
         '<div class="oi">' +
           '<div class="on">' + o.name + ' ×' + o.qty + ' · 报酬 ' + o.reward + ' 金</div>' +
           '<div class="os">' + (o.done ? '✅ 已完成' : thing + ' ' + Math.min(have, o.qty) + '/' + o.qty +
+            ' · 约 ' + Math.round(o.reward / o.qty) + ' 金/个' +
             (o.kind === 'fish' ? '（交最便宜的）' : '')) + '</div>' +
         '</div>' +
         (o.done ? '' :
@@ -980,20 +981,48 @@
   }
 
   function statsModal() {
-    const days = G.ledgerByDay(state).slice().reverse().slice(-14);
+    const days = G.ledgerByDay(state).slice().reverse().slice(-30);
     const inc = days.reduce(function (a, d) { return a + d.income; }, 0);
     const exp = days.reduce(function (a, d) { return a + d.expense; }, 0);
     const net = inc - exp;
     const best = days.slice().sort(function (a, b) {
       return (b.income - b.expense) - (a.income - a.expense);
     })[0];
+
+    const cat = {};
+    function put(k, inc, exp) {
+      cat[k] = cat[k] || { inc: 0, exp: 0 };
+      cat[k].inc += inc; cat[k].exp += exp;
+    }
+    function catOf(label) {
+      if (/委托/.test(label)) return '委托';
+      if (/卖鱼|水产|卖蚯蚓/.test(label)) return '渔获';
+      if (/卖仓库|卖 /.test(label)) return '作物';
+      if (/零工/.test(label)) return '打工';
+      if (/伙食/.test(label)) return '伙食';
+      if (/税/.test(label)) return '税金';
+      if (/维护/.test(label)) return '维护';
+      if (/买/.test(label)) return '采购';
+      return '其他';
+    }
+    days.forEach(function (d) {
+      d.items.forEach(function (it) { put(catOf(it.label), it.income || 0, it.expense || 0); });
+    });
+    const catHtml = '<div class="stat-cats">' + Object.keys(cat).map(function (k) {
+      const c = cat[k];
+      const net2 = c.inc - c.exp;
+      return '<span class="cat-chip"><b>' + k + '</b>' +
+        (c.inc ? '<i class="cat-in">+' + c.inc + '</i>' : '') +
+        (c.exp ? '<i class="cat-out">-' + c.exp + '</i>' : '') +
+        '</span>';
+    }).join('') + '</div>';
     openModal('📈 收益统计',
       '<div class="codex-stat" style="grid-template-columns:repeat(3,1fr)">' +
         '<div><b>' + inc + '</b><span>总收入</span></div>' +
         '<div><b>' + exp + '</b><span>总支出</span></div>' +
         '<div><b>' + (net >= 0 ? '+' : '') + net + '</b><span>净收益</span></div>' +
       '</div>' +
-      '<canvas id="stat-canvas" width="640" height="220"></canvas>' +
+      '<canvas id="stat-canvas" width="640" height="220"></canvas>' + catHtml +
       '<div class="shop-tip">最近 ' + days.length + ' 天 · 绿=收入、红=支出' +
         (best ? ' · 最赚的一天 D' + best.day + '（' + (best.income - best.expense) + ' 金）' : '') + '</div>',
       '<button class="btn" data-close>关闭</button>');
@@ -1050,7 +1079,7 @@
       return '<div class="store-row">' +
         '<span class="se">' + f.emoji + '</span>' +
         '<div><div class="sn">' + f.name + '</div>' +
-        '<div class="sv">买 ' + bp + ' 金/条 · 基础值 ' + f.base + ' 金</div></div>' +
+        '<div class="sv">买 ' + bp + ' 金/条 · 基础值 ' + f.base + ' 金 · 不能交委托</div></div>' +
         '<button class="btn mini" data-buyfish="' + f.id + '" data-n="1"' +
           (state.coins < bp ? ' disabled' : '') + '>买1</button>' +
         '<button class="btn mini" data-buyfish="' + f.id + '" data-n="3"' +
@@ -1134,10 +1163,8 @@
       const r = G.sleep(state);
       commit(r);
       SFX.sleep();
-      // 逐条播报：伙食费 / 天气 / 自动浇水 / 委托刷新
-      r.notes.slice(0, 6).forEach(function (n, i) {
-        setTimeout(function () { toast(n, i === 0 ? 'good' : ''); }, i * 380);
-      });
+      // 合并成一条播报，不再截断
+      toast(r.summary, 'good');
     },
     dig: function (ev) {
       const r = G.digWorms(state);
