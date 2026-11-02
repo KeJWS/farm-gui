@@ -50,7 +50,7 @@ console.log('== 种田：每块地每天的净收益 ==');
 [1, 5, 8].forEach(function (lv) {
   const rows = farmRows(lv);
   console.log('\n  种田 Lv' + lv + '（产量 +' + Math.floor(lv / 5) + '）');
-  rows.slice(0, 5).forEach(function (r) {
+  rows.forEach(function (r) {
     console.log('   ' + pad(r.name, 4) + pad(r.qty + '个/' + r.days + '天', 11) +
       pad('净 ' + Math.round(r.net) + ' 金', 11) +
       pad(r.perE.toFixed(2) + ' 金/体力', 13) + r.perDay.toFixed(1) + ' 金/地/天');
@@ -172,7 +172,7 @@ devRows.forEach(function (r) {
 /* ---------- 5. 每天固定支出 ---------- */
 function costs(maxEnergy, plots, sprinklers, nets, harvester) {
   const meal = Math.max(1, 3 + (maxEnergy - 10) / 5);
-  const upkeep = Math.max(0, plots - G.BALANCE.upkeep.free) * G.BALANCE.upkeep.plotPerWeek +
+  const upkeep = G.plotUpkeep(plots) +
     sprinklers * G.BALANCE.upkeep.sprinkle + nets * G.BALANCE.upkeep.net +
     (harvester ? G.BALANCE.upkeep.harvester : 0);
   return { meal: meal, upkeep: upkeep / 7 };
