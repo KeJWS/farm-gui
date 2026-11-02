@@ -21,6 +21,7 @@ function evBait(kind, weather, n) {
   let sum = 0, bites = 0;
   for (let i = 0; i < n; i++) {
     s.energy = 1e9;
+    s.levels.fish = 1; s.levels.fishXp = 0;      // 隔离等级加成，测基础数值
     const r = G.fish(s, kind);
     if (r.entry) { bites++; sum += r.entry.price; }
   }
@@ -94,9 +95,9 @@ console.log('\n== 委托样本（前 / 中 / 后期）==');
 
 console.log('\n== 设备回本 ==');
 const pb = [
-  ['洒水器', 80, perE - 3 / 7],
-  ['自动收获器(按每天省3体力)', 200, 3 * perE - 5 / 7],
-  ['渔网', 80, 0.65 * d.ev - 3 / 7]
+  ['洒水器', G.SPRINKLER_COST, perE - 3 / 7],
+  ['自动收获器(按每天省3体力)', G.HARVESTER_COST, 3 * perE - 5 / 7],
+  ['渔网', G.NET_COST, 0.65 * d.ev - 3 / 7]
 ];
 pb.forEach(function (x) {
   const days = x[1] / x[2];

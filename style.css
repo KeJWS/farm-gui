@@ -775,3 +775,13 @@ button{ color:inherit; font:inherit; }
 .ach-row.done .abar i{ background:var(--green-d); }
 .ach-row .adone{ font-size:10px; font-weight:800; color:var(--green-d); background:rgba(79,156,95,.14);
   border-radius:6px; padding:1px 6px; }
+
+/* ---------- v1.7: 四按钮商店 / 自定义数量 ---------- */
+.shop-four{ grid-template-columns:repeat(2, minmax(0,1fr)) !important; }
+.buy-custom{ display:flex; align-items:center; gap:8px; margin-top:8px; padding:8px 10px; border-radius:11px;
+  background:var(--card); border:1px solid var(--line); font-size:11.5px; font-weight:700; color:var(--ink-2);
+  flex-wrap:wrap; }
+.buy-custom input{ width:76px; padding:4px 8px; border-radius:8px; border:1px solid var(--line-2);
+  background:transparent; color:var(--ink); font:inherit; font-weight:800; text-align:center; }
+.buy-custom .bc-tip{ color:var(--ink-3); font-weight:600; }
+@media (max-width:560px){ .shop-four{ grid-template-columns:1fr !important; } }

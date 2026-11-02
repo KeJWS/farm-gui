@@ -124,6 +124,15 @@ ok(html('#modal-root').indexOf('水产店') >= 0 && html('#modal-root').indexOf(
    '水产店弹窗能打开，并提示买来的鱼不能交委托');
 ok(html('#modal-root').indexOf('今日') >= 0 && html('#modal-root').indexOf('一般品质') >= 0,
    '水产店显示每日库存与「一般品质」');
+clickAct('cropshop');
+ok(html('#modal-root').indexOf('农产品店') >= 0 && html('#modal-root').indexOf('全部卖出') >= 0,
+   '农产品店弹窗能打开');
+ok(html('#modal-root').indexOf('今日') >= 0 && html('#modal-root').indexOf('一般品质') >= 0,
+   '农产品店显示每日库存与「一般品质」');
+clickAct('shop');
+ok(html('#modal-root').indexOf('面团饵自定义数量') >= 0 && html('#modal-root').indexOf('dough-qty') >= 0,
+   '渔具店有面团饵自定义数量输入');
+ok(html('#modal-root').indexOf('耐用 25 次') >= 0, '渔具店显示假饵耐用 25 次');
 clickAct('shop');
 ok(html('#modal-root').indexOf('渔具店') >= 0 && html('#modal-root').indexOf('渔网') >= 0,
    '渔具店弹窗（含渔网）能打开');

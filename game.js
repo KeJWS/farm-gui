@@ -18,8 +18,14 @@
     tax: { rate: 0.04, min: 30, every: 30 },
     order: { mult: 1.35, seasonStep: 0.6 },
     expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
-    device: { sprinkler: 80, harvester: 200, net: 80 },
-    shop: { priceMul: 1.8, restock: true }
+    device: { sprinkler: 80, harvester: 300, net: 80 },
+    lure: { price: 5, dur: 25 },
+    shop: { priceMul: 1.8, cropPriceMul: 2.2, restock: true },
+    /* 累进税：0~2000 收 2%、2000~10000 收 4%、10000 以上收 6%，最低 30 金 */
+    tax: { min: 30, every: 30,
+           bands: [{ upTo: 2000, rate: 0.02 }, { upTo: 10000, rate: 0.04 }, { upTo: null, rate: 0.06 }] },
+    /* 等级：每级所需经验 = 15 + 10×(级-1)，满级 10 */
+    level: { max: 10, xpBase: 15, xpStep: 10 }
   };
 
   /* ---------------- 静态数据 ---------------- */
@@ -181,7 +187,33 @@
     /* 收集 */
     { id: 'codexall',  cat: 'all',  emoji: '📖', name: '全图鉴',     desc: '7 种鱼 + 10 种作物都收过', goal: 17,
       val: function (s) { return fishSpeciesOwned(s) + cropSpeciesOwned(s); },
-      reward: { coins: 500, ferts: { special: 5 } } }
+      reward: { coins: 500, ferts: { special: 5 } } },
+
+    /* v1.7 追加：等级 / 经营 / 长期 */
+    { id: 'farmLv3',   cat: 'farm', emoji: '🌿', name: '种田入门',   desc: '种田等级到 Lv3',       goal: 3,
+      val: function (s) { return (s.levels && s.levels.farm) || 1; }, reward: { coins: 40 } },
+    { id: 'farmLv6',   cat: 'farm', emoji: '🌻', name: '老把式',     desc: '种田等级到 Lv6',       goal: 6,
+      val: function (s) { return (s.levels && s.levels.farm) || 1; }, reward: { ferts: { normal: 6 } } },
+    { id: 'fishLv3',   cat: 'fish', emoji: '🎏', name: '手感来了',   desc: '钓鱼等级到 Lv3',       goal: 3,
+      val: function (s) { return (s.levels && s.levels.fish) || 1; }, reward: { bait: { dough: 10 } } },
+    { id: 'fishLv6',   cat: 'fish', emoji: '🐋', name: '河边常客',   desc: '钓鱼等级到 Lv6',       goal: 6,
+      val: function (s) { return (s.levels && s.levels.fish) || 1; }, reward: { coins: 300 } },
+    { id: 'cropsold100', cat: 'biz', emoji: '🛒', name: '农产品大客户', desc: '累计卖出 100 个作物', goal: 100,
+      val: function (s) { return s.stats.cropsSold || 0; }, reward: { coins: 80 } },
+    { id: 'order100',  cat: 'biz',  emoji: '📦', name: '老主顾',     desc: '累计完成 100 个委托',  goal: 100,
+      val: function (s) { return s.stats.orders || 0; }, reward: { coins: 600 } },
+    { id: 'coins50k',  cat: 'biz',  emoji: '🏦', name: '富甲一方',   desc: '金币达到 50000',       goal: 50000,
+      val: function (s) { return Math.max(s.coins || 0, 0); }, reward: { coins: 3000 } },
+    { id: 'day200',    cat: 'biz',  emoji: '🗓️', name: '两百天',     desc: '经营满 200 天',        goal: 200,
+      val: function (s) { return s.day || 1; }, reward: { coins: 800 } },
+    { id: 'perfect50', cat: 'fish', emoji: '✨', name: '完美猎手',   desc: '钓到 50 条完美品质的鱼', goal: 50,
+      val: perfectFish, reward: { coins: 1200 } },
+    { id: 'fishval20k', cat: 'fish', emoji: '🐚', name: '水产大户',  desc: '鱼类累计价值 20000 金', goal: 20000,
+      val: fishValueTotal, reward: { coins: 800 } },
+    { id: 'cropval5k', cat: 'farm', emoji: '🌾', name: '粮仓满满',   desc: '作物累计价值 5000 金', goal: 5000,
+      val: cropValueTotal, reward: { coins: 300 } },
+    { id: 'net9',      cat: 'fish', emoji: '🕸️', name: '网罗天下',   desc: '渔网放满 9 张',        goal: 9,
+      val: function (s) { return s.nets || 0; }, reward: { coins: 200 } }
   ];
 
   const ACH_CATS = { farm: '🌱 种田', fish: '🎣 钓鱼', biz: '💰 经营', all: '🏆 收集' };
@@ -282,6 +314,54 @@
     return best;
   }
 
+  /* ---------------- 等级（种田 / 钓鱼） ---------------- */
+
+  function levelNeed(lv) {
+    const L = BALANCE.level;
+    return L.xpBase + L.xpStep * ((lv || 1) - 1);
+  }
+
+  function levelEffectText(kind, lv) {
+    if (kind === 'fish') {
+      return '咬钩 +' + Math.min(12, (lv - 1) * 1.5).toFixed(1) + '% · 好鱼 +' + ((lv - 1) * 3) + '%';
+    }
+    return '收获产量 +' + Math.floor(lv / 3);
+  }
+
+  /* 加经验，返回升了几级 */
+  function addLevelXp(s, kind, n) {
+    if (!s.levels) s.levels = { farm: 1, fish: 1, farmXp: 0, fishXp: 0 };
+    const key = kind === 'fish' ? 'fish' : 'farm';
+    const xpKey = key + 'Xp';
+    s.levels[xpKey] = (s.levels[xpKey] || 0) + (n || 1);
+    let ups = 0;
+    while (s.levels[key] < BALANCE.level.max && s.levels[xpKey] >= levelNeed(s.levels[key])) {
+      s.levels[xpKey] -= levelNeed(s.levels[key]);
+      s.levels[key]++;
+      ups++;
+    }
+    if (s.levels[key] >= BALANCE.level.max) {
+      s.levels[xpKey] = Math.min(s.levels[xpKey], levelNeed(BALANCE.level.max) - 1);
+    }
+    if (ups) {
+      log(s, '⭐ ' + (key === 'fish' ? '钓鱼' : '种田') + '等级 → Lv' + s.levels[key] +
+        '（' + levelEffectText(key, s.levels[key]) + '）', 'good');
+    }
+    return ups;
+  }
+
+  /* 种田等级：每 3 级 +1 产量（普通作物） */
+  function farmYieldBonus(s) {
+    return Math.floor((((s.levels && s.levels.farm) || 1)) / 3);
+  }
+  /* 钓鱼等级：咬钩率 +1.5%/级（最多 +12%），好鱼权重 +3%/级 */
+  function fishHookBonus(s) {
+    return Math.min(0.12, 0.015 * ((((s.levels && s.levels.fish) || 1)) - 1));
+  }
+  function fishGoodBonus(s) {
+    return 1 + 0.03 * ((((s.levels && s.levels.fish) || 1)) - 1);
+  }
+
   /* ---------------- 状态 ---------------- */
 
   const SAVE_VERSION = 1;
@@ -306,14 +386,27 @@
     return { day: day || 1, stock: rollShopStock() };
   }
 
+  /* 农产品店每日进货：便宜的菜进得多，贵菜不一定有 */
+  function rollCropStock() {
+    const stock = {};
+    CROP_LIST.forEach(function (c) {
+      const r = c.price >= 40 ? [0, 1] : (c.price >= 16 ? [0, 2] : [1, 4]);
+      stock[c.id] = randInt(r[0], r[1]);
+    });
+    return stock;
+  }
+  function makeCropShop(day) {
+    return { day: day || 1, stock: rollCropStock() };
+  }
+
   function createState() {
     const s = {
       v: SAVE_VERSION,
       day: 1,
       weather: 'sunny',
       coins: 50,
-      energy: 10,
-      maxEnergy: 10,
+      energy: 15,
+      maxEnergy: 15,
       plots: [makePlot(), makePlot(), makePlot(), makePlot(), makePlot()],
       seeds: {},
       store: {},
@@ -333,6 +426,8 @@
       log: [{ day: 1, text: '🌾 欢迎来到我的小农场，第 1 天开始了。', kind: 'sys' }],
       orders: makeOrders({ day: 1 }),
       shop: makeShop(1),
+      cropShop: makeCropShop(1),
+      levels: { farm: 1, fish: 1, farmXp: 0, fishXp: 0 },
       ach: {},
       fishBook: { count: 0, entries: [], best: null, priciest: null },
       stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0 }
@@ -412,7 +507,7 @@
     if (!c) return 0;
     if (c.multi) return p.hits === 0 ? c.firstQty : c.regrowQty;
     if (c.big) return 1;
-    return Math.max(1, c.base + fertBonus(p) - p.missed);
+    return Math.max(1, c.base + farmYieldBonus(s) + fertBonus(p) - p.missed);
   }
 
   function canHarvest(s, p) {
@@ -509,7 +604,7 @@
 
     let qty;
     if (c.multi) qty = p.hits === 0 ? c.firstQty : c.regrowQty;
-    else qty = c.big ? 1 : clamp(c.base + randInt(-1, 1) - p.missed + fertBonus(p), 1, 99);
+    else qty = c.big ? 1 : clamp(c.base + farmYieldBonus(s) + randInt(-1, 1) - p.missed + fertBonus(p), 1, 99);
 
     // 作物也有品质：施肥会多滚几次取最好的（普通肥 2 次、特效肥 3 次）
     const q = rollQuality(p.fert > 0 ? 2 : 1);   // 普通/特效肥料品质一致
@@ -532,6 +627,7 @@
       extraSeed = true;
     }
     s.stats.harvests++;
+    const levelUp = addLevelXp(s, 'farm', 1);
 
     let regrown = false;
     if (willRegrow) {
@@ -551,7 +647,8 @@
                 (extraSeed ? ' · 留种 +1' : '') +
                 (regrown ? ' · 进入再生期' : '');
     log(s, '🧺 ' + msg, 'good');
-    return { ok: true, msg: msg, qty: qty, crop: p.crop || c.id, unit: unit, quality: q, seed: extraSeed, regrown: regrown };
+    return { ok: true, msg: msg, qty: qty, crop: p.crop || c.id, unit: unit, quality: q,
+             seed: extraSeed, regrown: regrown, levelUp: levelUp };
   }
 
   function harvestAll(s) {
@@ -565,23 +662,24 @@
     return { ok: true, msg: '收了 ' + plots + ' 块地，共 ' + total + ' 个' };
   }
 
-  /* 仓库「全部卖出」只卖作物；渔获只能去水产店卖 */
+  /* 农产品收购：作物只能在这里卖（仓库不出售任何东西） */
   function sellAll(s) {
     const ids = Object.keys(s.store).filter(function (k) { return storeCount(s, k) > 0; });
     if (!ids.length) return { ok: false, msg: '仓库里没有作物可卖' };
 
-    let income = 0;
+    let income = 0, count = 0;
     const parts = [];
     ids.forEach(function (id) {
       const n = storeCount(s, id);
       const gain = storeValue(s, id);
-      income += gain;
+      income += gain; count += n;
       parts.push(CROPS[id].name + '×' + n + ' = ' + gain + ' 金');
       delete s.store[id];
     });
-    addCoins(s, income, '卖仓库');
-    log(s, '💰 卖出 ' + parts.join('、') + '，收入 ' + income + ' 金', 'good');
-    return { ok: true, msg: '卖出全部，+' + income + ' 金', income: income };
+    s.stats.cropsSold = (s.stats.cropsSold || 0) + count;
+    addCoins(s, income, '农产品店 · 卖作物');
+    log(s, '💰 农产品店收购 ' + parts.join('、') + '，收入 ' + income + ' 金', 'good');
+    return { ok: true, msg: '卖出全部，+' + income + ' 金', income: income, count: count };
   }
 
   /* 铲除：直接清掉这块地，不返还种子/金币 */
@@ -599,9 +697,10 @@
     if (!n) return { ok: false, msg: '没有可卖的' };
     const gain = storeValue(s, id);
     delete s.store[id];
-    addCoins(s, gain, '卖 ' + CROPS[id].name);
-    log(s, '💰 卖出 ' + CROPS[id].name + '×' + n + '，+' + gain + ' 金', 'good');
-    return { ok: true, msg: '+' + gain + ' 金', income: gain };
+    s.stats.cropsSold = (s.stats.cropsSold || 0) + n;
+    addCoins(s, gain, '农产品店 · 卖 ' + CROPS[id].name);
+    log(s, '💰 农产品店收购 ' + CROPS[id].name + '×' + n + '，+' + gain + ' 金', 'good');
+    return { ok: true, msg: '+' + gain + ' 金', income: gain, count: n };
   }
 
   /* 施肥 = 消耗仓库里的肥料（肥料在种子店买，半价卖回） */
@@ -795,9 +894,10 @@
     s.manualRefreshUsed = false;
     notes.push({ kind: 'order', text: '📋 委托已换新' });
 
-    // 水产店每天补货
+    // 水产店 / 农产品店每天补货
     s.shop = makeShop(s.day);
-    notes.push({ kind: 'shop', text: '🏪 水产补货' });
+    s.cropShop = makeCropShop(s.day);
+    notes.push({ kind: 'shop', text: '🏪 商店补货' });
 
     const head = '🌙 第 ' + s.day + ' 天 · ' + w.name;
     const body = notes.filter(function (n) { return n.kind !== 'weather'; })
@@ -845,7 +945,7 @@
 
     // 先判定咬钩：天气与饵决定「有没有鱼咬」，鱼种权重不再受天气影响
     s.stats.casts++;
-    const hook = clamp((HOOK[kind] || 0.9) + (w.hookMod || 0), 0.3, 0.98);
+    const hook = clamp((HOOK[kind] || 0.9) + (w.hookMod || 0) + fishHookBonus(s), 0.3, 0.98);
     if (rand() > hook) {
       if (!opts.quiet) log(s, '💨 空竿：' + w.name + '，没有鱼咬钩', 'warn');
       return { ok: true, empty: true, entry: null, msg: '空竿了' };
@@ -857,6 +957,7 @@
       if (f.trash) mul = kind === 'lure' ? BALANCE.bait.lureTrash : 1;
       else if (kind === 'worm') mul = BALANCE.bait.wormGood;
       else if (kind === 'lure') mul = BALANCE.bait.lureGood;
+      if (!f.trash) mul *= fishGoodBonus(s);
       return Object.assign({}, f, { w: f.w * mul });
     });
     const f = weighted(table, 'w');
@@ -889,6 +990,7 @@
     const entry = { day: s.day, fish: name, emoji: emoji, quality: q, price: value,
                     base: f.base, bait: kind, trash: !!f.trash, noOrder: noOrder };
     s.fishBook.count++;
+    const levelUp = addLevelXp(s, 'fish', (q && q.id === 'perfect') ? 3 : 1);
     s.fishBook.entries.unshift(entry);
     if (s.fishBook.entries.length > 40) s.fishBook.entries.length = 40;
     if (!f.trash) {
@@ -905,7 +1007,7 @@
         : '🎣 钓到 ' + emoji + ' ' + name + ' · ' + q.emoji + q.name + ' · 值 ' + value + ' 金（已入仓库）',
         f.trash ? 'warn' : 'good');
     }
-    return { ok: true, entry: entry, msg: name + ' 值 ' + value + ' 金' };
+    return { ok: true, entry: entry, msg: name + ' 值 ' + value + ' 金', levelUp: levelUp };
   }
 
   function fishMany(s, times, preferBait) {
@@ -1074,11 +1176,12 @@
       return { ok: true, msg: '面团饵 ×' + n };
     }
     if (kind === 'lure') {
+      const price = BALANCE.lure.price, dur = BALANCE.lure.dur;
       if (s.lure.owned) return { ok: false, msg: '假饵一次只能持 1 个' };
-      if (s.coins < 5) return { ok: false, msg: '金币不够（5 金）' };
-      s.coins -= 5; ledger(s, '买假饵', 0, 5);
-      s.lure.owned = true; s.lure.dur = 20;
-      log(s, '🎣 买了一个假饵（耐用 20 次）', 'info');
+      if (s.coins < price) return { ok: false, msg: '金币不够（' + price + ' 金）' };
+      s.coins -= price; ledger(s, '买假饵', 0, price);
+      s.lure.owned = true; s.lure.dur = dur;
+      log(s, '🎣 买了一个假饵（耐用 ' + dur + ' 次）', 'info');
       return { ok: true, msg: '假饵到手' };
     }
     return { ok: false, msg: '这种饵料买不到' };
@@ -1133,10 +1236,25 @@
   const NET_MAX = BALANCE.prices.netMax;
   const NET_CHANCE = BALANCE.netChance;
 
-  /* 月度税金：按（金币 + 仓库价值）× 4%，最低 30 金 */
+  /* 月度累进税：按（金币 + 仓库价值）分档，0~2k 收 2%、2k~10k 收 4%、1w 以上收 6%，最低 30 金 */
+  function taxBase(s) { return Math.max(0, s.coins || 0) + storeTotal(s); }
+
   function taxDue(s) {
-    const base = Math.max(0, s.coins || 0) + storeTotal(s);
-    return Math.max(BALANCE.tax.min, Math.round(base * BALANCE.tax.rate));
+    const base = taxBase(s);
+    let tax = 0, prev = 0;
+    const bands = BALANCE.tax.bands;
+    for (let i = 0; i < bands.length; i++) {
+      const top = bands[i].upTo == null ? Infinity : bands[i].upTo;
+      if (base > prev) tax += (Math.min(base, top) - prev) * bands[i].rate;
+      prev = top;
+      if (base <= top) break;
+    }
+    return Math.max(BALANCE.tax.min, Math.round(tax));
+  }
+
+  /* 距离下次缴税还有几天 */
+  function taxInDays(s) {
+    return BALANCE.tax.every - ((s.day || 1) % BALANCE.tax.every);
   }
 
   /* 水产店售价：基础价的 1.8 倍 */
@@ -1170,9 +1288,38 @@
     return { ok: true, qty: qty, cost: cost, msg: '买到 ' + f.name + ' ×' + qty };
   }
 
+  /* ---------------- 农产品店（作物唯一出售处 + 每日进货） ---------------- */
+
+  /* 买价 = 售价 ×2.2，一般品质（标准），转手必亏，只用来应急凑单 */
+  function cropBuyPrice(id) {
+    const c = CROPS[id];
+    return c ? Math.max(2, Math.round(c.price * BALANCE.shop.cropPriceMul)) : 0;
+  }
+
+  function cropShopStock(s, id) {
+    return (s.cropShop && s.cropShop.stock && s.cropShop.stock[id]) || 0;
+  }
+
+  function buyCrop(s, id, n) {
+    const c = CROPS[id];
+    if (!c) return { ok: false, msg: '没有这种作物' };
+    const qty = Math.max(1, Math.floor(n || 1));
+    const stock = cropShopStock(s, id);
+    if (stock <= 0) return { ok: false, msg: c.name + '今天卖完了，明天再来' };
+    if (stock < qty) return { ok: false, msg: '库存只剩 ' + stock + ' 个' };
+    const cost = cropBuyPrice(id) * qty;
+    if (s.coins < cost) return { ok: false, msg: '金币不够' };
+    s.coins -= cost;
+    s.cropShop.stock[id] = stock - qty;
+    ledger(s, '买农产品 ' + c.name + ' ×' + qty, 0, cost);
+    addStore(s, id, 'std', qty);
+    log(s, '🛒 买进 ' + c.emoji + ' ' + c.name + ' ×' + qty + '（-' + cost + ' 金，今日剩 ' +
+      s.cropShop.stock[id] + ' 个）', 'info');
+    return { ok: true, qty: qty, cost: cost, msg: '买到 ' + c.name + ' ×' + qty };
+  }
+
   /* 渔网：每天吃 1 份面团饵，70% 概率网到 1 条「标准及以下」的普通鱼（不出杂物/宝箱） */
   const NET_QUALITIES = ['bad', 'common', 'std'];
-
   function netCatchOne(s) {
     const pool = FISH.filter(function (f) { return !f.trash && !f.noOrder; });
     const f = weighted(pool, 'w');
@@ -1337,11 +1484,35 @@
 
   /* ---------------- 每日委托 ---------------- */
 
-  /* 委托池随天数解锁：头几天只出便宜作物，后期才要贵货 */
+  /* 委托池：按天数一档档解锁（前期慢一点，后期全开） */
+  const ORDER_TIERS = [
+    { day: 1, n: 3 }, { day: 3, n: 4 }, { day: 5, n: 5 }, { day: 7, n: 6 },
+    { day: 9, n: 7 }, { day: 12, n: 8 }, { day: 15, n: 9 }, { day: 18, n: 10 }
+  ];
+
   function orderPool(day) {
     const sorted = CROP_LIST.slice().sort(function (a, b) { return a.seed - b.seed; });
-    const n = day <= 4 ? 4 : (day <= 9 ? 7 : sorted.length);
-    return sorted.slice(0, n);
+    let n = ORDER_TIERS[0].n;
+    ORDER_TIERS.forEach(function (t) { if (day >= t.day) n = t.n; });
+    return sorted.slice(0, Math.min(n, sorted.length));
+  }
+
+  /* 委托权重：越贵的作物越容易被点单，便宜菜不再天天刷屏 */
+  function orderWeight(c) {
+    return 1 + Math.min(5, Math.floor(c.price / 12));
+  }
+
+  function pickOrderCrop(pool, used) {
+    const cand = pool.filter(function (c) { return used.indexOf(c.id) < 0; });
+    if (!cand.length) return null;
+    let total = 0;
+    cand.forEach(function (c) { total += orderWeight(c); });
+    let r = rand() * total;
+    for (let i = 0; i < cand.length; i++) {
+      r -= orderWeight(cand[i]);
+      if (r <= 0) return cand[i];
+    }
+    return cand[cand.length - 1];
   }
 
   function makeOrders(s) {
@@ -1349,14 +1520,11 @@
     const pool = orderPool(day);
     const used = [];
     const orders = [];
-    const mult = 1 + Math.floor((day - 1) / 30) * BALANCE.order.seasonStep;    // 春 1 / 夏 1.6 / 秋 2.2 / 冬 2.8
+    const season = Math.floor((day - 1) / 30);                                  // 0 春 / 1 夏 / 2 秋 / 3 冬
+    const mult = 1 + season * BALANCE.order.seasonStep;                        // 1 / 1.6 / 2.2 / 2.8
 
     for (let i = 0; i < 2 && pool.length; i++) {
-      let c = null;
-      for (let t = 0; t < 12; t++) {
-        const cand = pool[Math.floor(rand() * pool.length)];
-        if (used.indexOf(cand.id) < 0) { c = cand; break; }
-      }
+      let c = pickOrderCrop(pool, used);
       if (!c) c = pool[i % pool.length];
       used.push(c.id);
       const qty = Math.max(1, Math.round((c.price >= 20 ? randInt(1, 2) : randInt(3, 6)) * mult));
@@ -1367,10 +1535,12 @@
       });
     }
 
+    // 鱼单：单价随季节上涨（11 → 15 → 19 → 23），不再后期白送
     const fq = Math.max(2, Math.round(randInt(2, 3) * mult));
+    const per = 11 + 4 * season;
     orders.push({
       id: 'd' + day + '-f', kind: 'fish', crop: null, name: '任意鱼', emoji: '🐟',
-      qty: fq, reward: Math.max(12, Math.round(fq * 11)), done: false
+      qty: fq, reward: Math.max(12, per * fq), done: false
     });
     return orders;
   }
@@ -1499,10 +1669,10 @@
     merged.bait.worm = Math.round(num(merged.bait.worm, 0, 0, 9999));
     merged.bait.dough = Math.round(num(merged.bait.dough, 0, 0, 9999));
     merged.lure = Object.assign({ owned: false, dur: 0 }, s.lure || {});
-    merged.lure.dur = Math.round(num(merged.lure.dur, 0, 0, 20));
+    merged.lure.dur = Math.round(num(merged.lure.dur, 0, 0, BALANCE.lure.dur));
     merged.lure.owned = !!merged.lure.owned && merged.lure.dur > 0;
     merged.fishBook = Object.assign({ count: 0, entries: [], best: null, priciest: null }, s.fishBook || {});
-    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0 }, s.stats || {});
+    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0 }, s.stats || {});
     merged.orders = normalizeOrders(s.orders, merged);
     merged.seeds = s.seeds && typeof s.seeds === 'object' ? s.seeds : {};
     // 老存档的仓库是「作物: 数量」，这里迁移成「作物: {品质: 数量}」
@@ -1581,6 +1751,43 @@
     } else {
       merged.shop = makeShop(merged.day);
     }
+
+    // 农产品店：同样按当天补一次货
+    const rawCropShop = s.cropShop && typeof s.cropShop === 'object' ? s.cropShop : null;
+    if (rawCropShop && rawCropShop.stock && typeof rawCropShop.stock === 'object') {
+      merged.cropShop = { day: merged.day, stock: {} };
+      CROP_LIST.forEach(function (c) {
+        const cap = c.price >= 40 ? 1 : (c.price >= 16 ? 2 : 4);
+        merged.cropShop.stock[c.id] = Math.round(num(rawCropShop.stock[c.id], 0, 0, cap));
+      });
+    } else {
+      merged.cropShop = makeCropShop(merged.day);
+    }
+
+    // 等级：老存档按已有收获 / 钓鱼次数补等级（新存档从 1 级开始）
+    const rawLv = s.levels && typeof s.levels === 'object' ? s.levels : null;
+    merged.levels = {
+      farm: Math.round(num(rawLv && rawLv.farm, 1, 1, BALANCE.level.max)),
+      fish: Math.round(num(rawLv && rawLv.fish, 1, 1, BALANCE.level.max)),
+      farmXp: Math.round(num(rawLv && rawLv.farmXp, 0, 0, 999999)),
+      fishXp: Math.round(num(rawLv && rawLv.fishXp, 0, 0, 999999))
+    };
+    if (!rawLv || (merged.levels.farm === 1 && merged.levels.farmXp === 0 &&
+                   merged.levels.fish === 1 && merged.levels.fishXp === 0 &&
+                   (merged.stats.harvests || 0) + (merged.stats.casts || 0) > 0)) {
+      [['farm', merged.stats.harvests || 0], ['fish', merged.stats.casts || 0]].forEach(function (pair) {
+        const key = pair[0];
+        merged.levels[key + 'Xp'] = Math.min(1e6, pair[1]);
+        while (merged.levels[key] < BALANCE.level.max &&
+               merged.levels[key + 'Xp'] >= levelNeed(merged.levels[key])) {
+          merged.levels[key + 'Xp'] -= levelNeed(merged.levels[key]);
+          merged.levels[key]++;
+        }
+        if (merged.levels[key] >= BALANCE.level.max) {
+          merged.levels[key + 'Xp'] = Math.min(merged.levels[key + 'Xp'], levelNeed(BALANCE.level.max) - 1);
+        }
+      });
+    }
     merged.ledger = Array.isArray(s.ledger) ? s.ledger : base.ledger;
     merged.log = Array.isArray(s.log) ? s.log.slice(0, 400) : base.log;
     // 旧存档迁移：垃圾不参与品质判定（早期版本会给出「优质垃圾」）
@@ -1620,6 +1827,11 @@
     NET_COST: NET_COST, NET_MAX: NET_MAX, NET_CHANCE: NET_CHANCE, plotUpkeep: plotUpkeep,
     storeTotal: storeTotal, taxDue: taxDue, buyFish: buyFish, fishBuyPrice: fishBuyPrice, deviceUpkeep: deviceUpkeep, HOOK: HOOK,
     fishDesc: fishDesc, shopStock: shopStock, rollShopStock: rollShopStock, makeShop: makeShop, SHOP_STOCK: SHOP_STOCK,
+    cropBuyPrice: cropBuyPrice, cropShopStock: cropShopStock, buyCrop: buyCrop, makeCropShop: makeCropShop,
+    rollCropStock: rollCropStock,
+    levelNeed: levelNeed, addLevelXp: addLevelXp, levelEffectText: levelEffectText,
+    farmYieldBonus: farmYieldBonus, fishHookBonus: fishHookBonus, fishGoodBonus: fishGoodBonus,
+    taxBase: taxBase, taxInDays: taxInDays, orderWeight: orderWeight, ORDER_TIERS: ORDER_TIERS,
     ACH: ACH, ACH_CATS: ACH_CATS, checkAchievements: checkAchievements, achInfo: achInfo, rewardText: rewardText,
     fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
     fishMany: fishMany, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,

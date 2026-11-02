@@ -22,7 +22,7 @@ function mulberry32(a) {
 section('播种 · 浇水 · 次日收获');
 G.setRng(mulberry32(7));
 let s = G.createState();
-ok(s.coins === 50 && s.energy === 10 && s.plots.length === 5, '初始状态 50 金/10 体力/5 块地');
+ok(s.coins === 50 && s.energy === 15 && s.plots.length === 5, '初始状态 50 金/15 体力/5 块地');
 
 let r = G.plant(s, 0, 'carrot');
 ok(!r.ok, '没有种子不能播种', r.msg);
@@ -31,7 +31,7 @@ let bsr = G.buySeed(s, 'carrot', 1);
 ok(bsr.ok && s.coins === 45 && s.seeds.carrot === 1, '种子店买 1 颗萝卜种子：-5 金', { coins: s.coins, seeds: s.seeds });
 
 r = G.plant(s, 0, 'carrot');
-ok(r.ok && s.energy === 9 && s.coins === 45 && !s.seeds.carrot, '播种只扣 1 颗种子 + 1 体力，不扣金币', { coins: s.coins, energy: s.energy, seeds: s.seeds });
+ok(r.ok && s.energy === 14 && s.coins === 45 && !s.seeds.carrot, '播种只扣 1 颗种子 + 1 体力，不扣金币', { coins: s.coins, energy: s.energy, seeds: s.seeds });
 
 r = G.water(s, 0);
 ok(r.ok && s.plots[0].growth === 1, '浇水 +1 天');
@@ -40,7 +40,7 @@ r = G.water(s, 0);
 ok(!r.ok, '同一天不能重复浇水');
 
 r = G.sleep(s);
-ok(s.day === 2 && s.coins === 42 && s.energy === 10, '睡觉：第 2 天、扣伙食 3 金、体力回满', { day: s.day, coins: s.coins, energy: s.energy });
+ok(s.day === 2 && s.coins === 41 && s.energy === 15, '睡觉：第 2 天、扣伙食 4 金、体力回满', { day: s.day, coins: s.coins, energy: s.energy });
 
 // 雨天会自动浇水，避免干扰：强制晴天
 s.weather = 'sunny';
@@ -262,16 +262,16 @@ ok(G.expandCost(s) === 40, '默认 5 块地，第 6 块 40 金');
 s.coins = 1000;
 G.expand(s);
 ok(G.expandCost(s) === 55, '第 7 块 55 金');
-ok(G.upgradeCost(s) === 30, '首次强化 30 金');
+ok(G.upgradeCost(s) === 36, '首次强化 36 金（Lv15 → 20）');
 G.upgrade(s);
-ok(s.maxEnergy === 15 && G.mealFee(s) === 4, '强化后上限 15、伙食 4 金', { max: s.maxEnergy, fee: G.mealFee(s) });
-ok(G.upgradeCost(s) === 36, '第二次强化 36 金（每级 ×1.2）');
-ok(G.workCost(s, 'half') === 8 && G.workPay(s, 'half') === 10, '半天零工：消耗 8、赚 10（×1.2）');
-ok(G.workCost(s, 'full') === 15 && G.workPay(s, 'full') === 30, '全天零工：消耗 15、赚 30（×2.0）');
+ok(s.maxEnergy === 20 && G.mealFee(s) === 5, '强化后上限 20、伙食 5 金', { max: s.maxEnergy, fee: G.mealFee(s) });
+ok(G.upgradeCost(s) === 43, '第二次强化 43 金（每级 ×1.2）');
+ok(G.workCost(s, 'half') === 10 && G.workPay(s, 'half') === 12, '半天零工：消耗 10、赚 12（×1.2）');
+ok(G.workCost(s, 'full') === 20 && G.workPay(s, 'full') === 40, '全天零工：消耗 20、赚 40（×2.0）');
 
-s.energy = 15; const c0 = s.coins;
+s.energy = 20; const c0 = s.coins;
 G.work(s, 'full');
-ok(s.coins - c0 === 30 && s.energy === 0, '全天零工结算正确', { gain: s.coins - c0, energy: s.energy });
+ok(s.coins - c0 === 40 && s.energy === 0, '全天零工结算正确', { gain: s.coins - c0, energy: s.energy });
 
 /* ---------- 5b. 半天零工：体力不足时全用上，收益仍 ×1.0 ---------- */
 section('半天零工 · 体力不足');
@@ -317,7 +317,7 @@ s = G.createState();
 s.seeds = { carrot: 10 };
 let rp = G.plantAll(s, 'carrot');
 ok(rp.ok && rp.planted === 5 && s.plots.every(function (p) { return p.crop === 'carrot'; }), '5 块空地一次种满', rp);
-ok(s.seeds.carrot === 5 && s.energy === 5, '消耗 5 颗种子 + 5 体力', { seeds: s.seeds, energy: s.energy });
+ok(s.seeds.carrot === 5 && s.energy === 10, '消耗 5 颗种子 + 5 体力', { seeds: s.seeds, energy: s.energy });
 
 s = G.createState();
 s.seeds = { carrot: 2 };
@@ -405,13 +405,13 @@ ok(agg[2].day === 1 && agg[2].balance === 50, '最早一天正常汇总', agg[2]
 
 /* ---------- 5g. 打零工合并 ---------- */
 section('打零工（半天/全天合并）');
-s = G.createState(); s.coins = 0; s.energy = 10;
+s = G.createState(); s.coins = 0; s.energy = 15;
 let wa = G.workAuto(s);
-ok(wa.ok && s.energy === 0 && s.coins === 20, '体力满 → 全天（-10 体力 +20 金）', { e: s.energy, c: s.coins });
+ok(wa.ok && s.energy === 0 && s.coins === 30, '体力满 → 全天（-15 体力 +30 金）', { e: s.energy, c: s.coins });
 
 s = G.createState(); s.coins = 0; s.energy = 6;
 wa = G.workAuto(s);
-ok(wa.ok && s.energy === 1 && s.coins === 6, '体力 6 → 半天（-5 体力 +6 金）', { e: s.energy, c: s.coins });
+ok(wa.ok && s.energy === 0 && s.coins === 7, '体力 6 → 半天（体力用光 +7 金）', { e: s.energy, c: s.coins });
 
 s = G.createState(); s.coins = 0; s.energy = 3;
 wa = G.workAuto(s);
@@ -484,14 +484,17 @@ ok(s.energy === 9, '没钱睡觉不会把 9 点体力扣成 5', s.energy);
 s = G.createState();
 const upCosts = [];
 for (let i = 0; i < 4; i++) { upCosts.push(G.upgradeCost(s)); s.maxEnergy += 5; }
-ok(upCosts[0] === 30 && upCosts[1] === 36 && upCosts[2] === 43 && upCosts[3] === 52,
-   '强化成本 30/36/43/52', upCosts.join('/'));
+ok(upCosts[0] === 36 && upCosts[1] === 43 && upCosts[2] === 52 && upCosts[3] === 62,
+   '强化成本 36/43/52/62', upCosts.join('/'));
 
 // 天气影响咬钩率：晴天咬钩更少
 function biteRate(weather) {
   const st = G.createState(); st.weather = weather; st.energy = 99999; st.bait.dough = 99999; st.coins = 99999;
   let bites = 0;
-  for (let i = 0; i < 2000; i++) if (G.fish(st, 'dough').entry) bites++;
+  for (let i = 0; i < 2000; i++) {
+    st.levels.fish = 1; st.levels.fishXp = 0;          // 隔离等级加成，测基础咬钩率
+    if (G.fish(st, 'dough').entry) bites++;
+  }
   return bites / 2000;
 }
 G.setRng(mulberry32(4242)); const sunnyBite = biteRate('sunny');
@@ -670,7 +673,7 @@ section('v1.2.0 新功能');
 G.setRng(mulberry32(33));
 
 s = G.createState(); s.coins = 500;
-ok(G.buyHarvester(s).ok && s.harvester === true && s.coins === 300, '自动收获器 200 金');
+ok(G.buyHarvester(s).ok && s.harvester === true && s.coins === 200, '自动收获器 300 金');
 ok(!G.buyHarvester(s).ok, '只能装一个');
 
 G.setRng(function () { return 0.1; });          // 晴天
@@ -729,7 +732,7 @@ s = G.createState();
 s.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
 s.day = 6; s.coins = 100;
 G.sleep(s);
-ok(s.coins === 100 - 3 - 15, '10 块地周末扣 15 金维护费', s.coins);
+ok(s.coins === 100 - 4 - 15, '10 块地周末扣 15 金维护费', s.coins);
 
 // 25 块之后扩展费暴涨
 function costAt(n) {
@@ -772,6 +775,7 @@ function rates(kind, weather, n) {
   let bites = 0, trash = 0;
   for (let i = 0; i < n; i++) {
     st.energy = 1e9;
+    st.levels.fish = 1; st.levels.fishXp = 0;          // 隔离等级加成
     const r = G.fish(st, kind);
     if (r.ok && r.entry) { bites++; if (r.entry.trash) trash++; }
   }
@@ -813,7 +817,7 @@ s = G.createState();
 s.plots = new Array(10).fill(0).map(function () { return G.createState().plots[0]; });
 s.day = 6; s.coins = 200; s.sprinklers = 3; s.nets = 1;
 G.sleep(s);
-ok(s.coins === 200 - 3 - (15 + 9 + 3), '周末同时扣土地与设备维护费', s.coins);
+ok(s.coins === 200 - 4 - (15 + 9 + 3), '周末同时扣土地与设备维护费', s.coins);
 
 // 老存档图鉴回填
 const migFish = G.deserialize({
@@ -831,11 +835,16 @@ G.setRng(mulberry32(321));
 s = G.createState(); s.coins = 0;
 ok(G.taxDue(s) === 30, '税金最低 30 金', G.taxDue(s));
 s.coins = 1000;
-ok(G.taxDue(s) === 40, '税金 = (金币+仓库) × 4%', G.taxDue(s));
+ok(G.taxDue(s) === 30, '1000 金落在 2% 档，仍按下限 30', G.taxDue(s));
+s.coins = 6000;
+ok(G.taxDue(s) === 200, '6000 金 = 2000×2% + 4000×4% = 200', G.taxDue(s));
+s.coins = 12000;
+ok(G.taxDue(s) === 480, '12000 金 = 40 + 320 + 120 = 480', G.taxDue(s));
 
 s = G.createState(); s.coins = 1000; s.day = 29;
 G.sleep(s);
-ok(s.day === 30 && s.coins === 1000 - 3 - 40, '第 30 天结算月税（税前 997 → 税 40）', s.coins);
+ok(s.day === 30 && s.coins === 1000 - 4 - 30, '第 30 天结算月税（税前 996 → 税 30）', s.coins);
+ok(G.taxInDays(s) === 30, '刚缴完税，下次还有 30 天', G.taxInDays(s));
 
 s = G.createState(); s.coins = 100; s.fishBag = [];
 const bp = G.fishBuyPrice('crucian');
@@ -881,8 +890,9 @@ ok(typeof sr.summary === 'string' && sr.summary.indexOf('🌙 第 30 天') === 0
 ok(Array.isArray(sr.notes) && sr.notes.every(function (n) { return n && n.kind && n.text; }),
    '播报已改成结构化 {kind,text}');
 
-ok(G.BALANCE && G.BALANCE.tax.rate === 0.04 && G.BALANCE.prices.sprinkler === 80 && G.BALANCE.hook.dough === 0.92,
-   '数值表 BALANCE 对外导出');
+ok(G.BALANCE && G.BALANCE.tax.bands.length === 3 && G.BALANCE.tax.bands[1].rate === 0.04 &&
+   G.BALANCE.prices.sprinkler === 80 && G.BALANCE.hook.dough === 0.92,
+   '数值表 BALANCE 对外导出（含累进税档）');
 
 /* ---------- 5s. v1.5.2: 渔网 / 肥料品质 / 水产店 ---------- */
 section('v1.5.2 渔网与肥料');
@@ -975,6 +985,74 @@ delete achLegacy.shop; delete achLegacy.ach;
 const achMig = G.deserialize(achLegacy);
 ok(achMig.shop && Object.keys(achMig.shop.stock).length > 0, '老存档自动补进货表');
 ok(achMig.ach && Object.keys(achMig.ach).length === 0, '老存档成就为空');
+
+/* ---------- v1.7 农产品店 / 等级 / 委托池 / 假饵 ---------- */
+section('v1.7 农产品店与等级');
+G.setRng(mulberry32(77));
+let cs = G.createState();
+cs.coins = 1000;
+ok(G.cropBuyPrice('carrot') === 9 && G.cropBuyPrice('pumpkin') === 132, '农产品买价 = 售价 ×2.2',
+  [G.cropBuyPrice('carrot'), G.cropBuyPrice('pumpkin')]);
+ok(G.cropBuyPrice('tomato') > Math.round(G.CROPS.tomato.price * G.BALANCE.order.mult),
+  '买农产品凑委托必亏（买价 > 委托价）');
+
+const st0 = G.cropShopStock(cs, 'carrot');
+ok(st0 >= 1, '农产品店蔬菜有货', st0);
+ok(G.buyCrop(cs, 'carrot', 1).ok && G.storeCount(cs, 'carrot') === 1 &&
+   G.cropShopStock(cs, 'carrot') === st0 - 1, '买农产品进仓库并扣库存');
+ok(!G.buyCrop(cs, 'carrot', st0 + 5).ok, '超过库存买不到');
+cs.cropShop.stock.carrot = 0;
+ok(!G.buyCrop(cs, 'carrot', 1).ok, '售罄买不到');
+G.sleep(cs);
+ok(cs.cropShop.day === cs.day && G.cropShopStock(cs, 'carrot') >= 1, '睡一觉农产品店补货');
+
+let cs2 = G.createState();
+G.addStore(cs2, 'carrot', 'std', 10);
+const csCoins = cs2.coins;
+const csSell = G.sellOne(cs2, 'carrot');
+ok(csSell.ok && cs2.stats.cropsSold === 10 && cs2.coins === csCoins + csSell.income,
+  '农产品店卖出计入统计', { sold: cs2.stats.cropsSold, gain: csSell.income });
+
+/* 等级 */
+let lvS = G.createState();
+ok(lvS.levels.farm === 1 && lvS.levels.fish === 1, '开局种田 / 钓鱼都是 Lv1');
+ok(G.levelNeed(1) === 15 && G.levelNeed(2) === 25, '升级所需经验 15 / 25');
+ok(G.addLevelXp(lvS, 'farm', 15) === 1 && lvS.levels.farm === 2 && lvS.levels.farmXp === 0,
+  '15 点经验升到 Lv2');
+G.addLevelXp(lvS, 'farm', 25);
+ok(lvS.levels.farm === 3, '再 25 点升到 Lv3');
+ok(G.farmYieldBonus(lvS) === 1, 'Lv3 产量 +1');
+const lvPlot = { crop: 'carrot', phase: 'growing', growth: 1, fert: 0, missed: 0 };
+ok(G.expectedYield(lvS, lvPlot) === 4, 'Lv3 萝卜预计产量 3+1', G.expectedYield(lvS, lvPlot));
+ok(G.expectedYield(G.createState(), lvPlot) === 3, 'Lv1 萝卜预计产量 3');
+
+let lvF = G.createState();
+ok(G.fishHookBonus(lvF) === 0 && G.fishGoodBonus(lvF) === 1, 'Lv1 没有钓鱼加成');
+G.addLevelXp(lvF, 'fish', 1e6);
+ok(lvF.levels.fish === 10 && Math.abs(G.fishHookBonus(lvF) - 0.12) < 1e-9, '满级钓鱼咬钩 +12%');
+ok(G.fishGoodBonus(lvF) > 1.2, '满级好鱼权重明显提升', G.fishGoodBonus(lvF).toFixed(2));
+
+ok(G.checkAchievements(lvS).some(x => x.id === 'farmLv3'), '等级成就可解锁');
+
+/* 委托池逐档解锁 + 鱼单随季节涨价 */
+ok(G.orderPool(1).length === 3 && G.orderPool(3).length === 4 && G.orderPool(9).length === 7 &&
+   G.orderPool(18).length === 10, '委托池逐档解锁 3/4/7/10',
+  [1, 3, 9, 18].map(d => G.orderPool(d).length).join('/'));
+G.setRng(mulberry32(404));
+const fishEarly = G.makeOrders({ day: 20 }).filter(o => o.kind === 'fish')[0];
+const fishLate = G.makeOrders({ day: 95 }).filter(o => o.kind === 'fish')[0];
+ok(fishLate.reward / fishLate.qty > fishEarly.reward / fishEarly.qty, '鱼单单价随季节上涨',
+  [fishEarly.reward / fishEarly.qty, fishLate.reward / fishLate.qty]);
+
+let lureS = G.createState(); lureS.coins = 100;
+G.buyBait(lureS, 'lure', 1);
+ok(lureS.lure.dur === 25 && lureS.coins === 95, '假饵 5 金 · 耐用 25 次', lureS.lure.dur);
+
+ok(G.ACH.length === 32, '成就总数 32', G.ACH.length);
+
+const retro = G.deserialize({ plots: [], coins: 100, day: 20, stats: { harvests: 100, casts: 300 } });
+ok(retro.levels.farm > 1 && retro.levels.fish > 1, '老存档按历史次数补等级',
+  [retro.levels.farm, retro.levels.fish]);
 
 /* ---------- 6. 存读档 ---------- */
 section('存读档');

@@ -15,7 +15,7 @@ const htmlIds = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]));
 
 /* 2. ui.js 里 $('#xxx') 直接引用的 id */
 const usedIds = new Set([...ui.matchAll(/\$\('#([\w-]+)'\)/g)].map(m => m[1]));
-const dynamicIds = new Set(['do-reset']);          // 运行时才生成的元素
+const dynamicIds = new Set(['do-reset', 'dough-qty']);   // 运行时才生成的元素
 
 console.log('== id 引用 ==');
 [...usedIds].sort().forEach(id => {
