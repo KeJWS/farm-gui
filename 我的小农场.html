@@ -389,7 +389,30 @@ button{ font-family:inherit; }
 
 /* ---------------- 仓库 ---------------- */
 
-.store-list{ display:flex; flex-direction:column; gap:7px; max-height:330px; overflow-y:auto; padding-right:4px; }
+.store-tools{ display:flex; flex-direction:column; gap:8px; margin:0 0 9px; }
+.store-search{
+  display:flex; align-items:center; gap:7px; min-height:36px; padding:0 10px;
+  border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--ink-3);
+}
+.store-search input{
+  min-width:0; width:100%; border:0; outline:0; background:transparent;
+  color:var(--ink); font:inherit; font-size:12px;
+}
+.store-search input::placeholder{ color:var(--ink-3); }
+.store-filters{ display:flex; gap:6px; overflow-x:auto; padding:1px 1px 4px; scrollbar-width:thin; }
+.store-filter{
+  flex:none; display:inline-flex; align-items:center; gap:5px; min-height:29px; padding:4px 9px;
+  border:1px solid var(--line); border-radius:9px; background:var(--card); color:var(--ink-2);
+  cursor:pointer; font:inherit; font-size:10.5px; font-weight:800; white-space:nowrap;
+}
+.store-filter span{
+  display:inline-flex; align-items:center; justify-content:center; min-width:16px; height:16px;
+  padding:0 4px; border-radius:99px; background:var(--card-2); color:var(--ink-3); font-size:9px;
+}
+.store-filter:hover{ border-color:var(--green); }
+.store-filter.active{ background:rgba(79,156,95,.12); border-color:rgba(79,156,95,.42); color:var(--green-d); }
+.store-filter.active span{ background:rgba(79,156,95,.14); color:var(--green-d); }
+.store-list{ display:flex; flex-direction:column; gap:7px; max-height:380px; overflow-y:auto; padding-right:4px; }
 .store-sub{
   margin:4px 0 0; padding-top:8px; font-size:11px; font-weight:800; color:var(--ink-3);
   border-top:1px dashed var(--line-2);
@@ -399,6 +422,7 @@ button{ font-family:inherit; }
   padding:7px 9px; border-radius:11px;
   background:var(--card); border:1px solid var(--line);
 }
+.store-row>div{ min-width:0; flex:1; }
 .store-row .se{ font-size:20px; }
 .store-row .sn{ font-size:12.5px; font-weight:800; }
 .store-row .sv{ font-size:11px; color:var(--ink-3); font-weight:700; }
@@ -413,6 +437,11 @@ button{ font-family:inherit; }
 .seed-box .tag{
   background:#eef7ec; color:var(--green-d); border:1px solid rgba(79,156,95,.28);
   padding:2px 8px; border-radius:7px; font-weight:800; font-size:11px;
+}
+@media (max-width:560px){
+  .store-list{ max-height:340px; }
+  .store-row{ gap:7px; padding:7px; }
+  .store-row .sv{ overflow-wrap:anywhere; }
 }
 .seed-box .tag-sell{
   display:inline-flex; align-items:center; gap:5px;
@@ -832,6 +861,16 @@ button{ color:inherit; font:inherit; }
 .sparkwrap{ flex:none; display:flex; align-items:center; justify-content:flex-end; }
 .spark{ color:var(--green); display:block; overflow:visible; }
 :root[data-theme="dark"] .spark{ color:#7fc98d; }
+.market-portfolio{ padding:9px 10px; margin:9px 0 12px; border:1px solid var(--line); border-radius:12px; background:var(--card); }
+.market-portfolio-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; margin:8px 0 6px; }
+.market-portfolio-grid div{ min-width:0; padding:7px 5px; border:1px solid var(--line); border-radius:9px; background:var(--card-2); text-align:center; }
+.market-portfolio-grid span{ display:block; color:var(--ink-3); font-size:10px; font-weight:700; }
+.market-portfolio-grid b{ display:block; font-size:13px; font-variant-numeric:tabular-nums; }
+.market-portfolio-grid .market-up b{ color:var(--green-d); }
+.market-portfolio-grid .market-down b{ color:var(--red); }
+.market-wait-note{ line-height:1.5; }
+:root[data-theme="dark"] .market-portfolio-grid .market-up b{ color:#7ec98d; }
+:root[data-theme="dark"] .market-portfolio-grid .market-down b{ color:#e28b80; }
 
 .ach-row{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:11px;
   background:var(--card); border:1px solid var(--line); margin-top:6px; }
@@ -951,6 +990,17 @@ button{ color:inherit; font:inherit; }
         <h2>🧺 仓库</h2>
         <span class="muted" id="store-sum"></span>
         <button class="btn mini" id="btn-box">📦 收购箱</button>
+      </div>
+      <div class="store-tools">
+        <label class="store-search">🔎 <input id="store-search" type="search" placeholder="搜索物品名称" autocomplete="off" aria-label="搜索仓库物品"></label>
+        <div class="store-filters" aria-label="仓库分类">
+          <button class="store-filter active" data-store-filter="all" aria-pressed="true">全部 <span>0</span></button>
+          <button class="store-filter" data-store-filter="crops" aria-pressed="false">作物 <span>0</span></button>
+          <button class="store-filter" data-store-filter="wild" aria-pressed="false">收集物 <span>0</span></button>
+          <button class="store-filter" data-store-filter="fish" aria-pressed="false">渔获 <span>0</span></button>
+          <button class="store-filter" data-store-filter="junk" aria-pressed="false">杂物/宝箱 <span>0</span></button>
+          <button class="store-filter" data-store-filter="supplies" aria-pressed="false">用品 <span>0</span></button>
+        </div>
       </div>
       <div id="store-list" class="store-list"></div>
       <div class="seed-box" id="seed-box"></div>
@@ -1846,6 +1896,7 @@ button{ color:inherit; font:inherit; }
       log: [{ day: 1, text: '🌾 欢迎来到我的小农场，第 1 天开始了。', kind: 'sys' }],
       orders: makeOrders({ day: 1 }),
       longOrder: null,
+      longOrderReadyDay: 0,
       shop: makeShop(1),
       cropShop: makeCropShop(1),
       levels: { farm: 1, fish: 1, farmXp: 0, fishXp: 0, dig: 1, digXp: 0, forage: 1, forageXp: 0,
@@ -2463,9 +2514,12 @@ button{ color:inherit; font:inherit; }
     s.orders = makeOrders(s);
     s.manualRefreshUsed = false;
 
-    // 长期订单：过期或没有就补一张
-    if (!s.longOrder || s.day > (s.longOrder.deadline || 0)) {
+    // 长期订单：完成后等到指定日期，过期单则在隔天自动换新。
+    const longOrderReady = !s.longOrder && s.longOrderReadyDay && s.day >= s.longOrderReadyDay;
+    if ((!s.longOrder && (!s.longOrderReadyDay || longOrderReady)) ||
+        (s.longOrder && s.day > (s.longOrder.deadline || 0))) {
       s.longOrder = makeLongOrder(s);
+      s.longOrderReadyDay = 0;
     }
 
     // 水产店 / 农产品店每天补货
@@ -2776,7 +2830,7 @@ button{ color:inherit; font:inherit; }
 /* 市场价格：供需、季节、小镇声望、掉档提示、价格历史 */
   /* ---------------- 市场价格 ----------------
    * 供给：最近卖得越多越便宜（×1.30 稀缺 → ×0.70 过剩，作物每件 -0.02、鱼每条 -0.015）
-   * 季节：当季 / 汛期 ×1.00，反季 / 非汛期 ×2.00（物以稀为贵）
+   * 季节：当季 / 汛期 ×1.00，反季 / 非汛期 ×1.70（物以稀为贵）
    * 冷却：每睡一觉销量回落 30%
    */
   function marketTag(supply) {
@@ -2805,6 +2859,12 @@ button{ color:inherit; font:inherit; }
   }
   function marketMul(s, id) { return marketInfo(s, id).total; }
   function addSupply(s, id, n) { marketOf(s, id).sold += Math.max(0, n || 0); }
+  function removeSupply(s, id, n) {
+    const m = s.market && s.market[id];
+    if (!m) return;
+    m.sold = Math.max(0, Math.round(((m.sold || 0) - Math.max(0, n || 0)) * 10) / 10);
+    if (m.sold <= 0) delete s.market[id];
+  }
 
   /* ---------------- 鱼的市场（供需 + 汛期） ---------------- */
   function fishMarketOf(s, name) {
@@ -2825,6 +2885,12 @@ button{ color:inherit; font:inherit; }
   }
   function fishMarketMul(s, name) { return fishMarketInfo(s, name).total; }
   function addFishSupply(s, name, n) { fishMarketOf(s, name).sold += Math.max(0, n || 0); }
+  function removeFishSupply(s, name, n) {
+    const m = s.marketF && s.marketF[name];
+    if (!m) return;
+    m.sold = Math.max(0, Math.round(((m.sold || 0) - Math.max(0, n || 0)) * 10) / 10);
+    if (m.sold <= 0) delete s.marketF[name];
+  }
 
   /* ---------------- 小镇声望（捐钱换永久加成，后期金币出口） ---------------- */
   function townTier(s) {
@@ -3021,7 +3087,8 @@ button{ color:inherit; font:inherit; }
     const v = Math.max(1, Math.round(raw * sellBonus(s) * marketMul(s, id)));
     addSupply(s, id, qty);
     s.box = s.box || [];
-    s.box.push({ kind: 'crop', id: id, name: c.name, emoji: c.emoji, n: qty, parts: t.parts, v: v });
+    s.box.push({ kind: 'crop', id: id, name: c.name, emoji: c.emoji, n: qty, parts: t.parts,
+                 v: v, marketImpact: qty });
     log(s, '📦 ' + c.name + '×' + qty + ' 放进收购箱（原价 ' + v + ' 金，明天结算）', 'info');
     return { ok: true, msg: c.name + '×' + qty + ' 已入箱', v: v, n: qty };
   }
@@ -3039,6 +3106,7 @@ button{ color:inherit; font:inherit; }
     s.box = s.box || [];
     s.box.push({ kind: 'fish', name: g.name, emoji: g.emoji, n: qty, parts: parts, v: v,
                  chest: g.chest || undefined, junk: g.junk || undefined,
+                 marketImpact: g.junk ? 0 : qty,
                  trash: (g.junk && !g.chest) ? true : undefined });
     log(s, '📦 ' + g.emoji + ' ' + g.name + '×' + qty + ' 放进收购箱（原价 ' + v + ' 金，明天结算）', 'info');
     return { ok: true, msg: g.name + '×' + qty + ' 已入箱', v: v, n: qty };
@@ -3048,6 +3116,14 @@ button{ color:inherit; font:inherit; }
   function takeFromEntry(s, e, take) {
     const total = e.n || 1;
     const t = Math.min(total, take);
+    const marketImpact = Math.max(0, Math.min(e.marketImpact || 0, t));
+    if (marketImpact > 0) {
+      if (e.kind === 'crop' && e.id) removeSupply(s, e.id, marketImpact);
+      else if (e.kind === 'fish' && !e.junk && !e.chest && !e.trash) {
+        removeFishSupply(s, e.name, marketImpact);
+      }
+    }
+    e.marketImpact = Math.max(0, Math.round(((e.marketImpact || 0) - marketImpact) * 10) / 10);
     const parts = (e.parts && e.parts.length)
       ? e.parts.map(function (p) { return { q: p.q, n: p.n, unit: p.unit }; })
       : [{ q: 'std', n: total, unit: Math.max(1, Math.round((e.v || 1) / total)) }];
@@ -4072,8 +4148,10 @@ button{ color:inherit; font:inherit; }
     tradeXp(s, total);
     log(s, '📜 长期订单完成：' + o.emoji + ' ' + o.name + ' ×' + o.qty + '，+' + total + ' 金' +
       (bonus ? '（提前 ' + early + ' 天，额外 +' + bonus + '）' : ''), 'good');
-    s.longOrder = null;
     s.stats.longOrders = (s.stats.longOrders || 0) + 1;
+    // 下一张长期委托在隔天睡醒后生成，期间保留该日期以便读档时不提前补单。
+    s.longOrder = null;
+    s.longOrderReadyDay = s.day + 1;
     return { ok: true, msg: '长期订单完成，+' + total + ' 金' + (bonus ? '（含提前奖励 +' + bonus + '）' : ''),
              reward: o.reward, bonus: bonus, early: early };
   }
@@ -4186,6 +4264,7 @@ button{ color:inherit; font:inherit; }
     // 数值清洗：导入的存档不能带 NaN / 负数 / 离谱的地块数
     merged.maxEnergy = Math.round(num(s.maxEnergy, 10, 5, 100) / 5) * 5;
     merged.day = Math.round(num(s.day, 1, 1, 100000));
+    merged.longOrderReadyDay = Math.round(num(s.longOrderReadyDay, 0, 0, 100000));
     merged.coins = Math.round(num(s.coins, 50, 0, 1e9));
     merged.energy = num(s.energy, merged.maxEnergy, 0, merged.maxEnergy);
 
@@ -4239,6 +4318,12 @@ button{ color:inherit; font:inherit; }
     }).map(function (e) {
       const out = { kind: e.kind, name: String(e.name).slice(0, 20), emoji: String(e.emoji || '').slice(0, 4),
                     n: Math.round(num(e.n, 1, 1, 9999)), v: Math.round(num(e.v, 0, 0, 1e9)) };
+      const marketable = e.kind === 'crop'
+        ? !!CROPS[e.id]
+        : (e.kind === 'fish' && !fishIsJunk(e));
+      out.marketImpact = marketable
+        ? Math.round(num(e.marketImpact, e.marketImpact == null ? out.n : 0, 0, out.n) * 10) / 10
+        : 0;
       if (e.kind === 'crop' && CROPS[e.id]) {
         out.id = e.id;
         out.parts = Array.isArray(e.parts) ? e.parts.filter(function (p) {
@@ -4273,14 +4358,19 @@ button{ color:inherit; font:inherit; }
         emoji: lo.kind === 'crop' ? CROPS[lo.crop].emoji : '🐟',
         qty: Math.round(num(lo.qty, 10, 1, 999)),
         reward: Math.round(num(lo.reward, 20, 1, 999999)),
+        mul: lo.kind === 'crop' && lo.mul != null ? num(lo.mul, 1, 0.5, 3) : 0,
         deadline: Math.round(num(lo.deadline, merged.day + 5, 1, 100000)),
         done: false
       };
+      merged.longOrderReadyDay = 0;
     } else {
       merged.longOrder = null;
     }
-    // 老存档没有长期订单：读档时补一张
-    if (!merged.longOrder) merged.longOrder = makeLongOrder(merged);
+    // 老存档没有长期订单时补一张；新存档的隔日等待标记则保留。
+    if (!merged.longOrder && (!merged.longOrderReadyDay || merged.longOrderReadyDay <= merged.day)) {
+      merged.longOrder = makeLongOrder(merged);
+      merged.longOrderReadyDay = 0;
+    }
     merged.seeds = s.seeds && typeof s.seeds === 'object' ? s.seeds : {};
     // 老存档的仓库是「作物: 数量」，这里迁移成「作物: {品质: 数量}」
     merged.store = {};
@@ -4568,6 +4658,8 @@ button{ color:inherit; font:inherit; }
   let state = null;
   let baitSel = 'worm';
   let soundOn = true;
+  let storeFilter = 'all';
+  let storeQuery = '';
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.prototype.slice.call(document.querySelectorAll(sel));
@@ -5127,16 +5219,33 @@ button{ color:inherit; font:inherit; }
   function renderStore() {
     const ids = Object.keys(state.store).filter(function (k) { return G.storeCount(state, k) > 0; });
     const fish = G.fishGroups(state);
-    const fishCount = fish.reduce(function (n, g) { return n + g.count; }, 0);
+    const query = storeQuery.trim().toLocaleLowerCase();
     const box = $('#store-list');
-
-    const cropHtml = ids.length
-      ? ids.map(function (id) {
-          const c = G.CROPS[id];
+    const crops = ids.map(function (id) { return { id: id, crop: G.CROPS[id] }; })
+      .filter(function (x) { return !!x.crop; });
+    const planted = crops.filter(function (x) { return !x.crop.wild; });
+    const wild = crops.filter(function (x) { return !!x.crop.wild; });
+    const fishOnly = fish.filter(function (g) { return !g.junk && !g.chest; });
+    const junk = fish.filter(function (g) { return g.junk || g.chest; });
+    const wormN = state.bait.worm || 0;
+    const fertRows = ['normal', 'special'].filter(function (k) { return (state.ferts[k] || 0) > 0; });
+    const counts = {
+      all: crops.length + fish.length + (wormN ? 1 : 0) + fertRows.length,
+      crops: planted.length,
+      wild: wild.length,
+      fish: fishOnly.length,
+      junk: junk.length,
+      supplies: (wormN ? 1 : 0) + fertRows.length
+    };
+    function matches(text) { return !query || String(text || '').toLocaleLowerCase().indexOf(query) >= 0; }
+    function cropRows(items) {
+      return items.filter(function (x) { return matches(x.crop.name + ' ' + (x.crop.desc || '')); })
+        .sort(function (a, b) { return G.shopSellValue(state, b.id) - G.shopSellValue(state, a.id); })
+        .map(function (x) {
+          const id = x.id, c = x.crop;
           const n = G.storeCount(state, id);
           const val = G.storeValue(state, id);
-          const mix = G.storeMix(state, id);
-          const mixTxt = mix.map(function (m) {
+          const mixTxt = G.storeMix(state, id).map(function (m) {
             return '<span style="color:' + m.color + '">' + m.name + ' ' + m.n + '</span>';
           }).join(' · ');
           const mk = G.marketInfo(state, id);
@@ -5150,12 +5259,16 @@ button{ color:inherit; font:inherit; }
             '<span class="sp">' + val + ' 金</span>' +
             '<button class="btn mini" data-boxcrop="' + id + '" title="整批放进收购箱，原价结算">📦</button>' +
           '</div>';
-        }).join('')
-      : '';
-
-    const fishHtml = fishCount
-      ? '<div class="store-sub">🐟 渔获 · ' + fishCount + ' 条</div>' +
-        fish.map(function (g) {
+        }).join('');
+    }
+    function cropSection(title, items) {
+      const visible = items.filter(function (x) { return matches(x.crop.name + ' ' + (x.crop.desc || '')); });
+      const rows = cropRows(visible);
+      return rows ? '<div class="store-sub">' + title + ' · ' + visible.length + ' 种</div>' + rows : '';
+    }
+    function fishRows(items) {
+      return items.filter(function (g) { return matches(g.name + ' ' + G.fishDesc(g.name)); })
+        .map(function (g) {
           const desc = G.fishDesc(g.name);
           // 杂物 / 宝箱不吃市价，别再挂「市价 ×1.30 · 稀缺」
           const priced = !g.junk && !g.chest;
@@ -5164,46 +5277,47 @@ button{ color:inherit; font:inherit; }
             '<span class="se">' + g.emoji + '</span>' +
             '<div><div class="sn">' + g.name + ' ×' + g.count +
               (priced ? ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b>' : '') + '</div>' +
-            '<div class="sv">' +
-              (desc ? '<span class="sf-note">' + desc + '</span> · ' : '') +
+            '<div class="sv">' + (desc ? '<span class="sf-note">' + desc + '</span> · ' : '') +
               fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) + ' 金/条' +
               (priced ? ' · ' + mk.tag : (g.chest ? ' · 宝箱' : '')) + '</div></div>' +
             '<span class="sp">' + g.total + ' 金</span>' +
             '<button class="btn mini" data-boxfish="' + g.key + '" title="整批放进收购箱，原价结算">📦</button>' +
           '</div>';
-        }).join('')
-      : '';
-
-    const wormN = state.bait.worm || 0;
-    const wormHtml = wormN
-      ? '<div class="store-sub">🪱 蚯蚓 · ' + wormN + ' 条（渔具店回收）</div>' +
-        '<div class="store-row">' +
-          '<span class="se">🪱</span>' +
-          '<div><div class="sn">蚯蚓 ×' + wormN + '</div>' +
-          '<div class="sv">' + G.WORM_VALUE + ' 金/条 · 也可当饵用</div></div>' +
-          '<span class="sp">' + (wormN * G.WORM_VALUE) + ' 金</span>' +
-        '</div>'
-      : '';
-
-    const fertRows = ['normal', 'special'].filter(function (k) { return (state.ferts[k] || 0) > 0; });
-    const fertHtml = fertRows.length
-      ? '<div class="store-sub">🧪 肥料 · 种子店买 / 卖</div>' +
-        fertRows.map(function (k) {
-          const f = G.FERT[k];
-          const n = state.ferts[k];
-          const sp = G.fertSellPrice(k);
-          return '<div class="store-row">' +
-            '<span class="se">' + f.emoji + '</span>' +
-            '<div><div class="sn">' + f.name + ' ×' + n + '</div>' +
-            '<div class="sv">半价回收 ' + sp + ' 金/袋 · +' + f.add + ' 产量</div></div>' +
-            '<span class="sp">' + (n * sp) + ' 金</span>' +
-          '</div>';
-        }).join('')
-      : '';
-
-    box.innerHTML = (cropHtml || fishHtml || wormHtml || fertHtml)
-      ? cropHtml + fishHtml + wormHtml + fertHtml
-      : '<div class="store-empty">仓库空空如也，去收点菜 / 钓点鱼吧 🌱</div>';
+        }).join('');
+    }
+    const sections = [];
+    if (storeFilter === 'all' || storeFilter === 'crops') sections.push(cropSection('🌱 作物', planted));
+    if (storeFilter === 'all' || storeFilter === 'wild') sections.push(cropSection('🌿 野生收集物', wild));
+    if (storeFilter === 'all' || storeFilter === 'fish') {
+      const visible = fishOnly.filter(function (g) { return matches(g.name + ' ' + G.fishDesc(g.name)); });
+      const rows = fishRows(visible);
+      if (rows) sections.push('<div class="store-sub">🐟 渔获 · ' + visible.reduce(function (n, g) { return n + g.count; }, 0) + ' 条</div>' + rows);
+    }
+    if (storeFilter === 'all' || storeFilter === 'junk') {
+      const visible = junk.filter(function (g) { return matches(g.name + ' ' + G.fishDesc(g.name)); });
+      const rows = fishRows(visible);
+      if (rows) sections.push('<div class="store-sub">🗑️ 杂物与宝箱 · ' + visible.reduce(function (n, g) { return n + g.count; }, 0) + ' 件</div>' + rows);
+    }
+    if (storeFilter === 'all' || storeFilter === 'supplies') {
+      const supplyRows = [];
+      if (wormN && matches('蚯蚓 worm')) supplyRows.push('<div class="store-row"><span class="se">🪱</span><div><div class="sn">蚯蚓 ×' + wormN + '</div><div class="sv">' + G.WORM_VALUE + ' 金/条 · 也可当饵用</div></div><span class="sp">' + (wormN * G.WORM_VALUE) + ' 金</span></div>');
+      fertRows.forEach(function (k) {
+        const f = G.FERT[k], n = state.ferts[k], sp = G.fertSellPrice(k);
+        if (!matches(f.name + ' 肥料')) return;
+        supplyRows.push('<div class="store-row"><span class="se">' + f.emoji + '</span><div><div class="sn">' + f.name + ' ×' + n + '</div><div class="sv">半价回收 ' + sp + ' 金/袋 · +' + f.add + ' 产量</div></div><span class="sp">' + (n * sp) + ' 金</span></div>');
+      });
+      if (supplyRows.length) sections.push('<div class="store-sub">🧰 农场用品 · ' + supplyRows.length + ' 类</div>' + supplyRows.join(''));
+    }
+    const content = sections.filter(Boolean).join('');
+    box.innerHTML = content || (query
+      ? '<div class="store-empty">没有找到匹配的库存，试试别的名称 🔎</div>'
+      : (counts.all ? '<div class="store-empty">这个分类目前没有库存</div>' : '<div class="store-empty">仓库空空如也，去收点菜 / 钓点鱼吧 🌱</div>'));
+    $$('[data-store-filter]').forEach(function (btn) {
+      const active = btn.dataset.storeFilter === storeFilter;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      btn.querySelector('span').textContent = counts[btn.dataset.storeFilter] || 0;
+    });
 
     const seeds = Object.keys(state.seeds).filter(function (k) { return state.seeds[k] > 0; });
     $('#seed-box').innerHTML = '🎒 种子：' + (seeds.length
@@ -5212,7 +5326,10 @@ button{ color:inherit; font:inherit; }
         }).join('')
       : '<span style="color:var(--ink-3)">无（收获 30% 留种，或去商店买）</span>');
 
-    $('#store-sum').textContent = '总价 ' + G.storeTotal(state) + ' 金';
+    const quantity = ids.reduce(function (n, id) { return n + G.storeCount(state, id); }, 0) +
+      fish.reduce(function (n, g) { return n + g.count; }, 0) + wormN +
+      fertRows.reduce(function (n, k) { return n + (state.ferts[k] || 0); }, 0);
+    $('#store-sum').textContent = '库存估值 ' + G.storeTotal(state) + ' 金 · ' + quantity + ' 件';
     const boxBtn = $('#btn-box');
     if (boxBtn) {
       const n = G.boxCount(state);
@@ -5239,7 +5356,13 @@ button{ color:inherit; font:inherit; }
     }
     const longHtml = (function () {
       const lo = state.longOrder;
-      if (!lo) return '';
+      if (!lo) {
+        return state.longOrderReadyDay > state.day
+          ? '<div class="order-row long"><span class="oe">📜</span>' +
+            '<div class="oi"><div class="on">长期委托已交付</div>' +
+            '<div class="os">明日睡醒后刷新下一张</div></div></div>'
+          : '';
+      }
       const have = G.orderHave(state, lo);
       const full = have >= lo.qty;
       const left = Math.max(0, (lo.deadline || 0) - state.day);
@@ -5250,8 +5373,9 @@ button{ color:inherit; font:inherit; }
           '<div class="on">长期 · ' + lo.emoji + ' ' + lo.name + ' ×' + lo.qty +
             ' · 报酬 ' + lo.reward + ' 金</div>' +
           '<div class="os">' + (lo.kind === 'fish' ? '渔获' : '仓库') + ' ' +
-            Math.min(have, lo.qty) + '/' + lo.qty + ' · 还剩 ' + left + ' 天 · 2 倍价' +
+            Math.min(have, lo.qty) + '/' + lo.qty + ' · ' + (left === 0 ? '今天截止' : '还剩 ' + left + ' 天') + ' · 2 倍价' +
             (lo.mul && Math.abs(lo.mul - 1) > 0.01 ? '（含市价 ×' + lo.mul.toFixed(2) + '）' : '') +
+            (lo.kind === 'fish' ? ' · 交付时优先扣低价的自钓鱼' : '') +
             (bonus ? ' · <b style="color:var(--green-d)">今天交 +' + bonus + ' 金</b>' : '') + '</div>' +
         '</div>' +
         '<button class="btn mini" data-long="1"' + (full ? '' : ' disabled') + '>交付</button>' +
@@ -5925,7 +6049,8 @@ button{ color:inherit; font:inherit; }
         G.BALANCE.market.cropStep + '，最低 ×' + G.BALANCE.market.supplyMin + '（过剩）；隔天回落 ' +
         Math.round((1 - G.BALANCE.market.decay) * 100) + '%<br>' +
         '· <b>季节</b>：<b>反季 ×' + G.BALANCE.market.offSeason + '</b>（过季稀缺、卖得贵），<b>当季 ×1.00</b><br>' +
-        '· 两相乘就是最终系数，界面上直接显示「市价 ×2.20 · 反季 · 稀缺」<br>' +
+        '· 两相乘就是最终系数，界面上直接显示「市价 ×' +
+        (G.BALANCE.market.supplyMax * G.BALANCE.market.offSeason).toFixed(2) + ' · 反季 · 稀缺」<br>' +
         '所以：<b>别一次性把同一种菜全砸出去</b>；囤到反季再卖，价格会翻上去。<br>' +
         '商店的<b>买价</b>也会跟着市价走 —— 缺货 / 反季时买得更贵。点商店面板的 <b>📈 行情</b> 看全部系数。<br>' +
         '店里每天同样进一批作物（一般品质），买价 = 售价 × ' + G.BALANCE.shop.cropPriceMul +
@@ -6011,7 +6136,7 @@ button{ color:inherit; font:inherit; }
         '贵的作物一次要 2–3 个，单张报酬<b>最低 40 金</b>；鱼单单价随季节涨（11 → 15 → 19 → 23）。<br>' +
         '<b>市价溢价</b>：指定作物的单子按<b>该作物当前市价</b>结算（反季 / 稀缺时合同价更高），' +
         '面板上会写「含市价 ×1.30」；「任意鱼」的单子不指定品种，价格固定。<br>' +
-        '📜 <b>长期订单</b>：5 天期限、数量大、<b>2 倍报酬</b>（同样吃市价溢价），完成后自动换下一张（过期也会换）。' +
+        '📜 <b>长期订单</b>：5 天期限、数量大、<b>2 倍报酬</b>（同样吃市价溢价），交付或过期后隔天睡醒换下一张。' +
         '<b>提前交货有额外奖励</b>：每提前 1 天 +10%，最多 +50%。<br>' +
         '交委托先扣<b>品质差的</b>，交鱼先交最便宜的；杂物、宝箱不算数。</p>' +
       '</div>' +
@@ -6661,7 +6786,59 @@ button{ color:inherit; font:inherit; }
   function analysisModal() {
     const season = G.seasonOf(state.day);
     const days = G.HIST_DAYS;
-    const OFF = G.BALANCE.market.offSeason;
+    const market = G.BALANCE.market;
+    const daysToNextSeason = 30 - ((state.day - 1) % 30);
+    const townMul = 1 + G.townBonus(state, 'marketBonus');
+
+    /* 预测到下季开季：逐日模拟供需冷却（与睡觉结算的 30% 回落规则一致）。 */
+    function nextSeasonMarket(mk, item, isFish) {
+      let sold = mk.sold;
+      for (let i = 0; i < daysToNextSeason; i++) {
+        sold = Math.round(sold * market.decay * 10) / 10;
+        if (sold < 0.5) sold = 0;
+      }
+      const step = isFish ? market.fishStep : market.cropStep;
+      const supply = Math.max(market.supplyMin,
+        Math.min(market.supplyMax, market.supplyMax - step * sold));
+      const seasonMul = isFish
+        ? G.fishNextSeasonMul(state, item.name)
+        : G.cropNextSeasonMul(state, item.id);
+      return { supply: supply, total: supply * seasonMul * townMul };
+    }
+
+    /* 当前背包卖给商店的到手金额，与囤到下季开季的估算对比。 */
+    const holdings = [];
+    G.CROP_LIST.concat(G.WILD_LIST).forEach(function (c) {
+      const qty = G.storeCount(state, c.id);
+      if (!qty) return;
+      const mk = G.marketInfo(state, c.id);
+      const nextMk = nextSeasonMarket(mk, c, false);
+      const raw = G.storeValue(state, c.id);
+      holdings.push({
+        name: c.name, emoji: c.emoji, qty: qty, unit: '个',
+        now: G.shopSellValue(state, c.id),
+        next: Math.max(1, Math.round(G.shopValue(raw) * G.sellBonus(state) * nextMk.total))
+      });
+    });
+    G.fishGroups(state, 'fish').forEach(function (g) {
+      const mk = G.fishMarketInfo(state, g.name);
+      const nextMk = nextSeasonMarket(mk, { name: g.name }, true);
+      holdings.push({
+        name: g.name, emoji: g.emoji, qty: g.count, unit: '条',
+        now: Math.max(1, Math.round(G.shopValue(g.total) * G.sellBonus(state) * mk.total)),
+        next: Math.max(1, Math.round(G.shopValue(g.total) * G.sellBonus(state) * nextMk.total))
+      });
+    });
+    const holdNow = holdings.reduce(function (n, h) { return n + h.now; }, 0);
+    const holdNext = holdings.reduce(function (n, h) { return n + h.next; }, 0);
+    const holdDelta = holdNext - holdNow;
+    const bestWaits = holdings.filter(function (h) { return h.next > h.now; })
+      .sort(function (a, b) { return (b.next - b.now) - (a.next - a.now); }).slice(0, 3);
+    const waitText = bestWaits.length
+      ? '更适合等的库存：' + bestWaits.map(function (h) {
+          return h.emoji + ' ' + h.name + ' ×' + h.qty + h.unit + ' +' + (h.next - h.now) + ' 金';
+        }).join(' · ')
+      : (holdings.length ? '按当前估算，现有库存没有品种适合等到下季再卖。' : '仓库里还没有可比较的作物或鱼。');
 
     function row(key, item, isFish) {
       const mk = isFish ? G.fishMarketInfo(state, item.name) : G.marketInfo(state, item.id);
@@ -6669,12 +6846,15 @@ button{ color:inherit; font:inherit; }
       const nxt = isFish ? G.fishNextSeasonMul(state, item.name) : G.cropNextSeasonMul(state, item.id);
       const base = isFish ? item.base : item.price;
       const now = Math.max(1, Math.round(base * mk.total));
-      const next = Math.max(1, Math.round(base * mk.supply * nxt *
-        (1 + G.townBonus(state, 'marketBonus'))));
+      const nextMk = nextSeasonMarket(mk, item, isFish);
+      const next = Math.max(1, Math.round(base * nextMk.total));
       const unit = isFish ? '条' : '个';
       const wk = series.slice(-7);
+      const trend = wk.length > 1 && wk[0] > 0
+        ? (wk[wk.length - 1] - wk[0]) / wk[0] * 100 : 0;
       const head = wk.length > 1
-        ? '7 天 ' + wk[0].toFixed(2) + ' → ' + wk[wk.length - 1].toFixed(2)
+        ? '近 ' + wk.length + ' 点 ' + wk[0].toFixed(2) + ' → ' + wk[wk.length - 1].toFixed(2) +
+          '（' + (trend > 0 ? '+' : '') + trend.toFixed(0) + '%）'
         : '只有今天 ' + (wk[0] || 0).toFixed(2);
       const tag = isFish
         ? (mk.inRun ? '<b class="own">汛期</b>' : '<b class="lock">非汛期</b>')
@@ -6683,12 +6863,12 @@ button{ color:inherit; font:inherit; }
         '<span class="se">' + (item.emoji || '') + '</span>' +
         '<div style="flex:1;min-width:0">' +
           '<div class="sn">' + item.name + ' ' + tag +
-            ' <b class="own">×' + mk.total.toFixed(2) + '</b> · <b>' + now + '</b> 金/' + unit + '</div>' +
+            ' <b class="own">×' + mk.total.toFixed(2) + '</b> · 市场参考价 <b>' + now + '</b> 金/' + unit + '</div>' +
           '<div class="sv">销量 ' + mk.sold.toFixed(0) + ' ' + unit + ' · 供需 ×' +
             mk.supply.toFixed(2) + ' · 季节 ×' + mk.season.toFixed(2) + ' · ' + head + '</div>' +
-          '<div class="sv">下季 ×' + nxt.toFixed(2) +
+          '<div class="sv">' + daysToNextSeason + ' 天后下季开市 ×' + nextMk.total.toFixed(2) +
             (nxt > 1 ? '（转' + (isFish ? '非汛期' : '反季') + '）' : '') +
-            ' → 预计 <b>' + next + '</b> 金/' + unit + '</div>' +
+            ' → 市场参考价 <b>' + next + '</b> 金/' + unit + '</div>' +
         '</div>' +
         '<span class="sparkwrap">' + sparkline(series) + '</span>' +
       '</div>';
@@ -6700,16 +6880,28 @@ button{ color:inherit; font:inherit; }
       .map(function (f) { return row('f:' + f.name, f, true); }).join('');
 
     const tracked = Object.keys(state.marketHist || {}).length;
+    const portfolio = '<div class="market-portfolio">' +
+      '<div class="store-sub">📦 当前库存 · 商店卖出到手估算 · ' +
+        holdings.reduce(function (n, h) { return n + h.qty; }, 0) + ' 件</div>' +
+      (holdings.length
+        ? '<div class="market-portfolio-grid">' +
+            '<div><span>现在卖</span><b>' + holdNow + ' 金</b></div>' +
+            '<div><span>' + daysToNextSeason + ' 天后下季开市</span><b>' + holdNext + ' 金</b></div>' +
+            '<div class="' + (holdDelta > 0 ? 'market-up' : (holdDelta < 0 ? 'market-down' : '')) + '">' +
+              '<span>估算差额</span><b>' + (holdDelta > 0 ? '+' : '') + holdDelta + ' 金</b></div>' +
+          '</div><div class="sv market-wait-note">' + waitText + '</div>'
+        : '<div class="sv market-wait-note">仓库里还没有可比较的作物或鱼。</div>') +
+    '</div>';
     openModal('📊 市场分析',
       '<div class="shop-head">现在是 <b>' + season + '季</b> · 已记录 <b>' + days +
         '</b> 天内最多 <b>' + days + '</b> 个价格点（存了 ' + tracked + ' 种货）</div>' +
+      portfolio +
       '<div class="store-sub">🌱 作物</div>' + cropRows +
       '<div class="store-sub" style="margin-top:10px">🌿 野货（采集）</div>' + wildRows +
       '<div class="store-sub" style="margin-top:10px">🐟 水产</div>' + fishRows +
-      '<div class="shop-tip">每行三件事：<b>当前价</b>（系数 + 实际单价）、<b>销量 / 供需 / 季节</b>、<b>7 天走势</b>，' +
+      '<div class="shop-tip">每行显示<b>当前市场参考价</b>、<b>销量 / 供需 / 季节</b>、<b>近期价格变化</b>和价格曲线，' +
         '右边那条线是最近 30 天的市价系数（纵轴固定 0.5~2.8，所以不同货能直接比）。<br>' +
-        '<b>预计下季</b>是「假设一件都不卖」的下季价格：反季 / 非汛期会直接涨到 ×' + OFF + '，' +
-        '看到 ×' + OFF + ' 就说明值得囤到那时候再出手。</div>',
+        '<b>下季开市估算</b>按“等待期间不再卖货”计算，并逐日计入市场销量回落；库存对比按商店折扣和成就加成估算，未计入委托收益、税费和等待期间的经营成本。</div>',
       '<button class="btn" data-close>关闭</button>');
   }
 
@@ -7014,8 +7206,19 @@ button{ color:inherit; font:inherit; }
   /* ---------------- 事件绑定 ---------------- */
 
   function bind() {
+    $('#store-search').addEventListener('input', function () {
+      storeQuery = this.value || '';
+      renderStore();
+    });
     document.addEventListener('click', function (ev) {
       const t = ev.target;
+
+      const storeFilterBtn = t.closest('[data-store-filter]');
+      if (storeFilterBtn) {
+        storeFilter = storeFilterBtn.dataset.storeFilter || 'all';
+        renderStore();
+        return;
+      }
 
       // 关闭弹窗
       const closer = t.closest('[data-close]');

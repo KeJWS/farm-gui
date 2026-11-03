@@ -119,8 +119,10 @@
     tradeXp(s, total);
     log(s, '📜 长期订单完成：' + o.emoji + ' ' + o.name + ' ×' + o.qty + '，+' + total + ' 金' +
       (bonus ? '（提前 ' + early + ' 天，额外 +' + bonus + '）' : ''), 'good');
-    s.longOrder = null;
     s.stats.longOrders = (s.stats.longOrders || 0) + 1;
+    // 下一张长期委托在隔天睡醒后生成，期间保留该日期以便读档时不提前补单。
+    s.longOrder = null;
+    s.longOrderReadyDay = s.day + 1;
     return { ok: true, msg: '长期订单完成，+' + total + ' 金' + (bonus ? '（含提前奖励 +' + bonus + '）' : ''),
              reward: o.reward, bonus: bonus, early: early };
   }

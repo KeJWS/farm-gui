@@ -35,7 +35,8 @@
     const v = Math.max(1, Math.round(raw * sellBonus(s) * marketMul(s, id)));
     addSupply(s, id, qty);
     s.box = s.box || [];
-    s.box.push({ kind: 'crop', id: id, name: c.name, emoji: c.emoji, n: qty, parts: t.parts, v: v });
+    s.box.push({ kind: 'crop', id: id, name: c.name, emoji: c.emoji, n: qty, parts: t.parts,
+                 v: v, marketImpact: qty });
     log(s, '📦 ' + c.name + '×' + qty + ' 放进收购箱（原价 ' + v + ' 金，明天结算）', 'info');
     return { ok: true, msg: c.name + '×' + qty + ' 已入箱', v: v, n: qty };
   }
@@ -53,6 +54,7 @@
     s.box = s.box || [];
     s.box.push({ kind: 'fish', name: g.name, emoji: g.emoji, n: qty, parts: parts, v: v,
                  chest: g.chest || undefined, junk: g.junk || undefined,
+                 marketImpact: g.junk ? 0 : qty,
                  trash: (g.junk && !g.chest) ? true : undefined });
     log(s, '📦 ' + g.emoji + ' ' + g.name + '×' + qty + ' 放进收购箱（原价 ' + v + ' 金，明天结算）', 'info');
     return { ok: true, msg: g.name + '×' + qty + ' 已入箱', v: v, n: qty };
@@ -62,6 +64,14 @@
   function takeFromEntry(s, e, take) {
     const total = e.n || 1;
     const t = Math.min(total, take);
+    const marketImpact = Math.max(0, Math.min(e.marketImpact || 0, t));
+    if (marketImpact > 0) {
+      if (e.kind === 'crop' && e.id) removeSupply(s, e.id, marketImpact);
+      else if (e.kind === 'fish' && !e.junk && !e.chest && !e.trash) {
+        removeFishSupply(s, e.name, marketImpact);
+      }
+    }
+    e.marketImpact = Math.max(0, Math.round(((e.marketImpact || 0) - marketImpact) * 10) / 10);
     const parts = (e.parts && e.parts.length)
       ? e.parts.map(function (p) { return { q: p.q, n: p.n, unit: p.unit }; })
       : [{ q: 'std', n: total, unit: Math.max(1, Math.round((e.v || 1) / total)) }];

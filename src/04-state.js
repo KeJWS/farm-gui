@@ -85,6 +85,7 @@
       log: [{ day: 1, text: '🌾 欢迎来到我的小农场，第 1 天开始了。', kind: 'sys' }],
       orders: makeOrders({ day: 1 }),
       longOrder: null,
+      longOrderReadyDay: 0,
       shop: makeShop(1),
       cropShop: makeCropShop(1),
       levels: { farm: 1, fish: 1, farmXp: 0, fishXp: 0, dig: 1, digXp: 0, forage: 1, forageXp: 0,

@@ -498,9 +498,12 @@
     s.orders = makeOrders(s);
     s.manualRefreshUsed = false;
 
-    // 长期订单：过期或没有就补一张
-    if (!s.longOrder || s.day > (s.longOrder.deadline || 0)) {
+    // 长期订单：完成后等到指定日期，过期单则在隔天自动换新。
+    const longOrderReady = !s.longOrder && s.longOrderReadyDay && s.day >= s.longOrderReadyDay;
+    if ((!s.longOrder && (!s.longOrderReadyDay || longOrderReady)) ||
+        (s.longOrder && s.day > (s.longOrder.deadline || 0))) {
       s.longOrder = makeLongOrder(s);
+      s.longOrderReadyDay = 0;
     }
 
     // 水产店 / 农产品店每天补货

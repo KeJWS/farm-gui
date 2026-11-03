@@ -87,6 +87,17 @@
         <span class="muted" id="store-sum"></span>
         <button class="btn mini" id="btn-box">📦 收购箱</button>
       </div>
+      <div class="store-tools">
+        <label class="store-search">🔎 <input id="store-search" type="search" placeholder="搜索物品名称" autocomplete="off" aria-label="搜索仓库物品"></label>
+        <div class="store-filters" aria-label="仓库分类">
+          <button class="store-filter active" data-store-filter="all" aria-pressed="true">全部 <span>0</span></button>
+          <button class="store-filter" data-store-filter="crops" aria-pressed="false">作物 <span>0</span></button>
+          <button class="store-filter" data-store-filter="wild" aria-pressed="false">收集物 <span>0</span></button>
+          <button class="store-filter" data-store-filter="fish" aria-pressed="false">渔获 <span>0</span></button>
+          <button class="store-filter" data-store-filter="junk" aria-pressed="false">杂物/宝箱 <span>0</span></button>
+          <button class="store-filter" data-store-filter="supplies" aria-pressed="false">用品 <span>0</span></button>
+        </div>
+      </div>
       <div id="store-list" class="store-list"></div>
       <div class="seed-box" id="seed-box"></div>
     </div>

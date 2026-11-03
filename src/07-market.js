@@ -1,7 +1,7 @@
 /* 市场价格：供需、季节、小镇声望、掉档提示、价格历史 */
   /* ---------------- 市场价格 ----------------
    * 供给：最近卖得越多越便宜（×1.30 稀缺 → ×0.70 过剩，作物每件 -0.02、鱼每条 -0.015）
-   * 季节：当季 / 汛期 ×1.00，反季 / 非汛期 ×2.00（物以稀为贵）
+   * 季节：当季 / 汛期 ×1.00，反季 / 非汛期 ×1.70（物以稀为贵）
    * 冷却：每睡一觉销量回落 30%
    */
   function marketTag(supply) {
@@ -30,6 +30,12 @@
   }
   function marketMul(s, id) { return marketInfo(s, id).total; }
   function addSupply(s, id, n) { marketOf(s, id).sold += Math.max(0, n || 0); }
+  function removeSupply(s, id, n) {
+    const m = s.market && s.market[id];
+    if (!m) return;
+    m.sold = Math.max(0, Math.round(((m.sold || 0) - Math.max(0, n || 0)) * 10) / 10);
+    if (m.sold <= 0) delete s.market[id];
+  }
 
   /* ---------------- 鱼的市场（供需 + 汛期） ---------------- */
   function fishMarketOf(s, name) {
@@ -50,6 +56,12 @@
   }
   function fishMarketMul(s, name) { return fishMarketInfo(s, name).total; }
   function addFishSupply(s, name, n) { fishMarketOf(s, name).sold += Math.max(0, n || 0); }
+  function removeFishSupply(s, name, n) {
+    const m = s.marketF && s.marketF[name];
+    if (!m) return;
+    m.sold = Math.max(0, Math.round(((m.sold || 0) - Math.max(0, n || 0)) * 10) / 10);
+    if (m.sold <= 0) delete s.marketF[name];
+  }
 
   /* ---------------- 小镇声望（捐钱换永久加成，后期金币出口） ---------------- */
   function townTier(s) {

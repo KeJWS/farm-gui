@@ -49,6 +49,7 @@
     // 数值清洗：导入的存档不能带 NaN / 负数 / 离谱的地块数
     merged.maxEnergy = Math.round(num(s.maxEnergy, 10, 5, 100) / 5) * 5;
     merged.day = Math.round(num(s.day, 1, 1, 100000));
+    merged.longOrderReadyDay = Math.round(num(s.longOrderReadyDay, 0, 0, 100000));
     merged.coins = Math.round(num(s.coins, 50, 0, 1e9));
     merged.energy = num(s.energy, merged.maxEnergy, 0, merged.maxEnergy);
 
@@ -102,6 +103,12 @@
     }).map(function (e) {
       const out = { kind: e.kind, name: String(e.name).slice(0, 20), emoji: String(e.emoji || '').slice(0, 4),
                     n: Math.round(num(e.n, 1, 1, 9999)), v: Math.round(num(e.v, 0, 0, 1e9)) };
+      const marketable = e.kind === 'crop'
+        ? !!CROPS[e.id]
+        : (e.kind === 'fish' && !fishIsJunk(e));
+      out.marketImpact = marketable
+        ? Math.round(num(e.marketImpact, e.marketImpact == null ? out.n : 0, 0, out.n) * 10) / 10
+        : 0;
       if (e.kind === 'crop' && CROPS[e.id]) {
         out.id = e.id;
         out.parts = Array.isArray(e.parts) ? e.parts.filter(function (p) {
@@ -136,14 +143,19 @@
         emoji: lo.kind === 'crop' ? CROPS[lo.crop].emoji : '🐟',
         qty: Math.round(num(lo.qty, 10, 1, 999)),
         reward: Math.round(num(lo.reward, 20, 1, 999999)),
+        mul: lo.kind === 'crop' && lo.mul != null ? num(lo.mul, 1, 0.5, 3) : 0,
         deadline: Math.round(num(lo.deadline, merged.day + 5, 1, 100000)),
         done: false
       };
+      merged.longOrderReadyDay = 0;
     } else {
       merged.longOrder = null;
     }
-    // 老存档没有长期订单：读档时补一张
-    if (!merged.longOrder) merged.longOrder = makeLongOrder(merged);
+    // 老存档没有长期订单时补一张；新存档的隔日等待标记则保留。
+    if (!merged.longOrder && (!merged.longOrderReadyDay || merged.longOrderReadyDay <= merged.day)) {
+      merged.longOrder = makeLongOrder(merged);
+      merged.longOrderReadyDay = 0;
+    }
     merged.seeds = s.seeds && typeof s.seeds === 'object' ? s.seeds : {};
     // 老存档的仓库是「作物: 数量」，这里迁移成「作物: {品质: 数量}」
     merged.store = {};

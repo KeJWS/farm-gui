@@ -799,6 +799,7 @@
       log: [{ day: 1, text: '🌾 欢迎来到我的小农场，第 1 天开始了。', kind: 'sys' }],
       orders: makeOrders({ day: 1 }),
       longOrder: null,
+      longOrderReadyDay: 0,
       shop: makeShop(1),
       cropShop: makeCropShop(1),
       levels: { farm: 1, fish: 1, farmXp: 0, fishXp: 0, dig: 1, digXp: 0, forage: 1, forageXp: 0,
@@ -1416,9 +1417,12 @@
     s.orders = makeOrders(s);
     s.manualRefreshUsed = false;
 
-    // 长期订单：过期或没有就补一张
-    if (!s.longOrder || s.day > (s.longOrder.deadline || 0)) {
+    // 长期订单：完成后等到指定日期，过期单则在隔天自动换新。
+    const longOrderReady = !s.longOrder && s.longOrderReadyDay && s.day >= s.longOrderReadyDay;
+    if ((!s.longOrder && (!s.longOrderReadyDay || longOrderReady)) ||
+        (s.longOrder && s.day > (s.longOrder.deadline || 0))) {
       s.longOrder = makeLongOrder(s);
+      s.longOrderReadyDay = 0;
     }
 
     // 水产店 / 农产品店每天补货
@@ -1729,7 +1733,7 @@
 /* 市场价格：供需、季节、小镇声望、掉档提示、价格历史 */
   /* ---------------- 市场价格 ----------------
    * 供给：最近卖得越多越便宜（×1.30 稀缺 → ×0.70 过剩，作物每件 -0.02、鱼每条 -0.015）
-   * 季节：当季 / 汛期 ×1.00，反季 / 非汛期 ×2.00（物以稀为贵）
+   * 季节：当季 / 汛期 ×1.00，反季 / 非汛期 ×1.70（物以稀为贵）
    * 冷却：每睡一觉销量回落 30%
    */
   function marketTag(supply) {
@@ -1758,6 +1762,12 @@
   }
   function marketMul(s, id) { return marketInfo(s, id).total; }
   function addSupply(s, id, n) { marketOf(s, id).sold += Math.max(0, n || 0); }
+  function removeSupply(s, id, n) {
+    const m = s.market && s.market[id];
+    if (!m) return;
+    m.sold = Math.max(0, Math.round(((m.sold || 0) - Math.max(0, n || 0)) * 10) / 10);
+    if (m.sold <= 0) delete s.market[id];
+  }
 
   /* ---------------- 鱼的市场（供需 + 汛期） ---------------- */
   function fishMarketOf(s, name) {
@@ -1778,6 +1788,12 @@
   }
   function fishMarketMul(s, name) { return fishMarketInfo(s, name).total; }
   function addFishSupply(s, name, n) { fishMarketOf(s, name).sold += Math.max(0, n || 0); }
+  function removeFishSupply(s, name, n) {
+    const m = s.marketF && s.marketF[name];
+    if (!m) return;
+    m.sold = Math.max(0, Math.round(((m.sold || 0) - Math.max(0, n || 0)) * 10) / 10);
+    if (m.sold <= 0) delete s.marketF[name];
+  }
 
   /* ---------------- 小镇声望（捐钱换永久加成，后期金币出口） ---------------- */
   function townTier(s) {
@@ -1974,7 +1990,8 @@
     const v = Math.max(1, Math.round(raw * sellBonus(s) * marketMul(s, id)));
     addSupply(s, id, qty);
     s.box = s.box || [];
-    s.box.push({ kind: 'crop', id: id, name: c.name, emoji: c.emoji, n: qty, parts: t.parts, v: v });
+    s.box.push({ kind: 'crop', id: id, name: c.name, emoji: c.emoji, n: qty, parts: t.parts,
+                 v: v, marketImpact: qty });
     log(s, '📦 ' + c.name + '×' + qty + ' 放进收购箱（原价 ' + v + ' 金，明天结算）', 'info');
     return { ok: true, msg: c.name + '×' + qty + ' 已入箱', v: v, n: qty };
   }
@@ -1992,6 +2009,7 @@
     s.box = s.box || [];
     s.box.push({ kind: 'fish', name: g.name, emoji: g.emoji, n: qty, parts: parts, v: v,
                  chest: g.chest || undefined, junk: g.junk || undefined,
+                 marketImpact: g.junk ? 0 : qty,
                  trash: (g.junk && !g.chest) ? true : undefined });
     log(s, '📦 ' + g.emoji + ' ' + g.name + '×' + qty + ' 放进收购箱（原价 ' + v + ' 金，明天结算）', 'info');
     return { ok: true, msg: g.name + '×' + qty + ' 已入箱', v: v, n: qty };
@@ -2001,6 +2019,14 @@
   function takeFromEntry(s, e, take) {
     const total = e.n || 1;
     const t = Math.min(total, take);
+    const marketImpact = Math.max(0, Math.min(e.marketImpact || 0, t));
+    if (marketImpact > 0) {
+      if (e.kind === 'crop' && e.id) removeSupply(s, e.id, marketImpact);
+      else if (e.kind === 'fish' && !e.junk && !e.chest && !e.trash) {
+        removeFishSupply(s, e.name, marketImpact);
+      }
+    }
+    e.marketImpact = Math.max(0, Math.round(((e.marketImpact || 0) - marketImpact) * 10) / 10);
     const parts = (e.parts && e.parts.length)
       ? e.parts.map(function (p) { return { q: p.q, n: p.n, unit: p.unit }; })
       : [{ q: 'std', n: total, unit: Math.max(1, Math.round((e.v || 1) / total)) }];
@@ -3025,8 +3051,10 @@
     tradeXp(s, total);
     log(s, '📜 长期订单完成：' + o.emoji + ' ' + o.name + ' ×' + o.qty + '，+' + total + ' 金' +
       (bonus ? '（提前 ' + early + ' 天，额外 +' + bonus + '）' : ''), 'good');
-    s.longOrder = null;
     s.stats.longOrders = (s.stats.longOrders || 0) + 1;
+    // 下一张长期委托在隔天睡醒后生成，期间保留该日期以便读档时不提前补单。
+    s.longOrder = null;
+    s.longOrderReadyDay = s.day + 1;
     return { ok: true, msg: '长期订单完成，+' + total + ' 金' + (bonus ? '（含提前奖励 +' + bonus + '）' : ''),
              reward: o.reward, bonus: bonus, early: early };
   }
@@ -3139,6 +3167,7 @@
     // 数值清洗：导入的存档不能带 NaN / 负数 / 离谱的地块数
     merged.maxEnergy = Math.round(num(s.maxEnergy, 10, 5, 100) / 5) * 5;
     merged.day = Math.round(num(s.day, 1, 1, 100000));
+    merged.longOrderReadyDay = Math.round(num(s.longOrderReadyDay, 0, 0, 100000));
     merged.coins = Math.round(num(s.coins, 50, 0, 1e9));
     merged.energy = num(s.energy, merged.maxEnergy, 0, merged.maxEnergy);
 
@@ -3192,6 +3221,12 @@
     }).map(function (e) {
       const out = { kind: e.kind, name: String(e.name).slice(0, 20), emoji: String(e.emoji || '').slice(0, 4),
                     n: Math.round(num(e.n, 1, 1, 9999)), v: Math.round(num(e.v, 0, 0, 1e9)) };
+      const marketable = e.kind === 'crop'
+        ? !!CROPS[e.id]
+        : (e.kind === 'fish' && !fishIsJunk(e));
+      out.marketImpact = marketable
+        ? Math.round(num(e.marketImpact, e.marketImpact == null ? out.n : 0, 0, out.n) * 10) / 10
+        : 0;
       if (e.kind === 'crop' && CROPS[e.id]) {
         out.id = e.id;
         out.parts = Array.isArray(e.parts) ? e.parts.filter(function (p) {
@@ -3226,14 +3261,19 @@
         emoji: lo.kind === 'crop' ? CROPS[lo.crop].emoji : '🐟',
         qty: Math.round(num(lo.qty, 10, 1, 999)),
         reward: Math.round(num(lo.reward, 20, 1, 999999)),
+        mul: lo.kind === 'crop' && lo.mul != null ? num(lo.mul, 1, 0.5, 3) : 0,
         deadline: Math.round(num(lo.deadline, merged.day + 5, 1, 100000)),
         done: false
       };
+      merged.longOrderReadyDay = 0;
     } else {
       merged.longOrder = null;
     }
-    // 老存档没有长期订单：读档时补一张
-    if (!merged.longOrder) merged.longOrder = makeLongOrder(merged);
+    // 老存档没有长期订单时补一张；新存档的隔日等待标记则保留。
+    if (!merged.longOrder && (!merged.longOrderReadyDay || merged.longOrderReadyDay <= merged.day)) {
+      merged.longOrder = makeLongOrder(merged);
+      merged.longOrderReadyDay = 0;
+    }
     merged.seeds = s.seeds && typeof s.seeds === 'object' ? s.seeds : {};
     // 老存档的仓库是「作物: 数量」，这里迁移成「作物: {品质: 数量}」
     merged.store = {};
