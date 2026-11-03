@@ -5959,7 +5959,7 @@ button{ color:inherit; font:inherit; }
         G.QUALITY.map(function (q) {
           return '<tr><td>' + q.emoji + ' ' + q.name + '</td><td>×' + q.mul + '</td><td>' + q.w + '%</td></tr>';
         }).join('') + '</table>' +
-        '<p>单价 = 基础价 × 品质倍率；施肥会多滚几次取最好的（普通肥 2 次、特效肥 3 次）。</p>' +
+        '<p>单价 = 基础价 × 品质倍率；施肥后品质判定取 2 次最好（普通肥和特效肥相同）。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -5968,7 +5968,7 @@ button{ color:inherit; font:inherit; }
         ['normal', 'special'].map(function (k) {
           const f = G.FERT[k];
           return '<tr><td>' + f.emoji + ' ' + f.name + '</td><td>' + f.cost + ' 金</td><td>' +
-            G.fertSellPrice(k) + ' 金</td><td>+' + f.add + ' 产量</td><td>取 ' + (k === 'special' ? 3 : 2) + ' 次最好</td></tr>';
+            G.fertSellPrice(k) + ' 金</td><td>+' + f.add + ' 产量</td><td>取 2 次最好</td></tr>';
         }).join('') + '</table>' +
         '<p>肥料在<b>种子店</b>购买，买回来进仓库，施肥时消耗；多收作物（黄瓜 / 草莓）只提质不加量。<br>' +
         '<b>南瓜 / 西瓜只吃品质加成</b>：数量永远是 1 个，但施肥后品质档位明显更高——这是它们唯一的施肥收益。<br>' +
