@@ -200,7 +200,7 @@
     return BALANCE.tax.every - ((s.day || 1) % BALANCE.tax.every);
   }
 
-  /* 水产店售价：基础价 × 1.8 × 鱼市价（缺鱼时更贵） */
+  /* 水产店售价：基础价 × 1.3 × 鱼市价（缺鱼时更贵） */
   function fishBuyPrice(id, s) {
     const f = FISH.filter(function (x) { return x.id === id; })[0];
     if (!f) return 0;

@@ -170,7 +170,7 @@
     return n;
   }
 
-  /* 大作物：固定 3 个，不吃肥料也不吃等级（收益稳定，图省心） */
+  /* 大作物：固定 1 个，不吃肥料产量加成，也不吃等级加成。 */
   function fertBonus(p) {
     const c = CROPS[p.crop];
     if (!c || c.big || c.multi) return 0;

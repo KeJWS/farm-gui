@@ -1665,7 +1665,7 @@ const v28old = JSON.parse(G.serialize(G.createState()));
 v28old.nets = 4; delete v28old.netSet; delete v28old.shop; delete v28old.ach;
 ok(G.netSetCount(G.deserialize(v28old)) === 4, '老存档渔网默认全布好');
 
-/* 反季种植：生长 +2 天、第一茬 -1 个，卖价 ×2，种子 ×1.8 */
+/* 反季种植：生长 +2 天、第一茬 -1 个，卖价 ×1.7，种子 ×1.8 */
 const v28pl = G.createState();
 v28pl.coins = 5000; v28pl.day = 1;
 v28pl.levels.farm = 3;
