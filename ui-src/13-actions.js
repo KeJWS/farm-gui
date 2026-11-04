@@ -116,7 +116,12 @@
       const r = G.fishMany(state, G.BALANCE.fishBatch, baitSel);
       commit(r);                       // commit 已经在失败时提示过一次
       if (!r.ok) return;
-      const got = r.results.filter(function (x) { return x.ok && x.entry; }).map(function (x) { return x.entry; });
+      /* 双咬钩的第二条鱼也要进「最近渔获」，以前只取每条杆的第一条 */
+      const got = [];
+      r.results.forEach(function (x) {
+        if (!x.ok) return;
+        (x.entries && x.entries.length ? x.entries : (x.entry ? [x.entry] : [])).forEach(function (e) { got.push(e); });
+      });
       setCatchBatch(got);
       toast(r.msg, 'good');
       SFX.catch();

@@ -74,7 +74,8 @@
         ' 天（浇够就不用再浇，两项都满足才成树）。每棵可单独浇水，浇水 ' + G.BALANCE.orchard.waterEnergy +
         ' 体力 / 收获 ' + G.BALANCE.orchard.harvestEnergy + ' 体力。<br>' +
         '成树<b>只在自己的季节</b>每天随机挂 <b>' + G.BALANCE.orchard.fruitMin + '~' +
-        G.BALANCE.orchard.fruitMax + ' 个</b>；水果固定<b>标准品质</b>，进仓库后和作物一样吃<b>市价</b>（当季 ×1、囤到反季 ×' +
+        G.BALANCE.orchard.fruitMax + ' 个</b>，每棵最多挂 <b>' + G.BALANCE.orchard.ripeCap +
+        ' 个</b>（挂满就不再长了，记得去收）；水果固定<b>标准品质</b>，进仓库后和作物一样吃<b>市价</b>（当季 ×1、囤到反季 ×' +
         G.BALANCE.market.offSeason + '），可以卖给农产品店、放进收购箱，市场「行情 / 分析」里也有单独一栏。</p>' +
         '<table class="rule-table"><tr><th>果树</th><th>结果季</th><th>果实</th><th>果价</th><th>种子</th><th>树苗</th></tr>' +
         G.TREE_LIST.map(function (t) {

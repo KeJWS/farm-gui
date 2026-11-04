@@ -458,10 +458,14 @@
       if (n) notes.push({ kind: 'water', text: '🚿 洒水器浇 ' + n + ' 块' + (ripe ? '，熟 ' + ripe : '') });
     }
 
-    // 果园：成树在当季每天挂果（等玩家花体力收）
+    // 果园：成树在当季每天挂果（等玩家花体力收），每棵挂满 ripeCap 个就不再长
     const orc = orchardTick(s, prevDay);
     if (orc.fruit) {
       notes.push({ kind: 'orchard', text: '🍑 果园挂了 ' + orc.fruit + ' 个水果，等你收' });
+    }
+    if (orc.full) {
+      notes.push({ kind: 'orchard', text: '🍑 ' + orc.full + ' 棵树挂满了（' +
+        BALANCE.orchard.ripeCap + ' 个），收完才会继续长' });
     }
     if (orc.thirsty) {
       notes.push({ kind: 'orchard', text: '💧 ' + orc.thirsty + ' 棵育苗树今天没浇水' });
@@ -804,7 +808,7 @@
 
   /* 全体力钓鱼：一直甩到体力不够 / 没饵，日志只留一条汇总 */
   function fishAll(s, preferBait) {
-    let n = 0, empty = 0, value = 0, chests = 0, ups = 0, lastErr = '';
+    let n = 0, empty = 0, value = 0, chests = 0, ups = 0, doubles = 0, lastErr = '';
     const got = [];
     while (s.energy >= BALANCE.energy.fish && n < 400) {
       const r = fish(s, preferBait, { quiet: true });
@@ -812,6 +816,7 @@
       n++;
       if (r.empty) empty++;
       else {
+        doubles += r.bonus || 0;
         (r.entries || [r.entry]).forEach(function (e) {
           value += e.price;
           if (e.chest) chests++;
@@ -823,25 +828,28 @@
     }
     if (!n) return { ok: false, msg: lastErr || '体力不够（钓鱼要 2 点），先睡觉吧' };
     log(s, '⚡ 一口气甩了 ' + n + ' 杆' + (empty ? '（空竿 ' + empty + '）' : '') +
-      '，渔获值 ' + value + ' 金' + (chests ? '，捞到宝箱 ' + chests + ' 个' : ''), 'good');
-    return { ok: true, count: n, empty: empty, income: value, chests: chests, levelUp: ups,
-             entries: got, msg: '甩了 ' + n + ' 杆，渔获值 ' + value + ' 金' };
+      '，渔获值 ' + value + ' 金' + (doubles ? '（双咬钩 ' + doubles + ' 次）' : '') +
+      (chests ? '，捞到宝箱 ' + chests + ' 个' : ''), 'good');
+    return { ok: true, count: n, empty: empty, income: value, chests: chests, levelUp: ups, doubles: doubles,
+             entries: got, msg: '甩了 ' + n + ' 杆，渔获值 ' + value + ' 金' + (doubles ? ' · 双咬钩 ×' + doubles : '') };
   }
 
   function fishMany(s, times, preferBait) {
     const results = [];
-    let value = 0, empty = 0;
+    let value = 0, empty = 0, doubles = 0;
     for (let i = 0; i < times; i++) {
       const r = fish(s, preferBait);
       if (!r.ok) { results.push(r); break; }
       if (r.empty) empty++; else {
+        doubles += r.bonus || 0;
         (r.entries || [r.entry]).forEach(function (e) { value += e.price; });
       }
       results.push(r);
     }
     const okCount = results.filter(function (r) { return r.ok; }).length;
     if (!okCount) return results[0] || { ok: false, msg: '钓不了' };
-    return { ok: true, count: okCount, empty: empty, income: value, results: results,
-             msg: '甩了 ' + okCount + ' 杆' + (empty ? '（空竿 ' + empty + '）' : '') + '，渔获值 ' + value + ' 金' };
+    return { ok: true, count: okCount, empty: empty, income: value, results: results, doubles: doubles,
+             msg: '甩了 ' + okCount + ' 杆' + (empty ? '（空竿 ' + empty + '）' : '') + '，渔获值 ' + value + ' 金' +
+               (doubles ? ' · 双咬钩 ×' + doubles : '') };
   }
 

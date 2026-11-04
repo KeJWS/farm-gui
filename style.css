@@ -674,6 +674,7 @@ button{ font-family:inherit; }
 .orc-tag{ margin-left:auto; font-size:10px; font-weight:800; color:var(--green-d); }
 .orc-tag.off{ color:var(--ink-3); }
 .orc-mid{ font-size:11.5px; line-height:1.55; font-weight:700; color:var(--ink-2); min-height:34px; }
+.orc-full{ color:var(--gold); }
 .orc-bar{ margin:1px 0; }
 .orc-act{ display:flex; justify-content:flex-end; align-items:center; min-height:24px; }
 .orc-note{ font-size:10.5px; font-weight:700; color:var(--ink-3); }

@@ -2722,5 +2722,37 @@ section('水果纳入市场');
     '水果下季估值按反季算', G.cropNextSeasonMul(spring, 'fruit_peach'));
 }
 
+/* ---------- 19. v2.38 挂果上限 / 连甩汇总双咬钩 ---------- */
+section('挂果上限与连甩双咬钩');
+{
+  const cap = G.createState();
+  cap.orchard = { unlocked: true, slots: [
+    { id: 'peach', mode: 'sapling', planted: -1000, water: 15, lastWater: 0, ripe: 0 }
+  ] };
+  for (let d = 0; d < 20; d++) { cap.day = 1 + d; G.orchardTick(cap, cap.day - 1); }
+  ok(cap.orchard.slots[0].ripe === G.BALANCE.orchard.ripeCap, '每棵最多挂 10 个果实',
+    cap.orchard.slots[0].ripe);
+  const tickFull = G.orchardTick(cap, 20);
+  ok(tickFull.fruit === 0, '挂满之后当天不再挂果', tickFull.fruit);
+  const hCap = G.harvestTree(cap, 0);
+  ok(hCap.ok && hCap.n === G.BALANCE.orchard.ripeCap, '挂满一次收 10 个', hCap);
+
+  const fm = G.createState();
+  fm.day = 35; fm.weather = 'rain'; fm.levels.fish = 10;
+  fm.bait.worm = 40; fm.energy = 20;
+  G.setRng(function () { return 0; });
+  const r5 = G.fishMany(fm, 5, 'worm');
+  ok(r5.ok && r5.count === 5, '连甩 5 杆正常结算', r5.count);
+  ok(r5.doubles === 5 && r5.results.every(function (x) { return x.entries.length === 2; }),
+    '连甩时双咬钩照常触发', r5.doubles);
+  ok(r5.msg.indexOf('双咬钩 ×5') >= 0, '连甩结果汇总双咬钩次数', r5.msg);
+
+  const ra = G.fishAll(fm, 'worm');
+  ok(ra.ok && ra.doubles === ra.count && ra.doubles > 0, '全部体力也统计双咬钩',
+    [ra.count, ra.doubles]);
+  ok(ra.msg.indexOf('双咬钩') >= 0, '全部体力结果带双咬钩', ra.msg);
+  ok(ra.entries.length === ra.count * 2, '双咬钩的第二条鱼也进了收获列表', ra.entries.length);
+}
+
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));
 process.exit(fail ? 1 : 0);

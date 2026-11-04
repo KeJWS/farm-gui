@@ -222,7 +222,7 @@
         id: t.id, mode: mode, planted: planted,
         water: t.water != null ? water : Math.min(need.water, Math.round(num(t.grown, 0, 0, need.water))),
         lastWater: Math.round(num(t.lastWater, 0, 0, 100000)),
-        ripe: Math.round(num(t.ripe, 0, 0, 99999))
+        ripe: Math.round(num(t.ripe, 0, 0, BALANCE.orchard.ripeCap))
       };
     });
     merged.treeStock = {};

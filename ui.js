@@ -1553,7 +1553,8 @@
         ' 天（浇够就不用再浇，两项都满足才成树）。每棵可单独浇水，浇水 ' + G.BALANCE.orchard.waterEnergy +
         ' 体力 / 收获 ' + G.BALANCE.orchard.harvestEnergy + ' 体力。<br>' +
         '成树<b>只在自己的季节</b>每天随机挂 <b>' + G.BALANCE.orchard.fruitMin + '~' +
-        G.BALANCE.orchard.fruitMax + ' 个</b>；水果固定<b>标准品质</b>，进仓库后和作物一样吃<b>市价</b>（当季 ×1、囤到反季 ×' +
+        G.BALANCE.orchard.fruitMax + ' 个</b>，每棵最多挂 <b>' + G.BALANCE.orchard.ripeCap +
+        ' 个</b>（挂满就不再长了，记得去收）；水果固定<b>标准品质</b>，进仓库后和作物一样吃<b>市价</b>（当季 ×1、囤到反季 ×' +
         G.BALANCE.market.offSeason + '），可以卖给农产品店、放进收购箱，市场「行情 / 分析」里也有单独一栏。</p>' +
         '<table class="rule-table"><tr><th>果树</th><th>结果季</th><th>果实</th><th>果价</th><th>种子</th><th>树苗</th></tr>' +
         G.TREE_LIST.map(function (t) {
@@ -3181,8 +3182,11 @@
       '<div class="orc-top"><span class="orc-emoji">' + t.emoji + '</span><span class="orc-no">' + no + ' 号坑</span>' +
         '<b class="orc-tag' + (inSeason ? '' : ' off') + '">' + (inSeason ? '当季' : '休眠') + '</b></div>' +
       '<div class="orc-mid">' + t.name + '<br>' +
-        (inSeason ? '每天挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax + ' 个 · 待收 ' + p.ripe
-                  : G.SEASONS[t.season] + '季结果') + '</div>' +
+        (inSeason
+          ? '每天挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax + ' 个 · 待收 ' +
+            p.ripe + '/' + G.BALANCE.orchard.ripeCap +
+            (p.ripe >= G.BALANCE.orchard.ripeCap ? ' <b class="orc-full">已挂满</b>' : '')
+          : G.SEASONS[t.season] + '季结果') + '</div>' +
       '<div class="orc-act">' +
         '<button class="btn mini primary" data-tree-harvest="' + i + '"' + (p.ripe ? '' : ' disabled') + '>' +
           '收获' + (p.ripe ? ' ' + p.ripe : '') + '</button></div></div>';
@@ -3391,7 +3395,12 @@
       const r = G.fishMany(state, G.BALANCE.fishBatch, baitSel);
       commit(r);                       // commit 已经在失败时提示过一次
       if (!r.ok) return;
-      const got = r.results.filter(function (x) { return x.ok && x.entry; }).map(function (x) { return x.entry; });
+      /* 双咬钩的第二条鱼也要进「最近渔获」，以前只取每条杆的第一条 */
+      const got = [];
+      r.results.forEach(function (x) {
+        if (!x.ok) return;
+        (x.entries && x.entries.length ? x.entries : (x.entry ? [x.entry] : [])).forEach(function (e) { got.push(e); });
+      });
       setCatchBatch(got);
       toast(r.msg, 'good');
       SFX.catch();

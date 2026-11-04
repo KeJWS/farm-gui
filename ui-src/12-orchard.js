@@ -37,8 +37,11 @@
       '<div class="orc-top"><span class="orc-emoji">' + t.emoji + '</span><span class="orc-no">' + no + ' 号坑</span>' +
         '<b class="orc-tag' + (inSeason ? '' : ' off') + '">' + (inSeason ? '当季' : '休眠') + '</b></div>' +
       '<div class="orc-mid">' + t.name + '<br>' +
-        (inSeason ? '每天挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax + ' 个 · 待收 ' + p.ripe
-                  : G.SEASONS[t.season] + '季结果') + '</div>' +
+        (inSeason
+          ? '每天挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax + ' 个 · 待收 ' +
+            p.ripe + '/' + G.BALANCE.orchard.ripeCap +
+            (p.ripe >= G.BALANCE.orchard.ripeCap ? ' <b class="orc-full">已挂满</b>' : '')
+          : G.SEASONS[t.season] + '季结果') + '</div>' +
       '<div class="orc-act">' +
         '<button class="btn mini primary" data-tree-harvest="' + i + '"' + (p.ripe ? '' : ' disabled') + '>' +
           '收获' + (p.ripe ? ' ' + p.ripe : '') + '</button></div></div>';

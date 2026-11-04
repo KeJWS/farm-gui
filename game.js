@@ -778,7 +778,7 @@
      * 种子：浇水 30 天 + 生长满 90 天才成树；树苗：浇水 15 天 + 生长满 30 天，浇足后无需再浇。
      * 成树只在自己季节结果，当季每天随机 1~3 个；浇水 / 收获各 1 体力。 */
     orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, free: 3, fruitMin: 1, fruitMax: 3,
-               waterEnergy: 1, harvestEnergy: 1,
+               waterEnergy: 1, harvestEnergy: 1, ripeCap: 10,
                grow: { seed: { days: 90, water: 30 }, sapling: { days: 30, water: 15 } },
                slotCosts: [600, 1000, 1600, 2400, 3200] },
     /* 经营档案：按净资产给的称号 */
@@ -2129,10 +2129,14 @@
       if (n) notes.push({ kind: 'water', text: '🚿 洒水器浇 ' + n + ' 块' + (ripe ? '，熟 ' + ripe : '') });
     }
 
-    // 果园：成树在当季每天挂果（等玩家花体力收）
+    // 果园：成树在当季每天挂果（等玩家花体力收），每棵挂满 ripeCap 个就不再长
     const orc = orchardTick(s, prevDay);
     if (orc.fruit) {
       notes.push({ kind: 'orchard', text: '🍑 果园挂了 ' + orc.fruit + ' 个水果，等你收' });
+    }
+    if (orc.full) {
+      notes.push({ kind: 'orchard', text: '🍑 ' + orc.full + ' 棵树挂满了（' +
+        BALANCE.orchard.ripeCap + ' 个），收完才会继续长' });
     }
     if (orc.thirsty) {
       notes.push({ kind: 'orchard', text: '💧 ' + orc.thirsty + ' 棵育苗树今天没浇水' });
@@ -2475,7 +2479,7 @@
 
   /* 全体力钓鱼：一直甩到体力不够 / 没饵，日志只留一条汇总 */
   function fishAll(s, preferBait) {
-    let n = 0, empty = 0, value = 0, chests = 0, ups = 0, lastErr = '';
+    let n = 0, empty = 0, value = 0, chests = 0, ups = 0, doubles = 0, lastErr = '';
     const got = [];
     while (s.energy >= BALANCE.energy.fish && n < 400) {
       const r = fish(s, preferBait, { quiet: true });
@@ -2483,6 +2487,7 @@
       n++;
       if (r.empty) empty++;
       else {
+        doubles += r.bonus || 0;
         (r.entries || [r.entry]).forEach(function (e) {
           value += e.price;
           if (e.chest) chests++;
@@ -2494,26 +2499,29 @@
     }
     if (!n) return { ok: false, msg: lastErr || '体力不够（钓鱼要 2 点），先睡觉吧' };
     log(s, '⚡ 一口气甩了 ' + n + ' 杆' + (empty ? '（空竿 ' + empty + '）' : '') +
-      '，渔获值 ' + value + ' 金' + (chests ? '，捞到宝箱 ' + chests + ' 个' : ''), 'good');
-    return { ok: true, count: n, empty: empty, income: value, chests: chests, levelUp: ups,
-             entries: got, msg: '甩了 ' + n + ' 杆，渔获值 ' + value + ' 金' };
+      '，渔获值 ' + value + ' 金' + (doubles ? '（双咬钩 ' + doubles + ' 次）' : '') +
+      (chests ? '，捞到宝箱 ' + chests + ' 个' : ''), 'good');
+    return { ok: true, count: n, empty: empty, income: value, chests: chests, levelUp: ups, doubles: doubles,
+             entries: got, msg: '甩了 ' + n + ' 杆，渔获值 ' + value + ' 金' + (doubles ? ' · 双咬钩 ×' + doubles : '') };
   }
 
   function fishMany(s, times, preferBait) {
     const results = [];
-    let value = 0, empty = 0;
+    let value = 0, empty = 0, doubles = 0;
     for (let i = 0; i < times; i++) {
       const r = fish(s, preferBait);
       if (!r.ok) { results.push(r); break; }
       if (r.empty) empty++; else {
+        doubles += r.bonus || 0;
         (r.entries || [r.entry]).forEach(function (e) { value += e.price; });
       }
       results.push(r);
     }
     const okCount = results.filter(function (r) { return r.ok; }).length;
     if (!okCount) return results[0] || { ok: false, msg: '钓不了' };
-    return { ok: true, count: okCount, empty: empty, income: value, results: results,
-             msg: '甩了 ' + okCount + ' 杆' + (empty ? '（空竿 ' + empty + '）' : '') + '，渔获值 ' + value + ' 金' };
+    return { ok: true, count: okCount, empty: empty, income: value, results: results, doubles: doubles,
+             msg: '甩了 ' + okCount + ' 杆' + (empty ? '（空竿 ' + empty + '）' : '') + '，渔获值 ' + value + ' 金' +
+               (doubles ? ' · 双咬钩 ×' + doubles : '') };
   }
 
 /* ==================== src/06-trade.js ==================== */
@@ -4193,11 +4201,12 @@
              msg: '收了 ' + n + ' 棵树共 ' + fruit + ' 个水果（-' + (n * E) + ' 体力）' };
   }
 
-  /* 睡觉结算：成树在当季每天随机挂 1~3 个果实，等人来收 */
+  /* 睡觉结算：成树在当季每天随机挂 1~3 个果实，等人来收（每棵最多挂 ripeCap 个，满了不再挂） */
   function orchardTick(s, prevDay) {
-    if (!orchardUnlocked(s)) return { fruit: 0, mature: 0, growing: 0, thirsty: 0, ripe: 0 };
+    if (!orchardUnlocked(s)) return { fruit: 0, mature: 0, growing: 0, thirsty: 0, ripe: 0, full: 0 };
     const slots = s.orchard.slots || [];
-    let fruit = 0, mature = 0, growing = 0, thirsty = 0, ripe = 0;
+    let fruit = 0, mature = 0, growing = 0, thirsty = 0, ripe = 0, full = 0;
+    const cap = BALANCE.orchard.ripeCap;
     const season = seasonIdx(s.day || 1);
     slots.forEach(function (t, i) {
       if (!t) return;
@@ -4205,8 +4214,10 @@
         mature++;
         if (TREES[t.id].season === season) {
           const n = randInt(BALANCE.orchard.fruitMin, BALANCE.orchard.fruitMax);
-          t.ripe = (t.ripe || 0) + n;
-          fruit += n;
+          const had = t.ripe || 0;
+          t.ripe = Math.min(cap, had + n);
+          fruit += t.ripe - had;
+          if (t.ripe >= cap) full++;
         }
       } else {
         growing++;
@@ -4214,7 +4225,7 @@
       }
       ripe += t.ripe || 0;
     });
-    return { fruit: fruit, mature: mature, growing: growing, thirsty: thirsty, ripe: ripe };
+    return { fruit: fruit, mature: mature, growing: growing, thirsty: thirsty, ripe: ripe, full: full };
   }
 
   /* 果园概况：给界面 / 总结用 */
@@ -4648,7 +4659,7 @@
         id: t.id, mode: mode, planted: planted,
         water: t.water != null ? water : Math.min(need.water, Math.round(num(t.grown, 0, 0, need.water))),
         lastWater: Math.round(num(t.lastWater, 0, 0, 100000)),
-        ripe: Math.round(num(t.ripe, 0, 0, 99999))
+        ripe: Math.round(num(t.ripe, 0, 0, BALANCE.orchard.ripeCap))
       };
     });
     merged.treeStock = {};

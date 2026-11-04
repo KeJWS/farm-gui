@@ -242,11 +242,12 @@
              msg: '收了 ' + n + ' 棵树共 ' + fruit + ' 个水果（-' + (n * E) + ' 体力）' };
   }
 
-  /* 睡觉结算：成树在当季每天随机挂 1~3 个果实，等人来收 */
+  /* 睡觉结算：成树在当季每天随机挂 1~3 个果实，等人来收（每棵最多挂 ripeCap 个，满了不再挂） */
   function orchardTick(s, prevDay) {
-    if (!orchardUnlocked(s)) return { fruit: 0, mature: 0, growing: 0, thirsty: 0, ripe: 0 };
+    if (!orchardUnlocked(s)) return { fruit: 0, mature: 0, growing: 0, thirsty: 0, ripe: 0, full: 0 };
     const slots = s.orchard.slots || [];
-    let fruit = 0, mature = 0, growing = 0, thirsty = 0, ripe = 0;
+    let fruit = 0, mature = 0, growing = 0, thirsty = 0, ripe = 0, full = 0;
+    const cap = BALANCE.orchard.ripeCap;
     const season = seasonIdx(s.day || 1);
     slots.forEach(function (t, i) {
       if (!t) return;
@@ -254,8 +255,10 @@
         mature++;
         if (TREES[t.id].season === season) {
           const n = randInt(BALANCE.orchard.fruitMin, BALANCE.orchard.fruitMax);
-          t.ripe = (t.ripe || 0) + n;
-          fruit += n;
+          const had = t.ripe || 0;
+          t.ripe = Math.min(cap, had + n);
+          fruit += t.ripe - had;
+          if (t.ripe >= cap) full++;
         }
       } else {
         growing++;
@@ -263,7 +266,7 @@
       }
       ripe += t.ripe || 0;
     });
-    return { fruit: fruit, mature: mature, growing: growing, thirsty: thirsty, ripe: ripe };
+    return { fruit: fruit, mature: mature, growing: growing, thirsty: thirsty, ripe: ripe, full: full };
   }
 
   /* 果园概况：给界面 / 总结用 */

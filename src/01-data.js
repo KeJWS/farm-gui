@@ -91,7 +91,7 @@
      * 种子：浇水 30 天 + 生长满 90 天才成树；树苗：浇水 15 天 + 生长满 30 天，浇足后无需再浇。
      * 成树只在自己季节结果，当季每天随机 1~3 个；浇水 / 收获各 1 体力。 */
     orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, free: 3, fruitMin: 1, fruitMax: 3,
-               waterEnergy: 1, harvestEnergy: 1,
+               waterEnergy: 1, harvestEnergy: 1, ripeCap: 10,
                grow: { seed: { days: 90, water: 30 }, sapling: { days: 30, water: 15 } },
                slotCosts: [600, 1000, 1600, 2400, 3200] },
     /* 经营档案：按净资产给的称号 */
