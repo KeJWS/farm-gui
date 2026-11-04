@@ -918,7 +918,7 @@ ok(Array.isArray(sr.notes) && sr.notes.every(function (n) { return n && n.kind &
    '播报已改成结构化 {kind,text}');
 
 ok(G.BALANCE && G.BALANCE.tax.bands.length === 3 && G.BALANCE.tax.bands[1].rate === 0.04 &&
-   G.BALANCE.prices.sprinkler === 80 && G.BALANCE.hook.dough === 0.92,
+   G.BALANCE.device.sprinkler === 80 && G.BALANCE.hook.dough === 0.92,
    '数值表 BALANCE 对外导出（含累进税档）');
 
 /* ---------- 5s. v1.5.2: 渔网 / 肥料品质 / 水产店 ---------- */

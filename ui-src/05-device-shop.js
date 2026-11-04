@@ -107,10 +107,11 @@
       '<dt>🪝 高级假饵</dt><dd>' + (lure2Open
         ? lure2.price + ' 金/个 · 耐用 ' + lure2.dur + ' 次 · 现有 ' + lure2Have + ' 次'
         : lure2LockTxt + ' 解锁') + '</dd>' +
-      '<dt>🪱 蚯蚓</dt><dd>3 体力挖 1~3 条（晴天 −1、阴雨 +1）</dd></dl>' +
+      '<dt>🪱 蚯蚓</dt><dd>' + G.BALANCE.dig.energy + ' 体力挖 ' + G.BALANCE.dig.min + '~' +
+        G.BALANCE.dig.max + ' 条（晴天 −1、阴雨 +1）</dd></dl>' +
       '<div class="action-grid">' +
-        '<button class="btn" data-buy="dough" data-n="1">🍞 买 1 份<small>1 金</small></button>' +
-        '<button class="btn" data-buy="dough" data-n="5">🍞 买 5 份<small>5 金</small></button>' +
+        '<button class="btn" data-buy="dough" data-n="1">🍞 买 1 份<small>' + G.BAIT.dough.price + ' 金</small></button>' +
+        '<button class="btn" data-buy="dough" data-n="5">🍞 买 5 份<small>' + G.BAIT.dough.price * 5 + ' 金</small></button>' +
         '<button class="btn" data-buy="lure" data-n="1">🎣 买假饵<small>' + lure.price + ' 金 · ' +
           lure.dur + ' 次</small></button>' +
         '<button class="btn' + (lure2Open ? '' : ' locked') + '" data-buy="lure2" data-n="1"' +

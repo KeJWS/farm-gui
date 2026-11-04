@@ -157,7 +157,7 @@
   }
 
   /* 蚯蚓也能卖：3 金/条（只在渔具店卖） */
-  const WORM_VALUE = 3;
+  const WORM_VALUE = BALANCE.dig.value;
 
   function sellWorms(s, n) {
     const have = s.bait.worm || 0;
@@ -176,7 +176,7 @@
     if (s.energy < cost) return { ok: false, msg: '体力不够（挖蚯蚓要 ' + cost + ' 点）' };
     const w = WEATHER[s.weather];
     const bonus = digYieldBonus(s);
-    const n = clamp(randInt(1, 3) + w.wormMod + bonus, 1, 5 + bonus);
+    const n = clamp(randInt(BALANCE.dig.min, BALANCE.dig.max) + w.wormMod + bonus, 1, BALANCE.dig.cap + bonus);
     s.energy -= cost;
     s.bait.worm += n;
     s.stats.dug++;

@@ -25,7 +25,8 @@
         '<div class="orc-mid">' + t.name + ' · ' + (p.mode === 'sapling' ? '树苗' : '种子') + '<br>' +
           '💧 ' + p.water + '/' + p.needWater + ' 天 · 🌱 ' + p.age + '/' + p.needDays + ' 天</div>' +
         '<div class="cc-bar orc-bar"><i style="width:' + pct + '%"></i></div>' +
-        '<div class="orc-act"><span class="orc-note">' + (watered ? '✅ 今天浇过' : '💧 待浇水（1 体力）') + '</span></div></div>';
+        '<div class="orc-act"><span class="orc-note">' + (watered ? '✅ 今天浇过' : '💧 待浇水（' +
+          G.BALANCE.orchard.waterEnergy + ' 体力）') + '</span></div></div>';
     }
     const inSeason = G.treeInSeason(state, i);
     return '<div class="orc-card mature' + (inSeason ? ' on' : '') + '">' +
@@ -115,7 +116,8 @@
       '<div class="shop-head">🍑 当季每天挂 ' + need.fruitPerDay + ' 个水果 · 每棵果树只在自己的季节结果</div>' + rows +
       '<div class="shop-tip">种子便宜，但要<b>浇水 ' + need.grow.seed.water + ' 天</b>并且<b>生长满 ' +
         need.grow.seed.days + ' 天</b>才成树；树苗贵，<b>浇水 ' + need.grow.sapling.water +
-        ' 天</b>、生长满 ' + need.grow.sapling.days + ' 天就成树。浇水 / 收获各花 1 体力。</div>',
+        ' 天</b>、生长满 ' + need.grow.sapling.days + ' 天就成树。浇水 ' + need.waterEnergy +
+        ' 体力/棵、收获 ' + need.harvestEnergy + ' 体力/棵。</div>',
       '<button class="btn" data-act="depart">🏬 去百货店买</button>' +
       '<button class="btn" data-close>取消</button>');
   }

@@ -48,7 +48,8 @@
         '已经种下的作物不受换季影响，该熟还会熟。</p>' +
         '<table class="rule-table"><tr><th>季节</th><th>特点</th></tr>' +
         '<tr><td>🌱 春</td><td><b>多雨</b>（雨天 50%，自动浇水）</td></tr>' +
-        '<tr><td>☀️ 夏</td><td><b>多晴</b>（晴天 60%）· <b>浇水要 2 体力</b>（其他季节 1 点）</td></tr>' +
+        '<tr><td>☀️ 夏</td><td><b>多晴</b>（晴天 60%）· <b>浇水要 ' + G.BALANCE.energy.waterSummer +
+          ' 体力</b>（其他季节 ' + G.BALANCE.energy.water + ' 点）</td></tr>' +
         '<tr><td>🍂 秋</td><td><b>丰收</b>：普通作物每次收获 <b>+1 个</b>（大作物不算）</td></tr>' +
         '<tr><td>❄️ 冬</td><td>会<b>下雪</b>（45%，化雪等于自动浇水）· 不能种也不能钓</td></tr>' +
         '</table>' +
@@ -57,7 +58,11 @@
     const P2 =
       '<div class="rule-sec">' +
         '<h4>🎣 钓鱼</h4>' +
-        '<p>2 体力 + 1 份饵甩一杆（<b>冬天河面结冰，钓不了</b>）。<b>先判定咬钩</b>：面团饵 92%、蚯蚓 95%、假饵 72%，晴天 −12%、雨天 +8%。<br>' +
+        '<p>' + G.BALANCE.energy.fish + ' 体力 + 1 份饵甩一杆（<b>冬天河面结冰，钓不了</b>）。<b>先判定咬钩</b>：面团饵 ' +
+        Math.round(G.BALANCE.hook.dough * 100) + '%、蚯蚓 ' + Math.round(G.BALANCE.hook.worm * 100) +
+        '%、假饵 ' + Math.round(G.BALANCE.hook.lure * 100) + '%，晴天 ' +
+        Math.round(G.BALANCE.weatherHook.sunny * 100) + '%、雨天 +' +
+        Math.round(G.BALANCE.weatherHook.rain * 100) + '%。<br>' +
         '🐟 <b>鱼汛</b>：每种鱼只在特定季节成群——汛期上钩权重 ×1.25，非汛期 ×0.3。' +
         '鲫鱼 春·秋 / 鲤鱼 春夏秋 / 鳜鱼 春·夏 / 鲈鱼 夏·秋 / 河豚 秋 / 锦鲤 春。<br>' +
         '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15、耐用 ' +
@@ -182,7 +187,8 @@
         '· 开局体力上限 <b>15</b>，强化 +5/级（成本每级 ×1.2）<br>' +
         '· 打零工：<b>每天只能打一次</b>，全天 ×2.0 金/体力、半天 ×1.2，不够半天就把剩下的体力用光<br>' +
         '· 挖蚯蚓 ' + G.BALANCE.dig.energy + ' 体力一次（挖蚯蚓满级 ' + (G.BALANCE.dig.energy - 1) +
-        ' 体力，Lv4 / Lv8 各 +1 条），晴天 −1 条、阴雨 +1 条，最多 ' + (5 + 2) + ' 条<br>' +
+        ' 体力，Lv4 / Lv8 各 +1 条），晴天 −1 条、阴雨 +1 条，最多 ' +
+        (G.BALANCE.dig.cap + Math.floor(G.BALANCE.level.max / G.BALANCE.dig.yieldAt)) + ' 条<br>' +
         '· 强化体力 ' + G.upgradeCost(state) + ' 金 · 扩张土地 ' + G.expandCost(state) + ' 金<br>' +
         '· 🔧 <b>设备</b>都攒在右栏的「设备」面板里<br>' +
         '· 🚿 洒水器 ' + G.SPRINKLER_COST + ' 金/个（需种田 Lv' + G.BALANCE.gate.sprinkler +
@@ -198,7 +204,8 @@
         ' 个树坑要花钱开（' + G.BALANCE.orchard.slotCosts.join(' / ') + ' 金）；种子要<b>浇水 ' +
         G.BALANCE.orchard.grow.seed.water + ' 天 + 生长 ' + G.BALANCE.orchard.grow.seed.days +
         ' 天</b>，树苗要<b>浇水 ' + G.BALANCE.orchard.grow.sapling.water + ' 天 + 生长 ' +
-        G.BALANCE.orchard.grow.sapling.days + ' 天</b>（两项都满足才成树）；浇水 / 收获各 1 体力；' +
+        G.BALANCE.orchard.grow.sapling.days + ' 天</b>（两项都满足才成树）；浇水 ' +
+        G.BALANCE.orchard.waterEnergy + ' 体力 / 收获 ' + G.BALANCE.orchard.harvestEnergy + ' 体力；' +
         '成树只在自己的季节每天挂 ' + G.BALANCE.orchard.fruitPerDay + ' 个水果，收进仓库后去农产品店卖<br>' +
         '· 💰 税：每 30 天按（金币 + 仓库价值）<b>累进</b>收一次——前 2000 收 2%、2000~1 万收 4%、1 万以上收 6%，最低 ' +
         G.BALANCE.tax.min + ' 金（当前约 ' + G.taxDue(state) + ' 金）<br>' +

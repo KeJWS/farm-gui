@@ -228,6 +228,15 @@ build-modules.cjs / build-ui.cjs / build-single.cjs   三个拼装脚本
 | `14-events.js` | 全部事件绑定（点击委托、输入、快捷键、文件导入） |
 | `15-boot.js` | 启动：读档、渲染、成就检查、欢迎提示 |
 
+## 数值来源
+
+所有可调数值只在 [`src/01-data.js`](src/01-data.js) 的 `BALANCE` 里定义一次：
+
+- **逻辑层**通过 `BALANCE.xxx` 读取，不写死数字；体力消耗统一在 `BALANCE.energy`，挖蚯蚓 / 采集 / 果园各有自己的小节
+- **界面层**通过 `G.BALANCE` 读取；`index.html` 里不带具体数值（「几体力 / 几金」都由 `ui.js` 渲染时填）
+- **新增数值**先加进 `BALANCE`，再在逻辑 / 界面里引用
+- `node check-config.cjs` 会检查：BALANCE 顶层键不重复、逻辑层没有写死的体力、界面没有写死的「N 体力」、HTML 的 `<small>` 不带死数字
+
 ## 开发者命令
 
 ```bash
@@ -235,6 +244,7 @@ node build-modules.cjs # src/*.js → game.js（改了 src/ 就要跑；build-si
 node build-ui.cjs      # ui-src/*.js → ui.js（改了界面层就要跑）
 node selftest.cjs      # 562 项逻辑自测：播种/种子店/肥料/品质/收获器/钓鱼/天气/经济/委托/等级/解锁/农产品店/水产库存/成就/税金/采集/小镇/市场历史/高级假饵/自动播种器/交易等级/果园/每日总结/存读档/3000 步压测
 node check-ui.cjs      # 校验 ui.js 用到的 id、data-act 在 index.html 里都存在
+node check-config.cjs  # 数值来源检查：BALANCE 无重复键、逻辑 / 界面不写死体力、HTML 不带死数字
 node dom-test.cjs      # DOM 冒烟：用最小 DOM 桩把 ui.js 跑起来，测渲染与弹窗
 node balance.cjs       # 数值体检：钓鱼期望 / 三种活计收益 / 委托样本 / 设备回本 / 套利检查
 node analysis.cjs      # 收益分析：作物 / 钓鱼（专项）/ 渔网 / 渔夫 / 采集 / 小镇 / 早中后期日净收入
@@ -244,6 +254,16 @@ node build-single.cjs  # 把三件套内联成 我的小农场.html
 （`selftest` / `dom-test` / `check-ui` / `balance` / `analysis` 都会先检查 `src/` 与 `ui-src/` 有没有比产物新，自动补拼装。）
 
 ## 更新记录
+
+**v2.22.0（统一数值来源）**
+
+- **BALANCE 去重**：删掉重复定义的 `tax`、把 `prices` 并进 `device`（`netMax`）、把 `lure2.lv` 并进 `gate.lure2`
+- **新增配置**：`start`（开局金币 / 体力 / 地块）、`energy`（播种 / 浇水 / 夏季浇水 / 收获 / 施肥 / 钓鱼）、`meal`（伙食费公式）、`upgrade`（强化体力）、`fishBatch`（连甩杆数）、`dig.min/max/cap/value`
+- **逻辑层不再写死体力**：所有 `s.energy -= 1 / 2` 改为读 `BALANCE`，`check-config.cjs` 会守住这条
+- **界面层不再写死数字**：甩杆体力、地块收获/浇水体力、挖蚯蚓、面团饵价格、果树浇水/收获体力都从 `G.BALANCE` 生成；`index.html` 的 HUD 与按钮改为占位符
+- **新增 `check-config.cjs`**：12 项检查（重复键 / 旧键复活 / 写死体力 / HTML 死数字 / 关键项有效性）
+- 修正渔夫注释：工资 8+4、升级 5+2（与代码一致）
+- **测试**：逻辑 562、DOM 127（新增 4 项「数值来自 BALANCE」断言）
 
 **v2.21.1（果园位置 / 果树收益分析）**
 

@@ -151,6 +151,10 @@ console.log('== 首屏渲染 ==');
 ok(html('#plot-grid').indexOf('class="plot') >= 0 && (html('#plot-grid').match(/class="plot /g) || []).length === 5,
    '农田渲染出 5 块地');
 ok(text('#hud-plots').indexOf('5 块') >= 0, 'HUD 显示 5 块地', text('#hud-plots'));
+ok(text('#hud-fee').indexOf(G.mealFee({ maxEnergy: 15 }) + ' 金/天') >= 0, 'HUD 伙食费来自 BALANCE', text('#hud-fee'));
+ok(text('#cast-cost') === G.BALANCE.energy.fish + ' 体力', '甩杆体力来自 BALANCE', text('#cast-cost'));
+ok(text('#cast5-n') === String(G.BALANCE.fishBatch), '连甩杆数来自 BALANCE', text('#cast5-n'));
+ok(text('#dig-txt') === G.digCost({ levels: { dig: 1 } }) + ' 体力', '挖蚯蚓体力来自 BALANCE', text('#dig-txt'));
 ok(text('#farm-lv').indexOf('Lv') >= 0 && text('#fish-lv').indexOf('Lv') >= 0,
    '农田 / 河边显示等级', [text('#farm-lv'), text('#fish-lv')]);
 ok(text('#store-sum').indexOf('估值') >= 0, '仓库显示总价值', text('#store-sum'));

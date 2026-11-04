@@ -113,7 +113,7 @@
       }
     },
     cast5: function () {
-      const r = G.fishMany(state, 5, baitSel);
+      const r = G.fishMany(state, G.BALANCE.fishBatch, baitSel);
       commit(r);                       // commit 已经在失败时提示过一次
       if (!r.ok) return;
       const got = r.results.filter(function (x) { return x.ok && x.entry; }).map(function (x) { return x.entry; });

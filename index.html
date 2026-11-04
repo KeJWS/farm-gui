@@ -15,20 +15,20 @@
     <div class="logo">🌾</div>
     <div class="brand-txt">
       <h1>我的小农场</h1>
-      <p id="season">春 · 第 1 天</p>
+      <p id="season">—</p>
     </div>
   </div>
 
   <div class="hud">
-    <div class="chip coins" id="hud-coins" title="金币">💰 <b>50</b></div>
+    <div class="chip coins" id="hud-coins" title="金币">💰 <b>—</b></div>
     <div class="chip energy" title="体力">
       <span>🔋</span>
       <div class="ebar"><i id="hud-ebar"></i></div>
-      <b id="hud-etxt">10/10</b>
+      <b id="hud-etxt">—</b>
     </div>
     <div class="chip weather" id="hud-weather">☀️ 晴天</div>
-    <div class="chip" id="hud-fee" title="每天睡觉扣一次">🍖 3 金/天</div>
-    <div class="chip" id="hud-plots">🏞️ 4 块</div>
+    <div class="chip" id="hud-fee" title="每天睡觉扣一次">🍖 —</div>
+    <div class="chip" id="hud-plots">🏞️ —</div>
   </div>
 
   <div class="top-actions">
@@ -71,8 +71,8 @@
       </div>
       <div class="bait-row" id="bait-row"></div>
       <div class="fish-row">
-        <button class="btn primary big" data-act="cast">🎣 甩一杆<small>2 体力</small></button>
-        <button class="btn big" data-act="cast5">⚡ 连甩 5 杆</button>
+        <button class="btn primary big" data-act="cast">🎣 甩一杆<small id="cast-cost"></small></button>
+        <button class="btn big" data-act="cast5">⚡ 连甩 <span id="cast5-n">5</span> 杆</button>
         <button class="btn big" data-act="castAll">🌊 全部体力</button>
       </div>
       <div class="catch-area" id="catch-area">
@@ -127,7 +127,7 @@
         <span class="lv-chip" id="forage-lv">🌿 Lv1</span>
       </div>
       <div class="action-grid">
-        <button class="btn" data-act="dig">🪱 挖蚯蚓<small id="dig-txt">3 体力</small></button>
+        <button class="btn" data-act="dig">🪱 挖蚯蚓<small id="dig-txt"></small></button>
         <button class="btn" data-act="work">🕐 打零工<small id="work-txt"></small></button>
         <button class="btn wide-cell" data-act="forage">🌿 采集<small id="forage-txt"></small></button>
       </div>
@@ -136,7 +136,7 @@
     <div class="panel">
       <div class="panel-head"><h2>🏡 农场</h2></div>
       <div class="action-grid farm-actions">
-        <button class="btn" data-act="tea">🍵 下午茶<small id="tea-txt">3 金 · +5 体力</small></button>
+        <button class="btn" data-act="tea">🍵 下午茶<small id="tea-txt"></small></button>
         <button class="btn" data-act="expand">🏞️ 扩张土地<small id="expand-txt"></small></button>
         <button class="btn wide-cell" data-act="upgrade">💪 强化体力<small id="upgrade-txt"></small></button>
       </div>

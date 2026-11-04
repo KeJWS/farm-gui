@@ -332,11 +332,17 @@
     }).join('');
 
     const frozen = G.isWinter(state.day);
+    const FISH_E = G.BALANCE.energy.fish;
+    const BATCH = G.BALANCE.fishBatch;
     const castBtn = $('[data-act="cast"]');
-    castBtn.disabled = frozen || state.energy < 2;
+    castBtn.disabled = frozen || state.energy < FISH_E;
     castBtn.title = frozen ? '河面结冰，冬天钓不了鱼' : '';
     const cast5Btn = $('[data-act="cast5"]');
-    cast5Btn.disabled = frozen || state.energy < 10;   // 5 杆要 10 体力，不够就别假装能连甩
+    cast5Btn.disabled = frozen || state.energy < FISH_E * BATCH;
+    const cast5n = $('#cast5-n');
+    if (cast5n) cast5n.textContent = String(BATCH);
+    const castCost = $('#cast-cost');
+    if (castCost) castCost.textContent = FISH_E + ' 体力';
     const castAllBtn = $('[data-act="castAll"]');
     if (castAllBtn) { castAllBtn.disabled = frozen; castAllBtn.title = frozen ? '河面结冰' : ''; }
   }

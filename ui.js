@@ -535,11 +535,17 @@
     }).join('');
 
     const frozen = G.isWinter(state.day);
+    const FISH_E = G.BALANCE.energy.fish;
+    const BATCH = G.BALANCE.fishBatch;
     const castBtn = $('[data-act="cast"]');
-    castBtn.disabled = frozen || state.energy < 2;
+    castBtn.disabled = frozen || state.energy < FISH_E;
     castBtn.title = frozen ? '河面结冰，冬天钓不了鱼' : '';
     const cast5Btn = $('[data-act="cast5"]');
-    cast5Btn.disabled = frozen || state.energy < 10;   // 5 杆要 10 体力，不够就别假装能连甩
+    cast5Btn.disabled = frozen || state.energy < FISH_E * BATCH;
+    const cast5n = $('#cast5-n');
+    if (cast5n) cast5n.textContent = String(BATCH);
+    const castCost = $('#cast-cost');
+    if (castCost) castCost.textContent = FISH_E + ' 体力';
     const castAllBtn = $('[data-act="castAll"]');
     if (castAllBtn) { castAllBtn.disabled = frozen; castAllBtn.title = frozen ? '河面结冰' : ''; }
   }
@@ -908,10 +914,10 @@
     let actions = '';
     if (p.phase === 'ripe') {
       actions += '<button class="btn primary" data-pact="harvest" data-i="' + i + '">' +
-        (can ? '🧺 收获' : '⏳ 明天才能收') + '<small>1 体力</small></button>';
+        (can ? '🧺 收获' : '⏳ 明天才能收') + '<small>' + G.BALANCE.energy.harvest + ' 体力</small></button>';
     } else {
       actions += '<button class="btn primary" data-pact="water" data-i="' + i + '"' +
-        (p.watered ? ' disabled' : '') + '>💧 浇水<small>' + (p.watered ? '今天浇过了' : '1 体力 · +1 天') + '</small></button>';
+        (p.watered ? ' disabled' : '') + '>💧 浇水<small>' + (p.watered ? '今天浇过了' : G.waterCost(state) + ' 体力 · +1 天') + '</small></button>';
       if (!big) {
         const fn = G.FERT.normal, fs = G.FERT.special;
         const nOwn = state.ferts.normal || 0, sOwn = state.ferts.special || 0;
@@ -1232,10 +1238,11 @@
       '<dt>🪝 高级假饵</dt><dd>' + (lure2Open
         ? lure2.price + ' 金/个 · 耐用 ' + lure2.dur + ' 次 · 现有 ' + lure2Have + ' 次'
         : lure2LockTxt + ' 解锁') + '</dd>' +
-      '<dt>🪱 蚯蚓</dt><dd>3 体力挖 1~3 条（晴天 −1、阴雨 +1）</dd></dl>' +
+      '<dt>🪱 蚯蚓</dt><dd>' + G.BALANCE.dig.energy + ' 体力挖 ' + G.BALANCE.dig.min + '~' +
+        G.BALANCE.dig.max + ' 条（晴天 −1、阴雨 +1）</dd></dl>' +
       '<div class="action-grid">' +
-        '<button class="btn" data-buy="dough" data-n="1">🍞 买 1 份<small>1 金</small></button>' +
-        '<button class="btn" data-buy="dough" data-n="5">🍞 买 5 份<small>5 金</small></button>' +
+        '<button class="btn" data-buy="dough" data-n="1">🍞 买 1 份<small>' + G.BAIT.dough.price + ' 金</small></button>' +
+        '<button class="btn" data-buy="dough" data-n="5">🍞 买 5 份<small>' + G.BAIT.dough.price * 5 + ' 金</small></button>' +
         '<button class="btn" data-buy="lure" data-n="1">🎣 买假饵<small>' + lure.price + ' 金 · ' +
           lure.dur + ' 次</small></button>' +
         '<button class="btn' + (lure2Open ? '' : ' locked') + '" data-buy="lure2" data-n="1"' +
@@ -1365,7 +1372,8 @@
         '已经种下的作物不受换季影响，该熟还会熟。</p>' +
         '<table class="rule-table"><tr><th>季节</th><th>特点</th></tr>' +
         '<tr><td>🌱 春</td><td><b>多雨</b>（雨天 50%，自动浇水）</td></tr>' +
-        '<tr><td>☀️ 夏</td><td><b>多晴</b>（晴天 60%）· <b>浇水要 2 体力</b>（其他季节 1 点）</td></tr>' +
+        '<tr><td>☀️ 夏</td><td><b>多晴</b>（晴天 60%）· <b>浇水要 ' + G.BALANCE.energy.waterSummer +
+          ' 体力</b>（其他季节 ' + G.BALANCE.energy.water + ' 点）</td></tr>' +
         '<tr><td>🍂 秋</td><td><b>丰收</b>：普通作物每次收获 <b>+1 个</b>（大作物不算）</td></tr>' +
         '<tr><td>❄️ 冬</td><td>会<b>下雪</b>（45%，化雪等于自动浇水）· 不能种也不能钓</td></tr>' +
         '</table>' +
@@ -1374,7 +1382,11 @@
     const P2 =
       '<div class="rule-sec">' +
         '<h4>🎣 钓鱼</h4>' +
-        '<p>2 体力 + 1 份饵甩一杆（<b>冬天河面结冰，钓不了</b>）。<b>先判定咬钩</b>：面团饵 92%、蚯蚓 95%、假饵 72%，晴天 −12%、雨天 +8%。<br>' +
+        '<p>' + G.BALANCE.energy.fish + ' 体力 + 1 份饵甩一杆（<b>冬天河面结冰，钓不了</b>）。<b>先判定咬钩</b>：面团饵 ' +
+        Math.round(G.BALANCE.hook.dough * 100) + '%、蚯蚓 ' + Math.round(G.BALANCE.hook.worm * 100) +
+        '%、假饵 ' + Math.round(G.BALANCE.hook.lure * 100) + '%，晴天 ' +
+        Math.round(G.BALANCE.weatherHook.sunny * 100) + '%、雨天 +' +
+        Math.round(G.BALANCE.weatherHook.rain * 100) + '%。<br>' +
         '🐟 <b>鱼汛</b>：每种鱼只在特定季节成群——汛期上钩权重 ×1.25，非汛期 ×0.3。' +
         '鲫鱼 春·秋 / 鲤鱼 春夏秋 / 鳜鱼 春·夏 / 鲈鱼 夏·秋 / 河豚 秋 / 锦鲤 春。<br>' +
         '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15、耐用 ' +
@@ -1499,7 +1511,8 @@
         '· 开局体力上限 <b>15</b>，强化 +5/级（成本每级 ×1.2）<br>' +
         '· 打零工：<b>每天只能打一次</b>，全天 ×2.0 金/体力、半天 ×1.2，不够半天就把剩下的体力用光<br>' +
         '· 挖蚯蚓 ' + G.BALANCE.dig.energy + ' 体力一次（挖蚯蚓满级 ' + (G.BALANCE.dig.energy - 1) +
-        ' 体力，Lv4 / Lv8 各 +1 条），晴天 −1 条、阴雨 +1 条，最多 ' + (5 + 2) + ' 条<br>' +
+        ' 体力，Lv4 / Lv8 各 +1 条），晴天 −1 条、阴雨 +1 条，最多 ' +
+        (G.BALANCE.dig.cap + Math.floor(G.BALANCE.level.max / G.BALANCE.dig.yieldAt)) + ' 条<br>' +
         '· 强化体力 ' + G.upgradeCost(state) + ' 金 · 扩张土地 ' + G.expandCost(state) + ' 金<br>' +
         '· 🔧 <b>设备</b>都攒在右栏的「设备」面板里<br>' +
         '· 🚿 洒水器 ' + G.SPRINKLER_COST + ' 金/个（需种田 Lv' + G.BALANCE.gate.sprinkler +
@@ -1515,7 +1528,8 @@
         ' 个树坑要花钱开（' + G.BALANCE.orchard.slotCosts.join(' / ') + ' 金）；种子要<b>浇水 ' +
         G.BALANCE.orchard.grow.seed.water + ' 天 + 生长 ' + G.BALANCE.orchard.grow.seed.days +
         ' 天</b>，树苗要<b>浇水 ' + G.BALANCE.orchard.grow.sapling.water + ' 天 + 生长 ' +
-        G.BALANCE.orchard.grow.sapling.days + ' 天</b>（两项都满足才成树）；浇水 / 收获各 1 体力；' +
+        G.BALANCE.orchard.grow.sapling.days + ' 天</b>（两项都满足才成树）；浇水 ' +
+        G.BALANCE.orchard.waterEnergy + ' 体力 / 收获 ' + G.BALANCE.orchard.harvestEnergy + ' 体力；' +
         '成树只在自己的季节每天挂 ' + G.BALANCE.orchard.fruitPerDay + ' 个水果，收进仓库后去农产品店卖<br>' +
         '· 💰 税：每 30 天按（金币 + 仓库价值）<b>累进</b>收一次——前 2000 收 2%、2000~1 万收 4%、1 万以上收 6%，最低 ' +
         G.BALANCE.tax.min + ' 金（当前约 ' + G.taxDue(state) + ' 金）<br>' +
@@ -2585,8 +2599,9 @@
     const orchard = [];
     if (rep.orchard) {
       if (rep.orchard.fruit) orchard.push(['🍑 挂果', '+' + rep.orchard.fruit + ' 个（等着收）']);
-      if (rep.orchard.ripe) orchard.push(['🧺 待收', rep.orchard.ripe + ' 个 · 每棵 1 体力']);
-      if (rep.orchard.thirsty) orchard.push(['💧 待浇水', rep.orchard.thirsty + ' 棵育苗树 · 1 体力/棵']);
+      if (rep.orchard.ripe) orchard.push(['🧺 待收', rep.orchard.ripe + ' 个 · 每棵 ' + G.BALANCE.orchard.harvestEnergy + ' 体力']);
+      if (rep.orchard.thirsty) orchard.push(['💧 待浇水', rep.orchard.thirsty + ' 棵育苗树 · ' +
+        G.BALANCE.orchard.waterEnergy + ' 体力/棵']);
     }
 
     function sec(title, rows) {
@@ -2645,7 +2660,8 @@
         '<div class="orc-mid">' + t.name + ' · ' + (p.mode === 'sapling' ? '树苗' : '种子') + '<br>' +
           '💧 ' + p.water + '/' + p.needWater + ' 天 · 🌱 ' + p.age + '/' + p.needDays + ' 天</div>' +
         '<div class="cc-bar orc-bar"><i style="width:' + pct + '%"></i></div>' +
-        '<div class="orc-act"><span class="orc-note">' + (watered ? '✅ 今天浇过' : '💧 待浇水（1 体力）') + '</span></div></div>';
+        '<div class="orc-act"><span class="orc-note">' + (watered ? '✅ 今天浇过' : '💧 待浇水（' +
+          G.BALANCE.orchard.waterEnergy + ' 体力）') + '</span></div></div>';
     }
     const inSeason = G.treeInSeason(state, i);
     return '<div class="orc-card mature' + (inSeason ? ' on' : '') + '">' +
@@ -2735,7 +2751,8 @@
       '<div class="shop-head">🍑 当季每天挂 ' + need.fruitPerDay + ' 个水果 · 每棵果树只在自己的季节结果</div>' + rows +
       '<div class="shop-tip">种子便宜，但要<b>浇水 ' + need.grow.seed.water + ' 天</b>并且<b>生长满 ' +
         need.grow.seed.days + ' 天</b>才成树；树苗贵，<b>浇水 ' + need.grow.sapling.water +
-        ' 天</b>、生长满 ' + need.grow.sapling.days + ' 天就成树。浇水 / 收获各花 1 体力。</div>',
+        ' 天</b>、生长满 ' + need.grow.sapling.days + ' 天就成树。浇水 ' + need.waterEnergy +
+        ' 体力/棵、收获 ' + need.harvestEnergy + ' 体力/棵。</div>',
       '<button class="btn" data-act="depart">🏬 去百货店买</button>' +
       '<button class="btn" data-close>取消</button>');
   }
@@ -2856,7 +2873,7 @@
       }
     },
     cast5: function () {
-      const r = G.fishMany(state, 5, baitSel);
+      const r = G.fishMany(state, G.BALANCE.fishBatch, baitSel);
       commit(r);                       // commit 已经在失败时提示过一次
       if (!r.ok) return;
       const got = r.results.filter(function (x) { return x.ok && x.entry; }).map(function (x) { return x.entry; });

@@ -16,28 +16,40 @@
   /* ---------------- 数值表（BALANCE） ---------------- */
 
   const BALANCE = {
+    /* ---------------- 全局入口：所有可调数值都在这里，界面 / 分析脚本只读这里 ---------------- */
+
+    /* 开局 */
+    start: { coins: 50, energy: 15, maxEnergy: 15, plots: 5 },
+    /* 各动作体力消耗（统一在这里改，不要在逻辑里写死数字） */
+    energy: { plant: 1, water: 1, waterSummer: 2, harvest: 1, fert: 1, fish: 2 },
+    /* 伙食费：base + (上限 − from) / perEnergy，最低 min */
+    meal: { base: 3, perEnergy: 5, from: 10, min: 1 },
+    /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
+    upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
+
     hook: { dough: 0.92, worm: 0.95, lure: 0.72, lure2: 0.92 },
     weatherHook: { sunny: -0.12, cloudy: 0, rain: 0.08 },
     bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.15 },
-    prices: { sprinkler: 80, harvester: 200, net: 50, netMax: 9 },
     netChance: 0.8,
     /* 渔网抓完鱼要重新布置：每张 1 体力 */
     netReset: { energy: 1 },
-    /* 雇佣渔夫：钓鱼 Lv5 解锁。每天 2+等级 杆，工资 10+5×(等级-1)；
-     * 每钓到 1 条 +1 经验，升级需要 6+3×(等级-1)，也可以花钱直接升 */
+    /* 「连甩 N 杆」的杆数 */
+    fishBatch: 5,
+    /* 雇佣渔夫：钓鱼 Lv5 解锁。每天 2+等级 杆，工资 8+4×(等级-1)；
+     * 每钓到 1 条 +1 经验，升级需要 5+2×(等级-1)，也可以花钱直接升 */
     fisher: { hire: 300, baseCasts: 2, wageBase: 8, wageStep: 4,
               needBase: 5, needStep: 2, upCost: 100, max: 10 },
     work: { full: 2.0, half: 1.2 },
     upkeep: { plotPerWeek: 3, plotMid: 6, plotHigh: 14, free: 5, sprinkle: 3, net: 0, harvester: 5,
               seeder: 6 },
-    tax: { rate: 0.04, min: 30, every: 30 },
     order: { mult: 1.35, seasonStep: 0.6 },
     expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
     /* 自动播种器：一台只管 5 块地，买几台就播几块（每台每天 5 块），每台每周要交维护费 */
-    device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5, seederMax: 9 },
+    device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5,
+              seederMax: 9, netMax: 9 },
     lure: { price: 5, dur: 25 },
     /* 高级假饵：钓鱼 Lv6 解锁，20 金 / 100 次；咬钩率跟面团饵一样，好鱼率跟假饵一样 */
-    lure2: { price: 20, dur: 100, lv: 6 },
+    lure2: { price: 20, dur: 100 },
     shop: { priceMul: 1.3, cropPriceMul: 1.3, restock: true, sellRate: 0.8 },
     /* 市场：供需 1.30（稀缺）→ 0.70（过剩），反季 ×1.7，每天睡觉回落 30% */
     market: { supplyMax: 1.3, supplyMin: 0.7, cropStep: 0.02, fishStep: 0.015,
@@ -47,8 +59,8 @@
     /* 采集：5 体力一次（采集满级 4），100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子
      * Lv4 / Lv8 各多取一次品质（野货品质更好） */
     forage: { energy: 5, qty2: 0.75, qty3: 0.35, seedChance: 0.25, xp: 2, qualityAt: 4 },
-    /* 挖蚯蚓：3 体力一次（满级 2），1–3 条；Lv4 / Lv8 各 +1 条（最多 7 条） */
-    dig: { energy: 3, xp: 2, yieldAt: 4 },
+    /* 挖蚯蚓：3 体力一次（满级 2），1–3 条；Lv4 / Lv8 各 +1 条（封顶 cap + 加成） */
+    dig: { energy: 3, xp: 2, yieldAt: 4, min: 1, max: 3, cap: 5, value: 3 },
     /* 交易等级：买东西 / 卖东西按交易额涨经验（每 5 金 1 点），每级把商店进价压低 0.5%（最多 −4.5%） */
     trade: { xpPer: 5, buyCut: 0.005, maxCut: 0.045, xpBase: 60, xpStep: 30 },
     /* 小镇捐赠：三档，捐得越多加成越多（金币出口） */
@@ -290,10 +302,10 @@
 
   const BAIT = {
     worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '好鱼概率 ×1.35 · 品质取两次较好' },
-    dough: { id: 'dough', name: '面团饵', emoji: '🍞', desc: '标准钓鱼体验 · 92% 咬钩' },
+    dough: { id: 'dough', name: '面团饵', emoji: '🍞', price: 1, desc: '标准钓鱼体验 · 92% 咬钩' },
     lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 25 次 · 杂物少、品质取两次较好，但只有 72% 咬钩' },
     lure2: { id: 'lure2', name: '高级假饵', emoji: '🪝',
-             desc: '耐用 100 次 · 咬钩率跟面团饵一样（92%），好鱼率跟假饵一样 · 钓鱼 Lv' + BALANCE.lure2.lv + ' 解锁' }
+             desc: '耐用 100 次 · 咬钩率跟面团饵一样（92%），好鱼率跟假饵一样 · 钓鱼 Lv' + BALANCE.gate.lure2 + ' 解锁' }
   };
   /* 各饵的咬钩基础概率（天气再加减） */
   const HOOK = BALANCE.hook;
@@ -795,10 +807,10 @@
       v: SAVE_VERSION,
       day: 1,
       weather: 'sunny',
-      coins: 50,
-      energy: 15,
-      maxEnergy: 15,
-      plots: [makePlot(), makePlot(), makePlot(), makePlot(), makePlot()],
+      coins: BALANCE.start.coins,
+      energy: BALANCE.start.energy,
+      maxEnergy: BALANCE.start.maxEnergy,
+      plots: Array.from({ length: BALANCE.start.plots }, makePlot),
       seeds: {},
       store: {},
       box: [],
@@ -874,7 +886,10 @@
   const WORK_RATE_FULL = BALANCE.work.full;
   const WORK_RATE_HALF = BALANCE.work.half;
 
-  function mealFee(s) { return Math.max(1, 3 + (s.maxEnergy - 10) / 5); }
+  function mealFee(s) {
+    const M = BALANCE.meal;
+    return Math.max(M.min, M.base + (s.maxEnergy - M.from) / M.perEnergy);
+  }
 
   /* 土地维护：超过 5 块开始收费，20 块以上 6 金/周、30 块以上 10 金/周 */
   function plotUpkeep(plots) {
@@ -904,8 +919,9 @@
   }
   /* 强化体力：成本超线性增长（每级 ×1.2），避免「无脑升级」把上限堆到几百 */
   function upgradeCost(s) {
-    const tier = Math.max(0, (s.maxEnergy - 10) / 5);
-    return Math.round(30 * Math.pow(1.2, tier));
+    const U = BALANCE.upgrade;
+    const tier = Math.max(0, (s.maxEnergy - U.from) / U.step);
+    return Math.round(U.baseCost * Math.pow(U.costMul, tier));
   }
   function workCost(s, mode) { return Math.round(mode === 'half' ? s.maxEnergy / 2 : s.maxEnergy); }
   function workPay(s, mode) {
@@ -976,7 +992,7 @@
     if (!c) return { ok: false, msg: '没有这种作物' };
     if (isWinter(s.day)) return { ok: false, msg: '冬天土地封冻了，开春再种吧' };
     if (p.crop) return { ok: false, msg: '这块地不是空地' };
-    if (!free && s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
+    if (!free && s.energy < BALANCE.energy.plant) return { ok: false, msg: '体力不够了，先睡觉吧' };
 
     // 种子只能从种子店买，播种时只消耗背包里的种子
     const owned = s.seeds[cropId] || 0;
@@ -985,7 +1001,7 @@
     if (s.seeds[cropId] === 0) delete s.seeds[cropId];
 
     const off = !cropSeasonOk(cropId, s.day);
-    if (!free) s.energy -= 1;
+    if (!free) s.energy -= BALANCE.energy.plant;
     p.crop = cropId;
     p.off = off ? 1 : 0;
     p.growth = 0;
@@ -1032,7 +1048,9 @@
   }
 
   /* 季节特性：夏天浇水更费体力（2 点），其他季节 1 点 */
-  function waterCost(s) { return seasonIdx(s.day) === 1 ? 2 : 1; }
+  function waterCost(s) {
+    return seasonIdx(s.day) === 1 ? BALANCE.energy.waterSummer : BALANCE.energy.water;
+  }
 
   function water(s, idx) {
     const p = s.plots[idx];
@@ -1066,10 +1084,10 @@
     if (!p || !p.crop) return { ok: false, msg: '这块地还没种东西' };
     if (p.phase !== 'ripe') return { ok: false, msg: '还没成熟（' + p.growth + '/' + needOf(p) + ' 天）' };
     if (s.day <= p.ripeDay) return { ok: false, msg: '刚浇成熟，明天才能收获' };
-    if (!free && s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
+    if (!free && s.energy < BALANCE.energy.harvest) return { ok: false, msg: '体力不够了，先睡觉吧' };
 
     const c = CROPS[p.crop];
-    if (!free) s.energy -= 1;
+    if (!free) s.energy -= BALANCE.energy.harvest;
 
     let qty;
     if (c.multi) qty = p.hits === 0 ? c.firstQty : c.regrowQty;
@@ -1208,9 +1226,9 @@
     if (p.fert) return { ok: false, msg: '这块地已经施过肥了' };
     if (p.phase === 'ripe') return { ok: false, msg: '都熟了，别浪费肥料' };
     if ((s.ferts[kind] || 0) < 1) return { ok: false, msg: '肥料用完了，去种子店买' };
-    if (s.energy < 1) return { ok: false, msg: '体力不够了' };
+    if (s.energy < BALANCE.energy.fert) return { ok: false, msg: '体力不够了' };
     s.ferts[kind]--;
-    s.energy -= 1;
+    s.energy -= BALANCE.energy.fert;
     p.fert = f.add;
     const big = !!CROPS[p.crop].big;
     log(s, '🧪 ' + (idx + 1) + ' 号地施了' + f.name +
@@ -1290,11 +1308,11 @@
 
     let n = 0, stop = null;
     for (let k = 0; k < targets.length; k++) {
-      if (s.energy < 1) { stop = '体力不够了'; break; }
+      if (s.energy < BALANCE.energy.fert) { stop = '体力不够了'; break; }
       if ((s.ferts[kind] || 0) < 1) { stop = '肥料不够了'; break; }
       const p = s.plots[targets[k]];
       s.ferts[kind]--;
-      s.energy -= 1;
+      s.energy -= BALANCE.energy.fert;
       p.fert = f.add;
       n++;
     }
@@ -1563,11 +1581,13 @@
     opts = opts || {};
     const w = WEATHER[s.weather];
     if (isWinter(s.day)) return { ok: false, msg: '河面结冰了，冬天钓不了鱼' };
-    if (!opts.free && s.energy < 2) return { ok: false, msg: '体力不够（钓鱼要 2 点）' };
+    if (!opts.free && s.energy < BALANCE.energy.fish) {
+      return { ok: false, msg: '体力不够（钓鱼要 ' + BALANCE.energy.fish + ' 点）' };
+    }
     const kind = opts.forceKind || pickBait(s, preferBait);
     if (!kind) return { ok: false, msg: '没有饵料了，先去挖蚯蚓或买面团饵' };
 
-    if (!opts.free) s.energy -= 2;
+    if (!opts.free) s.energy -= BALANCE.energy.fish;
     if (!opts.noBait) {
       if (kind === 'worm') {
         s.bait.worm--;
@@ -1667,7 +1687,7 @@
   function fishAll(s, preferBait) {
     let n = 0, empty = 0, value = 0, chests = 0, ups = 0, lastErr = '';
     const got = [];
-    while (s.energy >= 2 && n < 400) {
+    while (s.energy >= BALANCE.energy.fish && n < 400) {
       const r = fish(s, preferBait, { quiet: true });
       if (!r.ok) { lastErr = r.msg; break; }
       n++;
@@ -2214,7 +2234,7 @@
   }
 
   /* 蚯蚓也能卖：3 金/条（只在渔具店卖） */
-  const WORM_VALUE = 3;
+  const WORM_VALUE = BALANCE.dig.value;
 
   function sellWorms(s, n) {
     const have = s.bait.worm || 0;
@@ -2233,7 +2253,7 @@
     if (s.energy < cost) return { ok: false, msg: '体力不够（挖蚯蚓要 ' + cost + ' 点）' };
     const w = WEATHER[s.weather];
     const bonus = digYieldBonus(s);
-    const n = clamp(randInt(1, 3) + w.wormMod + bonus, 1, 5 + bonus);
+    const n = clamp(randInt(BALANCE.dig.min, BALANCE.dig.max) + w.wormMod + bonus, 1, BALANCE.dig.cap + bonus);
     s.energy -= cost;
     s.bait.worm += n;
     s.stats.dug++;
@@ -2295,7 +2315,7 @@
   function buyBait(s, kind, n) {
     n = n || 1;
     if (kind === 'dough') {
-      const cost = 1 * n;
+      const cost = BAIT.dough.price * n;
       if (s.coins < cost) return { ok: false, msg: '金币不够' };
       s.coins -= cost; ledger(s, '买面团饵 ×' + n, 0, cost);
       tradeXp(s, cost);
@@ -2538,7 +2558,7 @@
   /* 自动收获器：睡觉时免费收成熟作物 */
   const HARVESTER_COST = BALANCE.device.harvester;
   const NET_COST = BALANCE.device.net;
-  const NET_MAX = BALANCE.prices.netMax;
+  const NET_MAX = BALANCE.device.netMax;
   const NET_CHANCE = BALANCE.netChance;
 
   /* 月度累进税：按（金币 + 仓库价值）分档，0~2k 收 2%、2k~10k 收 4%、1w 以上收 6%，最低 30 金 */
@@ -3026,7 +3046,7 @@
     const cost = upgradeCost(s);
     if (s.coins < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
     s.coins -= cost; ledger(s, '体力上限强化', 0, cost);
-    s.maxEnergy += 5;
+    s.maxEnergy += BALANCE.upgrade.step;
     log(s, '💪 体力上限 → ' + s.maxEnergy + '（伙食费 ' + mealFee(s) + ' 金/天）', 'good');
     return { ok: true, msg: '体力上限 ' + s.maxEnergy, maxEnergy: s.maxEnergy };
   }

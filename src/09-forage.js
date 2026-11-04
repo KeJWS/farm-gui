@@ -49,7 +49,7 @@
   function buyBait(s, kind, n) {
     n = n || 1;
     if (kind === 'dough') {
-      const cost = 1 * n;
+      const cost = BAIT.dough.price * n;
       if (s.coins < cost) return { ok: false, msg: '金币不够' };
       s.coins -= cost; ledger(s, '买面团饵 ×' + n, 0, cost);
       tradeXp(s, cost);

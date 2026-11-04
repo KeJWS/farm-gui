@@ -9,28 +9,40 @@
   /* ---------------- 数值表（BALANCE） ---------------- */
 
   const BALANCE = {
+    /* ---------------- 全局入口：所有可调数值都在这里，界面 / 分析脚本只读这里 ---------------- */
+
+    /* 开局 */
+    start: { coins: 50, energy: 15, maxEnergy: 15, plots: 5 },
+    /* 各动作体力消耗（统一在这里改，不要在逻辑里写死数字） */
+    energy: { plant: 1, water: 1, waterSummer: 2, harvest: 1, fert: 1, fish: 2 },
+    /* 伙食费：base + (上限 − from) / perEnergy，最低 min */
+    meal: { base: 3, perEnergy: 5, from: 10, min: 1 },
+    /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
+    upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
+
     hook: { dough: 0.92, worm: 0.95, lure: 0.72, lure2: 0.92 },
     weatherHook: { sunny: -0.12, cloudy: 0, rain: 0.08 },
     bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.15 },
-    prices: { sprinkler: 80, harvester: 200, net: 50, netMax: 9 },
     netChance: 0.8,
     /* 渔网抓完鱼要重新布置：每张 1 体力 */
     netReset: { energy: 1 },
-    /* 雇佣渔夫：钓鱼 Lv5 解锁。每天 2+等级 杆，工资 10+5×(等级-1)；
-     * 每钓到 1 条 +1 经验，升级需要 6+3×(等级-1)，也可以花钱直接升 */
+    /* 「连甩 N 杆」的杆数 */
+    fishBatch: 5,
+    /* 雇佣渔夫：钓鱼 Lv5 解锁。每天 2+等级 杆，工资 8+4×(等级-1)；
+     * 每钓到 1 条 +1 经验，升级需要 5+2×(等级-1)，也可以花钱直接升 */
     fisher: { hire: 300, baseCasts: 2, wageBase: 8, wageStep: 4,
               needBase: 5, needStep: 2, upCost: 100, max: 10 },
     work: { full: 2.0, half: 1.2 },
     upkeep: { plotPerWeek: 3, plotMid: 6, plotHigh: 14, free: 5, sprinkle: 3, net: 0, harvester: 5,
               seeder: 6 },
-    tax: { rate: 0.04, min: 30, every: 30 },
     order: { mult: 1.35, seasonStep: 0.6 },
     expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
     /* 自动播种器：一台只管 5 块地，买几台就播几块（每台每天 5 块），每台每周要交维护费 */
-    device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5, seederMax: 9 },
+    device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5,
+              seederMax: 9, netMax: 9 },
     lure: { price: 5, dur: 25 },
     /* 高级假饵：钓鱼 Lv6 解锁，20 金 / 100 次；咬钩率跟面团饵一样，好鱼率跟假饵一样 */
-    lure2: { price: 20, dur: 100, lv: 6 },
+    lure2: { price: 20, dur: 100 },
     shop: { priceMul: 1.3, cropPriceMul: 1.3, restock: true, sellRate: 0.8 },
     /* 市场：供需 1.30（稀缺）→ 0.70（过剩），反季 ×1.7，每天睡觉回落 30% */
     market: { supplyMax: 1.3, supplyMin: 0.7, cropStep: 0.02, fishStep: 0.015,
@@ -40,8 +52,8 @@
     /* 采集：5 体力一次（采集满级 4），100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子
      * Lv4 / Lv8 各多取一次品质（野货品质更好） */
     forage: { energy: 5, qty2: 0.75, qty3: 0.35, seedChance: 0.25, xp: 2, qualityAt: 4 },
-    /* 挖蚯蚓：3 体力一次（满级 2），1–3 条；Lv4 / Lv8 各 +1 条（最多 7 条） */
-    dig: { energy: 3, xp: 2, yieldAt: 4 },
+    /* 挖蚯蚓：3 体力一次（满级 2），1–3 条；Lv4 / Lv8 各 +1 条（封顶 cap + 加成） */
+    dig: { energy: 3, xp: 2, yieldAt: 4, min: 1, max: 3, cap: 5, value: 3 },
     /* 交易等级：买东西 / 卖东西按交易额涨经验（每 5 金 1 点），每级把商店进价压低 0.5%（最多 −4.5%） */
     trade: { xpPer: 5, buyCut: 0.005, maxCut: 0.045, xpBase: 60, xpStep: 30 },
     /* 小镇捐赠：三档，捐得越多加成越多（金币出口） */
@@ -283,10 +295,10 @@
 
   const BAIT = {
     worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '好鱼概率 ×1.35 · 品质取两次较好' },
-    dough: { id: 'dough', name: '面团饵', emoji: '🍞', desc: '标准钓鱼体验 · 92% 咬钩' },
+    dough: { id: 'dough', name: '面团饵', emoji: '🍞', price: 1, desc: '标准钓鱼体验 · 92% 咬钩' },
     lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 25 次 · 杂物少、品质取两次较好，但只有 72% 咬钩' },
     lure2: { id: 'lure2', name: '高级假饵', emoji: '🪝',
-             desc: '耐用 100 次 · 咬钩率跟面团饵一样（92%），好鱼率跟假饵一样 · 钓鱼 Lv' + BALANCE.lure2.lv + ' 解锁' }
+             desc: '耐用 100 次 · 咬钩率跟面团饵一样（92%），好鱼率跟假饵一样 · 钓鱼 Lv' + BALANCE.gate.lure2 + ' 解锁' }
   };
   /* 各饵的咬钩基础概率（天气再加减） */
   const HOOK = BALANCE.hook;

@@ -20,10 +20,10 @@
     let actions = '';
     if (p.phase === 'ripe') {
       actions += '<button class="btn primary" data-pact="harvest" data-i="' + i + '">' +
-        (can ? '🧺 收获' : '⏳ 明天才能收') + '<small>1 体力</small></button>';
+        (can ? '🧺 收获' : '⏳ 明天才能收') + '<small>' + G.BALANCE.energy.harvest + ' 体力</small></button>';
     } else {
       actions += '<button class="btn primary" data-pact="water" data-i="' + i + '"' +
-        (p.watered ? ' disabled' : '') + '>💧 浇水<small>' + (p.watered ? '今天浇过了' : '1 体力 · +1 天') + '</small></button>';
+        (p.watered ? ' disabled' : '') + '>💧 浇水<small>' + (p.watered ? '今天浇过了' : G.waterCost(state) + ' 体力 · +1 天') + '</small></button>';
       if (!big) {
         const fn = G.FERT.normal, fs = G.FERT.special;
         const nOwn = state.ferts.normal || 0, sOwn = state.ferts.special || 0;

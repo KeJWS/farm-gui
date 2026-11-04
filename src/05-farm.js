@@ -20,7 +20,7 @@
     if (!c) return { ok: false, msg: '没有这种作物' };
     if (isWinter(s.day)) return { ok: false, msg: '冬天土地封冻了，开春再种吧' };
     if (p.crop) return { ok: false, msg: '这块地不是空地' };
-    if (!free && s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
+    if (!free && s.energy < BALANCE.energy.plant) return { ok: false, msg: '体力不够了，先睡觉吧' };
 
     // 种子只能从种子店买，播种时只消耗背包里的种子
     const owned = s.seeds[cropId] || 0;
@@ -29,7 +29,7 @@
     if (s.seeds[cropId] === 0) delete s.seeds[cropId];
 
     const off = !cropSeasonOk(cropId, s.day);
-    if (!free) s.energy -= 1;
+    if (!free) s.energy -= BALANCE.energy.plant;
     p.crop = cropId;
     p.off = off ? 1 : 0;
     p.growth = 0;
@@ -76,7 +76,9 @@
   }
 
   /* 季节特性：夏天浇水更费体力（2 点），其他季节 1 点 */
-  function waterCost(s) { return seasonIdx(s.day) === 1 ? 2 : 1; }
+  function waterCost(s) {
+    return seasonIdx(s.day) === 1 ? BALANCE.energy.waterSummer : BALANCE.energy.water;
+  }
 
   function water(s, idx) {
     const p = s.plots[idx];
@@ -110,10 +112,10 @@
     if (!p || !p.crop) return { ok: false, msg: '这块地还没种东西' };
     if (p.phase !== 'ripe') return { ok: false, msg: '还没成熟（' + p.growth + '/' + needOf(p) + ' 天）' };
     if (s.day <= p.ripeDay) return { ok: false, msg: '刚浇成熟，明天才能收获' };
-    if (!free && s.energy < 1) return { ok: false, msg: '体力不够了，先睡觉吧' };
+    if (!free && s.energy < BALANCE.energy.harvest) return { ok: false, msg: '体力不够了，先睡觉吧' };
 
     const c = CROPS[p.crop];
-    if (!free) s.energy -= 1;
+    if (!free) s.energy -= BALANCE.energy.harvest;
 
     let qty;
     if (c.multi) qty = p.hits === 0 ? c.firstQty : c.regrowQty;
@@ -252,9 +254,9 @@
     if (p.fert) return { ok: false, msg: '这块地已经施过肥了' };
     if (p.phase === 'ripe') return { ok: false, msg: '都熟了，别浪费肥料' };
     if ((s.ferts[kind] || 0) < 1) return { ok: false, msg: '肥料用完了，去种子店买' };
-    if (s.energy < 1) return { ok: false, msg: '体力不够了' };
+    if (s.energy < BALANCE.energy.fert) return { ok: false, msg: '体力不够了' };
     s.ferts[kind]--;
-    s.energy -= 1;
+    s.energy -= BALANCE.energy.fert;
     p.fert = f.add;
     const big = !!CROPS[p.crop].big;
     log(s, '🧪 ' + (idx + 1) + ' 号地施了' + f.name +
@@ -334,11 +336,11 @@
 
     let n = 0, stop = null;
     for (let k = 0; k < targets.length; k++) {
-      if (s.energy < 1) { stop = '体力不够了'; break; }
+      if (s.energy < BALANCE.energy.fert) { stop = '体力不够了'; break; }
       if ((s.ferts[kind] || 0) < 1) { stop = '肥料不够了'; break; }
       const p = s.plots[targets[k]];
       s.ferts[kind]--;
-      s.energy -= 1;
+      s.energy -= BALANCE.energy.fert;
       p.fert = f.add;
       n++;
     }
@@ -607,11 +609,13 @@
     opts = opts || {};
     const w = WEATHER[s.weather];
     if (isWinter(s.day)) return { ok: false, msg: '河面结冰了，冬天钓不了鱼' };
-    if (!opts.free && s.energy < 2) return { ok: false, msg: '体力不够（钓鱼要 2 点）' };
+    if (!opts.free && s.energy < BALANCE.energy.fish) {
+      return { ok: false, msg: '体力不够（钓鱼要 ' + BALANCE.energy.fish + ' 点）' };
+    }
     const kind = opts.forceKind || pickBait(s, preferBait);
     if (!kind) return { ok: false, msg: '没有饵料了，先去挖蚯蚓或买面团饵' };
 
-    if (!opts.free) s.energy -= 2;
+    if (!opts.free) s.energy -= BALANCE.energy.fish;
     if (!opts.noBait) {
       if (kind === 'worm') {
         s.bait.worm--;
@@ -711,7 +715,7 @@
   function fishAll(s, preferBait) {
     let n = 0, empty = 0, value = 0, chests = 0, ups = 0, lastErr = '';
     const got = [];
-    while (s.energy >= 2 && n < 400) {
+    while (s.energy >= BALANCE.energy.fish && n < 400) {
       const r = fish(s, preferBait, { quiet: true });
       if (!r.ok) { lastErr = r.msg; break; }
       n++;

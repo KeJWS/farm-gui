@@ -49,8 +49,9 @@
     const orchard = [];
     if (rep.orchard) {
       if (rep.orchard.fruit) orchard.push(['🍑 挂果', '+' + rep.orchard.fruit + ' 个（等着收）']);
-      if (rep.orchard.ripe) orchard.push(['🧺 待收', rep.orchard.ripe + ' 个 · 每棵 1 体力']);
-      if (rep.orchard.thirsty) orchard.push(['💧 待浇水', rep.orchard.thirsty + ' 棵育苗树 · 1 体力/棵']);
+      if (rep.orchard.ripe) orchard.push(['🧺 待收', rep.orchard.ripe + ' 个 · 每棵 ' + G.BALANCE.orchard.harvestEnergy + ' 体力']);
+      if (rep.orchard.thirsty) orchard.push(['💧 待浇水', rep.orchard.thirsty + ' 棵育苗树 · ' +
+        G.BALANCE.orchard.waterEnergy + ' 体力/棵']);
     }
 
     function sec(title, rows) {

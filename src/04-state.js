@@ -50,10 +50,10 @@
       v: SAVE_VERSION,
       day: 1,
       weather: 'sunny',
-      coins: 50,
-      energy: 15,
-      maxEnergy: 15,
-      plots: [makePlot(), makePlot(), makePlot(), makePlot(), makePlot()],
+      coins: BALANCE.start.coins,
+      energy: BALANCE.start.energy,
+      maxEnergy: BALANCE.start.maxEnergy,
+      plots: Array.from({ length: BALANCE.start.plots }, makePlot),
       seeds: {},
       store: {},
       box: [],
@@ -129,7 +129,10 @@
   const WORK_RATE_FULL = BALANCE.work.full;
   const WORK_RATE_HALF = BALANCE.work.half;
 
-  function mealFee(s) { return Math.max(1, 3 + (s.maxEnergy - 10) / 5); }
+  function mealFee(s) {
+    const M = BALANCE.meal;
+    return Math.max(M.min, M.base + (s.maxEnergy - M.from) / M.perEnergy);
+  }
 
   /* 土地维护：超过 5 块开始收费，20 块以上 6 金/周、30 块以上 10 金/周 */
   function plotUpkeep(plots) {
@@ -159,8 +162,9 @@
   }
   /* 强化体力：成本超线性增长（每级 ×1.2），避免「无脑升级」把上限堆到几百 */
   function upgradeCost(s) {
-    const tier = Math.max(0, (s.maxEnergy - 10) / 5);
-    return Math.round(30 * Math.pow(1.2, tier));
+    const U = BALANCE.upgrade;
+    const tier = Math.max(0, (s.maxEnergy - U.from) / U.step);
+    return Math.round(U.baseCost * Math.pow(U.costMul, tier));
   }
   function workCost(s, mode) { return Math.round(mode === 'half' ? s.maxEnergy / 2 : s.maxEnergy); }
   function workPay(s, mode) {

@@ -176,7 +176,7 @@
   /* 自动收获器：睡觉时免费收成熟作物 */
   const HARVESTER_COST = BALANCE.device.harvester;
   const NET_COST = BALANCE.device.net;
-  const NET_MAX = BALANCE.prices.netMax;
+  const NET_MAX = BALANCE.device.netMax;
   const NET_CHANCE = BALANCE.netChance;
 
   /* 月度累进税：按（金币 + 仓库价值）分档，0~2k 收 2%、2k~10k 收 4%、1w 以上收 6%，最低 30 金 */

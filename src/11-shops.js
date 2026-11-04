@@ -426,7 +426,7 @@
     const cost = upgradeCost(s);
     if (s.coins < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
     s.coins -= cost; ledger(s, '体力上限强化', 0, cost);
-    s.maxEnergy += 5;
+    s.maxEnergy += BALANCE.upgrade.step;
     log(s, '💪 体力上限 → ' + s.maxEnergy + '（伙食费 ' + mealFee(s) + ' 金/天）', 'good');
     return { ok: true, msg: '体力上限 ' + s.maxEnergy, maxEnergy: s.maxEnergy };
   }
