@@ -723,7 +723,9 @@
     work: { full: 2.0, half: 1.2 },
     upkeep: { plotPerWeek: 3, plotMid: 6, plotHigh: 14, free: 5, midAt: 20, highAt: 30,
               sprinkle: 3, net: 0, harvester: 5, seeder: 6 },
-    order: { mult: 1.35, seasonStep: 0.6 },
+    order: { mult: 1.35, seasonStep: 0.6,
+             /* 鱼单单价：每日单 11 + 4×季 / 长期单 18 + 4×季 */
+             fishBase: 11, longFishBase: 18, fishStep: 4 },
     expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
     /* 自动播种器：一台只管 5 块地，买几台就播几块（每台每天 5 块），每台每周要交维护费 */
     device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5,
@@ -4112,7 +4114,7 @@
 
     // 鱼单：单价随季节上涨（11 → 15 → 19 → 23），不再后期白送
     const fq = Math.max(2, Math.round(randInt(2, 3) * mult));
-    const per = 11 + 4 * season;
+    const per = BALANCE.order.fishBase + BALANCE.order.fishStep * season;
     orders.push({
       id: 'd' + day + '-f', kind: 'fish', crop: null, name: '任意鱼', emoji: '🐟',
       qty: fq, reward: Math.max(12, per * fq), done: false
@@ -4129,7 +4131,8 @@
     if (rand() < 0.3) {
       const qty = Math.max(6, Math.round(randInt(8, 14) * (1 + season * 0.3)));
       return { id: 'L' + day, kind: 'fish', crop: null, name: '任意鱼', emoji: '🐟',
-               qty: qty, reward: Math.round(qty * (18 + 4 * season)), deadline: day + 5, done: false };
+               qty: qty, reward: Math.round(qty * (BALANCE.order.longFishBase + BALANCE.order.fishStep * season)),
+               deadline: day + 5, done: false };
     }
     const c = pool[Math.floor(rand() * pool.length)];
     const qty = Math.max(6, Math.round((c.price >= 40 ? randInt(6, 10) : randInt(12, 20)) * (1 + season * 0.3)));

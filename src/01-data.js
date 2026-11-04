@@ -36,7 +36,9 @@
     work: { full: 2.0, half: 1.2 },
     upkeep: { plotPerWeek: 3, plotMid: 6, plotHigh: 14, free: 5, midAt: 20, highAt: 30,
               sprinkle: 3, net: 0, harvester: 5, seeder: 6 },
-    order: { mult: 1.35, seasonStep: 0.6 },
+    order: { mult: 1.35, seasonStep: 0.6,
+             /* 鱼单单价：每日单 11 + 4×季 / 长期单 18 + 4×季 */
+             fishBase: 11, longFishBase: 18, fishStep: 4 },
     expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
     /* 自动播种器：一台只管 5 块地，买几台就播几块（每台每天 5 块），每台每周要交维护费 */
     device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5,

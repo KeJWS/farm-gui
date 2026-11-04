@@ -1,5 +1,5 @@
 /* 我的小农场 · 界面层 / 06-help.js
- * 规则说明（分页正文 + 弹窗）
+ * 农场指南（分页正文 + 弹窗）
  * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
  */
 
@@ -128,6 +128,7 @@
         '鱼还跟着<b>汛期</b>走：汛期 ×1，<b>非汛期 ×' + G.BALANCE.market.offSeason + '</b>（稀罕货）。<br>' +
         '店里每天<b>进一批水产</b>（一般品质），每种数量随机、<b>睡觉后补货</b>，卖完只能等明天；' +
         '买价 = 基础价 × ' + G.BALANCE.shop.priceMul + ' <b>再乘鱼市价</b>（缺货 / 非汛期更贵），' +
+        '而且<b>买鱼会把销量往回拉</b>，越买越贵；' +
         '买来的鱼<b>不能交委托</b>，只适合转卖或凑图鉴。<br>' +
         '河豚 <b>D' + G.FISH_UNLOCK.puffer + '</b> 起、锦鲤 <b>D' + G.FISH_UNLOCK.koi + '</b> 起才进货。</p>' +
       '</div>';
@@ -230,7 +231,7 @@
         G.BALANCE.orchard.waterEnergy + ' 体力 / 收获 ' + G.BALANCE.orchard.harvestEnergy + ' 体力；' +
         '成树只在自己的季节每天随机挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax +
         ' 个水果，收进仓库后去农产品店卖<br>' +
-        '· 💰 税：每 ' + G.BALANCE.tax.every + ' 天按（金币 + 仓库价值）<b>累进</b>收一次——' +
+        '· 💰 税：每 ' + G.BALANCE.tax.every + ' 天按（金币 + 仓库价值 + 收购箱估值）<b>累进</b>收一次——' +
         G.BALANCE.tax.bands.map(function (b, i) {
           const from = i ? G.BALANCE.tax.bands[i - 1].upTo : 0;
           const rate = Math.round(b.rate * 100) + '%';
@@ -255,10 +256,16 @@
       '<div class="rule-sec">' +
         '<h4>📋 委托</h4>' +
         '<p>每天 2 个作物单 + 1 个鱼单，<b>每天自动换新</b>，另外还能<b>手动刷新一次</b>。<br>' +
-        '报酬约为直接卖的 ' + (G.BALANCE.order.mult * 100).toFixed(0) + '%，没交不罚；季节越往后要的量越多。<br>' +
+        '报酬 = 数量 × 基础价 × ' + G.BALANCE.order.mult + ' × 市价（市价封顶 ×' +
+        G.BALANCE.market.orderCap + '）—— 比商店直售（' + G.BALANCE.shop.sellRate +
+        ' × 市价）高约 ' + (G.BALANCE.order.mult / G.BALANCE.shop.sellRate).toFixed(1) +
+        ' 倍，没交不罚；季节越往后要的量越多。<br>' +
         '委托池按天数逐档解锁（D1 / D3 / D5 / D7 / D9 / D12 / D15），并且<b>只会要你当前等级买得到的作物</b>；' +
         '<b>每天第一张单固定是「买得到的最贵作物」</b>，剩下随机；' +
-        '贵的作物一次要 2–3 个，单张报酬<b>最低 40 金</b>；鱼单单价随季节涨（11 → 15 → 19 → 23）。<br>' +
+        '贵的作物一次要 2–3 个，单张报酬<b>最低 40 金</b>；鱼单单价随季节上涨（' +
+        G.BALANCE.order.fishBase + ' → ' + (G.BALANCE.order.fishBase + 3 * G.BALANCE.order.fishStep) +
+        ' 金/条），长期鱼单 ' + G.BALANCE.order.longFishBase + ' → ' +
+        (G.BALANCE.order.longFishBase + 3 * G.BALANCE.order.fishStep) + ' 金/条。<br>' +
         '<b>市价溢价</b>：指定作物的单子按<b>该作物当前市价</b>结算（反季 / 稀缺时合同价更高），' +
         '面板上会写「含市价 ×1.30」；「任意鱼」的单子不指定品种，价格固定。<br>' +
         '📜 <b>长期订单</b>：5 天期限、数量大、<b>2 倍报酬</b>（同样吃市价溢价），交付或过期后隔天睡醒换下一张。' +
@@ -328,7 +335,7 @@
       '<div class="rule-sec">' +
         '<h4>⌨️ 操作</h4>' +
         '<p>· 成熟地块<b>左键直接收</b>；右键或 Shift + 点击看详情（可铲除、看产量）<br>' +
-        '· 顶栏 <b>📊 状态</b> 看累计数据；<b>⚙️ 设置</b> 里有规则说明（分 4 页）/ 分享名片（导出 PNG）/ 导入导出 / 音效 / 重新开始<br>' +
+        '· 顶栏 <b>📊 状态</b> 看累计数据；<b>⚙️ 设置</b> 里有<b>农场指南</b>（分 4 页）/ 分享名片（导出 PNG）/ 导入导出 / 音效 / 重新开始<br>' +
         '· 地块 / 饵料 / 账本 / 日志都可以 Tab 聚焦、Enter 或空格操作<br>' +
         '· 日志和账本都能导出 .md；进度自动存在本浏览器</p>' +
       '</div>';
@@ -358,5 +365,5 @@
     const nav2 = helpPage < pages.length - 1
       ? '<button class="btn" data-helpnav="1">下一页 →</button>'
       : '<button class="btn" disabled>下一页 →</button>';
-    openModal('📖 规则速查', body, nav + nav2 + '<button class="btn" data-close>关闭</button>');
+    openModal('📖 农场指南', body, nav + nav2 + '<button class="btn" data-close>关闭</button>');
   }

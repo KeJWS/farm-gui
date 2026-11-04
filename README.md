@@ -17,7 +17,7 @@
 
 ## 界面
 
-- **顶栏**：金币、体力、天气（悬停看当天效果）、伙食费、地块数；右侧是 **🌙 睡觉**（醒来弹出「每日总结」：金币净变化、现金收入 / 支出、入库货值、农场 / 渔获 / 委托与明日提醒）、**📈 市场**（行情 / 分析）、**📊 状态**（累计数据与近 30 天收支趋势图）、**⚙️ 设置**（规则说明 / 分享名片 / 导入导出 / 音效 / 重新开始）
+- **顶栏**：金币、体力、天气（悬停看当天效果）、伙食费、地块数；右侧是 **🌙 睡觉**（醒来弹出「每日总结」：金币净变化、现金收入 / 支出、入库货值、农场 / 渔获 / 委托与明日提醒）、**📈 市场**（行情 / 分析）、**📊 状态**（累计数据与近 30 天收支趋势图）、**⚙️ 设置**（**农场指南** / 分享名片 / 导入导出 / 音效 / 重新开始）
 - **📖 图鉴**（顶栏）：鱼 / 作物 / 宝箱的首次捕获日、次数、最好品质与累计价值；收集到一定数量的鱼或作物会**自动发放图鉴奖励**（金币 / 饵料 / 肥料），弹窗顶部有各档进度条与领取状态
 - **农田**（左栏）：默认 5 块地，5 列 × 约 3 行可见，更多地块面板内滚动
   - 点空地 → 选种播种；点生长中的地 → 浇水 / 施肥 / 铲除
@@ -231,7 +231,7 @@ build-modules.cjs / build-ui.cjs / build-single.cjs   三个拼装脚本
 | `03-panels.js` | 仓库、今日委托、账本、钓鱼记录本、日志、总渲染与提交 |
 | `04-plot-modals.js` | 地块弹窗、铲除确认、选种、种子店、全部施肥 |
 | `05-device-shop.js` | 自动播种器面板、商店大类 |
-| `06-help.js` | 规则说明（分页正文 + 弹窗） |
+| `06-help.js` | 农场指南（分页正文 + 弹窗） |
 | `07-ach-stats.js` | 主题、图鉴、成就、统计、图表 |
 | `08-crop-shop.js` | 农产品店、收购箱、水产店 |
 | `09-town-market.js` | 小镇捐赠、市场行情、市场分析 |
@@ -253,7 +253,7 @@ build-modules.cjs / build-ui.cjs / build-single.cjs   三个拼装脚本
 - **内容表**（作物 / 鱼 / 品质 / 天气 / 果树 / 茶 / 宝箱 / 钥匙 / 肥料）在 `src/data/*.json`，改完跑 `node build-modules.cjs` 就会内联进 `game.js`；`file://` 下不能 fetch，所以不能运行时读 JSON
 - `node check-config.cjs` 会检查：BALANCE 顶层键不重复、逻辑层没有写死的体力、界面没有写死的「N 体力」、HTML 的 `<small>` 不带死数字
 - `node check-data.cjs` 会检查：JSON 能解析且都被拼进产物、id 与键名一致、季节 / 权重 / 价格合法、宝箱等级与 `BALANCE.chest` 一致、果树指向真实水果
-- `node check-docs.cjs` 会检查：README 里的关键数值和 BALANCE 一致、游戏内规则说明没有再写死这些数字
+- `node check-docs.cjs` 会检查：README 里的关键数值和 BALANCE 一致、游戏内**农场指南**没有再写死这些数字
 
 ## 开发者命令
 
@@ -264,7 +264,7 @@ node selftest.cjs      # 591 项逻辑自测：播种/种子店/肥料/品质/�
 node check-ui.cjs      # 校验 ui.js 用到的 id、data-act、G.* 成员在 index.html / FarmGame 里都存在
 node check-data.cjs    # 数据表检查：JSON 合法 / 无重复键、都被拼进产物、id / 引用 / 数值 / 跨表一致
 node check-config.cjs  # 数值来源检查：BALANCE 无重复键、逻辑 / 界面不写死体力、HTML 不带死数字
-node check-docs.cjs    # 文档一致性：README 关键数值与 BALANCE 对齐、规则说明不写死数字
+node check-docs.cjs    # 文档一致性：README 关键数值与 BALANCE 对齐、农场指南不写死数字
 node dom-test.cjs      # DOM 冒烟：用最小 DOM 桩把 ui.js 跑起来，测渲染与弹窗
 node balance.cjs       # 数值体检：钓鱼期望 / 三种活计收益 / 委托样本 / 设备回本 / 套利检查
 node analysis.cjs      # 收益分析：作物 / 钓鱼（专项）/ 渔网 / 渔夫 / 采集 / 小镇 / 早中后期日净收入
@@ -274,6 +274,13 @@ node build-single.cjs  # 把三件套内联成 我的小农场.html（CI 会再�
 （`selftest` / `dom-test` / `check-ui` / `check-data` / `check-config` / `balance` / `analysis` 都会先检查 `src/`、`src/data/`、`ui-src/` 有没有比产物新，自动补拼装。）
 
 ## 更新记录
+
+**v2.30.1（「规则说明」改名「农场指南」并同步内容）**
+
+- ⚙️ 设置里的入口和弹窗标题统一改成 **📖 农场指南**（原「规则说明 / 规则速查」）
+- 内容同步到 v2.30：市价批次中点定价、商店买货会把销量往回拉、收购箱入箱锁价 + 5% 手续费、图鉴奖励、分享名片
+- 委托页的鱼单单价不再写死：从 `BALANCE.order.fishBase / longFishBase / fishStep` 读取，逻辑层里原来的 `11 + 4×季` / `18 + 4×季` 也一并收进 BALANCE
+- `check-docs` / `dom-test` / 代码注释里的「规则说明」统一改成「指南」
 
 **v2.30.0（收购箱锁价 / 合并定价）**
 

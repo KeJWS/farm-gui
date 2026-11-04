@@ -1,7 +1,7 @@
 /* 文档一致性检查：node check-docs.cjs
  * ------------------------------------------------------------------
- * README 和游戏内「规则说明」（ui-src/06-help.js）里的关键数值必须和 BALANCE 一致。
- * 只要改了 BALANCE，这里就会提醒你去同步文档；规则说明里也不许再写死这些数字。
+ * README 和游戏内「农场指南」（ui-src/06-help.js）里的关键数值必须和 BALANCE 一致。
+ * 只要改了 BALANCE，这里就会提醒你去同步文档；指南里也不许再写死这些数字。
  */
 require('./ensure-build.cjs')();
 const fs = require('fs');
@@ -53,7 +53,7 @@ facts.forEach(function (f) {
   ok(readme.indexOf(f[1]) >= 0, 'README：' + f[0], f[1]);
 });
 
-console.log('\n== 规则说明不写死数字 ==');
+console.log('\n== 指南不写死数字 ==');
 const stale = [
   ['每 4 级', '产量加成间隔'],
   ['×1.25', '鱼汛'],
@@ -68,7 +68,7 @@ const stale = [
   ['2 体力 + 1 份饵', '钓鱼体力']
 ];
 stale.forEach(function (s) {
-  ok(help.indexOf(s[0]) < 0, '规则说明不再写死「' + s[1] + '」', s[0]);
+  ok(help.indexOf(s[0]) < 0, '指南不再写死「' + s[1] + '」', s[0]);
 });
 
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));

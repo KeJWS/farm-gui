@@ -477,13 +477,13 @@ ok(html('#modal-root').indexOf('data-mach="1"') >= 0 && html('#modal-root').inde
    '每台可以单独选种子');
 ok(html('#modal-root').indexOf('维护 6 金/周') >= 0, '显示当前播种器维护费');
 
-console.log('\n== 规则说明分页 ==');
+console.log('\n== 农场指南分页 ==');
 (function openHelp() {
   const btn = { dataset: {}, disabled: false };
   const target = { closest: function (s) { return s === '#set-help' ? btn : null; }, classList: classList() };
   (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
 })();
-ok(html('#modal-root').indexOf('rule-tabs') >= 0, '规则说明带分页标签');
+ok(html('#modal-root').indexOf('rule-tabs') >= 0, '指南带分页标签');
 ok((html('#modal-root').match(/data-helppage=/g) || []).length === 4, '规则分成 4 页');
 ok(html('#modal-root').indexOf('1 / 4') >= 0, '第 1 页页码正确');
 (function helpNext() {

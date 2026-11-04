@@ -72,7 +72,7 @@
 
     // 鱼单：单价随季节上涨（11 → 15 → 19 → 23），不再后期白送
     const fq = Math.max(2, Math.round(randInt(2, 3) * mult));
-    const per = 11 + 4 * season;
+    const per = BALANCE.order.fishBase + BALANCE.order.fishStep * season;
     orders.push({
       id: 'd' + day + '-f', kind: 'fish', crop: null, name: '任意鱼', emoji: '🐟',
       qty: fq, reward: Math.max(12, per * fq), done: false
@@ -89,7 +89,8 @@
     if (rand() < 0.3) {
       const qty = Math.max(6, Math.round(randInt(8, 14) * (1 + season * 0.3)));
       return { id: 'L' + day, kind: 'fish', crop: null, name: '任意鱼', emoji: '🐟',
-               qty: qty, reward: Math.round(qty * (18 + 4 * season)), deadline: day + 5, done: false };
+               qty: qty, reward: Math.round(qty * (BALANCE.order.longFishBase + BALANCE.order.fishStep * season)),
+               deadline: day + 5, done: false };
     }
     const c = pool[Math.floor(rand() * pool.length)];
     const qty = Math.max(6, Math.round((c.price >= 40 ? randInt(6, 10) : randInt(12, 20)) * (1 + season * 0.3)));

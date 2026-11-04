@@ -188,4 +188,4 @@
     openModal('🛒 渔具店', body, '<button class="btn" data-close>关闭</button>');
   }
 
-  /* 规则说明分页：种植 / 钓鱼 / 买卖 / 经营 */
+  /* 农场指南分页：种植 / 钓鱼 / 买卖 / 经营 */

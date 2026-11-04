@@ -41,7 +41,7 @@
         return;
       }
 
-      // 规则说明翻页
+      // 农场指南翻页
       const helpTab = t.closest('[data-helppage]');
       if (helpTab) {
         helpPage = Number(helpTab.dataset.helppage) || 0;

@@ -123,7 +123,7 @@
   function settingsModal() {
     openModal('⚙️ 设置',
       '<div class="action-grid">' +
-        '<button class="btn" id="set-help">📖 规则说明</button>' +
+        '<button class="btn" id="set-help">📖 农场指南</button>' +
         '<button class="btn" id="set-theme">' + (theme === 'dark' ? '🌙 黑夜模式：开' : '☀️ 黑夜模式：关') + '</button>' +
         '<button class="btn" id="set-share">🖼️ 分享名片<small>当前农场 · PNG</small></button>' +
         '<button class="btn" id="set-export">⬇️ 导出存档<small>.json</small></button>' +
