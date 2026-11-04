@@ -198,7 +198,7 @@
              desc: '耐用 ' + BALANCE.lure2.dur + ' 次 · 咬钩率跟面团饵一样（' + Math.round(BALANCE.hook.lure2 * 100) +
                '%），好鱼 ×' + BALANCE.bait.lureGood + ' · 钓鱼 Lv' + BALANCE.gate.lure2 + ' + 交易 Lv' +
                BALANCE.gate.lure2Trade + ' 解锁' },
-    premium: { id: 'premium', name: '特级饵料', emoji: '🍤', price: 5,
+    premium: { id: 'premium', name: '特级饵料', emoji: '🍤', price: 4,
                desc: '一次一份 · ' + Math.round(BALANCE.hook.premium * 100) + '% 咬钩、好鱼 ×' +
                  BALANCE.bait.premiumGood + '、品质取两次较好 · 钓鱼 Lv' + BALANCE.gate.premium +
                  ' + 交易 Lv' + BALANCE.gate.premiumTrade + ' 解锁' }

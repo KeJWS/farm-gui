@@ -113,7 +113,7 @@
         G.BALANCE.gate.premiumTrade + '</b> 解锁）：' + G.BAIT.premium.price + ' 金 / 份，' +
         Math.round(G.BALANCE.hook.premium * 100) + '% 咬钩、好鱼 ×' + G.BALANCE.bait.premiumGood +
         '、品质取两次较好，冲好鱼用。<br>' +
-        '⚡ <b>咬钩超过 100% 不浪费</b>：多出来的概率再判定一次（例如 108% = 98% 上一条 + 8% 双咬钩）。<br>' +
+        '⚡ <b>咬钩没有上限</b>：满 100% 必中，多出来的概率再判定一次（例如 107% = 100% 上一条 + 7% 双咬钩）。<br>' +
         '🕸️ 渔网：<b>' + G.NET_COST + ' 金/张，不缴维护费</b>。晚上耗 1 份面团饵，<b>' +
         Math.round(G.NET_CHANCE * 100) + '%</b> 网到 1 条标准及以下的普通鱼，' +
         '<b>不会出杂物和宝箱</b>；要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b> 解锁，上限 = ' +
@@ -200,7 +200,7 @@
 
       '<div class="rule-sec">' +
         '<h4>📦 收购箱</h4>' +
-        '<p>在仓库点每行的 <b>📦</b>，把整批或自定义数量的<b>作物 / 鱼 / 杂物 / 宝箱</b>放进收购箱，' +
+        '<p>在仓库点每行的 <b>全部</b> 一键把该物品全放进收购箱（📦 可按数量放），' +
         '<b>按入箱那一刻的市价锁价</b>，睡觉结算时只跟随<b>出箱当天的季节</b>（换季会变），并扣 <b>' +
         Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费</b>；放错了可以「全部取出」。<br>' +
         '直接卖给水产店 / 农产品店只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) +

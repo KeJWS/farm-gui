@@ -373,7 +373,8 @@ ok(html('#fish-forecast').indexOf('咬钩') >= 0 && html('#fish-forecast').index
   const target = { closest: function (s) { return s === '[data-boxcrop]' ? btn : null; }, classList: classList() };
   (docListeners.click || []).forEach(function (fn) { fn({ target: target }); });
 })();
-ok(html('#modal-root').indexOf('全部放入') >= 0, '单物品放箱弹窗有「全部放入」');
+ok(html('#modal-root').indexOf('按数量放入') >= 0, '单物品放箱弹窗支持按数量放入');
+ok(html('#store-list').indexOf('data-boxall="crop|') >= 0, '仓库每行物品旁带「全部」按钮');
 
 console.log('\n== 成就 ==');
 document.querySelector('#btn-ach').fire('click', { target: {} });

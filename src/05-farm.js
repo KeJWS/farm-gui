@@ -606,7 +606,7 @@
     kind = kind || 'dough';
     const w = WEATHER[s.weather] || { hookMod: 0 };
     const rawHook = (HOOK[kind] || 0.9) + (w.hookMod || 0) + fishHookBonus(s);
-    const hook = clamp(rawHook, 0.3, 0.98);
+    const hook = clamp(rawHook, 0.3, 1);            // 咬钩不设 98% 上限：满 100% 必中，超出部分走双咬钩
     const bonusHook = Math.max(0, rawHook - 1);      // 超过 100% 的部分 = 再来一条的概率
     const lvNow = fishLv(s);
     const lureLike = kind === 'lure' || kind === 'lure2';
@@ -772,7 +772,7 @@
     const hookExtra = (opts.hookBonus == null) ? fishHookBonus(s) : opts.hookBonus;
     // 超过 100% 的咬钩率不浪费：多出来的部分再判定一次（当前理论上限约 1.15）
     const rawHook = (HOOK[kind] || 0.9) + (w.hookMod || 0) + hookExtra;
-    const hook = clamp(rawHook, 0.3, 0.98);
+    const hook = clamp(rawHook, 0.3, 1);            // 咬钩不设 98% 上限：满 100% 必中，超出部分走双咬钩
     if (rand() > hook) {
       if (!opts.quiet) log(s, '💨 空竿：' + w.name + '，没有鱼咬钩', 'warn');
       return { ok: true, empty: true, entry: null, entries: [], bonus: 0, msg: '空竿了' };

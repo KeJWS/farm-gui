@@ -695,7 +695,10 @@
             '<div class="sv"><span class="sf-note">' + (c.desc || '') + '</span> · ' + mixTxt +
               ' · 均 ' + (val / n).toFixed(1) + ' 金 · ' + mk.tag + '</div></div>' +
             '<span class="sp">' + val + ' 金</span>' +
+             '<span class="spw">' +
+             '<button class="btn mini" data-boxall="crop|' + id + '" title="全部放进收购箱">全部</button>' +
              '<button class="btn mini" data-boxcrop="' + id + '" title="自定义数量放进收购箱">📦</button>' +
+             '</span>' +
           '</div>';
         }).join('');
     }
@@ -719,7 +722,10 @@
               fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) + ' 金/条' +
               (priced ? ' · ' + mk.tag : (g.chest ? ' · 宝箱' : '')) + '</div></div>' +
             '<span class="sp">' + g.total + ' 金</span>' +
+             '<span class="spw">' +
+             '<button class="btn mini" data-boxall="fish|' + esc(g.key) + '" title="全部放进收购箱">全部</button>' +
              '<button class="btn mini" data-boxfish="' + esc(g.key) + '" title="自定义数量放进收购箱">📦</button>' +
+             '</span>' +
           '</div>';
         }).join('');
     }
@@ -1338,31 +1344,58 @@
       : '还需交易 Lv' + G.BALANCE.gate.premiumTrade;
     const netLock = !G.netUnlocked(state);
     const netCap = G.netMax(state);
+    const evOf = function (id) {
+      const f = G.fishForecast(state, id);
+      return '每杆约 <b class="' + (f.net >= 0 ? 'up' : 'down') + '">' + (f.net >= 0 ? '+' : '') +
+        f.net.toFixed(1) + '</b> 金';
+    };
+    const buyBtn = function (id, n, label, ok) {
+      return '<button class="btn mini" data-buy="' + id + '" data-n="' + n + '"' +
+        (ok === false ? ' disabled' : '') + '>' + label + '</button>';
+    };
+    const lureHave = state.lure.owned ? state.lure.dur : 0;
     const body =
-      '<dl class="kv"><dt>🍞 面团饵</dt><dd>1 金/份 · 现有 ' + dough + ' 份 · 标准收获</dd>' +
-      '<dt>🎣 假饵</dt><dd>' + lure.price + ' 金/个 · 耐用 ' + lure.dur + ' 次 · 持有上限 1</dd>' +
-      '<dt>🪝 高级假饵</dt><dd>' + (lure2Open
-        ? lure2.price + ' 金/个 · 耐用 ' + lure2.dur + ' 次 · 现有 ' + lure2Have + ' 次'
-        : lure2LockTxt + ' 解锁') + '</dd>' +
-      '<dt>🍤 特级饵料</dt><dd>' + (premOpen
-        ? G.BAIT.premium.price + ' 金/份 · 现有 ' + (state.bait.premium || 0) + ' 份 · ' +
-          Math.round(G.BALANCE.hook.premium * 100) + '% 咬钩 / 好鱼 ×' + G.BALANCE.bait.premiumGood
-        : premLockTxt + ' 解锁') + '</dd>' +
-      '<dt>🪱 蚯蚓</dt><dd>' + G.BALANCE.dig.energy + ' 体力挖 ' + G.BALANCE.dig.min + '~' +
-        G.BALANCE.dig.max + ' 条（晴天 −1、阴雨 +1）</dd></dl>' +
-      '<div class="action-grid">' +
-        '<button class="btn" data-buy="dough" data-n="1">🍞 买 1 份<small>' + G.BAIT.dough.price + ' 金</small></button>' +
-        '<button class="btn" data-buy="dough" data-n="5">🍞 买 5 份<small>' + G.BAIT.dough.price * 5 + ' 金</small></button>' +
-        '<button class="btn" data-buy="lure" data-n="1">🎣 买假饵<small>' + lure.price + ' 金 · ' +
-          lure.dur + ' 次</small></button>' +
-        '<button class="btn' + (lure2Open ? '' : ' locked') + '" data-buy="lure2" data-n="1"' +
-          (lure2Open && state.coins >= lure2.price ? '' : ' disabled') + '>' +
-          '🪝 买高级假饵<small>' + (lure2Open ? lure2.price + ' 金 · ' + lure2.dur + ' 次'
-            : lure2LockTxt) + '</small></button>' +
-        '<button class="btn' + (premOpen ? '' : ' locked') + '" data-buy="premium" data-n="1"' +
-          (premOpen && state.coins >= G.BAIT.premium.price ? '' : ' disabled') + '>' +
-          '🍤 买特级饵料<small>' + (premOpen ? G.BAIT.premium.price + ' 金 · 1 次' : premLockTxt) +
-          '</small></button>' +
+      '<div class="shop-head">🎣 饵料 · 金币 <b>' + state.coins + '</b> · 钓鱼 Lv' + G.fishLv(state) +
+        ' · ' + ((G.WEATHER[state.weather] || {}).name || '') + '</div>' +
+      '<div class="store-row">' +
+        '<span class="se">🍞</span>' +
+        '<div><div class="sn">面团饵 <b class="own">现有 ' + dough + '</b></div>' +
+        '<div class="sv">' + Math.round(G.BALANCE.hook.dough * 100) + '% 咬钩 · ' +
+          G.BAIT.dough.price + ' 金/份 · ' + evOf('dough') + '</div></div>' +
+        '<span class="spw">' + buyBtn('dough', 1, '买 1') + buyBtn('dough', 5, '买 5') + '</span>' +
+      '</div>' +
+      '<div class="store-row">' +
+        '<span class="se">🎣</span>' +
+        '<div><div class="sn">假饵' +
+          (lureHave ? ' <b class="own">剩 ' + lureHave + ' 次</b>' : '') + '</div>' +
+        '<div class="sv">' + Math.round(G.BALANCE.hook.lure * 100) + '% 咬钩 · 好鱼 ×' +
+          G.BALANCE.bait.lureGood + ' · 杂物 ×' + G.BALANCE.bait.lureTrash + ' · ' +
+          lure.price + ' 金 / 耐用 ' + lure.dur + ' 次 · ' + evOf('lure') + '</div></div>' +
+        '<span class="spw">' + buyBtn('lure', 1, '买 1', !lureHave && state.coins >= lure.price) +
+        '</span>' +
+      '</div>' +
+      '<div class="store-row' + (lure2Open ? '' : ' locked') + '">' +
+        '<span class="se">🪝</span>' +
+        '<div><div class="sn">高级假饵' +
+          (lure2Have ? ' <b class="own">剩 ' + lure2Have + ' 次</b>' : '') +
+          (lure2Open ? '' : ' <b class="lock">' + lure2LockTxt + '</b>') + '</div>' +
+        '<div class="sv">' + (lure2Open
+          ? Math.round(G.BALANCE.hook.lure2 * 100) + '% 咬钩 · 好鱼 ×' + G.BALANCE.bait.lureGood +
+            ' · ' + lure2.price + ' 金 / ' + lure2.dur + ' 次 · ' + evOf('lure2')
+          : lure2LockTxt + ' 解锁') + '</div></div>' +
+        '<span class="spw">' + buyBtn('lure2', 1, '买 1',
+          lure2Open && !lure2Have && state.coins >= lure2.price) + '</span>' +
+      '</div>' +
+      '<div class="store-row' + (premOpen ? '' : ' locked') + '">' +
+        '<span class="se">🍤</span>' +
+        '<div><div class="sn">特级饵料 <b class="own">现有 ' + (state.bait.premium || 0) + '</b>' +
+          (premOpen ? '' : ' <b class="lock">' + premLockTxt + '</b>') + '</div>' +
+        '<div class="sv">' + (premOpen
+          ? Math.round(G.BALANCE.hook.premium * 100) + '% 咬钩 · 好鱼 ×' + G.BALANCE.bait.premiumGood +
+            ' · 品质取两次 · ' + G.BAIT.premium.price + ' 金/份 · ' + evOf('premium')
+          : premLockTxt + ' 解锁') + '</div></div>' +
+        '<span class="spw">' + buyBtn('premium', 1, '买 1', premOpen) +
+          buyBtn('premium', 5, '买 5', premOpen) + '</span>' +
       '</div>' +
       '<div class="buy-custom">' +
         '<span>🍞 面团饵自定义数量</span>' +
@@ -1551,7 +1584,7 @@
         G.BALANCE.gate.premiumTrade + '</b> 解锁）：' + G.BAIT.premium.price + ' 金 / 份，' +
         Math.round(G.BALANCE.hook.premium * 100) + '% 咬钩、好鱼 ×' + G.BALANCE.bait.premiumGood +
         '、品质取两次较好，冲好鱼用。<br>' +
-        '⚡ <b>咬钩超过 100% 不浪费</b>：多出来的概率再判定一次（例如 108% = 98% 上一条 + 8% 双咬钩）。<br>' +
+        '⚡ <b>咬钩没有上限</b>：满 100% 必中，多出来的概率再判定一次（例如 107% = 100% 上一条 + 7% 双咬钩）。<br>' +
         '🕸️ 渔网：<b>' + G.NET_COST + ' 金/张，不缴维护费</b>。晚上耗 1 份面团饵，<b>' +
         Math.round(G.NET_CHANCE * 100) + '%</b> 网到 1 条标准及以下的普通鱼，' +
         '<b>不会出杂物和宝箱</b>；要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b> 解锁，上限 = ' +
@@ -1638,7 +1671,7 @@
 
       '<div class="rule-sec">' +
         '<h4>📦 收购箱</h4>' +
-        '<p>在仓库点每行的 <b>📦</b>，把整批或自定义数量的<b>作物 / 鱼 / 杂物 / 宝箱</b>放进收购箱，' +
+        '<p>在仓库点每行的 <b>全部</b> 一键把该物品全放进收购箱（📦 可按数量放），' +
         '<b>按入箱那一刻的市价锁价</b>，睡觉结算时只跟随<b>出箱当天的季节</b>（换季会变），并扣 <b>' +
         Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费</b>；放错了可以「全部取出」。<br>' +
         '直接卖给水产店 / 农产品店只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) +
@@ -2244,8 +2277,7 @@
       '<div class="shop-tip">指定数量会从仓库移入收购箱，剩余库存不变；<b>按入箱时的市价锁价</b>，' +
         '睡觉结算时只跟随<b>当天季节</b>，并扣 ' + Math.round(G.BALANCE.market.boxFee * 100) +
         '% 手续费。入箱不压价，拆几批放和一次放价格一样。</div>',
-      '<button class="btn primary" data-boxput-all="' + kind + '|' + key + '">全部放入（' + n + ' 件）</button>' +
-      '<button class="btn" data-boxput-kind="' + kind + '" data-boxput-key="' + key + '">按数量放入</button>' +
+      '<button class="btn primary" data-boxput-kind="' + kind + '" data-boxput-key="' + key + '">按数量放入</button>' +
       '<button class="btn" data-close>取消</button>');
   }
 
@@ -3651,7 +3683,27 @@
         return;
       }
 
-      // 收购箱：全部放入（单物品）
+      // 收购箱：仓库行上的「全部」按钮
+      const boxAllRow = t.closest('[data-boxall]');
+      if (boxAllRow) {
+        const raw = String(boxAllRow.dataset.boxall || '');
+        const cut = raw.indexOf('|');
+        const kind = raw.slice(0, cut);
+        const key = raw.slice(cut + 1);
+        const available = kind === 'crop'
+          ? G.storeCount(state, key)
+          : ((G.fishGroups(state).filter(function (g) { return g.key === key; })[0] || {}).count || 0);
+        if (!(available > 0)) { toast('仓库里已经没有这件了', 'warn'); return; }
+        const r = kind === 'crop'
+          ? G.boxPutCrop(state, key, available)
+          : G.boxPutFish(state, key, available);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        return;
+      }
+
+      // 收购箱：弹窗里的「全部放入」（保留兼容）
       const boxAll = t.closest('[data-boxput-all]');
       if (boxAll) {
         const raw = String(boxAll.dataset.boxputAll || '');

@@ -2624,7 +2624,8 @@ section('河边预估与交易折扣');
   s.day = 35; s.weather = 'rain';
   const fd = G.fishForecast(s, 'dough');
   const fw = G.fishForecast(s, 'worm');
-  ok(fd.hook > 0.9 && fd.hook <= 0.98, '预估咬钩率在 30%~98% 区间内', fd.hook);
+  ok(fd.hook > 0.9 && fd.hook <= 1 && fd.bonusHook >= 0, '预估咬钩率封顶 100%，超出部分给双咬钩',
+    [fd.hook, fd.bonusHook]);
   ok(fd.cost === G.BAIT.dough.price && fw.cost === G.BALANCE.dig.value, '预估成本用真实饵价',
     [fd.cost, fw.cost]);
   ok(fd.net > 0, '面团饵每杆期望为正', fd.net);

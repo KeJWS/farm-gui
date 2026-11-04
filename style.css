@@ -1055,3 +1055,10 @@ button{ color:inherit; font:inherit; }
 .fish-forecast b.up, .fish-forecast i.up{ color:var(--green-d); }
 .fish-forecast b.down, .fish-forecast i.down{ color:var(--red); }
 .fish-forecast .ff-warn{ color:var(--blue); }
+
+/* ---------- 行内小按钮组（仓库「全部」/ 渔具店买饵） ---------- */
+.store-row .spw{ margin-left:auto; display:flex; gap:5px; flex:none; }
+.store-row .spw .btn{ min-height:24px; padding:3px 8px; }
+@media (max-width:560px){
+  .store-row .spw{ flex-wrap:wrap; justify-content:flex-end; }
+}
