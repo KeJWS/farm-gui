@@ -45,6 +45,15 @@
       '<button class="btn" data-close>关闭</button>');
   }
 
+  function marketTabs(active) {
+    return '<div class="market-tabs" role="tablist" aria-label="市场页面">' +
+      '<button class="market-tab' + (active === 'quote' ? ' active' : '') + '"' +
+        ' data-market-page="quote" role="tab" aria-selected="' + (active === 'quote') + '">📈 行情</button>' +
+      '<button class="market-tab' + (active === 'analysis' ? ' active' : '') + '"' +
+        ' data-market-page="analysis" role="tab" aria-selected="' + (active === 'analysis') + '">📊 分析</button>' +
+    '</div>';
+  }
+
   function marketModal() {
     const season = G.seasonOf(state.day);
     const OFF = G.BALANCE.market.offSeason;
@@ -63,10 +72,8 @@
         '<div><div class="sn">' + c.name +
           (mk.inSeason ? ' <b class="own">当季 ×1</b>' : ' <b class="lock">反季 ×' + mk.season + '</b>') +
           (wild ? ' <b class="own">采集</b>' : '') + '</div>' +
-        '<div class="sv">' + G.seasonText(c.id) + '季 · 最近卖出 ' + mk.sold.toFixed(0) +
-          ' 件 · ' + mk.tag + '（×' + mk.supply.toFixed(2) + '）' +
-          (wild ? '' : '· 买价 ' + G.cropBuyPrice(c.id, state) + ' 金') + '</div>' +
-        '<div class="sv">↳ ' + headroomText(hr, '件') + '</div></div>' +
+        '<div class="sv">供需 ×' + mk.supply.toFixed(2) + ' · ' + mk.tag +
+          ' · ' + headroomText(hr, '件') + '</div></div>' +
         '<span class="sp">×' + mk.total.toFixed(2) + '</span>' +
       '</div>';
     };
@@ -80,25 +87,20 @@
         '<span class="se">' + f.emoji + '</span>' +
         '<div><div class="sn">' + f.name +
           (mk.inRun ? ' <b class="own">汛期 ×1</b>' : ' <b class="lock">非汛期 ×' + mk.season + '</b>') + '</div>' +
-        '<div class="sv">鱼汛 ' + G.fishSeasonText(f.id) + ' · 最近卖出 ' + mk.sold.toFixed(0) + ' 条 · ' +
-          mk.tag + '（×' + mk.supply.toFixed(2) + '）· 买价 ' + G.fishBuyPrice(f.id, state) + ' 金</div>' +
-        '<div class="sv">↳ ' + headroomText(hr, '条') + '</div></div>' +
+        '<div class="sv">供需 ×' + mk.supply.toFixed(2) + ' · ' + mk.tag +
+          ' · ' + headroomText(hr, '条') + '</div></div>' +
         '<span class="sp">×' + mk.total.toFixed(2) + '</span>' +
       '</div>';
     }).join('');
 
-    openModal('📈 市场行情',
-      '<div class="shop-head">现在是 <b>' + season + '季</b> · 最近销量越多越便宜</div>' +
+    openModal('📈 市场',
+      marketTabs('quote') +
+      '<div class="shop-head">现在是 <b>' + season + '季</b> · 售出会压低供需，睡觉后回落 ' +
+        Math.round((1 - G.BALANCE.market.decay) * 100) + '%</div>' +
       '<div class="store-sub">🌱 作物 · 当季 ×1 / 反季 ×' + OFF + '</div>' + cropRows +
-      '<div class="store-sub" style="margin-top:10px">🌿 野货 · 只能靠「采集」拿到，一样吃市价</div>' + wildRows +
-      '<div class="store-sub" style="margin-top:10px">🐟 水产 · 汛期 ×1 / 非汛期 ×' + OFF +
-        '（非汛期上钩率也只有 ' + G.FISH_OFF_SEASON + '）</div>' + fishRows +
-      '<div class="shop-tip">市价 = 供需 × 季节：刚开张是 <b>×' + G.BALANCE.market.supplyMax +
-        '</b>（稀缺），作物每卖 1 件 −0.02、鱼每条 −0.015，最低 ×' + G.BALANCE.market.supplyMin +
-        '（过剩）；每天睡觉销量回落 ' + Math.round((1 - G.BALANCE.market.decay) * 100) + '%。<br>' +
-        '<b>↳ 那行就是「还能卖多少」</b>：同一种货一天卖太多会掉档，分品种轮着卖最划算。<br>' +
-        '反季的菜 / 非汛期的鱼卖价 <b>×' + OFF + '</b>，囤到那时候再出手更值钱 —— 但砸得太狠一样会饱和。<br>' +
-        '商店的<b>进价</b>也跟着市价走：缺货时进货更贵，反季进货更贵。</div>',
+      '<div class="store-sub" style="margin-top:10px">🌿 野货 · 采集获得</div>' + wildRows +
+      '<div class="store-sub" style="margin-top:10px">🐟 水产 · 汛期 ×1 / 非汛期 ×' + OFF + '</div>' + fishRows +
+      '<div class="shop-tip">右侧是当前市价系数；每行显示供需状态和距离下个价格档位的销量。成本、利润、走势与下季估值见「分析」。</div>',
       '<button class="btn" data-close>关闭</button>');
   }
 
@@ -159,21 +161,30 @@
       holdings.push({
         name: c.name, emoji: c.emoji, qty: qty, unit: '个',
         now: G.shopSellValue(state, c.id),
-        next: Math.max(1, Math.round(G.shopValue(raw) * G.sellBonus(state) * nextMk.total))
+        next: Math.max(1, Math.round(G.shopValue(raw) * G.sellBonus(state) * nextMk.total)),
+        cost: c.wild ? null : G.cropBuyPrice(c.id, state) * qty
       });
     });
     G.fishGroups(state, 'fish').forEach(function (g) {
       const mk = G.fishMarketInfo(state, g.name);
       const nextMk = nextSeasonMarket(mk, { name: g.name }, true);
+      const fishDef = G.fishByName(g.name);
       holdings.push({
         name: g.name, emoji: g.emoji, qty: g.count, unit: '条',
         now: Math.max(1, Math.round(G.shopValue(g.total) * G.sellBonus(state) * mk.total)),
-        next: Math.max(1, Math.round(G.shopValue(g.total) * G.sellBonus(state) * nextMk.total))
+        next: Math.max(1, Math.round(G.shopValue(g.total) * G.sellBonus(state) * nextMk.total)),
+        cost: fishDef ? G.fishBuyPrice(fishDef.id, state) * g.count : null
       });
     });
     const holdNow = holdings.reduce(function (n, h) { return n + h.now; }, 0);
     const holdNext = holdings.reduce(function (n, h) { return n + h.next; }, 0);
     const holdDelta = holdNext - holdNow;
+    const costed = holdings.filter(function (h) { return h.cost != null; });
+    const referenceCost = costed.reduce(function (n, h) { return n + h.cost; }, 0);
+    const costedNow = costed.reduce(function (n, h) { return n + h.now; }, 0);
+    const costedNext = costed.reduce(function (n, h) { return n + h.next; }, 0);
+    const nowMargin = costedNow - referenceCost;
+    const nextMargin = costedNext - referenceCost;
     const bestWaits = holdings.filter(function (h) { return h.next > h.now; })
       .sort(function (a, b) { return (b.next - b.now) - (a.next - a.now); }).slice(0, 3);
     const waitText = bestWaits.length
@@ -187,10 +198,14 @@
       const series = G.marketSeries(state, key, mk.total);
       const nxt = isFish ? G.fishNextSeasonMul(state, item.name) : G.cropNextSeasonMul(state, item.id);
       const base = isFish ? item.base : item.price;
-      const now = Math.max(1, Math.round(base * mk.total));
+      const marketBase = Math.max(1, Math.round(base * mk.total));
       const nextMk = nextSeasonMarket(mk, item, isFish);
-      const next = Math.max(1, Math.round(base * nextMk.total));
+      const nextSale = Math.max(1, Math.round(G.shopValue(base) * G.sellBonus(state) * nextMk.total));
       const unit = isFish ? '条' : '个';
+      const buyCost = isFish ? G.fishBuyPrice(item.id, state)
+        : (item.wild ? null : G.cropBuyPrice(item.id, state));
+      const oneSale = Math.max(1, Math.round(G.shopValue(base) * G.sellBonus(state) * mk.total));
+      const unitMargin = buyCost == null ? null : oneSale - buyCost;
       const wk = series.slice(-7);
       const trend = wk.length > 1 && wk[0] > 0
         ? (wk[wk.length - 1] - wk[0]) / wk[0] * 100 : 0;
@@ -205,12 +220,17 @@
         '<span class="se">' + (item.emoji || '') + '</span>' +
         '<div style="flex:1;min-width:0">' +
           '<div class="sn">' + item.name + ' ' + tag +
-            ' <b class="own">×' + mk.total.toFixed(2) + '</b> · 市场参考价 <b>' + now + '</b> 金/' + unit + '</div>' +
+            ' <b class="own">×' + mk.total.toFixed(2) + '</b> · 标准品质市场基准价 <b>' + marketBase + '</b> 金/' + unit + '</div>' +
           '<div class="sv">销量 ' + mk.sold.toFixed(0) + ' ' + unit + ' · 供需 ×' +
             mk.supply.toFixed(2) + ' · 季节 ×' + mk.season.toFixed(2) + ' · ' + head + '</div>' +
+          '<div class="sv">' + (buyCost == null
+            ? '单件卖出到手 ' + oneSale + ' 金 · 采集现金成本未计'
+            : '单件参考进价 ' + buyCost + ' 金 · 卖出到手 ' + oneSale + ' 金 · 毛差 <b class="' +
+              (unitMargin > 0 ? 'market-up' : (unitMargin < 0 ? 'market-down' : '')) + '">' +
+              (unitMargin > 0 ? '+' : '') + unitMargin + ' 金</b>') + '</div>' +
           '<div class="sv">' + daysToNextSeason + ' 天后下季开市 ×' + nextMk.total.toFixed(2) +
             (nxt > 1 ? '（转' + (isFish ? '非汛期' : '反季') + '）' : '') +
-            ' → 市场参考价 <b>' + next + '</b> 金/' + unit + '</div>' +
+            ' → 单件卖出到手约 <b>' + nextSale + '</b> 金</div>' +
         '</div>' +
         '<span class="sparkwrap">' + sparkline(series) + '</span>' +
       '</div>';
@@ -223,26 +243,33 @@
 
     const tracked = Object.keys(state.marketHist || {}).length;
     const portfolio = '<div class="market-portfolio">' +
-      '<div class="store-sub">📦 当前库存 · 商店卖出到手估算 · ' +
+      '<div class="store-sub">📦 当前库存 · 成本与利润参考 · ' +
         holdings.reduce(function (n, h) { return n + h.qty; }, 0) + ' 件</div>' +
       (holdings.length
         ? '<div class="market-portfolio-grid">' +
-            '<div><span>现在卖</span><b>' + holdNow + ' 金</b></div>' +
-            '<div><span>' + daysToNextSeason + ' 天后下季开市</span><b>' + holdNext + ' 金</b></div>' +
-            '<div class="' + (holdDelta > 0 ? 'market-up' : (holdDelta < 0 ? 'market-down' : '')) + '">' +
-              '<span>估算差额</span><b>' + (holdDelta > 0 ? '+' : '') + holdDelta + ' 金</b></div>' +
-          '</div><div class="sv market-wait-note">' + waitText + '</div>'
+            '<div><span>参考进货成本</span><b>' + referenceCost + ' 金</b></div>' +
+            '<div><span>成本货现在卖</span><b>' + costedNow + ' 金</b></div>' +
+            '<div class="' + (nowMargin > 0 ? 'market-up' : (nowMargin < 0 ? 'market-down' : '')) + '">' +
+              '<span>现在参考毛差</span><b>' + (nowMargin > 0 ? '+' : '') + nowMargin + ' 金</b></div>' +
+            '<div><span>成本货下季卖</span><b>' + costedNext + ' 金</b></div>' +
+            '<div class="' + (nextMargin > 0 ? 'market-up' : (nextMargin < 0 ? 'market-down' : '')) + '">' +
+              '<span>下季参考毛差</span><b>' + (nextMargin > 0 ? '+' : '') + nextMargin + ' 金</b></div>' +
+          '</div><div class="sv market-wait-note">' +
+            '全库存估算：现在卖 ' + holdNow + ' 金 · 下季卖 ' + holdNext + ' 金 · 等待变化 ' +
+            (holdDelta > 0 ? '+' : '') + holdDelta + ' 金。' + waitText + '</div>'
         : '<div class="sv market-wait-note">仓库里还没有可比较的作物或鱼。</div>') +
     '</div>';
-    openModal('📊 市场分析',
+    openModal('📈 市场',
+      marketTabs('analysis') +
       '<div class="shop-head">现在是 <b>' + season + '季</b> · 已记录 <b>' + days +
         '</b> 天内最多 <b>' + days + '</b> 个价格点（存了 ' + tracked + ' 种货）</div>' +
       portfolio +
       '<div class="store-sub">🌱 作物</div>' + cropRows +
       '<div class="store-sub" style="margin-top:10px">🌿 野货（采集）</div>' + wildRows +
       '<div class="store-sub" style="margin-top:10px">🐟 水产</div>' + fishRows +
-      '<div class="shop-tip">每行显示<b>当前市场参考价</b>、<b>销量 / 供需 / 季节</b>、<b>近期价格变化</b>和价格曲线，' +
+      '<div class="shop-tip">每行显示<b>标准品质市场基准价</b>、<b>单件商店进价 / 卖出价 / 毛差</b>、<b>销量 / 供需 / 季节</b>、<b>近期价格变化</b>和价格曲线，' +
         '右边那条线是最近 30 天的市价系数（纵轴固定 0.5~2.8，所以不同货能直接比）。<br>' +
-        '<b>下季开市估算</b>按“等待期间不再卖货”计算，并逐日计入市场销量回落；库存对比按商店折扣和成就加成估算，未计入委托收益、税费和等待期间的经营成本。</div>',
+        '<b>成本口径：</b>单件买卖价按标准品质估算；持仓毛差使用当前商店进价作补货成本参考，不是历史实际成本；自产成本、野货采集体力未计。' +
+        '<b>下季开市估算</b>按“等待期间不再卖货”计算，并逐日计入市场销量回落；未计入委托收益、税费和等待期间的经营成本。</div>',
       '<button class="btn" data-close>关闭</button>');
   }

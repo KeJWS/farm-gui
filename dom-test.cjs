@@ -147,6 +147,15 @@ function clickAct(act) {
   (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
 }
 
+function clickMarketPage(page) {
+  const btn = { dataset: { marketPage: page }, disabled: false };
+  const target = {
+    closest: function (sel) { return sel === '[data-market-page]' ? btn : null; },
+    classList: classList()
+  };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+}
+
 console.log('== 首屏渲染 ==');
 ok(html('#plot-grid').indexOf('class="plot') >= 0 && (html('#plot-grid').match(/class="plot /g) || []).length === 5,
    '农田渲染出 5 块地');
@@ -228,18 +237,22 @@ ok(html('#modal-root').indexOf('data-buycrop="watermelon" data-n="3"') < 0,
 ok(html('#modal-root').indexOf('脆生生') >= 0, '农产品店显示作物简述');
 ok(html('#modal-root').indexOf('crop-sell-id') >= 0, '农产品店有自定义卖出选择框');
 
-console.log('\n== 市场行情 ==');
+console.log('\n== 市场入口 / 行情 ==');
 document.querySelector('#btn-market').fire('click', { target: {} });
-ok(html('#modal-root').indexOf('市场行情') >= 0, '行情面板能打开');
+ok(html('#modal-root').indexOf('📈 市场') >= 0, '统一市场入口能打开');
+ok(html('#modal-root').indexOf('data-market-page="quote"') >= 0 &&
+   html('#modal-root').indexOf('data-market-page="analysis"') >= 0, '市场内保留行情 / 分析两页');
 ok(html('#modal-root').indexOf('反季 ×1.7') >= 0, '行情显示反季 ×1.7');
 ok(html('#modal-root').indexOf('汛期 ×1') >= 0 || html('#modal-root').indexOf('非汛期 ×1.7') >= 0,
    '行情显示鱼的汛期系数');
-ok(html('#modal-root').indexOf('×1.30') >= 0 && html('#modal-root').indexOf('回落 30%') >= 0,
-   '行情说明稀缺上限与回落幅度');
+ok(html('#modal-root').indexOf('供需 ×') >= 0 && html('#modal-root').indexOf('睡觉后回落 30%') >= 0,
+   '行情显示当前供需系数和销量回落幅度');
 ok(html('#modal-root').indexOf('再卖') >= 0 && html('#modal-root').indexOf('掉到') >= 0,
    '行情标注「还能卖多少」');
+ok(html('#modal-root').indexOf('买价') < 0, '简化行情页不重复显示商店成本');
 ok(html('#modal-root').indexOf('野货') >= 0 && html('#modal-root').indexOf('松茸') >= 0,
-   '行情包含野货');
+    '行情包含野货');
+ok(html('#modal-root').indexOf('最近卖出') < 0, '简化行情页不重复显示详细销量');
 
 console.log('\n== 收购箱 ==');
 document.querySelector('#btn-box').fire('click', { target: {} });
@@ -329,12 +342,23 @@ clickAct('forage');
 ok(html('#store-list').indexOf('荠菜') >= 0, '采集把当季野货（春·荠菜）放进仓库');
 
 console.log('\n== 市场分析 ==');
-document.querySelector('#btn-analysis').fire('click', { target: {} });
-ok(html('#modal-root').indexOf('市场分析') >= 0, '市场分析面板能打开');
+document.querySelector('#btn-market').fire('click', { target: {} });
+clickMarketPage('analysis');
+ok(html('#modal-root').indexOf('📈 市场') >= 0 && html('#modal-root').indexOf('data-market-page="analysis"') >= 0,
+   '统一市场入口能切换到分析页');
+clickMarketPage('quote');
+ok(html('#modal-root').indexOf('market-tab active" data-market-page="quote"') >= 0,
+   '市场弹窗可从分析切回行情');
+clickMarketPage('analysis');
 ok(html('#modal-root').indexOf('供需 ×') >= 0 && html('#modal-root').indexOf('季节 ×') >= 0,
    '分析面板列出供需与季节系数');
 ok(/近 \d+ 点/.test(html('#modal-root')), '分析面板显示 7 天走势');
 ok(html('#modal-root').indexOf('下季开市 ×') >= 0, '分析面板预测下一季');
+ok(html('#modal-root').indexOf('参考进货成本') >= 0 && html('#modal-root').indexOf('现在参考毛差') >= 0 &&
+   html('#modal-root').indexOf('下季参考毛差') >= 0, '持仓分析展示参考成本与现在 / 下季毛差');
+ok(html('#modal-root').indexOf('单件参考进价') >= 0 && html('#modal-root').indexOf('单件卖出到手') >= 0 &&
+   html('#modal-root').indexOf('毛差') >= 0, '分析行展示单件进价、卖价和毛差');
+ok(html('#modal-root').indexOf('不是历史实际成本') >= 0, '持仓毛差说明其补货参考成本口径');
 ok((html('#modal-root').match(/<svg class="spark"/g) || []).length >= 20, '每种货都有一条价格曲线',
    (html('#modal-root').match(/<svg class="spark"/g) || []).length);
 (function multiPoint() {

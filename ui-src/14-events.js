@@ -13,6 +13,13 @@
     document.addEventListener('click', function (ev) {
       const t = ev.target;
 
+      const marketPageBtn = t.closest('[data-market-page]');
+      if (marketPageBtn) {
+        if (marketPageBtn.dataset.marketPage === 'analysis') analysisModal();
+        else marketModal();
+        return;
+      }
+
       const storeFilterBtn = t.closest('[data-store-filter]');
       if (storeFilterBtn) {
         storeFilter = storeFilterBtn.dataset.storeFilter || 'all';
@@ -627,8 +634,6 @@
     if (mktBtn) mktBtn.addEventListener('click', marketModal);
     const townBtn = $('#btn-town');
     if (townBtn) townBtn.addEventListener('click', townModal);
-    const anaBtn = $('#btn-analysis');
-    if (anaBtn) anaBtn.addEventListener('click', analysisModal);
     $('#btn-refresh-orders').addEventListener('click', function () {
       const r = G.refreshOrders(state);
       commit(r);
