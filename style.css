@@ -24,6 +24,9 @@
 
 *{ box-sizing:border-box; }
 
+/* hidden 属性优先于组件自身的 display（果园面板 / 底部按钮用得到） */
+[hidden]{ display:none !important; }
+
 html,body{ height:100%; }
 
 body{
@@ -620,6 +623,29 @@ button{ font-family:inherit; }
 .day-line b.down{ color:var(--red); }
 .day-empty{ font-size:11.5px; color:var(--ink-3); font-weight:700; padding:2px 0; }
 .day-todo{ margin:0; padding-left:18px; font-size:12.5px; font-weight:700; color:var(--ink-2); line-height:1.8; }
+
+/* ---------------- 果园 ---------------- */
+
+.orchard-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:9px; }
+.orc-card{
+  display:flex; flex-direction:column; gap:5px; padding:9px 10px; border-radius:14px;
+  border:1px solid var(--line); background:var(--panel-2);
+}
+.orc-card.empty{ border-style:dashed; }
+.orc-card.mature.on{ border-color:var(--green); }
+.orc-top{ display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:800; color:var(--ink-3); }
+.orc-emoji{ font-size:18px; line-height:1; }
+.orc-tag{ margin-left:auto; font-size:10px; font-weight:800; color:var(--green-d); }
+.orc-tag.off{ color:var(--ink-3); }
+.orc-mid{ font-size:11.5px; line-height:1.55; font-weight:700; color:var(--ink-2); min-height:34px; }
+.orc-bar{ margin:1px 0; }
+.orc-act{ display:flex; justify-content:flex-end; align-items:center; min-height:24px; }
+.orc-note{ font-size:10.5px; font-weight:700; color:var(--ink-3); }
+.orchard-locked{ padding:2px 2px 0; font-size:12.5px; line-height:1.8; font-weight:700; color:var(--ink-2); }
+.orchard-locked span{ display:block; font-size:11px; color:var(--ink-3); }
+.orchard-locked .btn{ margin-top:7px; }
+.orchard-foot{ display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-top:10px; }
+
 
 .rule-table{ width:100%; border-collapse:collapse; font-size:11.8px; margin:6px 0 14px; }
 .rule-table th,.rule-table td{ padding:5px 8px; text-align:left; border-bottom:1px solid var(--line); }

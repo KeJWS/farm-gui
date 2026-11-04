@@ -194,9 +194,12 @@
         '那块地<b>收完立刻补种</b>，睡觉时再把空着的补上；用你选的种子、不耗体力，每台每周维护 ' +
         G.BALANCE.upkeep.seeder + ' 金<br>' +
         '· 🍑 果园：种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.BALANCE.orchard.unlockCost +
-        ' 金开垦，' + G.BALANCE.orchard.slots + ' 个树坑；种子便宜但要育苗 ' + G.BALANCE.orchard.growDays +
-        ' 天（一年，<b>只有浇过水的日子才算</b>），树苗贵但种下即成树；成树只在自己的季节结果，当季每天 ' +
-        G.BALANCE.orchard.fruitPerDay + ' 个水果，水果在果园面板直接卖<br>' +
+        ' 金开垦，先给 ' + G.BALANCE.orchard.free + ' 个树坑，第 4~' + G.BALANCE.orchard.slots +
+        ' 个树坑要花钱开（' + G.BALANCE.orchard.slotCosts.join(' / ') + ' 金）；种子要<b>浇水 ' +
+        G.BALANCE.orchard.grow.seed.water + ' 天 + 生长 ' + G.BALANCE.orchard.grow.seed.days +
+        ' 天</b>，树苗要<b>浇水 ' + G.BALANCE.orchard.grow.sapling.water + ' 天 + 生长 ' +
+        G.BALANCE.orchard.grow.sapling.days + ' 天</b>（两项都满足才成树）；浇水 / 收获各 1 体力；' +
+        '成树只在自己的季节每天挂 ' + G.BALANCE.orchard.fruitPerDay + ' 个水果，收进仓库后去农产品店卖<br>' +
         '· 💰 税：每 30 天按（金币 + 仓库价值）<b>累进</b>收一次——前 2000 收 2%、2000~1 万收 4%、1 万以上收 6%，最低 ' +
         G.BALANCE.tax.min + ' 金（当前约 ' + G.taxDue(state) + ' 金）<br>' +
         '· 🧾 维护费：每 7 天收一次，土地 ' + G.plotUpkeep(state.plots.length) + ' 金（6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 ' +

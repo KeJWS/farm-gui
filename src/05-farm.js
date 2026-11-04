@@ -454,14 +454,13 @@
       if (n) notes.push({ kind: 'water', text: '🚿 洒水器浇 ' + n + ' 块' + (ripe ? '，熟 ' + ripe : '') });
     }
 
-    // 果园：昨天浇过水 → 育苗 +1 天；成树在自己季节每天结果
+    // 果园：成树在当季每天挂果（等玩家花体力收）
     const orc = orchardTick(s, prevDay);
-    if (orc.grown) {
-      notes.push({ kind: 'orchard', text: '🍑 果树育苗 +' + orc.grown + ' 天' +
-        (orc.grownReady ? '（' + orc.grownReady + ' 棵成树）' : '') });
-    }
     if (orc.fruit) {
-      notes.push({ kind: 'orchard', text: '🍑 果园产出 ' + orc.fruit + ' 个水果（值 ' + orc.value + '）' });
+      notes.push({ kind: 'orchard', text: '🍑 果园挂了 ' + orc.fruit + ' 个水果，等你收' });
+    }
+    if (orc.thirsty) {
+      notes.push({ kind: 'orchard', text: '💧 ' + orc.thirsty + ' 棵育苗树今天没浇水' });
     }
 
     // 渔夫：发工资 → 替你重布渔网 → 自动甩杆（不耗玩家体力、不给玩家经验）
@@ -561,7 +560,8 @@
     if (longLeft !== null) tomorrow.push('长期订单还剩 ' + longLeft + ' 天');
     if (s.coins < fee) tomorrow.push('金币不够明天的伙食（' + fee + ' 金）');
     const orcSummary = orchardSummary(s);
-    if (orcSummary.growing) tomorrow.push('果园有 ' + orcSummary.growing + ' 棵育苗树要浇水');
+    if (orcSummary.thirsty) tomorrow.push('果园有 ' + orcSummary.thirsty + ' 棵育苗树要浇水（1 体力/棵）');
+    if (orcSummary.ripe) tomorrow.push('果园有 ' + orcSummary.ripe + ' 个水果可以收（1 体力/棵）');
     const report = {
       day: s.day,
       weather: { id: s.weather, emoji: w.emoji, name: w.name },
@@ -573,8 +573,8 @@
       fisher: fisherReport,
       net: netReport,
       orders: { fresh: (s.orders || []).length, deliverable: deliverable },
-      orchard: { grown: orc.grown, grownReady: orc.grownReady, fruit: orc.fruit, value: orc.value,
-                 growing: orcSummary.growing, mature: orcSummary.mature, stock: orcSummary.fruit },
+      orchard: { fruit: orc.fruit, mature: orcSummary.mature, growing: orcSummary.growing,
+                 ripe: orcSummary.ripe, thirsty: orcSummary.thirsty },
       longOrder: s.longOrder ? { name: s.longOrder.name, emoji: s.longOrder.emoji,
         qty: s.longOrder.qty, have: orderHave(s, s.longOrder), days: longLeft } : null,
       tomorrow: tomorrow

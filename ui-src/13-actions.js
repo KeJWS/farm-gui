@@ -41,7 +41,24 @@
     },
     tea: teaModal,
     depart: departModal,
-    orchard: orchardModal,
+    orchardWater: function () {
+      const r = G.waterOrchard(state);
+      commit(r);
+      toast(r.msg, r.ok ? 'good' : 'warn');
+      if (r.ok) SFX.water();
+    },
+    orchardHarvest: function () {
+      const r = G.harvestOrchard(state);
+      commit(r);
+      toast(r.msg, r.ok ? 'good' : 'warn');
+      if (r.ok) SFX.good();
+    },
+    orchardExpand: function () {
+      const r = G.expandOrchard(state);
+      commit(r);
+      toast(r.msg, r.ok ? 'good' : 'warn');
+      if (r.ok) SFX.coin();
+    },
     work: function (ev) {
       const r = G.workAuto(state);
       commit(r);

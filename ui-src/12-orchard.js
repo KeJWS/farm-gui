@@ -1,83 +1,96 @@
 /* 我的小农场 · 界面层 / 12-orchard.js
- * 果园：开垦 / 树坑 / 种树 / 浇水 / 卖水果
+ * 果园面板：开垦 / 扩坑 / 树坑 / 种树 / 浇水 / 收获
  * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
  */
 
-  /* ---------------- 果园 ---------------- */
+  /* ---------------- 果园面板 ---------------- */
 
-  function orchardRow(i) {
+  function orchardCard(i) {
     const slot = G.treeSlot(state, i);
     const no = i + 1;
     if (!slot) {
-      return '<div class="store-row">' +
-        '<span class="se">🕳️</span>' +
-        '<div><div class="sn">' + no + ' 号树坑 <b class="lock">空着</b></div>' +
-          '<div class="sv">种子便宜但要育苗，树苗贵但立刻成树</div></div>' +
-        '<button class="btn mini primary" data-tree-pick="' + i + '">种树</button></div>';
+      return '<div class="orc-card empty">' +
+        '<div class="orc-top"><span class="orc-emoji">🕳️</span><span class="orc-no">' + no + ' 号坑</span></div>' +
+        '<div class="orc-mid">空着 · 可以种果树</div>' +
+        '<div class="orc-act"><button class="btn mini" data-tree-pick="' + i + '">种树</button></div></div>';
     }
     const t = G.TREES[slot.id];
-    const need = G.BALANCE.orchard.growDays;
-    if (slot.grown < need) {
-      const pct = Math.round(slot.grown / need * 100);
-      const watered = state.orchard.wateredDay === state.day;
-      return '<div class="store-row">' +
-        '<span class="se">' + t.emoji + '</span>' +
-        '<div><div class="sn">' + t.name + ' <b class="own">育苗 ' + slot.grown + ' / ' + need + ' 天</b></div>' +
-          '<div class="sv">' + (watered ? '✅ 今天已浇水' : '💧 今天还没浇水（不浇就不长）') +
-            ' · ' + G.SEASONS[t.season] + '季结果</div>' +
-          '<div class="cc-bar" style="margin-top:5px"><i style="width:' + pct + '%"></i></div></div>' +
-        '<span class="sp">' + pct + '%</span></div>';
+    const p = G.treeProgress(state, i);
+    if (!p.done) {
+      const watered = slot.lastWater === state.day;
+      const pct = Math.min(100, Math.round(Math.min(p.water / p.needWater, p.age / p.needDays) * 100));
+      return '<div class="orc-card">' +
+        '<div class="orc-top"><span class="orc-emoji">' + t.emoji + '</span><span class="orc-no">' + no + ' 号坑</span>' +
+          '<b class="orc-tag">育苗</b></div>' +
+        '<div class="orc-mid">' + t.name + ' · ' + (p.mode === 'sapling' ? '树苗' : '种子') + '<br>' +
+          '💧 ' + p.water + '/' + p.needWater + ' 天 · 🌱 ' + p.age + '/' + p.needDays + ' 天</div>' +
+        '<div class="cc-bar orc-bar"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="orc-act"><span class="orc-note">' + (watered ? '✅ 今天浇过' : '💧 待浇水（1 体力）') + '</span></div></div>';
     }
     const inSeason = G.treeInSeason(state, i);
-    return '<div class="store-row">' +
-      '<span class="se">' + t.emoji + '</span>' +
-      '<div><div class="sn">' + t.name + ' <b class="own">成树</b> ' +
-        (inSeason ? '<b class="own">当季结果</b>' : '<b class="lock">休眠</b>') + '</div>' +
-        '<div class="sv">' + (inSeason
-          ? '每天产 ' + G.BALANCE.orchard.fruitPerDay + ' 个' + t.fruit + '（' + t.price + ' 金/个）'
-          : '只在' + G.SEASONS[t.season] + '季结果 · ' + t.desc) + '</div></div>' +
-      '<span class="sp">' + (inSeason ? '🍬' : '💤') + '</span></div>';
+    return '<div class="orc-card mature' + (inSeason ? ' on' : '') + '">' +
+      '<div class="orc-top"><span class="orc-emoji">' + t.emoji + '</span><span class="orc-no">' + no + ' 号坑</span>' +
+        '<b class="orc-tag' + (inSeason ? '' : ' off') + '">' + (inSeason ? '当季' : '休眠') + '</b></div>' +
+      '<div class="orc-mid">' + t.name + '<br>' +
+        (inSeason ? '每天挂 ' + G.BALANCE.orchard.fruitPerDay + ' 个 · 待收 ' + p.ripe
+                  : G.SEASONS[t.season] + '季结果') + '</div>' +
+      '<div class="orc-act">' +
+        '<button class="btn mini primary" data-tree-harvest="' + i + '"' + (p.ripe ? '' : ' disabled') + '>' +
+          '收获' + (p.ripe ? ' ' + p.ripe : '') + '</button></div></div>';
   }
 
-  function orchardModal() {
+  function renderOrchard() {
+    const sum = G.orchardSummary(state);
+    const locked = $('#orchard-locked');
+    const grid = $('#orchard-grid');
+    const foot = $('#orchard-foot');
+    if (!locked || !grid || !foot) return;
+    const head = $('#orchard-sum');
     const need = G.BALANCE.orchard;
     if (!G.orchardUnlocked(state)) {
       const lv = G.farmLv(state);
       const lvOk = lv >= need.unlockLv;
       const coinOk = state.coins >= need.unlockCost;
-      openModal('🍑 果园',
-        '<div class="shop-head">🔒 还没开垦 · ' + need.slots + ' 个树坑</div>' +
-        '<dl class="kv">' +
-          '<dt>等级</dt><dd>种田 Lv' + need.unlockLv + '（现在 Lv' + lv + (lvOk ? ' ✓' : '') + '）</dd>' +
-          '<dt>费用</dt><dd>' + need.unlockCost + ' 金（现有 ' + state.coins + ' 金' + (coinOk ? '' : ' ✗') + '）</dd>' +
-          '<dt>成树</dt><dd>种子要育苗 ' + need.growDays + ' 天（一年），树苗种下即成树</dd>' +
-          '<dt>结果</dt><dd>每种果树只在自己的季节结果，当季每天 ' + need.fruitPerDay + ' 个</dd>' +
-        '</dl>' +
-        '<div class="shop-tip">果树在<b>百货店</b>买；四季各一种，种齐了整年都有水果卖。后期建造，越早开垦越早回本。</div>',
+      locked.innerHTML = '<div class="orc-locked">🔒 种田 <b>Lv' + need.unlockLv + '</b> + <b>' +
+        need.unlockCost + '</b> 金开垦（现在 Lv' + lv + (lvOk ? ' ✓' : '') + '）<br>' +
+        '<span>开垦后先给 ' + need.free + ' 个树坑，后面每个树坑再花钱开</span><br>' +
         '<button class="btn primary" data-orchard-unlock="1"' +
-          (lvOk && coinOk ? '' : ' disabled') + '>开垦果园（' + need.unlockCost + ' 金）</button>' +
-        '<button class="btn" data-close>关闭</button>');
+          (lvOk && coinOk ? '' : ' disabled') + '>开垦果园（' + need.unlockCost + ' 金）</button></div>';
+      locked.hidden = false;
+      grid.hidden = true;
+      foot.hidden = true;
+      if (head) head.textContent = '';
       return;
     }
-
-    const sum = G.orchardSummary(state);
-    const rows = [];
-    for (let i = 0; i < G.orchardSlots(); i++) rows.push(orchardRow(i));
-    const watered = state.orchard.wateredDay === state.day;
-    openModal('🍑 果园',
-      '<div class="shop-head">🌳 成树 <b>' + sum.mature + '</b> · 育苗 <b>' + sum.growing + '</b>' +
-        ' · 水果 <b>' + sum.fruit + '</b> 个（<b>' + sum.value + '</b> 金）</div>' +
-      '<div class="action-grid" style="margin-bottom:9px">' +
-        '<button class="btn" data-orchard-water="1"' + (watered || !sum.growing ? ' disabled' : '') + '>' +
-          '💧 浇果树<small>' + (watered ? '今天浇过了' : (sum.growing ? sum.growing + ' 棵育苗树' : '没有育苗树')) + '</small></button>' +
-        '<button class="btn" data-orchard-sell="1"' + (sum.fruit ? '' : ' disabled') + '>' +
-          '🍑 卖水果<small>' + (sum.fruit ? sum.value + ' 金' : '还没有水果') + '</small></button>' +
-        '<button class="btn" data-act="depart">🏬 百货店<small>买种子 / 树苗</small></button>' +
-      '</div>' +
-      '<div class="store-sub">树坑 · 育苗树要每天浇水，才会长一天</div>' + rows.join('') +
-      '<div class="shop-tip">成树不用浇水，只在<b>自己季节</b>每天结果；其余季节休眠。' +
-        '水果不占仓库，直接在这里卖。</div>',
-      '<button class="btn" data-close>关闭</button>');
+    locked.hidden = true;
+    grid.hidden = false;
+    foot.hidden = false;
+    const cards = [];
+    for (let i = 0; i < G.orchardSlotCount(state); i++) cards.push(orchardCard(i));
+    grid.innerHTML = cards.join('');
+    if (head) head.textContent = '树坑 ' + sum.total + '/' + sum.max + ' · 成树 ' + sum.mature +
+      ' · 待收 ' + sum.ripe;
+    const waterTxt = $('#orchard-water-txt');
+    if (waterTxt) {
+      waterTxt.textContent = sum.thirsty
+        ? sum.thirsty + ' 棵 · ' + (sum.thirsty * G.BALANCE.orchard.waterEnergy) + ' 体力'
+        : (sum.growing ? '今天都浇过了' : '没有育苗树');
+    }
+    const harvTxt = $('#orchard-harvest-txt');
+    if (harvTxt) {
+      harvTxt.textContent = sum.ripe ? '待收 ' + sum.ripe + ' 个' : '没有可收的';
+    }
+    const expTxt = $('#orchard-expand-txt');
+    if (expTxt) {
+      const cost = G.orchardExpandCost(state);
+      expTxt.textContent = sum.total >= sum.max ? '已开满' : (cost + ' 金');
+    }
+    const waterBtn = $('[data-act="orchardWater"]');
+    if (waterBtn) waterBtn.disabled = !sum.thirsty;
+    const harvBtn = $('[data-act="orchardHarvest"]');
+    if (harvBtn) harvBtn.disabled = !sum.ripe;
+    const expBtn = $('[data-act="orchardExpand"]');
+    if (expBtn) expBtn.disabled = sum.total >= sum.max;
   }
 
   function treePicker(i) {
@@ -88,8 +101,10 @@
       return '<div class="store-row">' +
         '<span class="se">' + t.emoji + '</span>' +
         '<div><div class="sn">' + t.name + ' <b class="own">' + G.SEASONS[t.season] + '季结果</b></div>' +
-          '<div class="sv">' + t.fruit + ' ' + t.price + ' 金/个 · ' + t.desc + '</div>' +
-          '<div class="sv">种子有 ' + seedN + '（育苗 ' + need.growDays + ' 天）· 树苗有 ' + sapN + '（立刻成树）</div></div>' +
+          '<div class="sv">' + t.fruit + ' ' + t.price + ' 金/个 · 种子需 浇水 ' + need.grow.seed.water +
+            ' 天 + 生长 ' + need.grow.seed.days + ' 天 · 树苗需 浇水 ' + need.grow.sapling.water +
+            ' 天 + 生长 ' + need.grow.sapling.days + ' 天</div>' +
+          '<div class="sv">种子有 ' + seedN + ' · 树苗有 ' + sapN + '</div></div>' +
         '<button class="btn mini" data-tree-plant="' + i + '" data-tree="' + t.id + '" data-mode="seed"' +
           (seedN ? '' : ' disabled') + '>种子</button>' +
         '<button class="btn mini" data-tree-plant="' + i + '" data-tree="' + t.id + '" data-mode="sapling"' +
@@ -97,9 +112,10 @@
       '</div>';
     }).join('');
     openModal('🌰 ' + (i + 1) + ' 号树坑 · 种什么',
-      '<div class="shop-head">🍑 当季每天 ' + need.fruitPerDay + ' 个水果 · 果树只在自己的季节结果</div>' + rows +
-      '<div class="shop-tip">种子便宜，但要育苗 <b>' + need.growDays + '</b> 天（一年，只有浇过水的日子才算）；' +
-        '树苗贵，种下立刻成树。库存为 0 的按钮是灰的，先去百货店买。</div>',
+      '<div class="shop-head">🍑 当季每天挂 ' + need.fruitPerDay + ' 个水果 · 每棵果树只在自己的季节结果</div>' + rows +
+      '<div class="shop-tip">种子便宜，但要<b>浇水 ' + need.grow.seed.water + ' 天</b>并且<b>生长满 ' +
+        need.grow.seed.days + ' 天</b>才成树；树苗贵，<b>浇水 ' + need.grow.sapling.water +
+        ' 天</b>、生长满 ' + need.grow.sapling.days + ' 天就成树。浇水 / 收获各花 1 体力。</div>',
       '<button class="btn" data-act="depart">🏬 去百货店买</button>' +
       '<button class="btn" data-close>取消</button>');
   }

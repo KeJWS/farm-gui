@@ -65,10 +65,13 @@
             seeder: 4, lure2: 6, lure2Trade: 3, goldKeyTrade: 4 },
     /* 宝箱：铁箱 / 金箱按钓鱼等级解锁 */
     chest: { ironLv: 4, goldLv: 7 },
-    /* 果园：种田 Lv7 + 2500 金开垦，8 个树坑。
-     * 果树种子便宜，但要育苗满 120 天（只有浇过水的日子才算）；树苗贵，种下即成树。
-     * 成树只在自己的季节结果，当季每天 2 个。 */
-    orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, growDays: 120, fruitPerDay: 2 }
+    /* 果园：种田 Lv7 + 2500 金开垦，先给 3 个树坑，后面每个花钱开（第 4~8 个）。
+     * 种子：浇水 30 天 + 生长满 120 天才成树；树苗：浇水 15 天 + 生长满 30 天。
+     * 成树只在自己季节结果，当季每天 2 个；浇水 / 收获各 1 体力。 */
+    orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, free: 3, fruitPerDay: 2,
+               waterEnergy: 1, harvestEnergy: 1,
+               grow: { seed: { days: 120, water: 30 }, sapling: { days: 30, water: 15 } },
+               slotCosts: [600, 1000, 1600, 2400, 3200] }
   };
 
   /* ---------------- 静态数据 ---------------- */
@@ -115,13 +118,24 @@
     mushroom:   { name: '松茸', emoji: '🍄', price: 24, wild: true, seasons: [2],
                   desc: '雨后林子里的宝贝，城里人抢着要' },
     frozenpear: { name: '冻梨', emoji: '🍐', price: 22, wild: true, seasons: [3],
-                  desc: '冻得梆硬，化开了甜到心里' }
+                  desc: '冻得梆硬，化开了甜到心里' },
+
+    /* 果园水果：只能在果园收获，进仓库 / 农产品店，不进种子店 / 委托池 / 进货表 */
+    fruit_peach: { name: '桃',   emoji: '🍑', price: 24, fruit: true, seasons: [0],
+                   desc: '果园当季现摘，软甜多汁' },
+    fruit_mango: { name: '芒果', emoji: '🥭', price: 30, fruit: true, seasons: [1],
+                   desc: '晒足太阳的热带甜' },
+    fruit_apple: { name: '苹果', emoji: '🍎', price: 26, fruit: true, seasons: [2],
+                   desc: '秋天第一口脆' }
   };
   Object.keys(CROPS).forEach(function (k) { CROPS[k].id = k; });
-  /* CROP_LIST 只放能种的；WILD_LIST 是采集产物，只进仓库 / 市场 / 收购箱 */
-  const CROP_LIST = Object.keys(CROPS).filter(function (k) { return !CROPS[k].wild; })
-    .map(function (k) { return CROPS[k]; });
+  /* CROP_LIST 只放能种的；WILD_LIST 是采集产物，水果走果园单独收获 */
+  const CROP_LIST = Object.keys(CROPS).filter(function (k) {
+    return !CROPS[k].wild && !CROPS[k].fruit;
+  }).map(function (k) { return CROPS[k]; });
   const WILD_LIST = Object.keys(CROPS).filter(function (k) { return CROPS[k].wild; })
+    .map(function (k) { return CROPS[k]; });
+  const FRUIT_LIST = Object.keys(CROPS).filter(function (k) { return CROPS[k].fruit; })
     .map(function (k) { return CROPS[k]; });
 
   const FERT = {
@@ -208,16 +222,15 @@
   const TEA_LIST = Object.keys(TEAS).map(function (k) { return TEAS[k]; });
 
   /* 果树：每种只在自己的季节结果（当季每天 BALANCE.orchard.fruitPerDay 个）
-   * seed = 种子价（便宜，育苗 120 天），sapling = 树苗价（贵，种下即成树），price = 果实单价 */
+   * seed = 种子价（便宜，要浇水 30 天 + 满 120 天），sapling = 树苗价（贵，浇水 15 天 + 满 30 天）
+   * price = 果实单价，fruitId 指向 CROPS 里对应的水果（收获进仓库） */
   const TREES = {
-    peach:  { id: 'peach',  name: '桃树',   fruit: '桃',   emoji: '🍑', season: 0,
-              seed: 90,  sapling: 750, price: 24, desc: '春天开花，夏天摘桃' },
-    mango:  { id: 'mango',  name: '芒果树', fruit: '芒果', emoji: '🥭', season: 1,
-              seed: 110, sapling: 900, price: 30, desc: '晒足太阳才够甜' },
-    apple:  { id: 'apple',  name: '苹果树', fruit: '苹果', emoji: '🍎', season: 2,
-              seed: 95,  sapling: 780, price: 26, desc: '秋天第一口脆' },
-    orange: { id: 'orange', name: '橘子树', fruit: '橘子', emoji: '🍊', season: 3,
-              seed: 105, sapling: 850, price: 28, desc: '冬天也不怕冷' }
+    peach:  { id: 'peach',  name: '桃树',   fruit: '桃',   fruitId: 'fruit_peach',
+              emoji: '🍑', season: 0, seed: 90,  sapling: 750, price: 24, desc: '春天开花，夏天摘桃' },
+    mango:  { id: 'mango',  name: '芒果树', fruit: '芒果', fruitId: 'fruit_mango',
+              emoji: '🥭', season: 1, seed: 110, sapling: 900, price: 30, desc: '晒足太阳才够甜' },
+    apple:  { id: 'apple',  name: '苹果树', fruit: '苹果', fruitId: 'fruit_apple',
+              emoji: '🍎', season: 2, seed: 95,  sapling: 780, price: 26, desc: '秋天第一口脆' }
   };
   const TREE_LIST = Object.keys(TREES).map(function (k) { return TREES[k]; });
 

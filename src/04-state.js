@@ -71,9 +71,8 @@
       nets: 0,
       netSet: 0,
       fisher: null,
-      orchard: { unlocked: false, wateredDay: 0, slots: [] },
+      orchard: { unlocked: false, slots: [] },
       treeStock: {},
-      fruits: {},
       townDonated: 0,
       codex: { fish: {}, crops: {} },
       manualRefreshUsed: false,
@@ -101,9 +100,8 @@
     };
     TREE_LIST.forEach(function (t) {
       s.treeStock[t.id] = { seed: 0, sapling: 0 };
-      s.fruits[t.id] = 0;
     });
-    s.orchard.slots = new Array(BALANCE.orchard.slots).fill(null);
+    s.orchard.slots = new Array(BALANCE.orchard.free).fill(null);
     snapshotMarket(s);
     return s;
   }

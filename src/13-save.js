@@ -95,26 +95,37 @@
       if (!TEAS[id]) { delete merged.teas[id]; return; }
       merged.teas[id] = Math.round(num(merged.teas[id], 0, 0, 999));
     });
-    merged.orchard = Object.assign({ unlocked: false, wateredDay: 0, slots: [] }, s.orchard || {});
+    merged.orchard = Object.assign({ unlocked: false }, s.orchard || {});
     merged.orchard.unlocked = !!merged.orchard.unlocked;
-    merged.orchard.wateredDay = Math.round(num(merged.orchard.wateredDay, 0, 0, 100000));
     const treeSlots = Array.isArray(merged.orchard.slots) ? merged.orchard.slots : [];
-    merged.orchard.slots = Array.from({ length: BALANCE.orchard.slots }).map(function (_, i) {
+    const slotCount = merged.orchard.unlocked
+      ? Math.max(BALANCE.orchard.free,
+          Math.min(BALANCE.orchard.slots, treeSlots.length || BALANCE.orchard.free))
+      : 0;
+    merged.orchard.slots = Array.from({ length: slotCount }).map(function (_, i) {
       const t = treeSlots[i];
       if (!t || !TREES[t.id]) return null;
-      return { id: t.id,
-               grown: Math.round(num(t.grown, 0, 0, BALANCE.orchard.growDays)),
-               day: Math.round(num(t.day, 1, 1, 100000)) };
+      const mode = t.mode === 'sapling' ? 'sapling' : 'seed';
+      const need = BALANCE.orchard.grow[mode];
+      const water = Math.round(num(t.water, 0, 0, 9999));
+      /* v2.20 的老存档只有 grown，这里换算成新的成长进度 */
+      const planted = t.planted != null
+        ? Math.round(num(t.planted, 1, 1, 100000))
+        : Math.max(1, merged.day - Math.round(num(t.grown, 0, 0, need.days)));
+      return {
+        id: t.id, mode: mode, planted: planted,
+        water: t.water != null ? water : Math.min(need.water, Math.round(num(t.grown, 0, 0, need.water))),
+        lastWater: Math.round(num(t.lastWater, 0, 0, 100000)),
+        ripe: Math.round(num(t.ripe, 0, 0, 99999))
+      };
     });
     merged.treeStock = {};
-    merged.fruits = {};
     TREE_LIST.forEach(function (t) {
       const row = (s.treeStock && s.treeStock[t.id]) || {};
       merged.treeStock[t.id] = {
         seed: Math.round(num(row.seed, 0, 0, 999)),
         sapling: Math.round(num(row.sapling, 0, 0, 999))
       };
-      merged.fruits[t.id] = Math.round(num(s.fruits && s.fruits[t.id], 0, 0, 99999));
     });
     merged.keys = Object.assign({ iron: 0, gold: 0 }, s.keys || {});
     Object.keys(merged.keys).forEach(function (id) {
@@ -437,13 +448,15 @@
     fishMany: fishMany, fishAll: fishAll, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,
     forage: forage, foragePool: foragePool, forageSeedPool: forageSeedPool,
     donate: donate, townTier: townTier, townBonus: townBonus, townNext: townNext,
-    TREES: TREES, TREE_LIST: TREE_LIST,
-    orchardSlots: orchardSlots, orchardUnlocked: orchardUnlocked, orchardUnlock: orchardUnlock,
+    TREES: TREES, TREE_LIST: TREE_LIST, FRUIT_LIST: FRUIT_LIST,
+    orchardSlots: orchardSlots, orchardFree: orchardFree, orchardUnlocked: orchardUnlocked,
+    orchardUnlock: orchardUnlock, orchardSlotCount: orchardSlotCount,
+    orchardExpandCost: orchardExpandCost, expandOrchard: expandOrchard,
     treeData: treeData, treeBuyPrice: treeBuyPrice, treeStockCount: treeStockCount,
     buyTreeStock: buyTreeStock, treeSlot: treeSlot, treeStage: treeStage, treeInSeason: treeInSeason,
+    treeNeed: treeNeed, treeAge: treeAge, treeMature: treeMature, treeProgress: treeProgress,
     plantTree: plantTree, waterOrchard: waterOrchard, orchardTick: orchardTick,
-    fruitCount: fruitCount, fruitValue: fruitValue, sellFruits: sellFruits,
-    orchardSummary: orchardSummary,
+    harvestTree: harvestTree, harvestOrchard: harvestOrchard, orchardSummary: orchardSummary,
     marketHeadroom: marketHeadroom, fishMarketHeadroom: fishMarketHeadroom,
     snapshotMarket: snapshotMarket, marketSeries: marketSeries, pushMarketHist: pushMarketHist,
     cropNextSeasonMul: cropNextSeasonMul, fishNextSeasonMul: fishNextSeasonMul,

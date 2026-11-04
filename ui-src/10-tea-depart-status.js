@@ -55,8 +55,10 @@
         '<span class="se">' + t.emoji + '</span>' +
         '<div><div class="sn">' + t.name + ' <b class="own">' + G.SEASONS[t.season] + '季结果</b>' +
           ((seedN || sapN) ? ' <b class="own">库存 ' + (seedN + sapN) + '</b>' : '') + '</div>' +
-          '<div class="sv">种子 ' + seedPrice + ' 金（育苗 ' + G.BALANCE.orchard.growDays + ' 天）· ' +
-            '树苗 ' + sapPrice + ' 金（立刻成树）· ' + t.fruit + ' ' + t.price + ' 金/个</div></div>' +
+          '<div class="sv">种子 ' + seedPrice + ' 金（浇水 ' + G.BALANCE.orchard.grow.seed.water +
+            ' 天 + 生长 ' + G.BALANCE.orchard.grow.seed.days + ' 天）· 树苗 ' + sapPrice + ' 金（浇水 ' +
+            G.BALANCE.orchard.grow.sapling.water + ' 天 + 生长 ' + G.BALANCE.orchard.grow.sapling.days +
+            ' 天）· ' + t.fruit + ' ' + t.price + ' 金/个</div></div>' +
         '<button class="btn mini" data-buytree="' + t.id + '" data-mode="seed"' +
           (state.coins < seedPrice ? ' disabled' : '') + '>种子</button>' +
         '<button class="btn mini" data-buytree="' + t.id + '" data-mode="sapling"' +
@@ -148,8 +150,8 @@
           return '未开垦（种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.BALANCE.orchard.unlockCost + ' 金）';
         }
         const o = G.orchardSummary(state);
-        return '成树 ' + o.mature + ' · 育苗 ' + o.growing + ' · 当季结果 ' + o.inSeason +
-          ' · 水果 ' + o.fruit + ' 个（' + o.value + ' 金）';
+        return '树坑 ' + o.total + '/' + o.max + ' · 成树 ' + o.mature + ' · 育苗 ' + o.growing +
+          ' · 待收 ' + o.ripe + ' 个 · 待浇水 ' + o.thirsty + ' 棵';
       })()],
       ['种田等级', 'Lv' + lv.farm + (lv.farm >= G.BALANCE.level.max ? '（满级）' :
         '（' + lv.farmXp + '/' + G.levelNeed(lv.farm) + '）') + ' · ' + G.levelEffectText('farm', lv.farm)],

@@ -2222,53 +2222,88 @@ ok(JSON.stringify(s).length > 0, '最终状态可序列化（' + (JSON.stringify
 
 /* ---------- 8. 果园 ---------- */
 section('果园');
+{
 G.setRng(mulberry32(11));
 s = G.createState();
 s.levels.farm = 6;
-s.coins = 5000;
+s.coins = 9000;
 ok(!G.orchardUnlock(s).ok, '种田 Lv6 不能开垦果园');
 s.levels.farm = 7;
 const unlockRes = G.orchardUnlock(s);
-ok(unlockRes.ok && s.coins === 2500 && s.orchard.slots.length === 8,
-   '种田 Lv7 + 2500 金开垦出 8 个树坑', { coins: s.coins, slots: s.orchard.slots.length });
+ok(unlockRes.ok && G.orchardSlotCount(s) === 3 && s.coins === 6500,
+   '种田 Lv7 + 2500 金开垦，先给 3 个树坑', { slots: G.orchardSlotCount(s), coins: s.coins });
 
-const stockRes = G.buyTreeStock(s, 'peach', 'seed', 2);
-ok(stockRes.ok && G.treeStockCount(s, 'peach', 'seed') === 2, '百货店买果树种子进库存', stockRes.msg);
-ok(G.treeBuyPrice(s, 'peach', 'sapling') === Math.round(750 * G.tradeCut(s)), '树苗价吃交易等级折扣');
+ok(G.orchardExpandCost(s) === 600, '第 4 个树坑 600 金');
+const growSlot = G.expandOrchard(s);
+ok(growSlot.ok && G.orchardSlotCount(s) === 4, '花钱开第 4 个树坑', growSlot.msg);
 
+s.coins = 20000;
+while (G.orchardSlotCount(s) < G.orchardSlots()) G.expandOrchard(s);
+ok(G.orchardSlotCount(s) === 8 && !G.expandOrchard(s).ok, '树坑最多 8 个');
+
+const stockRes = G.buyTreeStock(s, 'peach', 'seed', 1);
+ok(stockRes.ok && G.treeStockCount(s, 'peach', 'seed') === 1, '百货店买果树种子进库存', stockRes.msg);
+ok(!G.plantTree(s, 2, 'mango', 'seed').ok, '没有种子时不能种');
+
+s.day = 5;
 const plantSeed = G.plantTree(s, 0, 'peach', 'seed');
 ok(plantSeed.ok && G.treeStage(s, 0) === 'growing', '种下种子进入育苗');
 ok(!G.plantTree(s, 0, 'peach', 'seed').ok, '同一个树坑不能重复种');
 
-G.waterOrchard(s);
-G.sleep(s);
-const grown1 = G.treeSlot(s, 0).grown;
-ok(grown1 === 1, '浇过水的育苗 +1 天');
-G.sleep(s);
-ok(G.treeSlot(s, 0).grown === grown1, '没浇水的日子不长');
+s.energy = 10;
+const water1 = G.waterOrchard(s);
+ok(water1.ok && water1.n === 1 && s.energy === 9, '浇水 1 棵花 1 体力', { n: water1.n, e: s.energy });
+ok(!G.waterOrchard(s).ok, '同一天不能重复浇同一棵树');
 
+s.day = 125;                       // 长满 120 天，但只浇过 1 天
+ok(!G.treeMature(s, 0), '只长够天数、没浇够水也不成树');
+s.energy = 60;
+for (let k = 1; k < 30; k++) { s.day++; G.waterOrchard(s); }
+ok(G.treeProgress(s, 0).water === 30 && G.treeMature(s, 0), '浇水 30 天 + 生长 120 天 → 成树',
+   G.treeProgress(s, 0));
+
+// 树苗：浇水 15 天 + 生长 30 天
 G.buyTreeStock(s, 'apple', 'sapling', 1);
-const plantSap = G.plantTree(s, 1, 'apple', 'sapling');
-ok(plantSap.ok && G.treeStage(s, 1) === 'mature', '树苗种下立刻成树');
+s.day = 200;
+G.plantTree(s, 1, 'apple', 'sapling');
+s.energy = 60;
+for (let k = 0; k < 15; k++) { G.waterOrchard(s); s.day++; }
+ok(G.treeProgress(s, 1).water === 15 && !G.treeMature(s, 1), '树苗浇够 15 天但还没长满 30 天不算成树');
+s.day = 230;
+ok(G.treeMature(s, 1), '树苗浇水 15 天 + 生长 30 天 → 成树');
 
-s.day = 61;                       // 秋（苹果季）
+// 结果与收获（第 301 天起是秋天，苹果当季）
+s.day = 301;
 G.sleep(s);
-ok((s.fruits.apple || 0) === G.BALANCE.orchard.fruitPerDay, '成树在自己季节每天结果', s.fruits);
-ok((s.fruits.peach || 0) === 0, '不是自己季节的树不结果');
+const ripe1 = G.treeSlot(s, 1).ripe;
+ok(ripe1 === G.BALANCE.orchard.fruitPerDay, '成树当季每天挂果', { ripe: ripe1 });
+ok(G.treeSlot(s, 0).ripe === 0, '不是当季的树不结果');
 
-s.day = 91;                       // 冬
+s.energy = 5;
+const appleStoreBefore = G.storeCount(s, 'fruit_apple');
+const h1 = G.harvestTree(s, 1);
+ok(h1.ok && G.storeCount(s, 'fruit_apple') === appleStoreBefore + h1.n && s.energy === 4,
+   '收获 1 体力，果实进仓库', { store: G.storeCount(s, 'fruit_apple'), e: s.energy });
+ok(!G.harvestTree(s, 1).ok, '没有果实可收时收获失败');
+
+s.day = 331;                       // 冬
 G.sleep(s);
-ok((s.fruits.apple || 0) === G.BALANCE.orchard.fruitPerDay, '休眠季不新增水果', s.fruits);
+ok(G.treeSlot(s, 1).ripe === 0, '休眠季不挂果');
 
-const coinsBeforeFruit = s.coins;
-const sellRes = G.sellFruits(s);
-ok(sellRes.ok && s.coins > coinsBeforeFruit && G.fruitCount(s) === 0, '水果卖掉换金币并清空', sellRes.msg);
+s.day = 421; G.sleep(s);
+s.energy = 0;
+ok(!G.harvestTree(s, 1).ok, '体力为 0 时不能收获');
 
-s.orchard.slots[2] = { id: 'orange', grown: 10, day: 1 };
+// 存档
 const orchardRound = G.deserialize(G.serialize(s));
-ok(G.orchardUnlocked(orchardRound) && orchardRound.orchard.slots[2].id === 'orange' &&
-   orchardRound.orchard.slots.length === 8, '果园读档保留树坑与解锁状态');
-ok(G.treeStockCount(orchardRound, 'peach', 'seed') === 1, '读档保留种子库存');
+ok(G.orchardUnlocked(orchardRound) && G.orchardSlotCount(orchardRound) === 8,
+   '果园读档保留树坑数量与解锁状态');
+ok(G.treeProgress(orchardRound, 1).water === 15 && G.treeProgress(orchardRound, 1).ripe > 0,
+   '读档保留浇水次数与挂果');
+ok(G.treeStockCount(orchardRound, 'peach', 'seed') === 0 &&
+   G.CROP_LIST.every(function (c) { return !c.fruit; }) && G.FRUIT_LIST.length === 3,
+   '水果不进种子店 / 委托池');
+}
 
 /* ---------- 9. 每日总结 ---------- */
 section('每日总结');

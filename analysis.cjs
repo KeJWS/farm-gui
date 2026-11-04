@@ -457,30 +457,40 @@ console.log('\n== 小镇捐赠（后期金币出口）==');
 
 /* ---------- 15. 果园 ---------- */
 console.log('\n== 果园（种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.BALANCE.orchard.unlockCost +
-  ' 金开垦，' + G.BALANCE.orchard.slots + ' 个树坑）==');
+  ' 金开垦，先 ' + G.BALANCE.orchard.free + ' 个树坑）==');
 {
   const O = G.BALANCE.orchard;
   const S = ['春', '夏', '秋', '冬'];
-  let saplingSum = 0;
+  const per = {};
   G.TREE_LIST.forEach(function (t) {
     const perDay = O.fruitPerDay * t.price;
-    const perSeason = perDay * 30;
-    saplingSum += t.sapling;
+    per[t.id] = { day: perDay, season: perDay * 30, sapling: t.sapling, seed: t.seed };
     console.log('   ' + pad(t.name, 4) + ' ' + S[t.season] + '季 · 种子 ' + pad(t.seed + ' 金', 6) +
-      '（育苗 ' + O.growDays + ' 天）· 树苗 ' + pad(t.sapling + ' 金', 7) +
-      ' · 当季 ' + perDay + ' 金/天（30 天约 ' + perSeason + ' 金）');
+      '（浇水 ' + O.grow.seed.water + ' 天 + 生长 ' + O.grow.seed.days + ' 天）· 树苗 ' +
+      pad(t.sapling + ' 金', 7) + '（浇水 ' + O.grow.sapling.water + ' 天 + 生长 ' +
+      O.grow.sapling.days + ' 天）· 当季 ' + perDay + ' 金/天');
   });
-  const invest = O.unlockCost + saplingSum * 2;
-  const perSeasonSum = G.TREE_LIST.reduce(function (n, t) { return n + O.fruitPerDay * t.price; }, 0);
-  // 每季 2 棵：任意时刻只有当季那 2 棵在结果，全年平均 = 四季各一套 ×2 ÷ 4
-  const perDayAll = Math.round(perSeasonSum * 2 / 4);
-  console.log('   满配（每季 2 棵，共 ' + O.slots + ' 棵）：树苗 ' + saplingSum * 2 + ' + 开垦 ' +
-    O.unlockCost + ' = ' + invest + ' 金 · 全年平均 ' + perDayAll + ' 金/天 · 回本约 ' +
-    Math.ceil(invest / perDayAll) + ' 天');
-  console.log('   种子路线：每棵 ' + G.TREE_LIST.map(function (t) { return t.seed; }).join('/') +
-    ' 金，但要育苗 ' + O.growDays + ' 天（一年，需天天浇水）—— 省 ' +
-    Math.round((1 - 100 / 800) * 100) + '% 的钱，晚一年见收益');
-  console.log('   对比：36 块地图后期日净约 1000，果园满配约 ' + perDayAll + ' 金/天（≈11%）');
+  const saplingSum = G.TREE_LIST.reduce(function (n, t) { return n + t.sapling; }, 0);
+  const seedSum = G.TREE_LIST.reduce(function (n, t) { return n + t.seed; }, 0);
+  const avg3 = Math.round(G.TREE_LIST.reduce(function (n, t) { return n + per[t.id].day; }, 0) / 4);
+  const inv3 = O.unlockCost + saplingSum;
+  console.log('   3 个免费坑各一棵（树苗）：投资 ' + inv3 + ' 金 · 全年平均 ' + avg3 +
+    ' 金/天 · 回本约 ' + Math.ceil(inv3 / avg3) + ' 天');
+  const slotCost = O.slotCosts.reduce(function (a, b) { return a + b; }, 0);
+  const extra = O.slots - O.free;
+  const inv8 = O.unlockCost + slotCost + saplingSum * 2 + G.TREE_LIST.slice(0, 2).reduce(function (n, t) {
+    return n + t.sapling; }, 0);
+  const avg8 = Math.round((per.peach.day * 3 + per.mango.day * 3 + per.apple.day * 2) / 4);
+  console.log('   满配 ' + O.slots + ' 棵（桃 3 / 芒果 3 / 苹果 2，树苗）：开坑 ' + slotCost +
+    ' + 树苗 ' + (saplingSum * 2 + G.TREE_LIST.slice(0, 2).reduce(function (n, t) { return n + t.sapling; }, 0)) +
+    ' + 开垦 ' + O.unlockCost + ' = ' + inv8 + ' 金 · 全年平均 ' + avg8 + ' 金/天 · 回本约 ' +
+    Math.ceil(inv8 / avg8) + ' 天');
+  console.log('   种子路线：一棵 ' + seedSum + ' 金（三棵合计，比树苗省 ' +
+    Math.round((1 - seedSum / saplingSum) * 100) + '%），但要浇水 ' + O.grow.seed.water +
+    ' 天 + 生长 ' + O.grow.seed.days + ' 天');
+  console.log('   体力：浇水 1 点/棵/天（种子 30 天、树苗 15 天）· 收获 1 点/棵');
+  console.log('   对比：36 块地图后期日净约 1000，果园满配约 ' + avg8 + ' 金/天（≈' +
+    Math.round(avg8 / 1000 * 100) + '%）+ 冬季无收获');
 }
 
 /* ---------- 16. 钓鱼专项 ---------- */

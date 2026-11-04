@@ -283,6 +283,7 @@
   function renderAll() {
     renderHud();
     renderPlots();
+    renderOrchard();
     renderActions();
     renderBait();
     renderCatch();

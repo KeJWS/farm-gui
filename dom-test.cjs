@@ -126,7 +126,7 @@ const G = require('./game.js');
   st.longOrder = G.makeLongOrder({ day: 5, levels: { farm: 3 } });
   st.coins = 5000;
   // 果园已开垦 + 一点桃树种子，方便测树坑 / 种树 / 浇水
-  st.orchard = { unlocked: true, wateredDay: 0, slots: new Array(G.orchardSlots()).fill(null) };
+  st.orchard = { unlocked: true, slots: new Array(G.orchardFree()).fill(null) };
   st.treeStock = { peach: { seed: 2, sapling: 0 }, mango: { seed: 0, sapling: 0 },
                    apple: { seed: 0, sapling: 0 }, orange: { seed: 0, sapling: 0 } };
   localStorage.setItem('farm-gui-save-v1', G.serialize(st));
@@ -428,14 +428,10 @@ ok(stHtml.indexOf('其中自动播种器') < 0, '维护费不再带「其中自�
 ok(text('#trade-lv').indexOf('Lv') >= 0, '商店面板显示交易等级', text('#trade-lv'));
 
 console.log('\n== 果园 ==');
-(function openOrchard() {
-  const btn = { dataset: { act: 'orchard' }, disabled: false };
-  const target = { closest: function (s) { return s === '[data-act]' ? btn : null; }, classList: classList() };
-  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
-})();
-ok(html('#modal-root').indexOf('号树坑') >= 0, '果园弹窗列出树坑');
-ok(html('#modal-root').indexOf('种树') >= 0, '空树坑有「种树」按钮');
-ok(html('#modal-root').indexOf('卖水果') >= 0, '果园有「卖水果」按钮');
+ok(html('#orchard-grid').indexOf('号坑') >= 0, '左侧果园面板列出树坑');
+ok(html('#orchard-grid').indexOf('种树') >= 0, '空树坑有「种树」按钮');
+ok(text('#orchard-water-txt').length > 0 && text('#orchard-harvest-txt').indexOf('没有') >= 0,
+   '果园面板有浇水 / 收获按钮');
 
 (function pickSlot() {
   const btn = { dataset: { treePick: '0' }, disabled: false };
@@ -450,14 +446,15 @@ ok(html('#modal-root').indexOf('种什么') >= 0 && html('#modal-root').indexOf(
   const target = { closest: function (s) { return s === '[data-tree-plant]' ? btn : null; }, classList: classList() };
   (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
 })();
-ok(html('#modal-root').indexOf('育苗 0 / 120 天') >= 0, '种下种子后显示育苗进度');
+ok(html('#orchard-grid').indexOf('育苗') >= 0 && html('#orchard-grid').indexOf('0/30') >= 0,
+   '种下种子后显示育苗进度');
 
-(function waterOrchard() {
-  const btn = { dataset: { orchardWater: '1' }, disabled: false };
-  const target = { closest: function (s) { return s === '[data-orchard-water]' ? btn : null; }, classList: classList() };
+(function waterTrees() {
+  const btn = { dataset: { act: 'orchardWater' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-act]' ? btn : null; }, classList: classList() };
   (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
 })();
-ok(html('#modal-root').indexOf('今天浇过了') >= 0, '浇过水后按钮显示今天浇过了');
+ok(html('#orchard-grid').indexOf('今天浇过') >= 0, '浇水后面板显示今天浇过');
 
 (function openDepart() {
   const btn = { dataset: { act: 'depart' }, disabled: false };

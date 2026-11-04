@@ -72,10 +72,13 @@
             seeder: 4, lure2: 6, lure2Trade: 3, goldKeyTrade: 4 },
     /* 宝箱：铁箱 / 金箱按钓鱼等级解锁 */
     chest: { ironLv: 4, goldLv: 7 },
-    /* 果园：种田 Lv7 + 2500 金开垦，8 个树坑。
-     * 果树种子便宜，但要育苗满 120 天（只有浇过水的日子才算）；树苗贵，种下即成树。
-     * 成树只在自己的季节结果，当季每天 2 个。 */
-    orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, growDays: 120, fruitPerDay: 2 }
+    /* 果园：种田 Lv7 + 2500 金开垦，先给 3 个树坑，后面每个花钱开（第 4~8 个）。
+     * 种子：浇水 30 天 + 生长满 120 天才成树；树苗：浇水 15 天 + 生长满 30 天。
+     * 成树只在自己季节结果，当季每天 2 个；浇水 / 收获各 1 体力。 */
+    orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, free: 3, fruitPerDay: 2,
+               waterEnergy: 1, harvestEnergy: 1,
+               grow: { seed: { days: 120, water: 30 }, sapling: { days: 30, water: 15 } },
+               slotCosts: [600, 1000, 1600, 2400, 3200] }
   };
 
   /* ---------------- 静态数据 ---------------- */
@@ -122,13 +125,24 @@
     mushroom:   { name: '松茸', emoji: '🍄', price: 24, wild: true, seasons: [2],
                   desc: '雨后林子里的宝贝，城里人抢着要' },
     frozenpear: { name: '冻梨', emoji: '🍐', price: 22, wild: true, seasons: [3],
-                  desc: '冻得梆硬，化开了甜到心里' }
+                  desc: '冻得梆硬，化开了甜到心里' },
+
+    /* 果园水果：只能在果园收获，进仓库 / 农产品店，不进种子店 / 委托池 / 进货表 */
+    fruit_peach: { name: '桃',   emoji: '🍑', price: 24, fruit: true, seasons: [0],
+                   desc: '果园当季现摘，软甜多汁' },
+    fruit_mango: { name: '芒果', emoji: '🥭', price: 30, fruit: true, seasons: [1],
+                   desc: '晒足太阳的热带甜' },
+    fruit_apple: { name: '苹果', emoji: '🍎', price: 26, fruit: true, seasons: [2],
+                   desc: '秋天第一口脆' }
   };
   Object.keys(CROPS).forEach(function (k) { CROPS[k].id = k; });
-  /* CROP_LIST 只放能种的；WILD_LIST 是采集产物，只进仓库 / 市场 / 收购箱 */
-  const CROP_LIST = Object.keys(CROPS).filter(function (k) { return !CROPS[k].wild; })
-    .map(function (k) { return CROPS[k]; });
+  /* CROP_LIST 只放能种的；WILD_LIST 是采集产物，水果走果园单独收获 */
+  const CROP_LIST = Object.keys(CROPS).filter(function (k) {
+    return !CROPS[k].wild && !CROPS[k].fruit;
+  }).map(function (k) { return CROPS[k]; });
   const WILD_LIST = Object.keys(CROPS).filter(function (k) { return CROPS[k].wild; })
+    .map(function (k) { return CROPS[k]; });
+  const FRUIT_LIST = Object.keys(CROPS).filter(function (k) { return CROPS[k].fruit; })
     .map(function (k) { return CROPS[k]; });
 
   const FERT = {
@@ -215,16 +229,15 @@
   const TEA_LIST = Object.keys(TEAS).map(function (k) { return TEAS[k]; });
 
   /* 果树：每种只在自己的季节结果（当季每天 BALANCE.orchard.fruitPerDay 个）
-   * seed = 种子价（便宜，育苗 120 天），sapling = 树苗价（贵，种下即成树），price = 果实单价 */
+   * seed = 种子价（便宜，要浇水 30 天 + 满 120 天），sapling = 树苗价（贵，浇水 15 天 + 满 30 天）
+   * price = 果实单价，fruitId 指向 CROPS 里对应的水果（收获进仓库） */
   const TREES = {
-    peach:  { id: 'peach',  name: '桃树',   fruit: '桃',   emoji: '🍑', season: 0,
-              seed: 90,  sapling: 750, price: 24, desc: '春天开花，夏天摘桃' },
-    mango:  { id: 'mango',  name: '芒果树', fruit: '芒果', emoji: '🥭', season: 1,
-              seed: 110, sapling: 900, price: 30, desc: '晒足太阳才够甜' },
-    apple:  { id: 'apple',  name: '苹果树', fruit: '苹果', emoji: '🍎', season: 2,
-              seed: 95,  sapling: 780, price: 26, desc: '秋天第一口脆' },
-    orange: { id: 'orange', name: '橘子树', fruit: '橘子', emoji: '🍊', season: 3,
-              seed: 105, sapling: 850, price: 28, desc: '冬天也不怕冷' }
+    peach:  { id: 'peach',  name: '桃树',   fruit: '桃',   fruitId: 'fruit_peach',
+              emoji: '🍑', season: 0, seed: 90,  sapling: 750, price: 24, desc: '春天开花，夏天摘桃' },
+    mango:  { id: 'mango',  name: '芒果树', fruit: '芒果', fruitId: 'fruit_mango',
+              emoji: '🥭', season: 1, seed: 110, sapling: 900, price: 30, desc: '晒足太阳才够甜' },
+    apple:  { id: 'apple',  name: '苹果树', fruit: '苹果', fruitId: 'fruit_apple',
+              emoji: '🍎', season: 2, seed: 95,  sapling: 780, price: 26, desc: '秋天第一口脆' }
   };
   const TREE_LIST = Object.keys(TREES).map(function (k) { return TREES[k]; });
 
@@ -803,9 +816,8 @@
       nets: 0,
       netSet: 0,
       fisher: null,
-      orchard: { unlocked: false, wateredDay: 0, slots: [] },
+      orchard: { unlocked: false, slots: [] },
       treeStock: {},
-      fruits: {},
       townDonated: 0,
       codex: { fish: {}, crops: {} },
       manualRefreshUsed: false,
@@ -833,9 +845,8 @@
     };
     TREE_LIST.forEach(function (t) {
       s.treeStock[t.id] = { seed: 0, sapling: 0 };
-      s.fruits[t.id] = 0;
     });
-    s.orchard.slots = new Array(BALANCE.orchard.slots).fill(null);
+    s.orchard.slots = new Array(BALANCE.orchard.free).fill(null);
     snapshotMarket(s);
     return s;
   }
@@ -1399,14 +1410,13 @@
       if (n) notes.push({ kind: 'water', text: '🚿 洒水器浇 ' + n + ' 块' + (ripe ? '，熟 ' + ripe : '') });
     }
 
-    // 果园：昨天浇过水 → 育苗 +1 天；成树在自己季节每天结果
+    // 果园：成树在当季每天挂果（等玩家花体力收）
     const orc = orchardTick(s, prevDay);
-    if (orc.grown) {
-      notes.push({ kind: 'orchard', text: '🍑 果树育苗 +' + orc.grown + ' 天' +
-        (orc.grownReady ? '（' + orc.grownReady + ' 棵成树）' : '') });
-    }
     if (orc.fruit) {
-      notes.push({ kind: 'orchard', text: '🍑 果园产出 ' + orc.fruit + ' 个水果（值 ' + orc.value + '）' });
+      notes.push({ kind: 'orchard', text: '🍑 果园挂了 ' + orc.fruit + ' 个水果，等你收' });
+    }
+    if (orc.thirsty) {
+      notes.push({ kind: 'orchard', text: '💧 ' + orc.thirsty + ' 棵育苗树今天没浇水' });
     }
 
     // 渔夫：发工资 → 替你重布渔网 → 自动甩杆（不耗玩家体力、不给玩家经验）
@@ -1506,7 +1516,8 @@
     if (longLeft !== null) tomorrow.push('长期订单还剩 ' + longLeft + ' 天');
     if (s.coins < fee) tomorrow.push('金币不够明天的伙食（' + fee + ' 金）');
     const orcSummary = orchardSummary(s);
-    if (orcSummary.growing) tomorrow.push('果园有 ' + orcSummary.growing + ' 棵育苗树要浇水');
+    if (orcSummary.thirsty) tomorrow.push('果园有 ' + orcSummary.thirsty + ' 棵育苗树要浇水（1 体力/棵）');
+    if (orcSummary.ripe) tomorrow.push('果园有 ' + orcSummary.ripe + ' 个水果可以收（1 体力/棵）');
     const report = {
       day: s.day,
       weather: { id: s.weather, emoji: w.emoji, name: w.name },
@@ -1518,8 +1529,8 @@
       fisher: fisherReport,
       net: netReport,
       orders: { fresh: (s.orders || []).length, deliverable: deliverable },
-      orchard: { grown: orc.grown, grownReady: orc.grownReady, fruit: orc.fruit, value: orc.value,
-                 growing: orcSummary.growing, mature: orcSummary.mature, stock: orcSummary.fruit },
+      orchard: { fruit: orc.fruit, mature: orcSummary.mature, growing: orcSummary.growing,
+                 ripe: orcSummary.ripe, thirsty: orcSummary.thirsty },
       longOrder: s.longOrder ? { name: s.longOrder.name, emoji: s.longOrder.emoji,
         qty: s.longOrder.qty, have: orderHave(s, s.longOrder), days: longLeft } : null,
       tomorrow: tomorrow
@@ -3021,13 +3032,19 @@
   }
 
 /* ==================== src/12-orchard.js ==================== */
-/* 果园：开垦 / 买树苗 / 育苗 / 当季结果 / 卖水果 */
+/* 果园：开垦 / 扩坑 / 买树苗 / 浇水 / 收获 */
   /* ---------------- 果园 ---------------- */
 
-  /* 解锁：种田 Lv7 + 2500 金，开垦后给 8 个树坑 */
+  /* 开垦：种田 Lv7 + 2500 金，先给 3 个树坑；第 4~8 个树坑逐个花钱开 */
   function orchardSlots() { return BALANCE.orchard.slots; }
 
+  function orchardFree() { return BALANCE.orchard.free; }
+
   function orchardUnlocked(s) { return !!(s && s.orchard && s.orchard.unlocked); }
+
+  function orchardSlotCount(s) {
+    return (s.orchard && s.orchard.slots) ? s.orchard.slots.length : 0;
+  }
 
   function orchardUnlock(s) {
     if (orchardUnlocked(s)) return { ok: false, msg: '果园已经开垦过了' };
@@ -3039,9 +3056,31 @@
     if ((s.coins || 0) < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
     s.coins -= cost;
     ledger(s, '开垦果园', 0, cost);
-    s.orchard = { unlocked: true, wateredDay: 0, slots: new Array(BALANCE.orchard.slots).fill(null) };
-    log(s, '🍑 开垦了一片果园（-' + cost + ' 金），有 ' + BALANCE.orchard.slots + ' 个树坑', 'good');
-    return { ok: true, msg: '果园开垦完成，有 ' + BALANCE.orchard.slots + ' 个树坑' };
+    s.orchard = { unlocked: true, slots: new Array(BALANCE.orchard.free).fill(null) };
+    log(s, '🍑 开垦了一片果园（-' + cost + ' 金），有 ' + BALANCE.orchard.free + ' 个树坑', 'good');
+    return { ok: true, msg: '果园开垦完成，先给你 ' + BALANCE.orchard.free + ' 个树坑' };
+  }
+
+  /* 第 n 个树坑（从 4 开始）的价格；满了返回 0 */
+  function orchardExpandCost(s) {
+    if (!orchardUnlocked(s)) return 0;
+    const extra = orchardSlotCount(s) - BALANCE.orchard.free;
+    if (extra < 0) return 0;
+    return BALANCE.orchard.slotCosts[extra] || 0;
+  }
+
+  function expandOrchard(s) {
+    if (!orchardUnlocked(s)) return { ok: false, msg: '先去开垦果园' };
+    if (orchardSlotCount(s) >= BALANCE.orchard.slots) {
+      return { ok: false, msg: '树坑已经开满了（' + BALANCE.orchard.slots + ' 个）' };
+    }
+    const cost = orchardExpandCost(s);
+    if ((s.coins || 0) < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
+    s.coins -= cost;
+    ledger(s, '开垦第 ' + (orchardSlotCount(s) + 1) + ' 个树坑', 0, cost);
+    s.orchard.slots.push(null);
+    log(s, '🕳️ 开垦出第 ' + s.orchard.slots.length + ' 个树坑（-' + cost + ' 金）', 'good');
+    return { ok: true, msg: '现在有 ' + s.orchard.slots.length + ' 个树坑', slots: s.orchard.slots.length };
   }
 
   /* ---------------- 树苗 / 种子 ---------------- */
@@ -3087,10 +3126,25 @@
     return slots[i] || null;
   }
 
+  /* 成树条件：浇够水数 且 长够天数（两项都要满足） */
+  function treeNeed(t) {
+    const g = BALANCE.orchard.grow[t && t.mode === 'sapling' ? 'sapling' : 'seed'];
+    return { days: g.days, water: g.water };
+  }
+
+  function treeAge(s, t) { return t ? Math.max(0, (s.day || 1) - (t.planted || 1)) : 0; }
+
+  function treeMature(s, i) {
+    const t = treeSlot(s, i);
+    if (!t) return false;
+    const need = treeNeed(t);
+    return treeAge(s, t) >= need.days && (t.water || 0) >= need.water;
+  }
+
   function treeStage(s, i) {
     const t = treeSlot(s, i);
     if (!t) return 'empty';
-    return t.grown >= BALANCE.orchard.growDays ? 'mature' : 'growing';
+    return treeMature(s, i) ? 'mature' : 'growing';
   }
 
   function treeInSeason(s, i) {
@@ -3099,112 +3153,136 @@
     return seasonIdx(s.day || 1) === TREES[t.id].season;
   }
 
-  /* 种树：树苗直接成树，种子要育苗（浇水才长），满 120 天才成树 */
+  /* 育苗进度：给界面显示「浇水 x/30 · 生长 y/120 天」 */
+  function treeProgress(s, i) {
+    const t = treeSlot(s, i);
+    if (!t) return null;
+    const need = treeNeed(t);
+    return { age: treeAge(s, t), needDays: need.days,
+             water: t.water || 0, needWater: need.water,
+             done: treeMature(s, i), ripe: t.ripe || 0, mode: t.mode || 'seed' };
+  }
+
+  /* 种树：种子要浇水 30 天 + 满 120 天；树苗浇水 15 天 + 满 30 天 */
   function plantTree(s, i, id, mode) {
     if (!orchardUnlocked(s)) return { ok: false, msg: '先去农场开垦果园' };
     const t = TREES[id];
     if (!t) return { ok: false, msg: '没有这种果树' };
     const slots = s.orchard.slots || [];
-    if (!(i >= 0 && i < slots.length)) return { ok: false, msg: '没有这个树坑' };
+    if (!(i >= 0 && i < slots.length)) return { ok: false, msg: '这个树坑还没开垦' };
     if (slots[i]) return { ok: false, msg: '这个树坑已经种了 ' + TREES[slots[i].id].name };
     const m = mode === 'sapling' ? 'sapling' : 'seed';
     if (treeStockCount(s, id, m) <= 0) {
       return { ok: false, msg: '没有' + t.name + (m === 'sapling' ? '树苗' : '种子') + '了，先去百货店买' };
     }
     s.treeStock[id][m]--;
-    slots[i] = { id: id, grown: m === 'sapling' ? BALANCE.orchard.growDays : 0, day: s.day || 1 };
+    slots[i] = { id: id, mode: m, planted: s.day || 1, water: 0, lastWater: 0, ripe: 0 };
     s.orchard.slots = slots;
     s.stats.orchardPlanted = (s.stats.orchardPlanted || 0) + 1;
+    const need = treeNeed(slots[i]);
     log(s, t.emoji + ' 在 ' + (i + 1) + ' 号树坑种下' + t.name +
-      (m === 'sapling' ? '（树苗，立刻成树）' : '（种子，育苗 ' + BALANCE.orchard.growDays + ' 天）'), 'info');
-    return { ok: true, slot: i, msg: t.name + (m === 'sapling' ? ' 已经成树' : ' 开始育苗') };
+      '（浇水 ' + need.water + ' 天 + 生长 ' + need.days + ' 天）', 'info');
+    return { ok: true, slot: i, msg: t.name + ' 种下了（浇水 ' + need.water + ' 天 · 生长 ' + need.days + ' 天）' };
   }
 
-  /* 浇水：一次浇所有育苗中的树；只有浇过水的当天才会长 */
+  /* 浇水：一次浇所有今天还没浇的育苗树，每棵 1 体力 */
   function waterOrchard(s) {
     if (!orchardUnlocked(s)) return { ok: false, msg: '还没有果园' };
-    if (s.orchard.wateredDay === s.day) return { ok: false, msg: '今天已经浇过果树了' };
-    const growing = (s.orchard.slots || []).filter(function (t) {
-      return t && t.grown < BALANCE.orchard.growDays;
-    }).length;
-    s.orchard.wateredDay = s.day;
-    if (!growing) return { ok: true, n: 0, msg: '果树都成树了，不用浇水' };
-    log(s, '💧 给 ' + growing + ' 棵育苗中的果树浇水', 'info');
-    return { ok: true, n: growing, msg: '给 ' + growing + ' 棵育苗树浇了水' };
-  }
-
-  /* 睡觉结算：浇过水 → 育苗 +1 天；成树在当季每天结果 */
-  function orchardTick(s, prevDay) {
-    if (!orchardUnlocked(s)) return { grown: 0, grownReady: 0, fruit: 0, value: 0, species: [] };
+    const E = BALANCE.orchard.waterEnergy;
     const slots = s.orchard.slots || [];
-    const watered = s.orchard.wateredDay === prevDay;
-    let grown = 0, grownReady = 0;
-    const G0 = BALANCE.orchard.growDays;
-    if (watered) {
-      slots.forEach(function (t) {
-        if (!t || t.grown >= G0) return;
-        t.grown++;
-        grown++;
-        if (t.grown === G0) grownReady++;
-      });
-    }
-    const season = seasonIdx(s.day || 1);
-    let fruit = 0, value = 0;
-    const species = [];
-    slots.forEach(function (t) {
-      if (!t || t.grown < G0 || !TREES[t.id]) return;
-      if (TREES[t.id].season !== season) return;
-      const n = BALANCE.orchard.fruitPerDay;
-      s.fruits = s.fruits || {};
-      s.fruits[t.id] = (s.fruits[t.id] || 0) + n;
-      fruit += n;
-      value += n * TREES[t.id].price;
-      species.push(TREES[t.id]);
+    const todo = [];
+    slots.forEach(function (t, i) {
+      if (!t || treeMature(s, i)) return;
+      if (t.lastWater === s.day) return;
+      todo.push(t);
     });
-    if (fruit) s.stats.orchardFruit = (s.stats.orchardFruit || 0) + fruit;
-    return { grown: grown, grownReady: grownReady, fruit: fruit, value: value, species: species };
+    if (!todo.length) return { ok: false, msg: '今天没有要浇水的果树' };
+    const canPay = Math.floor((s.energy || 0) / E);
+    if (canPay <= 0) return { ok: false, msg: '体力不够，浇水要 ' + E + ' 点/棵' };
+    const n = Math.min(canPay, todo.length);
+    for (let k = 0; k < n; k++) { todo[k].lastWater = s.day; todo[k].water = (todo[k].water || 0) + 1; }
+    s.energy -= n * E;
+    log(s, '💧 给 ' + n + ' 棵果树浇水（-' + (n * E) + ' 体力）', 'info');
+    return { ok: true, n: n, cost: n * E,
+             msg: '给 ' + n + ' 棵果树浇水（-' + (n * E) + ' 体力）' +
+               (n < todo.length ? '，体力不够还有 ' + (todo.length - n) + ' 棵没浇' : '') };
   }
 
-  /* ---------------- 水果仓库 / 卖出 ---------------- */
-
-  function fruitCount(s) {
-    let n = 0;
-    TREE_LIST.forEach(function (t) { n += (s.fruits && s.fruits[t.id]) || 0; });
-    return n;
+  /* 收获：每棵 1 体力，果实直接进仓库 */
+  function harvestTree(s, i) {
+    const t = treeSlot(s, i);
+    if (!t) return { ok: false, msg: '这个树坑还是空的' };
+    if (!t.ripe) return { ok: false, msg: '还没有可收的果实' };
+    const E = BALANCE.orchard.harvestEnergy;
+    if ((s.energy || 0) < E) return { ok: false, msg: '体力不够，收获要 ' + E + ' 点' };
+    const tr = TREES[t.id];
+    const n = t.ripe;
+    t.ripe = 0;
+    s.energy -= E;
+    addStore(s, tr.fruitId, 'std', n);
+    s.stats.orchardFruit = (s.stats.orchardFruit || 0) + n;
+    log(s, '🧺 收获 ' + tr.emoji + ' ' + tr.fruit + ' ×' + n + '（-' + E + ' 体力）', 'good');
+    return { ok: true, n: n, cost: E, msg: '收获 ' + tr.fruit + ' ×' + n + ' 进仓库（-' + E + ' 体力）' };
   }
 
-  function fruitValue(s) {
-    let v = 0;
-    TREE_LIST.forEach(function (t) { v += ((s.fruits && s.fruits[t.id]) || 0) * t.price; });
-    return v;
-  }
-
-  function sellFruits(s) {
+  function harvestOrchard(s) {
     if (!orchardUnlocked(s)) return { ok: false, msg: '还没有果园' };
-    const n = fruitCount(s);
-    if (!n) return { ok: false, msg: '果园里还没有水果' };
-    const raw = fruitValue(s);
-    const gain = Math.max(1, Math.round(raw * sellBonus(s) * (1 + townBonus(s, 'marketBonus'))));
-    s.fruits = {};
-    TREE_LIST.forEach(function (t) { s.fruits[t.id] = 0; });
-    addCoins(s, gain, '卖水果');
-    tradeXp(s, gain);
-    s.stats.fruitSold = (s.stats.fruitSold || 0) + n;
-    log(s, '🍑 卖掉 ' + n + ' 个水果，+' + gain + ' 金', 'good');
-    return { ok: true, n: n, income: gain, msg: '卖掉 ' + n + ' 个水果，+' + gain + ' 金' };
+    const E = BALANCE.orchard.harvestEnergy;
+    const slots = s.orchard.slots || [];
+    let n = 0, fruit = 0;
+    for (let i = 0; i < slots.length; i++) {
+      const t = slots[i];
+      if (!t || !t.ripe) continue;
+      if ((s.energy || 0) < E) break;
+      const r = harvestTree(s, i);
+      if (r.ok) { n++; fruit += r.n; }
+    }
+    if (!n) return { ok: false, msg: '现在没有可收的果实' };
+    return { ok: true, n: n, fruit: fruit, cost: n * E,
+             msg: '收了 ' + n + ' 棵树共 ' + fruit + ' 个水果（-' + (n * E) + ' 体力）' };
+  }
+
+  /* 睡觉结算：成树在当季每天挂 2 个果实，等人来收 */
+  function orchardTick(s, prevDay) {
+    if (!orchardUnlocked(s)) return { fruit: 0, mature: 0, growing: 0, thirsty: 0, ripe: 0 };
+    const slots = s.orchard.slots || [];
+    let fruit = 0, mature = 0, growing = 0, thirsty = 0, ripe = 0;
+    const season = seasonIdx(s.day || 1);
+    slots.forEach(function (t, i) {
+      if (!t) return;
+      if (treeMature(s, i)) {
+        mature++;
+        if (TREES[t.id].season === season) {
+          const n = BALANCE.orchard.fruitPerDay;
+          t.ripe = (t.ripe || 0) + n;
+          fruit += n;
+        }
+      } else {
+        growing++;
+        if (t.lastWater !== s.day) thirsty++;
+      }
+      ripe += t.ripe || 0;
+    });
+    return { fruit: fruit, mature: mature, growing: growing, thirsty: thirsty, ripe: ripe };
   }
 
   /* 果园概况：给界面 / 总结用 */
   function orchardSummary(s) {
     const slots = (s.orchard && s.orchard.slots) || [];
-    let mature = 0, growing = 0, inSeason = 0;
+    let mature = 0, growing = 0, inSeason = 0, ripe = 0, thirsty = 0;
     slots.forEach(function (t, i) {
       if (!t) return;
-      if (t.grown >= BALANCE.orchard.growDays) { mature++; if (treeInSeason(s, i)) inSeason++; }
-      else growing++;
+      ripe += t.ripe || 0;
+      if (treeMature(s, i)) {
+        mature++;
+        if (treeInSeason(s, i)) inSeason++;
+      } else {
+        growing++;
+        if (t.lastWater !== s.day) thirsty++;
+      }
     });
-    return { total: slots.length, mature: mature, growing: growing, inSeason: inSeason,
-             fruit: fruitCount(s), value: fruitValue(s) };
+    return { total: slots.length, max: BALANCE.orchard.slots, mature: mature, growing: growing,
+             inSeason: inSeason, ripe: ripe, thirsty: thirsty };
   }
 
 /* ==================== src/12-orders.js ==================== */
@@ -3491,26 +3569,37 @@
       if (!TEAS[id]) { delete merged.teas[id]; return; }
       merged.teas[id] = Math.round(num(merged.teas[id], 0, 0, 999));
     });
-    merged.orchard = Object.assign({ unlocked: false, wateredDay: 0, slots: [] }, s.orchard || {});
+    merged.orchard = Object.assign({ unlocked: false }, s.orchard || {});
     merged.orchard.unlocked = !!merged.orchard.unlocked;
-    merged.orchard.wateredDay = Math.round(num(merged.orchard.wateredDay, 0, 0, 100000));
     const treeSlots = Array.isArray(merged.orchard.slots) ? merged.orchard.slots : [];
-    merged.orchard.slots = Array.from({ length: BALANCE.orchard.slots }).map(function (_, i) {
+    const slotCount = merged.orchard.unlocked
+      ? Math.max(BALANCE.orchard.free,
+          Math.min(BALANCE.orchard.slots, treeSlots.length || BALANCE.orchard.free))
+      : 0;
+    merged.orchard.slots = Array.from({ length: slotCount }).map(function (_, i) {
       const t = treeSlots[i];
       if (!t || !TREES[t.id]) return null;
-      return { id: t.id,
-               grown: Math.round(num(t.grown, 0, 0, BALANCE.orchard.growDays)),
-               day: Math.round(num(t.day, 1, 1, 100000)) };
+      const mode = t.mode === 'sapling' ? 'sapling' : 'seed';
+      const need = BALANCE.orchard.grow[mode];
+      const water = Math.round(num(t.water, 0, 0, 9999));
+      /* v2.20 的老存档只有 grown，这里换算成新的成长进度 */
+      const planted = t.planted != null
+        ? Math.round(num(t.planted, 1, 1, 100000))
+        : Math.max(1, merged.day - Math.round(num(t.grown, 0, 0, need.days)));
+      return {
+        id: t.id, mode: mode, planted: planted,
+        water: t.water != null ? water : Math.min(need.water, Math.round(num(t.grown, 0, 0, need.water))),
+        lastWater: Math.round(num(t.lastWater, 0, 0, 100000)),
+        ripe: Math.round(num(t.ripe, 0, 0, 99999))
+      };
     });
     merged.treeStock = {};
-    merged.fruits = {};
     TREE_LIST.forEach(function (t) {
       const row = (s.treeStock && s.treeStock[t.id]) || {};
       merged.treeStock[t.id] = {
         seed: Math.round(num(row.seed, 0, 0, 999)),
         sapling: Math.round(num(row.sapling, 0, 0, 999))
       };
-      merged.fruits[t.id] = Math.round(num(s.fruits && s.fruits[t.id], 0, 0, 99999));
     });
     merged.keys = Object.assign({ iron: 0, gold: 0 }, s.keys || {});
     Object.keys(merged.keys).forEach(function (id) {
@@ -3833,13 +3922,15 @@
     fishMany: fishMany, fishAll: fishAll, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,
     forage: forage, foragePool: foragePool, forageSeedPool: forageSeedPool,
     donate: donate, townTier: townTier, townBonus: townBonus, townNext: townNext,
-    TREES: TREES, TREE_LIST: TREE_LIST,
-    orchardSlots: orchardSlots, orchardUnlocked: orchardUnlocked, orchardUnlock: orchardUnlock,
+    TREES: TREES, TREE_LIST: TREE_LIST, FRUIT_LIST: FRUIT_LIST,
+    orchardSlots: orchardSlots, orchardFree: orchardFree, orchardUnlocked: orchardUnlocked,
+    orchardUnlock: orchardUnlock, orchardSlotCount: orchardSlotCount,
+    orchardExpandCost: orchardExpandCost, expandOrchard: expandOrchard,
     treeData: treeData, treeBuyPrice: treeBuyPrice, treeStockCount: treeStockCount,
     buyTreeStock: buyTreeStock, treeSlot: treeSlot, treeStage: treeStage, treeInSeason: treeInSeason,
+    treeNeed: treeNeed, treeAge: treeAge, treeMature: treeMature, treeProgress: treeProgress,
     plantTree: plantTree, waterOrchard: waterOrchard, orchardTick: orchardTick,
-    fruitCount: fruitCount, fruitValue: fruitValue, sellFruits: sellFruits,
-    orchardSummary: orchardSummary,
+    harvestTree: harvestTree, harvestOrchard: harvestOrchard, orchardSummary: orchardSummary,
     marketHeadroom: marketHeadroom, fishMarketHeadroom: fishMarketHeadroom,
     snapshotMarket: snapshotMarket, marketSeries: marketSeries, pushMarketHist: pushMarketHist,
     cropNextSeasonMul: cropNextSeasonMul, fishNextSeasonMul: fishNextSeasonMul,

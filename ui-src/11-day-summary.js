@@ -48,16 +48,9 @@
 
     const orchard = [];
     if (rep.orchard) {
-      if (rep.orchard.grown) {
-        orchard.push(['🌱 育苗', '+' + rep.orchard.grown + ' 天' +
-          (rep.orchard.grownReady ? ' · ' + rep.orchard.grownReady + ' 棵成树' : '')]);
-      }
-      if (rep.orchard.fruit) {
-        orchard.push(['🍑 结果', rep.orchard.fruit + ' 个 · 值 ' + rep.orchard.value + ' 金']);
-      }
-      if (rep.orchard.growing) {
-        orchard.push(['💧 待浇水', rep.orchard.growing + ' 棵育苗树（明天睡前浇）']);
-      }
+      if (rep.orchard.fruit) orchard.push(['🍑 挂果', '+' + rep.orchard.fruit + ' 个（等着收）']);
+      if (rep.orchard.ripe) orchard.push(['🧺 待收', rep.orchard.ripe + ' 个 · 每棵 1 体力']);
+      if (rep.orchard.thirsty) orchard.push(['💧 待浇水', rep.orchard.thirsty + ' 棵育苗树 · 1 体力/棵']);
     }
 
     function sec(title, rows) {
