@@ -161,7 +161,7 @@ console.log('   农产品店买入：售价 ×' + G.BALANCE.shop.cropPriceMul + 
 console.log('\n== 卖货渠道（1000 金货值）==');
 const saleRows = [
   ['委托', G.BALANCE.order.mult, '立刻（每天 2 作物单 + 1 鱼单）'],
-  ['收购箱', 1, '下次睡觉结算'],
+  ['收购箱', 1 - G.BALANCE.market.boxFee, '下次睡觉按当时市价结算'],
   ['水产店 / 农产品店', G.BALANCE.shop.sellRate, '立刻']
 ];
 saleRows.forEach(function (r) {
@@ -293,7 +293,9 @@ console.log('   参考：36 地图后期日毛收入约 1073，维护费占 ' +
 /* ---------- 9. 市场价格 ---------- */
 console.log('\n== 市场价格 ==');
 console.log('   价格系数 = 供需 × 季节（鱼：汛期）');
-console.log('   供需：1.30 - 0.02 × 最近销量（作物）/ 0.015（鱼），下限 0.70，睡觉回落 30%');
+console.log('   供需：1.30 - ' + G.BALANCE.market.cropStep + ' × 最近销量（作物）/ ' +
+  G.BALANCE.market.fishStep + '（鱼），下限 0.70，睡觉回落 ' +
+  Math.round((1 - G.BALANCE.market.decay) * 100) + '%；批量按批次中点定价');
 console.log('   季节：当季 / 汛期 ×1.00 · 反季 / 非汛期 ×' + G.BALANCE.market.offSeason);
 {
   const M = G.BALANCE.market;
@@ -465,7 +467,7 @@ console.log('\n== 果园（种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.B
   const fresh = G.BALANCE.market.supplyMax;
   const DAYS = 120;                       // 一年 = 4 季 × 30 天
   const avgFruit = (O.fruitMin + O.fruitMax) / 2;
-  console.log('   产量：当季每天随机 ' + O.fruitMin + '–' + O.fruitMax + ' 个/棵，期望 ' + avgFruit.toFixed(1) + ' 个；卖价：收购箱按原价结算，当季刚上市 ×' + fresh + '，囤到反季 ×' +
+  console.log('   产量：当季每天随机 ' + O.fruitMin + '–' + O.fruitMax + ' 个/棵，期望 ' + avgFruit.toFixed(1) + ' 个；卖价：收购箱按次日市价 ×95% 结算，当季刚上市 ×' + fresh + '，囤到反季 ×' +
     (fresh * off).toFixed(2) + '（每季只产 30 天，囤起来卖得掉吗？见文末）');
   const list = G.TREE_LIST.map(function (t) {
     const perDay = avgFruit * t.price;

@@ -199,7 +199,7 @@ ok(text('#cast5-n') === String(G.BALANCE.fishBatch), '连甩杆数来自 BALANCE
 ok(text('#dig-txt') === G.digCost({ levels: { dig: 1 } }) + ' 体力', '挖蚯蚓体力来自 BALANCE', text('#dig-txt'));
 ok(text('#farm-lv').indexOf('Lv') >= 0 && text('#fish-lv').indexOf('Lv') >= 0,
    '农田 / 河边显示等级', [text('#farm-lv'), text('#fish-lv')]);
-ok(text('#store-sum').indexOf('估值') >= 0, '仓库显示总价值', text('#store-sum'));
+ok(text('#store-sum').indexOf('收购箱到手') >= 0, '仓库显示统一的到手估值', text('#store-sum'));
 ok(html('#store-list').indexOf('去水产店卖') < 0, '仓库渔获不再写「去水产店卖」');
 ok(html('#store-list').indexOf('脆生生') >= 0, '仓库作物显示简述');
 ok(html('#store-list').indexOf('松茸') >= 0, '仓库能显示采集来的野货');
@@ -288,7 +288,7 @@ ok(html('#modal-root').indexOf('data-market-page="quote"') >= 0 &&
 ok(html('#modal-root').indexOf('反季 ×1.7') >= 0, '行情显示反季 ×1.7');
 ok(html('#modal-root').indexOf('汛期 ×1') >= 0 || html('#modal-root').indexOf('非汛期 ×1.7') >= 0,
    '行情显示鱼的汛期系数');
-ok(html('#modal-root').indexOf('供需 ×') >= 0 && html('#modal-root').indexOf('睡觉后回落 30%') >= 0,
+ok(html('#modal-root').indexOf('供需 ×') >= 0 && html('#modal-root').indexOf('睡觉后回落 25%') >= 0,
    '行情显示当前供需系数和销量回落幅度');
 ok(html('#modal-root').indexOf('再卖') >= 0 && html('#modal-root').indexOf('掉到') >= 0,
    '行情标注「还能卖多少」');

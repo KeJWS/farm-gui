@@ -731,10 +731,13 @@
     lure: { price: 5, dur: 25 },
     /* 高级假饵：钓鱼 Lv6 解锁，20 金 / 100 次；咬钩率跟面团饵一样，好鱼率跟假饵一样 */
     lure2: { price: 20, dur: 100 },
-    shop: { priceMul: 1.3, cropPriceMul: 1.3, restock: true, sellRate: 0.8 },
-    /* 市场：供需 1.30（稀缺）→ 0.70（过剩），反季 ×1.7，每天睡觉回落 30% */
-    market: { supplyMax: 1.3, supplyMin: 0.7, cropStep: 0.02, fishStep: 0.015,
-              offSeason: 1.7, decay: 0.7, scarce: 1.15, glut: 0.9,
+    shop: { priceMul: 1.25, cropPriceMul: 1.25, restock: true, sellRate: 0.8 },
+    /* 市场：供需 1.30（稀缺）→ 0.70（过剩）；作物每件 −0.015、鱼每条 −0.010，睡一觉销量回落 25%。
+     * 批量按「批次中点」定价：一次卖 30 件 ≈ 分三次卖 10 件，整批砸盘不再有价格优势。
+     * 收购箱次日按当时市价结算，并扣 boxFee 手续费。 */
+    market: { supplyMax: 1.3, supplyMin: 0.7, cropStep: 0.015, fishStep: 0.01,
+              offSeason: 1.7, decay: 0.75, scarce: 1.15, glut: 0.9,
+              boxFee: 0.05,
               /* 委托的市价溢价封顶，避免一张单顶掉整个农场 */
               orderCap: 1.6 },
     /* 采集：5 体力一次（采集满级 4），100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子
@@ -1373,7 +1376,7 @@
 /* 存档状态：createState 与通用工具（log / ledger / addCoins） */
   /* ---------------- 状态 ---------------- */
 
-  const SAVE_VERSION = 1;
+  const SAVE_VERSION = 2;
 
   function makePlot() {
     return { crop: null, growth: 0, watered: false, missed: 0, fert: 0,
@@ -1781,7 +1784,7 @@
     const parts = [];
     ids.forEach(function (id) {
       const n = storeCount(s, id);
-      const gain = shopSellValue(s, id);
+      const gain = shopSellValue(s, id, n);
       income += gain; count += n;
       parts.push(CROPS[id].name + '×' + n + ' = ' + gain + ' 金');
       addSupply(s, id, n);
@@ -1811,7 +1814,7 @@
     const qty = Math.max(1, Math.min(have, Math.floor(n || have)));
     const t = takeStoreN(s, id, qty);
     const raw = t.parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
-    const gain = Math.max(1, Math.round(shopValue(raw) * sellBonus(s) * marketMul(s, id)));
+    const gain = Math.max(1, Math.round(shopValue(raw) * sellBonus(s) * marketMul(s, id, qty)));
     addSupply(s, id, qty);
     s.stats.cropsSold = (s.stats.cropsSold || 0) + qty;
     addCoins(s, gain, '农产品店 · 卖 ' + CROPS[id].name + '×' + qty);
@@ -1823,7 +1826,7 @@
   function sellOne(s, id) {
     const n = storeCount(s, id);
     if (!n) return { ok: false, msg: '没有可卖的' };
-    const gain = shopSellValue(s, id);
+    const gain = shopSellValue(s, id, n);
     addSupply(s, id, n);
     delete s.store[id];
     s.stats.cropsSold = (s.stats.cropsSold || 0) + n;
@@ -2472,15 +2475,23 @@
 /* ==================== src/07-market.js ==================== */
 /* 市场价格：供需、季节、小镇声望、掉档提示、价格历史 */
   /* ---------------- 市场价格 ----------------
-   * 供给：最近卖得越多越便宜（×1.30 稀缺 → ×0.70 过剩，作物每件 -0.02、鱼每条 -0.015）
+   * 供给：最近卖得越多越便宜（×1.30 稀缺 → ×0.70 过剩，作物每件 -0.015、鱼每条 -0.010）
+   * 批量：按「批次中点」取供需（一次卖 n 件 = 在这 n 件的中间点定价），
+   *       所以整批砸和分批卖的单位价一样，堵住「攒一大票一次出货」的漏洞
    * 季节：当季 / 汛期 ×1.00，反季 / 非汛期 ×1.70（物以稀为贵）
-   * 冷却：每睡一觉销量回落 30%
+   * 冷却：每睡一觉销量回落 25%
    */
   function marketTag(supply) {
     const M = BALANCE.market;
     if (supply >= M.scarce) return '稀缺';
     if (supply <= M.glut) return '过剩';
     return '平稳';
+  }
+
+  /* 一批 n 件的定价位置：批次中点（sold 是成交前的销量） */
+  function midSold(sold, n) {
+    const cnt = Math.max(1, Math.round(n || 1));
+    return sold + (cnt - 1) / 2;
   }
 
   function marketOf(s, id) {
@@ -2490,17 +2501,17 @@
   }
   function marketSold(s, id) { return (s.market && s.market[id] && s.market[id].sold) || 0; }
 
-  function marketInfo(s, id) {
+  function marketInfo(s, id, n) {
     const M = BALANCE.market;
     const sold = marketSold(s, id);
-    const supply = clamp(M.supplyMax - M.cropStep * sold, M.supplyMin, M.supplyMax);
+    const supply = clamp(M.supplyMax - M.cropStep * midSold(sold, n), M.supplyMin, M.supplyMax);
     const inSeason = CROPS[id] ? cropSeasonOk(id, s.day) : true;
     const season = inSeason ? 1 : M.offSeason;
     const total = supply * season * (1 + townBonus(s, 'marketBonus'));
     return { sold: sold, supply: supply, season: season, inSeason: inSeason, total: total,
              tag: marketTag(supply) };
   }
-  function marketMul(s, id) { return marketInfo(s, id).total; }
+  function marketMul(s, id, n) { return marketInfo(s, id, n).total; }
   function addSupply(s, id, n) { marketOf(s, id).sold += Math.max(0, n || 0); }
   function removeSupply(s, id, n) {
     const m = s.market && s.market[id];
@@ -2515,10 +2526,10 @@
     if (!s.marketF[name]) s.marketF[name] = { sold: 0 };
     return s.marketF[name];
   }
-  function fishMarketInfo(s, name) {
+  function fishMarketInfo(s, name, n) {
     const M = BALANCE.market;
     const sold = (s.marketF && s.marketF[name] && s.marketF[name].sold) || 0;
-    const supply = clamp(M.supplyMax - M.fishStep * sold, M.supplyMin, M.supplyMax);
+    const supply = clamp(M.supplyMax - M.fishStep * midSold(sold, n), M.supplyMin, M.supplyMax);
     const f = fishByName(name);
     const inRun = f && f.seasons ? f.seasons.indexOf(seasonIdx(s.day)) >= 0 : true;
     const season = inRun ? 1 : M.offSeason;
@@ -2526,7 +2537,7 @@
     return { sold: sold, supply: supply, season: season, inRun: inRun, total: total,
              tag: marketTag(supply) };
   }
-  function fishMarketMul(s, name) { return fishMarketInfo(s, name).total; }
+  function fishMarketMul(s, name, n) { return fishMarketInfo(s, name, n).total; }
   function addFishSupply(s, name, n) { fishMarketOf(s, name).sold += Math.max(0, n || 0); }
   function removeFishSupply(s, name, n) {
     const m = s.marketF && s.marketF[name];
@@ -2571,12 +2582,13 @@
   function headroomOf(sold, step) {
     const M = BALANCE.market;
     const supply = clamp(M.supplyMax - step * sold, M.supplyMin, M.supplyMax);
-    const toCalm = supply > M.scarce
-      ? Math.max(0, Math.ceil((M.supplyMax - M.scarce) / step - sold - 1e-9)) : 0;
-    const toGlut = supply > M.glut
-      ? Math.max(0, Math.ceil((M.supplyMax - M.glut) / step - sold - 1e-9)) : 0;
-    const toFloor = Math.max(0, Math.ceil((M.supplyMax - M.supplyMin) / step - sold - 1e-9));
-    return { supply: supply, toCalm: toCalm, toGlut: toGlut, toFloor: toFloor,
+    const need = function (target) {
+      return Math.max(0, Math.ceil((M.supplyMax - target) / step - sold - 1e-6));
+    };
+    return { supply: supply,
+             toCalm: supply > M.scarce ? need(M.scarce) : 0,
+             toGlut: supply > M.glut ? need(M.glut) : 0,
+             toFloor: need(M.supplyMin),
              atFloor: supply <= M.supplyMin + 1e-9 };
   }
   function marketHeadroom(s, id) {
@@ -2662,14 +2674,37 @@
 
   /* 商店直接收购只给 8 折；想卖原价就放收购箱，等第二天结算 */
   function shopValue(v) { return Math.max(1, Math.round((v || 0) * BALANCE.shop.sellRate)); }
-  function shopSellValue(s, id) {
-    return Math.max(1, Math.round(shopValue(storeValue(s, id)) * sellBonus(s) * marketMul(s, id)));
+  function shopSellValue(s, id, n) {
+    const cnt = n == null ? storeCount(s, id) : n;
+    return Math.max(1, Math.round(shopValue(storeValue(s, id)) * sellBonus(s) * marketMul(s, id, cnt)));
+  }
+
+  /* 走收购箱的预估到手：按当前市价、扣手续费（实际以次日结算价为准） */
+  function cropNetEstimate(s, id, n) {
+    const cnt = n == null ? storeCount(s, id) : n;
+    if (!cnt) return 0;
+    return Math.max(1, Math.round(storeValue(s, id) * sellBonus(s) * marketMul(s, id, cnt) *
+      (1 - BALANCE.market.boxFee)));
+  }
+  function fishNetEstimate(s, name, count, total) {
+    if (!count) return 0;
+    return Math.max(1, Math.round((total || 0) * sellBonus(s) * fishMarketMul(s, name, count) *
+      (1 - BALANCE.market.boxFee)));
+  }
+  /* 仓库里的作物 + 渔获全走收购箱的预估到手（界面统一用这个口径） */
+  function storeNetEstimate(s) {
+    let v = 0;
+    Object.keys(s.store || {}).forEach(function (id) {
+      if (CROPS[id] && storeCount(s, id)) v += cropNetEstimate(s, id);
+    });
+    fishGroups(s, 'fish').forEach(function (g) { v += fishNetEstimate(s, g.name, g.count, g.total); });
+    return v;
   }
 
   function sellFishGroup(s, key) {
     const g = fishGroups(s, 'fish').filter(function (x) { return x.key === key; })[0];
     if (!g) return { ok: false, msg: '仓库里没有这种鱼' };
-    const gain = Math.max(1, Math.round(shopValue(g.total) * sellBonus(s) * fishMarketMul(s, g.name)));
+    const gain = Math.max(1, Math.round(shopValue(g.total) * sellBonus(s) * fishMarketMul(s, g.name, g.count)));
     s.fishBag = s.fishBag.filter(function (e) { return fishKey(e) !== key; });
     addFishSupply(s, g.name, g.count);
     addCoins(s, gain, '卖鱼 ' + g.name);
@@ -2682,7 +2717,7 @@
     if (!groups.length) return { ok: false, msg: '仓库里没有鱼（杂物和宝箱要去百货店）' };
     let gain = 0, n = 0;
     groups.forEach(function (g) {
-      gain += Math.max(1, Math.round(shopValue(g.total) * sellBonus(s) * fishMarketMul(s, g.name)));
+      gain += Math.max(1, Math.round(shopValue(g.total) * sellBonus(s) * fishMarketMul(s, g.name, g.count)));
       addFishSupply(s, g.name, g.count);
       n += g.count;
     });
@@ -2697,8 +2732,20 @@
   /* ---------------- 收购箱 ---------------- */
 
   function boxCount(s) { return (s.box || []).length; }
+
+  /* 收购箱里的东西按「次日市价 ×（1−手续费）」估值；
+   * 入箱时不压价、也不算销量 —— 真正出货是在睡觉结算那一刻。 */
+  function boxEntryNet(s, e) {
+    const raw = e.raw != null ? e.raw : (e.v || 0);
+    const cnt = e.n || 1;
+    const junk = e.junk || e.chest || e.trash;
+    const mkt = junk ? 1
+      : (e.kind === 'fish' ? fishMarketMul(s, e.name, cnt) : marketMul(s, e.id, cnt));
+    return Math.max(1, Math.round(raw * sellBonus(s) * mkt * (1 - BALANCE.market.boxFee)));
+  }
+
   function boxValue(s) {
-    return (s.box || []).reduce(function (n, e) { return n + (e.v || 0); }, 0);
+    return (s.box || []).reduce(function (n, e) { return n + boxEntryNet(s, e); }, 0);
   }
 
   /* 从仓库按「品质差的先出」取 n 个，返回 parts 与总价值 */
@@ -2719,7 +2766,7 @@
     return { parts: parts, left: left };
   }
 
-  /* 放进收购箱：按原价（含成就售价加成），第二天睡觉时结算 */
+  /* 放进收购箱：只记账，不压价、不计销量；睡觉时按当日市价结算并扣手续费 */
   function boxPutCrop(s, id, n) {
     const have = storeCount(s, id);
     if (!have) return { ok: false, msg: '仓库里没有这种作物' };
@@ -2727,49 +2774,39 @@
     const c = CROPS[id];
     const t = takeStoreN(s, id, qty);
     const raw = t.parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
-    const v = Math.max(1, Math.round(raw * sellBonus(s) * marketMul(s, id)));
-    addSupply(s, id, qty);
     s.box = s.box || [];
-    s.box.push({ kind: 'crop', id: id, name: c.name, emoji: c.emoji, n: qty, parts: t.parts,
-                 v: v, marketImpact: qty });
-    log(s, '📦 ' + c.name + '×' + qty + ' 放进收购箱（原价 ' + v + ' 金，明天结算）', 'info');
-    return { ok: true, msg: c.name + '×' + qty + ' 已入箱', v: v, n: qty };
+    const entry = { kind: 'crop', id: id, name: c.name, emoji: c.emoji, n: qty, parts: t.parts, raw: raw };
+    s.box.push(entry);
+    log(s, '📦 ' + c.name + '×' + qty + ' 放进收购箱（约 ' + boxEntryNet(s, entry) +
+      ' 金，睡觉按当日市价结算，扣 ' + Math.round(BALANCE.market.boxFee * 100) + '% 手续费）', 'info');
+    return { ok: true, msg: c.name + '×' + qty + ' 已入箱', v: boxEntryNet(s, entry), n: qty };
   }
 
-  /* 放进收购箱：鱼、杂物、宝箱都收，按原价 × 市价（含成就售价加成），第二天睡觉时结算 */
+  /* 放进收购箱：鱼、杂物、宝箱都收；杂物 / 宝箱不吃市价 */
   function boxPutFish(s, key, n) {
     const g = fishGroups(s).filter(function (x) { return x.key === key; })[0];
     if (!g) return { ok: false, msg: '没有这种渔获' };
     const qty = Math.max(1, Math.min(g.count, Math.floor(n || g.count)));
     const parts = takeFishN(s, key, qty);
     const raw = parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
-    const mkt = g.junk ? 1 : fishMarketMul(s, g.name);   // 杂物 / 宝箱不受市价影响
-    const v = Math.max(1, Math.round(raw * sellBonus(s) * mkt));
-    if (!g.junk) addFishSupply(s, g.name, qty);
     s.box = s.box || [];
-    s.box.push({ kind: 'fish', name: g.name, emoji: g.emoji, n: qty, parts: parts, v: v,
-                 chest: g.chest || undefined, junk: g.junk || undefined,
-                 marketImpact: g.junk ? 0 : qty,
-                 trash: (g.junk && !g.chest) ? true : undefined });
-    log(s, '📦 ' + g.emoji + ' ' + g.name + '×' + qty + ' 放进收购箱（原价 ' + v + ' 金，明天结算）', 'info');
-    return { ok: true, msg: g.name + '×' + qty + ' 已入箱', v: v, n: qty };
+    const entry = { kind: 'fish', name: g.name, emoji: g.emoji, n: qty, parts: parts, raw: raw,
+                    chest: g.chest || undefined, junk: g.junk || undefined,
+                    trash: (g.junk && !g.chest) ? true : undefined };
+    s.box.push(entry);
+    log(s, '📦 ' + g.emoji + ' ' + g.name + '×' + qty + ' 放进收购箱（约 ' + boxEntryNet(s, entry) +
+      ' 金，睡觉按当日市价结算）', 'info');
+    return { ok: true, msg: g.name + '×' + qty + ' 已入箱', v: boxEntryNet(s, entry), n: qty };
   }
 
-  /* 从某一批里取回 take 件（就地修改 entry，鱼和作物共用 parts） */
+  /* 从某一批里取回 take 件（就地修改 entry，鱼和作物共用 parts）
+   * 入箱时不计销量，所以取回也不用回滚市场。 */
   function takeFromEntry(s, e, take) {
     const total = e.n || 1;
     const t = Math.min(total, take);
-    const marketImpact = Math.max(0, Math.min(e.marketImpact || 0, t));
-    if (marketImpact > 0) {
-      if (e.kind === 'crop' && e.id) removeSupply(s, e.id, marketImpact);
-      else if (e.kind === 'fish' && !e.junk && !e.chest && !e.trash) {
-        removeFishSupply(s, e.name, marketImpact);
-      }
-    }
-    e.marketImpact = Math.max(0, Math.round(((e.marketImpact || 0) - marketImpact) * 10) / 10);
     const parts = (e.parts && e.parts.length)
       ? e.parts.map(function (p) { return { q: p.q, n: p.n, unit: p.unit }; })
-      : [{ q: 'std', n: total, unit: Math.max(1, Math.round((e.v || 1) / total)) }];
+      : [{ q: 'std', n: total, unit: Math.max(1, Math.round((e.raw || e.v || 1) / total)) }];
     let remain = t;
     const kept = [];
     parts.forEach(function (p) {
@@ -2789,7 +2826,7 @@
     });
     e.parts = kept;
     e.n = total - t;
-    e.v = Math.max(1, Math.round((e.v || 1) * e.n / total));
+    e.raw = Math.max(1, Math.round((e.raw != null ? e.raw : (e.v || 1)) * e.n / total));
     return t;
   }
 
@@ -2822,12 +2859,18 @@
     return { ok: true, msg: '取回 ' + e.name + ' ×' + took, n: took };
   }
 
-  /* 收购箱出货：睡觉时按原价一次性结清 */
+  /* 收购箱出货：睡觉时按当时市价一次性结清（扣手续费，并按批次推进供需） */
   function shipBox(s) {
     const list = s.box || [];
     if (!list.length) return { n: 0, value: 0 };
-    const value = boxValue(s);
-    const n = list.reduce(function (a, e) { return a + (e.n || 1); }, 0);
+    let value = 0, n = 0;
+    list.forEach(function (e) {
+      const cnt = e.n || 1;
+      value += boxEntryNet(s, e);
+      n += cnt;
+      if (e.kind === 'crop' && e.id) addSupply(s, e.id, cnt);
+      else if (e.kind === 'fish' && !e.junk && !e.chest && !e.trash) addFishSupply(s, e.name, cnt);
+    });
     s.box = [];
     s.stats.boxItems = (s.stats.boxItems || 0) + n;
     s.stats.boxIncome = (s.stats.boxIncome || 0) + value;
@@ -2843,7 +2886,7 @@
     const qty = Math.max(1, Math.min(g.count, Math.floor(n || g.count)));
     const parts = takeFishN(s, key, qty);
     const raw = parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
-    const gain = Math.max(1, Math.round(shopValue(raw) * sellBonus(s) * fishMarketMul(s, g.name)));
+    const gain = Math.max(1, Math.round(shopValue(raw) * sellBonus(s) * fishMarketMul(s, g.name, qty)));
     addFishSupply(s, g.name, qty);
     addCoins(s, gain, '卖鱼 ' + g.name);
     tradeXp(s, gain);
@@ -3225,6 +3268,8 @@
     if (s.coins < cost) return { ok: false, msg: '金币不够' };
     s.coins -= cost;
     s.shop.stock[id] = stock - qty;
+    // 买鱼 = 把鱼从市场里拿走：销量回落，之后卖鱼的价格会略微回升
+    removeFishSupply(s, f.name, qty);
     ledger(s, '买水产 ' + f.name + ' ×' + qty, 0, cost);
     tradeXp(s, cost);
     for (let i = 0; i < qty; i++) {
@@ -3263,6 +3308,8 @@
     if (s.coins < cost) return { ok: false, msg: '金币不够' };
     s.coins -= cost;
     s.cropShop.stock[id] = stock - qty;
+    // 买农产品 = 把货从市场里拿走：销量回落一点点
+    removeSupply(s, id, qty);
     ledger(s, '买农产品 ' + c.name + ' ×' + qty, 0, cost);
     tradeXp(s, cost);
     addStore(s, id, 'std', qty);
@@ -4322,14 +4369,10 @@
     merged.box = Array.isArray(s.box) ? s.box.slice(0, 500).filter(function (e) {
       return e && (e.kind === 'crop' || e.kind === 'fish') && e.name;
     }).map(function (e) {
+      // v2.29 起收购箱只记「原价 raw」，结算时才按当日市价算；老存档的 v 直接当 raw
+      const raw = Math.round(num(e.raw != null ? e.raw : e.v, 0, 0, 1e9));
       const out = { kind: e.kind, name: plain(e.name, 20), emoji: plain(e.emoji, 4),
-                    n: Math.round(num(e.n, 1, 1, 9999)), v: Math.round(num(e.v, 0, 0, 1e9)) };
-      const marketable = e.kind === 'crop'
-        ? !!CROPS[e.id]
-        : (e.kind === 'fish' && !fishIsJunk(e));
-      out.marketImpact = marketable
-        ? Math.round(num(e.marketImpact, e.marketImpact == null ? out.n : 0, 0, out.n) * 10) / 10
-        : 0;
+                    n: Math.round(num(e.n, 1, 1, 9999)), raw: raw };
       if (e.kind === 'crop' && CROPS[e.id]) {
         out.id = e.id;
         out.parts = Array.isArray(e.parts) ? e.parts.filter(function (p) {
@@ -4657,10 +4700,10 @@
     storeTotal: storeTotal, taxDue: taxDue, buyFish: buyFish, fishBuyPrice: fishBuyPrice, deviceUpkeep: deviceUpkeep, HOOK: HOOK,
     fishDesc: fishDesc, shopStock: shopStock, rollShopStock: rollShopStock, makeShop: makeShop, SHOP_STOCK: SHOP_STOCK,
     shopValue: shopValue, shopSellValue: shopSellValue, sellCropN: sellCropN, takeStoreN: takeStoreN,
-    boxCount: boxCount, boxValue: boxValue, boxPutCrop: boxPutCrop, boxPutFish: boxPutFish, boxTake: boxTake,
+    boxCount: boxCount, boxValue: boxValue, boxEntryNet: boxEntryNet, boxPutCrop: boxPutCrop, boxPutFish: boxPutFish, boxTake: boxTake,
+    cropNetEstimate: cropNetEstimate, fishNetEstimate: fishNetEstimate, storeNetEstimate: storeNetEstimate,
     boxTakeEntry: boxTakeEntry, sellFishGroupN: sellFishGroupN, shipBox: shipBox,
-    cropBuyPrice: cropBuyPrice, cropShopStock: cropShopStock, buyCrop: buyCrop, makeCropShop: makeCropShop,
-    rollCropStock: rollCropStock, cropStockCap: cropStockCap, FISH_UNLOCK: FISH_UNLOCK, CROP_UNLOCK: CROP_UNLOCK,
+    cropBuyPrice: cropBuyPrice, cropShopStock: cropShopStock, buyCrop: buyCrop, makeCropShop: makeCropShop,    rollCropStock: rollCropStock, cropStockCap: cropStockCap, FISH_UNLOCK: FISH_UNLOCK, CROP_UNLOCK: CROP_UNLOCK,
     seedUnlocked: seedUnlocked, fertUnlocked: fertUnlocked,    sprinklerUnlocked: sprinklerUnlocked, harvesterUnlocked: harvesterUnlocked,
     netUnlocked: netUnlocked, netMax: netMax, farmLv: farmLv, fishLv: fishLv,
     digLv: digLv, forageLv: forageLv, skillLv: skillLv, digCost: digCost, forageCost: forageCost,

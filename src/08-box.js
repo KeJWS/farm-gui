@@ -2,8 +2,20 @@
   /* ---------------- 收购箱 ---------------- */
 
   function boxCount(s) { return (s.box || []).length; }
+
+  /* 收购箱里的东西按「次日市价 ×（1−手续费）」估值；
+   * 入箱时不压价、也不算销量 —— 真正出货是在睡觉结算那一刻。 */
+  function boxEntryNet(s, e) {
+    const raw = e.raw != null ? e.raw : (e.v || 0);
+    const cnt = e.n || 1;
+    const junk = e.junk || e.chest || e.trash;
+    const mkt = junk ? 1
+      : (e.kind === 'fish' ? fishMarketMul(s, e.name, cnt) : marketMul(s, e.id, cnt));
+    return Math.max(1, Math.round(raw * sellBonus(s) * mkt * (1 - BALANCE.market.boxFee)));
+  }
+
   function boxValue(s) {
-    return (s.box || []).reduce(function (n, e) { return n + (e.v || 0); }, 0);
+    return (s.box || []).reduce(function (n, e) { return n + boxEntryNet(s, e); }, 0);
   }
 
   /* 从仓库按「品质差的先出」取 n 个，返回 parts 与总价值 */
@@ -24,7 +36,7 @@
     return { parts: parts, left: left };
   }
 
-  /* 放进收购箱：按原价（含成就售价加成），第二天睡觉时结算 */
+  /* 放进收购箱：只记账，不压价、不计销量；睡觉时按当日市价结算并扣手续费 */
   function boxPutCrop(s, id, n) {
     const have = storeCount(s, id);
     if (!have) return { ok: false, msg: '仓库里没有这种作物' };
@@ -32,49 +44,39 @@
     const c = CROPS[id];
     const t = takeStoreN(s, id, qty);
     const raw = t.parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
-    const v = Math.max(1, Math.round(raw * sellBonus(s) * marketMul(s, id)));
-    addSupply(s, id, qty);
     s.box = s.box || [];
-    s.box.push({ kind: 'crop', id: id, name: c.name, emoji: c.emoji, n: qty, parts: t.parts,
-                 v: v, marketImpact: qty });
-    log(s, '📦 ' + c.name + '×' + qty + ' 放进收购箱（原价 ' + v + ' 金，明天结算）', 'info');
-    return { ok: true, msg: c.name + '×' + qty + ' 已入箱', v: v, n: qty };
+    const entry = { kind: 'crop', id: id, name: c.name, emoji: c.emoji, n: qty, parts: t.parts, raw: raw };
+    s.box.push(entry);
+    log(s, '📦 ' + c.name + '×' + qty + ' 放进收购箱（约 ' + boxEntryNet(s, entry) +
+      ' 金，睡觉按当日市价结算，扣 ' + Math.round(BALANCE.market.boxFee * 100) + '% 手续费）', 'info');
+    return { ok: true, msg: c.name + '×' + qty + ' 已入箱', v: boxEntryNet(s, entry), n: qty };
   }
 
-  /* 放进收购箱：鱼、杂物、宝箱都收，按原价 × 市价（含成就售价加成），第二天睡觉时结算 */
+  /* 放进收购箱：鱼、杂物、宝箱都收；杂物 / 宝箱不吃市价 */
   function boxPutFish(s, key, n) {
     const g = fishGroups(s).filter(function (x) { return x.key === key; })[0];
     if (!g) return { ok: false, msg: '没有这种渔获' };
     const qty = Math.max(1, Math.min(g.count, Math.floor(n || g.count)));
     const parts = takeFishN(s, key, qty);
     const raw = parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
-    const mkt = g.junk ? 1 : fishMarketMul(s, g.name);   // 杂物 / 宝箱不受市价影响
-    const v = Math.max(1, Math.round(raw * sellBonus(s) * mkt));
-    if (!g.junk) addFishSupply(s, g.name, qty);
     s.box = s.box || [];
-    s.box.push({ kind: 'fish', name: g.name, emoji: g.emoji, n: qty, parts: parts, v: v,
-                 chest: g.chest || undefined, junk: g.junk || undefined,
-                 marketImpact: g.junk ? 0 : qty,
-                 trash: (g.junk && !g.chest) ? true : undefined });
-    log(s, '📦 ' + g.emoji + ' ' + g.name + '×' + qty + ' 放进收购箱（原价 ' + v + ' 金，明天结算）', 'info');
-    return { ok: true, msg: g.name + '×' + qty + ' 已入箱', v: v, n: qty };
+    const entry = { kind: 'fish', name: g.name, emoji: g.emoji, n: qty, parts: parts, raw: raw,
+                    chest: g.chest || undefined, junk: g.junk || undefined,
+                    trash: (g.junk && !g.chest) ? true : undefined };
+    s.box.push(entry);
+    log(s, '📦 ' + g.emoji + ' ' + g.name + '×' + qty + ' 放进收购箱（约 ' + boxEntryNet(s, entry) +
+      ' 金，睡觉按当日市价结算）', 'info');
+    return { ok: true, msg: g.name + '×' + qty + ' 已入箱', v: boxEntryNet(s, entry), n: qty };
   }
 
-  /* 从某一批里取回 take 件（就地修改 entry，鱼和作物共用 parts） */
+  /* 从某一批里取回 take 件（就地修改 entry，鱼和作物共用 parts）
+   * 入箱时不计销量，所以取回也不用回滚市场。 */
   function takeFromEntry(s, e, take) {
     const total = e.n || 1;
     const t = Math.min(total, take);
-    const marketImpact = Math.max(0, Math.min(e.marketImpact || 0, t));
-    if (marketImpact > 0) {
-      if (e.kind === 'crop' && e.id) removeSupply(s, e.id, marketImpact);
-      else if (e.kind === 'fish' && !e.junk && !e.chest && !e.trash) {
-        removeFishSupply(s, e.name, marketImpact);
-      }
-    }
-    e.marketImpact = Math.max(0, Math.round(((e.marketImpact || 0) - marketImpact) * 10) / 10);
     const parts = (e.parts && e.parts.length)
       ? e.parts.map(function (p) { return { q: p.q, n: p.n, unit: p.unit }; })
-      : [{ q: 'std', n: total, unit: Math.max(1, Math.round((e.v || 1) / total)) }];
+      : [{ q: 'std', n: total, unit: Math.max(1, Math.round((e.raw || e.v || 1) / total)) }];
     let remain = t;
     const kept = [];
     parts.forEach(function (p) {
@@ -94,7 +96,7 @@
     });
     e.parts = kept;
     e.n = total - t;
-    e.v = Math.max(1, Math.round((e.v || 1) * e.n / total));
+    e.raw = Math.max(1, Math.round((e.raw != null ? e.raw : (e.v || 1)) * e.n / total));
     return t;
   }
 
@@ -127,12 +129,18 @@
     return { ok: true, msg: '取回 ' + e.name + ' ×' + took, n: took };
   }
 
-  /* 收购箱出货：睡觉时按原价一次性结清 */
+  /* 收购箱出货：睡觉时按当时市价一次性结清（扣手续费，并按批次推进供需） */
   function shipBox(s) {
     const list = s.box || [];
     if (!list.length) return { n: 0, value: 0 };
-    const value = boxValue(s);
-    const n = list.reduce(function (a, e) { return a + (e.n || 1); }, 0);
+    let value = 0, n = 0;
+    list.forEach(function (e) {
+      const cnt = e.n || 1;
+      value += boxEntryNet(s, e);
+      n += cnt;
+      if (e.kind === 'crop' && e.id) addSupply(s, e.id, cnt);
+      else if (e.kind === 'fish' && !e.junk && !e.chest && !e.trash) addFishSupply(s, e.name, cnt);
+    });
     s.box = [];
     s.stats.boxItems = (s.stats.boxItems || 0) + n;
     s.stats.boxIncome = (s.stats.boxIncome || 0) + value;
@@ -148,7 +156,7 @@
     const qty = Math.max(1, Math.min(g.count, Math.floor(n || g.count)));
     const parts = takeFishN(s, key, qty);
     const raw = parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
-    const gain = Math.max(1, Math.round(shopValue(raw) * sellBonus(s) * fishMarketMul(s, g.name)));
+    const gain = Math.max(1, Math.round(shopValue(raw) * sellBonus(s) * fishMarketMul(s, g.name, qty)));
     addFishSupply(s, g.name, qty);
     addCoins(s, gain, '卖鱼 ' + g.name);
     tradeXp(s, gain);

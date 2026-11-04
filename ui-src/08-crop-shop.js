@@ -96,9 +96,11 @@
         : '') +
       '<div class="store-sub" style="margin-top:10px">今日进货 · 一般品质 · 共 <b>' + stockN + '</b> 件' +
         (soldOutN ? ' · ' + soldOutN + '/' + openN + ' 种售罄' : '') + '</div>' + buyRows +
-      '<div class="shop-tip">每天补一次货，卖完等明天。进价 = 基准价 × 市价（' +
-        '最近卖得多就便宜、反季贵 ×' + G.BALANCE.market.offSeason + '），所以转手必亏，只在凑委托 / 应急时买。<br>' +
-        '想卖原价就把作物放进<b>收购箱</b>（仓库 📦），明天睡觉结算。</div>',
+      '<div class="shop-tip">每天补一次货，卖完等明天。进价 = 基准价 × ' + G.BALANCE.shop.cropPriceMul +
+        ' × 市价（卖得多就便宜、反季贵 ×' + G.BALANCE.market.offSeason + '），而且<b>买货会把销量往回拉</b>，' +
+        '越买越贵 —— 转手必亏，只在凑委托 / 应急时买。<br>' +
+        '想卖得贵就把作物放进<b>收购箱</b>，下次睡觉按当时市价结算（扣 ' +
+        Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费）。</div>',
       '<button class="btn" data-sellallcrop' + (total ? '' : ' disabled') + '>全部卖出</button>' +
       '<button class="btn" data-close>关闭</button>');
   }
@@ -111,7 +113,8 @@
       '<div class="shop-head">' + name + ' · 仓库有 <b>' + n + '</b> 件</div>' +
       '<label class="buy-custom"><span>放入数量</span>' +
         '<input id="box-put-n" type="number" min="1" max="' + n + '" step="1" value="1" inputmode="numeric"></label>' +
-      '<div class="shop-tip">指定数量会从仓库移入收购箱，剩余库存不变；下次睡觉按放入时的金额结算。</div>',
+      '<div class="shop-tip">指定数量会从仓库移入收购箱，剩余库存不变；<b>下次睡觉时</b>按当时的市价结算，' +
+        '并扣 ' + Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费。入箱时不会马上压价。</div>',
       '<button class="btn primary" data-boxput-kind="' + kind + '" data-boxput-key="' + key + '">放入收购箱</button>' +
       '<button class="btn" data-close>取消</button>');
   }
@@ -120,23 +123,25 @@
     const list = state.box || [];
     const total = G.boxValue(state);
     const rows = list.length ? list.map(function (e) {
-      let sub = '原价 ' + e.v + ' 金';
+      const raw = e.raw != null ? e.raw : (e.v || 0);
+      let sub = '原价 ' + raw + ' 金';
       if (e.parts && e.parts.length) {
         sub = e.parts.map(function (p) {
           const q = G.qualityById(p.q);
           return (q ? q.emoji + q.name : '杂物') + ' ' + p.n;
-        }).join(' · ') + ' · 原价 ' + e.v + ' 金';
+        }).join(' · ') + ' · 原价 ' + raw + ' 金';
       }
       return '<div class="store-row">' +
         '<span class="se">' + esc(e.emoji || '📦') + '</span>' +
         '<div><div class="sn">' + esc(e.name) + ' ×' + e.n + '</div>' +
         '<div class="sv">' + sub + '</div></div>' +
-        '<span class="sp">' + e.v + ' 金</span>' +
+        '<span class="sp">约 ' + G.boxEntryNet(state, e) + ' 金</span>' +
       '</div>';
     }).join('') : '<div class="store-empty">收购箱是空的：在仓库点 📦 把作物 / 渔获放进来</div>';
 
     openModal('📦 收购箱',
-      '<div class="shop-head">待出货 <b>' + list.length + '</b> 批 · 原价合计 <b>' + total + '</b> 金</div>' +
+      '<div class="shop-head">待出货 <b>' + list.length + '</b> 批 · 预计到手 <b>' + total + '</b> 金' +
+        '（按当前市价 ×' + Math.round((1 - G.BALANCE.market.boxFee) * 100) + '%）</div>' +
       rows +
       (list.length
         ? '<div class="buy-custom"><span>🧮 自定义取出</span>' +
@@ -147,9 +152,10 @@
             '<button class="btn mini" data-boxtaken="1">取出</button>' +
             '<span class="bc-tip">共 ' + list.reduce(function (a, e) { return a + (e.n || 1); }, 0) + ' 件</span></div>'
         : '') +
-      '<div class="shop-tip">放进去的货会在<b>下次睡觉时</b>按原价（100%）结算；' +
+      '<div class="shop-tip">放进去的货会在<b>下次睡觉时</b>按当时的市价结算，扣 ' +
+      Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费（市价可能比现在高，也可能更低）；' +
       '直接卖给水产店 / 农产品店只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) + '%。<br>' +
-      '放错了可以取出放回仓库。</div>',
+      '放错了可以取出放回仓库，入箱 / 取出都不影响市价。</div>',
       '<button class="btn" data-boxtake' + (list.length ? '' : ' disabled') + '>全部取出</button>' +
       '<button class="btn" data-close>关闭</button>');
   }
@@ -228,7 +234,8 @@
         (soldOutN ? ' · ' + soldOutN + '/' + openN + ' 种售罄' : '') + '</div>' + buyRows +
       '<div class="shop-tip">水产店每天补一次货，卖完要等明天；买来的鱼是<b>一般品质</b>，只能卖钱、不能交委托。<br>' +
         '进价 = 基准价 × 市价（非汛期贵 ×' + G.BALANCE.market.offSeason + '）。<br>' +
-        '直接卖只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折，想原价卖就放进<b>收购箱</b>（仓库 📦）。</div>',
+        '直接卖只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折，想卖得贵就放进<b>收购箱</b>（仓库 📦），' +
+      '下次睡觉按当时市价结算、扣 ' + Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费。</div>',
       '<button class="btn" data-sellallfish' + (total ? '' : ' disabled') + '>全部卖出</button>' +
       '<button class="btn" data-close>关闭</button>');
   }

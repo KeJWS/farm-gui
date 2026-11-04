@@ -741,12 +741,12 @@
     const quantity = ids.reduce(function (n, id) { return n + G.storeCount(state, id); }, 0) +
       fish.reduce(function (n, g) { return n + g.count; }, 0) + wormN +
       fertRows.reduce(function (n, k) { return n + (state.ferts[k] || 0); }, 0);
-    $('#store-sum').textContent = '库存估值 ' + G.storeTotal(state) + ' 金 · ' + quantity + ' 件';
+    $('#store-sum').textContent = '收购箱到手约 ' + G.storeNetEstimate(state) + ' 金 · ' + quantity + ' 件';
     const boxBtn = $('#btn-box');
     if (boxBtn) {
       const n = G.boxCount(state);
       boxBtn.textContent = '📦 收购箱' + (n ? ' (' + n + ')' : '');
-      boxBtn.title = n ? '待出货 ' + G.boxValue(state) + ' 金' : '仓库里点 📦 放货进去';
+      boxBtn.title = n ? '待出货 ' + G.boxValue(state) + ' 金（按次日市价，含 5% 费）' : '仓库里点 📦 放货进去';
     }
   }
 
@@ -1541,8 +1541,10 @@
         '· <b>季节</b>：<b>反季 ×' + G.BALANCE.market.offSeason + '</b>（过季稀缺、卖得贵），<b>当季 ×1.00</b><br>' +
         '· 两相乘就是最终系数，界面上直接显示「市价 ×' +
         (G.BALANCE.market.supplyMax * G.BALANCE.market.offSeason).toFixed(2) + ' · 反季 · 稀缺」<br>' +
-        '所以：<b>别一次性把同一种菜全砸出去</b>；囤到反季再卖，价格会翻上去。<br>' +
-        '商店的<b>买价</b>也会跟着市价走 —— 缺货 / 反季时买得更贵。点商店面板的 <b>📈 行情</b> 看全部系数。<br>' +
+        '· <b>批量按批次中点定价</b>：一次卖 30 件和分三次卖 10 件到手一样多 —— 想卖高价靠<b>换着品种卖 / 囤到反季</b>，' +
+        '不是靠攒一大票一次砸<br>' +
+        '所以：<b>同一个品种别连着几天猛卖</b>；囤到反季再卖，价格会翻上去。<br>' +
+        '商店的<b>买价</b>也会跟着市价走 —— 缺货 / 反季时买得更贵，而且<b>买货会把销量往回拉</b>（越买越贵）。点商店面板的 <b>📈 行情</b> 看全部系数。<br>' +
         '店里每天同样进一批作物（一般品质），买价 = 售价 × ' + G.BALANCE.shop.cropPriceMul +
         ' <b>再乘市价</b>，转手必亏，只在凑委托或应急时买。<br>' +
         '🤝 <b>交易等级</b>会把所有商店的<b>进价</b>往下压（每级 −' +
@@ -1562,10 +1564,13 @@
 
       '<div class="rule-sec">' +
         '<h4>📦 收购箱</h4>' +
-        '<p>在仓库点每行的 <b>📦</b>，把整批或自定义数量的<b>作物 / 鱼 / 杂物 / 宝箱</b>放进收购箱，<b>下次睡觉时按原价（100%）结算</b>；放错了可以「全部取出」。<br>' +
+        '<p>在仓库点每行的 <b>📦</b>，把整批或自定义数量的<b>作物 / 鱼 / 杂物 / 宝箱</b>放进收购箱，' +
+        '<b>下次睡觉时按当时的市价结算</b>，并扣 <b>' + Math.round(G.BALANCE.market.boxFee * 100) +
+        '% 手续费</b>；放错了可以「全部取出」。<br>' +
         '直接卖给水产店 / 农产品店只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) +
-        '%，所以：<b>急用钱走商店，不急就进收购箱</b>。箱子里的货也计入税金基数，不能用来避税。<br>' +
-        '宝箱也可以直接进箱子换钱（原价），但<b>开箱通常更划算</b>。</p>' +
+        '%，所以：<b>急用钱走商店，不急就进收购箱</b>（市价可能涨也可能跌，入箱本身不压价）。' +
+        '箱子里的货也计入税金基数，不能用来避税。<br>' +
+        '宝箱也可以直接进箱子换钱，但<b>开箱通常更划算</b>。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -2146,9 +2151,11 @@
         : '') +
       '<div class="store-sub" style="margin-top:10px">今日进货 · 一般品质 · 共 <b>' + stockN + '</b> 件' +
         (soldOutN ? ' · ' + soldOutN + '/' + openN + ' 种售罄' : '') + '</div>' + buyRows +
-      '<div class="shop-tip">每天补一次货，卖完等明天。进价 = 基准价 × 市价（' +
-        '最近卖得多就便宜、反季贵 ×' + G.BALANCE.market.offSeason + '），所以转手必亏，只在凑委托 / 应急时买。<br>' +
-        '想卖原价就把作物放进<b>收购箱</b>（仓库 📦），明天睡觉结算。</div>',
+      '<div class="shop-tip">每天补一次货，卖完等明天。进价 = 基准价 × ' + G.BALANCE.shop.cropPriceMul +
+        ' × 市价（卖得多就便宜、反季贵 ×' + G.BALANCE.market.offSeason + '），而且<b>买货会把销量往回拉</b>，' +
+        '越买越贵 —— 转手必亏，只在凑委托 / 应急时买。<br>' +
+        '想卖得贵就把作物放进<b>收购箱</b>，下次睡觉按当时市价结算（扣 ' +
+        Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费）。</div>',
       '<button class="btn" data-sellallcrop' + (total ? '' : ' disabled') + '>全部卖出</button>' +
       '<button class="btn" data-close>关闭</button>');
   }
@@ -2161,7 +2168,8 @@
       '<div class="shop-head">' + name + ' · 仓库有 <b>' + n + '</b> 件</div>' +
       '<label class="buy-custom"><span>放入数量</span>' +
         '<input id="box-put-n" type="number" min="1" max="' + n + '" step="1" value="1" inputmode="numeric"></label>' +
-      '<div class="shop-tip">指定数量会从仓库移入收购箱，剩余库存不变；下次睡觉按放入时的金额结算。</div>',
+      '<div class="shop-tip">指定数量会从仓库移入收购箱，剩余库存不变；<b>下次睡觉时</b>按当时的市价结算，' +
+        '并扣 ' + Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费。入箱时不会马上压价。</div>',
       '<button class="btn primary" data-boxput-kind="' + kind + '" data-boxput-key="' + key + '">放入收购箱</button>' +
       '<button class="btn" data-close>取消</button>');
   }
@@ -2170,23 +2178,25 @@
     const list = state.box || [];
     const total = G.boxValue(state);
     const rows = list.length ? list.map(function (e) {
-      let sub = '原价 ' + e.v + ' 金';
+      const raw = e.raw != null ? e.raw : (e.v || 0);
+      let sub = '原价 ' + raw + ' 金';
       if (e.parts && e.parts.length) {
         sub = e.parts.map(function (p) {
           const q = G.qualityById(p.q);
           return (q ? q.emoji + q.name : '杂物') + ' ' + p.n;
-        }).join(' · ') + ' · 原价 ' + e.v + ' 金';
+        }).join(' · ') + ' · 原价 ' + raw + ' 金';
       }
       return '<div class="store-row">' +
         '<span class="se">' + esc(e.emoji || '📦') + '</span>' +
         '<div><div class="sn">' + esc(e.name) + ' ×' + e.n + '</div>' +
         '<div class="sv">' + sub + '</div></div>' +
-        '<span class="sp">' + e.v + ' 金</span>' +
+        '<span class="sp">约 ' + G.boxEntryNet(state, e) + ' 金</span>' +
       '</div>';
     }).join('') : '<div class="store-empty">收购箱是空的：在仓库点 📦 把作物 / 渔获放进来</div>';
 
     openModal('📦 收购箱',
-      '<div class="shop-head">待出货 <b>' + list.length + '</b> 批 · 原价合计 <b>' + total + '</b> 金</div>' +
+      '<div class="shop-head">待出货 <b>' + list.length + '</b> 批 · 预计到手 <b>' + total + '</b> 金' +
+        '（按当前市价 ×' + Math.round((1 - G.BALANCE.market.boxFee) * 100) + '%）</div>' +
       rows +
       (list.length
         ? '<div class="buy-custom"><span>🧮 自定义取出</span>' +
@@ -2197,9 +2207,10 @@
             '<button class="btn mini" data-boxtaken="1">取出</button>' +
             '<span class="bc-tip">共 ' + list.reduce(function (a, e) { return a + (e.n || 1); }, 0) + ' 件</span></div>'
         : '') +
-      '<div class="shop-tip">放进去的货会在<b>下次睡觉时</b>按原价（100%）结算；' +
+      '<div class="shop-tip">放进去的货会在<b>下次睡觉时</b>按当时的市价结算，扣 ' +
+      Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费（市价可能比现在高，也可能更低）；' +
       '直接卖给水产店 / 农产品店只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) + '%。<br>' +
-      '放错了可以取出放回仓库。</div>',
+      '放错了可以取出放回仓库，入箱 / 取出都不影响市价。</div>',
       '<button class="btn" data-boxtake' + (list.length ? '' : ' disabled') + '>全部取出</button>' +
       '<button class="btn" data-close>关闭</button>');
   }
@@ -2278,7 +2289,8 @@
         (soldOutN ? ' · ' + soldOutN + '/' + openN + ' 种售罄' : '') + '</div>' + buyRows +
       '<div class="shop-tip">水产店每天补一次货，卖完要等明天；买来的鱼是<b>一般品质</b>，只能卖钱、不能交委托。<br>' +
         '进价 = 基准价 × 市价（非汛期贵 ×' + G.BALANCE.market.offSeason + '）。<br>' +
-        '直接卖只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折，想原价卖就放进<b>收购箱</b>（仓库 📦）。</div>',
+        '直接卖只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) + ' 折，想卖得贵就放进<b>收购箱</b>（仓库 📦），' +
+      '下次睡觉按当时市价结算、扣 ' + Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费。</div>',
       '<button class="btn" data-sellallfish' + (total ? '' : ' disabled') + '>全部卖出</button>' +
       '<button class="btn" data-close>关闭</button>');
   }
@@ -2392,7 +2404,10 @@
       '<div class="store-sub">🌱 作物 · 当季 ×1 / 反季 ×' + OFF + '</div>' + cropRows +
       '<div class="store-sub" style="margin-top:10px">🌿 野货 · 采集获得</div>' + wildRows +
       '<div class="store-sub" style="margin-top:10px">🐟 水产 · 汛期 ×1 / 非汛期 ×' + OFF + '</div>' + fishRows +
-      '<div class="shop-tip">右侧是当前市价系数；每行显示供需状态和距离下个价格档位的销量。成本、利润、走势与下季估值见「分析」。</div>',
+      '<div class="shop-tip">右侧是当前市价系数；每行显示供需状态和距离下个价格档位的销量。' +
+      '一批货按<b>批次中点</b>定价 —— 一次卖 30 件和分三次卖 10 件到手一样多；' +
+      '收购箱次日按市价结算、扣 ' + Math.round(G.BALANCE.market.boxFee * 100) + '%。' +
+      '成本、利润、走势与下季估值见「分析」。</div>',
       '<button class="btn" data-close>关闭</button>');
   }
 
@@ -2452,8 +2467,9 @@
       const raw = G.storeValue(state, c.id);
       holdings.push({
         name: c.name, emoji: c.emoji, qty: qty, unit: '个',
-        now: G.shopSellValue(state, c.id),
-        next: Math.max(1, Math.round(G.shopValue(raw) * G.sellBonus(state) * nextMk.total)),
+        now: G.cropNetEstimate(state, c.id),
+        next: Math.max(1, Math.round(raw * G.sellBonus(state) * nextMk.total *
+          (1 - G.BALANCE.market.boxFee))),
         cost: c.wild ? null : G.cropBuyPrice(c.id, state) * qty
       });
     });
@@ -2463,8 +2479,9 @@
       const fishDef = G.fishByName(g.name);
       holdings.push({
         name: g.name, emoji: g.emoji, qty: g.count, unit: '条',
-        now: Math.max(1, Math.round(G.shopValue(g.total) * G.sellBonus(state) * mk.total)),
-        next: Math.max(1, Math.round(G.shopValue(g.total) * G.sellBonus(state) * nextMk.total)),
+        now: G.fishNetEstimate(state, g.name, g.count, g.total),
+        next: Math.max(1, Math.round(g.total * G.sellBonus(state) * nextMk.total *
+          (1 - G.BALANCE.market.boxFee))),
         cost: fishDef ? G.fishBuyPrice(fishDef.id, state) * g.count : null
       });
     });
@@ -2492,11 +2509,13 @@
       const base = isFish ? item.base : item.price;
       const marketBase = Math.max(1, Math.round(base * mk.total));
       const nextMk = nextSeasonMarket(mk, item, isFish);
-      const nextSale = Math.max(1, Math.round(G.shopValue(base) * G.sellBonus(state) * nextMk.total));
+      const nextSale = Math.max(1, Math.round(base * G.sellBonus(state) * nextMk.total *
+        (1 - G.BALANCE.market.boxFee)));
       const unit = isFish ? '条' : '个';
       const buyCost = isFish ? G.fishBuyPrice(item.id, state)
         : (item.wild ? null : G.cropBuyPrice(item.id, state));
-      const oneSale = Math.max(1, Math.round(G.shopValue(base) * G.sellBonus(state) * mk.total));
+      const oneSale = Math.max(1, Math.round(base * G.sellBonus(state) * mk.total *
+        (1 - G.BALANCE.market.boxFee)));
       const unitMargin = buyCost == null ? null : oneSale - buyCost;
       const wk = series.slice(-7);
       const trend = wk.length > 1 && wk[0] > 0
@@ -2516,8 +2535,8 @@
           '<div class="sv">销量 ' + mk.sold.toFixed(0) + ' ' + unit + ' · 供需 ×' +
             mk.supply.toFixed(2) + ' · 季节 ×' + mk.season.toFixed(2) + ' · ' + head + '</div>' +
           '<div class="sv">' + (buyCost == null
-            ? '单件卖出到手 ' + oneSale + ' 金 · 采集现金成本未计'
-            : '单件参考进价 ' + buyCost + ' 金 · 卖出到手 ' + oneSale + ' 金 · 毛差 <b class="' +
+            ? '单件收购箱到手 ' + oneSale + ' 金 · 采集现金成本未计'
+            : '单件参考进价 ' + buyCost + ' 金 · 收购箱到手 ' + oneSale + ' 金 · 毛差 <b class="' +
               (unitMargin > 0 ? 'market-up' : (unitMargin < 0 ? 'market-down' : '')) + '">' +
               (unitMargin > 0 ? '+' : '') + unitMargin + ' 金</b>') + '</div>' +
           '<div class="sv">' + daysToNextSeason + ' 天后下季开市 ×' + nextMk.total.toFixed(2) +
@@ -2741,8 +2760,8 @@
         ' 金（土地 ' + G.plotUpkeep(state.plots.length) + ' + 设备 ' + G.deviceUpkeep(state) + '）'],
       ['税金', '还有 ' + nextTax + ' 天 · 约 ' + G.taxDue(state) + ' 金（累进 2% / 4% / 6%，最低 ' +
         G.BALANCE.tax.min + '）'],
-      ['仓库总价', G.storeTotal(state) + ' 金'],
-      ['收购箱', G.boxCount(state) + ' 批 · ' + G.boxValue(state) + ' 金（睡觉结算）'],
+      ['仓库总价', '收购箱到手约 ' + G.storeNetEstimate(state) + ' 金'],
+      ['收购箱', G.boxCount(state) + ' 批 · 预计 ' + G.boxValue(state) + ' 金（睡觉结算，扣 5%）'],
       ['茶叶', (function () {
         const list = G.teaStock(state);
         return list.length ? list.map(function (t) { return t.emoji + t.name + '×' + state.teas[t.id]; }).join(' · ')

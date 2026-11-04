@@ -193,7 +193,7 @@
     const parts = [];
     ids.forEach(function (id) {
       const n = storeCount(s, id);
-      const gain = shopSellValue(s, id);
+      const gain = shopSellValue(s, id, n);
       income += gain; count += n;
       parts.push(CROPS[id].name + '×' + n + ' = ' + gain + ' 金');
       addSupply(s, id, n);
@@ -223,7 +223,7 @@
     const qty = Math.max(1, Math.min(have, Math.floor(n || have)));
     const t = takeStoreN(s, id, qty);
     const raw = t.parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
-    const gain = Math.max(1, Math.round(shopValue(raw) * sellBonus(s) * marketMul(s, id)));
+    const gain = Math.max(1, Math.round(shopValue(raw) * sellBonus(s) * marketMul(s, id, qty)));
     addSupply(s, id, qty);
     s.stats.cropsSold = (s.stats.cropsSold || 0) + qty;
     addCoins(s, gain, '农产品店 · 卖 ' + CROPS[id].name + '×' + qty);
@@ -235,7 +235,7 @@
   function sellOne(s, id) {
     const n = storeCount(s, id);
     if (!n) return { ok: false, msg: '没有可卖的' };
-    const gain = shopSellValue(s, id);
+    const gain = shopSellValue(s, id, n);
     addSupply(s, id, n);
     delete s.store[id];
     s.stats.cropsSold = (s.stats.cropsSold || 0) + n;

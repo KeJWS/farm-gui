@@ -44,10 +44,13 @@
     lure: { price: 5, dur: 25 },
     /* 高级假饵：钓鱼 Lv6 解锁，20 金 / 100 次；咬钩率跟面团饵一样，好鱼率跟假饵一样 */
     lure2: { price: 20, dur: 100 },
-    shop: { priceMul: 1.3, cropPriceMul: 1.3, restock: true, sellRate: 0.8 },
-    /* 市场：供需 1.30（稀缺）→ 0.70（过剩），反季 ×1.7，每天睡觉回落 30% */
-    market: { supplyMax: 1.3, supplyMin: 0.7, cropStep: 0.02, fishStep: 0.015,
-              offSeason: 1.7, decay: 0.7, scarce: 1.15, glut: 0.9,
+    shop: { priceMul: 1.25, cropPriceMul: 1.25, restock: true, sellRate: 0.8 },
+    /* 市场：供需 1.30（稀缺）→ 0.70（过剩）；作物每件 −0.015、鱼每条 −0.010，睡一觉销量回落 25%。
+     * 批量按「批次中点」定价：一次卖 30 件 ≈ 分三次卖 10 件，整批砸盘不再有价格优势。
+     * 收购箱次日按当时市价结算，并扣 boxFee 手续费。 */
+    market: { supplyMax: 1.3, supplyMin: 0.7, cropStep: 0.015, fishStep: 0.01,
+              offSeason: 1.7, decay: 0.75, scarce: 1.15, glut: 0.9,
+              boxFee: 0.05,
               /* 委托的市价溢价封顶，避免一张单顶掉整个农场 */
               orderCap: 1.6 },
     /* 采集：5 体力一次（采集满级 4），100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子

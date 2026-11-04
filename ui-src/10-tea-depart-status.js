@@ -172,8 +172,8 @@
         ' 金（土地 ' + G.plotUpkeep(state.plots.length) + ' + 设备 ' + G.deviceUpkeep(state) + '）'],
       ['税金', '还有 ' + nextTax + ' 天 · 约 ' + G.taxDue(state) + ' 金（累进 2% / 4% / 6%，最低 ' +
         G.BALANCE.tax.min + '）'],
-      ['仓库总价', G.storeTotal(state) + ' 金'],
-      ['收购箱', G.boxCount(state) + ' 批 · ' + G.boxValue(state) + ' 金（睡觉结算）'],
+      ['仓库总价', '收购箱到手约 ' + G.storeNetEstimate(state) + ' 金'],
+      ['收购箱', G.boxCount(state) + ' 批 · 预计 ' + G.boxValue(state) + ' 金（睡觉结算，扣 5%）'],
       ['茶叶', (function () {
         const list = G.teaStock(state);
         return list.length ? list.map(function (t) { return t.emoji + t.name + '×' + state.teas[t.id]; }).join(' · ')

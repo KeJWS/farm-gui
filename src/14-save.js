@@ -185,14 +185,10 @@
     merged.box = Array.isArray(s.box) ? s.box.slice(0, 500).filter(function (e) {
       return e && (e.kind === 'crop' || e.kind === 'fish') && e.name;
     }).map(function (e) {
+      // v2.29 起收购箱只记「原价 raw」，结算时才按当日市价算；老存档的 v 直接当 raw
+      const raw = Math.round(num(e.raw != null ? e.raw : e.v, 0, 0, 1e9));
       const out = { kind: e.kind, name: plain(e.name, 20), emoji: plain(e.emoji, 4),
-                    n: Math.round(num(e.n, 1, 1, 9999)), v: Math.round(num(e.v, 0, 0, 1e9)) };
-      const marketable = e.kind === 'crop'
-        ? !!CROPS[e.id]
-        : (e.kind === 'fish' && !fishIsJunk(e));
-      out.marketImpact = marketable
-        ? Math.round(num(e.marketImpact, e.marketImpact == null ? out.n : 0, 0, out.n) * 10) / 10
-        : 0;
+                    n: Math.round(num(e.n, 1, 1, 9999)), raw: raw };
       if (e.kind === 'crop' && CROPS[e.id]) {
         out.id = e.id;
         out.parts = Array.isArray(e.parts) ? e.parts.filter(function (p) {
@@ -520,10 +516,10 @@
     storeTotal: storeTotal, taxDue: taxDue, buyFish: buyFish, fishBuyPrice: fishBuyPrice, deviceUpkeep: deviceUpkeep, HOOK: HOOK,
     fishDesc: fishDesc, shopStock: shopStock, rollShopStock: rollShopStock, makeShop: makeShop, SHOP_STOCK: SHOP_STOCK,
     shopValue: shopValue, shopSellValue: shopSellValue, sellCropN: sellCropN, takeStoreN: takeStoreN,
-    boxCount: boxCount, boxValue: boxValue, boxPutCrop: boxPutCrop, boxPutFish: boxPutFish, boxTake: boxTake,
+    boxCount: boxCount, boxValue: boxValue, boxEntryNet: boxEntryNet, boxPutCrop: boxPutCrop, boxPutFish: boxPutFish, boxTake: boxTake,
+    cropNetEstimate: cropNetEstimate, fishNetEstimate: fishNetEstimate, storeNetEstimate: storeNetEstimate,
     boxTakeEntry: boxTakeEntry, sellFishGroupN: sellFishGroupN, shipBox: shipBox,
-    cropBuyPrice: cropBuyPrice, cropShopStock: cropShopStock, buyCrop: buyCrop, makeCropShop: makeCropShop,
-    rollCropStock: rollCropStock, cropStockCap: cropStockCap, FISH_UNLOCK: FISH_UNLOCK, CROP_UNLOCK: CROP_UNLOCK,
+    cropBuyPrice: cropBuyPrice, cropShopStock: cropShopStock, buyCrop: buyCrop, makeCropShop: makeCropShop,    rollCropStock: rollCropStock, cropStockCap: cropStockCap, FISH_UNLOCK: FISH_UNLOCK, CROP_UNLOCK: CROP_UNLOCK,
     seedUnlocked: seedUnlocked, fertUnlocked: fertUnlocked,    sprinklerUnlocked: sprinklerUnlocked, harvesterUnlocked: harvesterUnlocked,
     netUnlocked: netUnlocked, netMax: netMax, farmLv: farmLv, fishLv: fishLv,
     digLv: digLv, forageLv: forageLv, skillLv: skillLv, digCost: digCost, forageCost: forageCost,

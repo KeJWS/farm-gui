@@ -100,7 +100,10 @@
       '<div class="store-sub">🌱 作物 · 当季 ×1 / 反季 ×' + OFF + '</div>' + cropRows +
       '<div class="store-sub" style="margin-top:10px">🌿 野货 · 采集获得</div>' + wildRows +
       '<div class="store-sub" style="margin-top:10px">🐟 水产 · 汛期 ×1 / 非汛期 ×' + OFF + '</div>' + fishRows +
-      '<div class="shop-tip">右侧是当前市价系数；每行显示供需状态和距离下个价格档位的销量。成本、利润、走势与下季估值见「分析」。</div>',
+      '<div class="shop-tip">右侧是当前市价系数；每行显示供需状态和距离下个价格档位的销量。' +
+      '一批货按<b>批次中点</b>定价 —— 一次卖 30 件和分三次卖 10 件到手一样多；' +
+      '收购箱次日按市价结算、扣 ' + Math.round(G.BALANCE.market.boxFee * 100) + '%。' +
+      '成本、利润、走势与下季估值见「分析」。</div>',
       '<button class="btn" data-close>关闭</button>');
   }
 
@@ -160,8 +163,9 @@
       const raw = G.storeValue(state, c.id);
       holdings.push({
         name: c.name, emoji: c.emoji, qty: qty, unit: '个',
-        now: G.shopSellValue(state, c.id),
-        next: Math.max(1, Math.round(G.shopValue(raw) * G.sellBonus(state) * nextMk.total)),
+        now: G.cropNetEstimate(state, c.id),
+        next: Math.max(1, Math.round(raw * G.sellBonus(state) * nextMk.total *
+          (1 - G.BALANCE.market.boxFee))),
         cost: c.wild ? null : G.cropBuyPrice(c.id, state) * qty
       });
     });
@@ -171,8 +175,9 @@
       const fishDef = G.fishByName(g.name);
       holdings.push({
         name: g.name, emoji: g.emoji, qty: g.count, unit: '条',
-        now: Math.max(1, Math.round(G.shopValue(g.total) * G.sellBonus(state) * mk.total)),
-        next: Math.max(1, Math.round(G.shopValue(g.total) * G.sellBonus(state) * nextMk.total)),
+        now: G.fishNetEstimate(state, g.name, g.count, g.total),
+        next: Math.max(1, Math.round(g.total * G.sellBonus(state) * nextMk.total *
+          (1 - G.BALANCE.market.boxFee))),
         cost: fishDef ? G.fishBuyPrice(fishDef.id, state) * g.count : null
       });
     });
@@ -200,11 +205,13 @@
       const base = isFish ? item.base : item.price;
       const marketBase = Math.max(1, Math.round(base * mk.total));
       const nextMk = nextSeasonMarket(mk, item, isFish);
-      const nextSale = Math.max(1, Math.round(G.shopValue(base) * G.sellBonus(state) * nextMk.total));
+      const nextSale = Math.max(1, Math.round(base * G.sellBonus(state) * nextMk.total *
+        (1 - G.BALANCE.market.boxFee)));
       const unit = isFish ? '条' : '个';
       const buyCost = isFish ? G.fishBuyPrice(item.id, state)
         : (item.wild ? null : G.cropBuyPrice(item.id, state));
-      const oneSale = Math.max(1, Math.round(G.shopValue(base) * G.sellBonus(state) * mk.total));
+      const oneSale = Math.max(1, Math.round(base * G.sellBonus(state) * mk.total *
+        (1 - G.BALANCE.market.boxFee)));
       const unitMargin = buyCost == null ? null : oneSale - buyCost;
       const wk = series.slice(-7);
       const trend = wk.length > 1 && wk[0] > 0
@@ -224,8 +231,8 @@
           '<div class="sv">销量 ' + mk.sold.toFixed(0) + ' ' + unit + ' · 供需 ×' +
             mk.supply.toFixed(2) + ' · 季节 ×' + mk.season.toFixed(2) + ' · ' + head + '</div>' +
           '<div class="sv">' + (buyCost == null
-            ? '单件卖出到手 ' + oneSale + ' 金 · 采集现金成本未计'
-            : '单件参考进价 ' + buyCost + ' 金 · 卖出到手 ' + oneSale + ' 金 · 毛差 <b class="' +
+            ? '单件收购箱到手 ' + oneSale + ' 金 · 采集现金成本未计'
+            : '单件参考进价 ' + buyCost + ' 金 · 收购箱到手 ' + oneSale + ' 金 · 毛差 <b class="' +
               (unitMargin > 0 ? 'market-up' : (unitMargin < 0 ? 'market-down' : '')) + '">' +
               (unitMargin > 0 ? '+' : '') + unitMargin + ' 金</b>') + '</div>' +
           '<div class="sv">' + daysToNextSeason + ' 天后下季开市 ×' + nextMk.total.toFixed(2) +

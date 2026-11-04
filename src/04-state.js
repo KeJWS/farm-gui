@@ -1,7 +1,7 @@
 /* 存档状态：createState 与通用工具（log / ledger / addCoins） */
   /* ---------------- 状态 ---------------- */
 
-  const SAVE_VERSION = 1;
+  const SAVE_VERSION = 2;
 
   function makePlot() {
     return { crop: null, growth: 0, watered: false, missed: 0, fert: 0,

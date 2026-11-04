@@ -25,6 +25,8 @@
     if (s.coins < cost) return { ok: false, msg: '金币不够' };
     s.coins -= cost;
     s.cropShop.stock[id] = stock - qty;
+    // 买农产品 = 把货从市场里拿走：销量回落一点点
+    removeSupply(s, id, qty);
     ledger(s, '买农产品 ' + c.name + ' ×' + qty, 0, cost);
     tradeXp(s, cost);
     addStore(s, id, 'std', qty);

@@ -225,6 +225,8 @@
     if (s.coins < cost) return { ok: false, msg: '金币不够' };
     s.coins -= cost;
     s.shop.stock[id] = stock - qty;
+    // 买鱼 = 把鱼从市场里拿走：销量回落，之后卖鱼的价格会略微回升
+    removeFishSupply(s, f.name, qty);
     ledger(s, '买水产 ' + f.name + ' ×' + qty, 0, cost);
     tradeXp(s, cost);
     for (let i = 0; i < qty; i++) {

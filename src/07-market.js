@@ -1,14 +1,22 @@
 /* 市场价格：供需、季节、小镇声望、掉档提示、价格历史 */
   /* ---------------- 市场价格 ----------------
-   * 供给：最近卖得越多越便宜（×1.30 稀缺 → ×0.70 过剩，作物每件 -0.02、鱼每条 -0.015）
+   * 供给：最近卖得越多越便宜（×1.30 稀缺 → ×0.70 过剩，作物每件 -0.015、鱼每条 -0.010）
+   * 批量：按「批次中点」取供需（一次卖 n 件 = 在这 n 件的中间点定价），
+   *       所以整批砸和分批卖的单位价一样，堵住「攒一大票一次出货」的漏洞
    * 季节：当季 / 汛期 ×1.00，反季 / 非汛期 ×1.70（物以稀为贵）
-   * 冷却：每睡一觉销量回落 30%
+   * 冷却：每睡一觉销量回落 25%
    */
   function marketTag(supply) {
     const M = BALANCE.market;
     if (supply >= M.scarce) return '稀缺';
     if (supply <= M.glut) return '过剩';
     return '平稳';
+  }
+
+  /* 一批 n 件的定价位置：批次中点（sold 是成交前的销量） */
+  function midSold(sold, n) {
+    const cnt = Math.max(1, Math.round(n || 1));
+    return sold + (cnt - 1) / 2;
   }
 
   function marketOf(s, id) {
@@ -18,17 +26,17 @@
   }
   function marketSold(s, id) { return (s.market && s.market[id] && s.market[id].sold) || 0; }
 
-  function marketInfo(s, id) {
+  function marketInfo(s, id, n) {
     const M = BALANCE.market;
     const sold = marketSold(s, id);
-    const supply = clamp(M.supplyMax - M.cropStep * sold, M.supplyMin, M.supplyMax);
+    const supply = clamp(M.supplyMax - M.cropStep * midSold(sold, n), M.supplyMin, M.supplyMax);
     const inSeason = CROPS[id] ? cropSeasonOk(id, s.day) : true;
     const season = inSeason ? 1 : M.offSeason;
     const total = supply * season * (1 + townBonus(s, 'marketBonus'));
     return { sold: sold, supply: supply, season: season, inSeason: inSeason, total: total,
              tag: marketTag(supply) };
   }
-  function marketMul(s, id) { return marketInfo(s, id).total; }
+  function marketMul(s, id, n) { return marketInfo(s, id, n).total; }
   function addSupply(s, id, n) { marketOf(s, id).sold += Math.max(0, n || 0); }
   function removeSupply(s, id, n) {
     const m = s.market && s.market[id];
@@ -43,10 +51,10 @@
     if (!s.marketF[name]) s.marketF[name] = { sold: 0 };
     return s.marketF[name];
   }
-  function fishMarketInfo(s, name) {
+  function fishMarketInfo(s, name, n) {
     const M = BALANCE.market;
     const sold = (s.marketF && s.marketF[name] && s.marketF[name].sold) || 0;
-    const supply = clamp(M.supplyMax - M.fishStep * sold, M.supplyMin, M.supplyMax);
+    const supply = clamp(M.supplyMax - M.fishStep * midSold(sold, n), M.supplyMin, M.supplyMax);
     const f = fishByName(name);
     const inRun = f && f.seasons ? f.seasons.indexOf(seasonIdx(s.day)) >= 0 : true;
     const season = inRun ? 1 : M.offSeason;
@@ -54,7 +62,7 @@
     return { sold: sold, supply: supply, season: season, inRun: inRun, total: total,
              tag: marketTag(supply) };
   }
-  function fishMarketMul(s, name) { return fishMarketInfo(s, name).total; }
+  function fishMarketMul(s, name, n) { return fishMarketInfo(s, name, n).total; }
   function addFishSupply(s, name, n) { fishMarketOf(s, name).sold += Math.max(0, n || 0); }
   function removeFishSupply(s, name, n) {
     const m = s.marketF && s.marketF[name];
@@ -99,12 +107,13 @@
   function headroomOf(sold, step) {
     const M = BALANCE.market;
     const supply = clamp(M.supplyMax - step * sold, M.supplyMin, M.supplyMax);
-    const toCalm = supply > M.scarce
-      ? Math.max(0, Math.ceil((M.supplyMax - M.scarce) / step - sold - 1e-9)) : 0;
-    const toGlut = supply > M.glut
-      ? Math.max(0, Math.ceil((M.supplyMax - M.glut) / step - sold - 1e-9)) : 0;
-    const toFloor = Math.max(0, Math.ceil((M.supplyMax - M.supplyMin) / step - sold - 1e-9));
-    return { supply: supply, toCalm: toCalm, toGlut: toGlut, toFloor: toFloor,
+    const need = function (target) {
+      return Math.max(0, Math.ceil((M.supplyMax - target) / step - sold - 1e-6));
+    };
+    return { supply: supply,
+             toCalm: supply > M.scarce ? need(M.scarce) : 0,
+             toGlut: supply > M.glut ? need(M.glut) : 0,
+             toFloor: need(M.supplyMin),
              atFloor: supply <= M.supplyMin + 1e-9 };
   }
   function marketHeadroom(s, id) {
@@ -190,14 +199,37 @@
 
   /* 商店直接收购只给 8 折；想卖原价就放收购箱，等第二天结算 */
   function shopValue(v) { return Math.max(1, Math.round((v || 0) * BALANCE.shop.sellRate)); }
-  function shopSellValue(s, id) {
-    return Math.max(1, Math.round(shopValue(storeValue(s, id)) * sellBonus(s) * marketMul(s, id)));
+  function shopSellValue(s, id, n) {
+    const cnt = n == null ? storeCount(s, id) : n;
+    return Math.max(1, Math.round(shopValue(storeValue(s, id)) * sellBonus(s) * marketMul(s, id, cnt)));
+  }
+
+  /* 走收购箱的预估到手：按当前市价、扣手续费（实际以次日结算价为准） */
+  function cropNetEstimate(s, id, n) {
+    const cnt = n == null ? storeCount(s, id) : n;
+    if (!cnt) return 0;
+    return Math.max(1, Math.round(storeValue(s, id) * sellBonus(s) * marketMul(s, id, cnt) *
+      (1 - BALANCE.market.boxFee)));
+  }
+  function fishNetEstimate(s, name, count, total) {
+    if (!count) return 0;
+    return Math.max(1, Math.round((total || 0) * sellBonus(s) * fishMarketMul(s, name, count) *
+      (1 - BALANCE.market.boxFee)));
+  }
+  /* 仓库里的作物 + 渔获全走收购箱的预估到手（界面统一用这个口径） */
+  function storeNetEstimate(s) {
+    let v = 0;
+    Object.keys(s.store || {}).forEach(function (id) {
+      if (CROPS[id] && storeCount(s, id)) v += cropNetEstimate(s, id);
+    });
+    fishGroups(s, 'fish').forEach(function (g) { v += fishNetEstimate(s, g.name, g.count, g.total); });
+    return v;
   }
 
   function sellFishGroup(s, key) {
     const g = fishGroups(s, 'fish').filter(function (x) { return x.key === key; })[0];
     if (!g) return { ok: false, msg: '仓库里没有这种鱼' };
-    const gain = Math.max(1, Math.round(shopValue(g.total) * sellBonus(s) * fishMarketMul(s, g.name)));
+    const gain = Math.max(1, Math.round(shopValue(g.total) * sellBonus(s) * fishMarketMul(s, g.name, g.count)));
     s.fishBag = s.fishBag.filter(function (e) { return fishKey(e) !== key; });
     addFishSupply(s, g.name, g.count);
     addCoins(s, gain, '卖鱼 ' + g.name);
@@ -210,7 +242,7 @@
     if (!groups.length) return { ok: false, msg: '仓库里没有鱼（杂物和宝箱要去百货店）' };
     let gain = 0, n = 0;
     groups.forEach(function (g) {
-      gain += Math.max(1, Math.round(shopValue(g.total) * sellBonus(s) * fishMarketMul(s, g.name)));
+      gain += Math.max(1, Math.round(shopValue(g.total) * sellBonus(s) * fishMarketMul(s, g.name, g.count)));
       addFishSupply(s, g.name, g.count);
       n += g.count;
     });

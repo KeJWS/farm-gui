@@ -118,12 +118,12 @@
     const quantity = ids.reduce(function (n, id) { return n + G.storeCount(state, id); }, 0) +
       fish.reduce(function (n, g) { return n + g.count; }, 0) + wormN +
       fertRows.reduce(function (n, k) { return n + (state.ferts[k] || 0); }, 0);
-    $('#store-sum').textContent = '库存估值 ' + G.storeTotal(state) + ' 金 · ' + quantity + ' 件';
+    $('#store-sum').textContent = '收购箱到手约 ' + G.storeNetEstimate(state) + ' 金 · ' + quantity + ' 件';
     const boxBtn = $('#btn-box');
     if (boxBtn) {
       const n = G.boxCount(state);
       boxBtn.textContent = '📦 收购箱' + (n ? ' (' + n + ')' : '');
-      boxBtn.title = n ? '待出货 ' + G.boxValue(state) + ' 金' : '仓库里点 📦 放货进去';
+      boxBtn.title = n ? '待出货 ' + G.boxValue(state) + ' 金（按次日市价，含 5% 费）' : '仓库里点 📦 放货进去';
     }
   }
 

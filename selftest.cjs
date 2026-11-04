@@ -159,7 +159,7 @@ ok(fishWithoutQuality, '非垃圾鱼都带品质');
 /* 卖鱼 */
 const groupsBefore = G.fishGroups(s, 'fish');
 const expectFishSale = groupsBefore.reduce((a, g) =>
-  a + Math.max(1, Math.round(G.shopValue(g.total) * G.sellBonus(s) * G.fishMarketMul(s, g.name))), 0);
+  a + Math.max(1, Math.round(G.shopValue(g.total) * G.sellBonus(s) * G.fishMarketMul(s, g.name, g.count))), 0);
 const soldAll = G.sellAllFish(s);
 ok(soldAll.ok && soldAll.income === expectFishSale && s.coins === coinsAtStart + expectFishSale && s.fishBag.every(e => G.fishIsJunk(e)),
    '全部卖鱼：按 8 折 × 市价结算，杂物和宝箱留下', { gain: soldAll.income, expect: expectFishSale });
@@ -878,7 +878,7 @@ const bp = G.fishBuyPrice('crucian', s);
 ok(G.buyFish(s, 'crucian', 1).ok && s.coins === 100 - bp && s.fishBag.length === 1 && s.fishBag[0].v === 3,
    '水产店能买鱼（基础 5 金 × 市价，价值 3）', { coins: s.coins, bag: s.fishBag.length });
 ok(!G.buyFish(s, 'trash', 1).ok, '杂物买不到');
-ok(G.fishBuyPrice('koi') === 33, '锦鲤买价 33 金（25 × 1.3）', G.fishBuyPrice('koi'));
+ok(G.fishBuyPrice('koi') === 31, '锦鲤买价 31 金（25 × 1.25）', G.fishBuyPrice('koi'));
 
 s = G.createState(); s.coins = 1e6; s.levels.fish = 7;
 while (G.buyNet(s).ok) { /* 买满 */ }
@@ -1019,7 +1019,7 @@ section('v1.7 农产品店与等级');
 G.setRng(mulberry32(77));
 let cs = G.createState();
 cs.coins = 1000;
-ok(G.cropBuyPrice('carrot') === 5 && G.cropBuyPrice('pumpkin') === 143, '农产品买价 = 售价 ×1.3',
+ok(G.cropBuyPrice('carrot') === 5 && G.cropBuyPrice('pumpkin') === 138, '农产品买价 = 售价 ×1.25',
   [G.cropBuyPrice('carrot'), G.cropBuyPrice('pumpkin')]);
 ok(G.cropBuyPrice('carrot', cs) > Math.round(G.CROPS.carrot.price * G.BALANCE.order.mult),
   '行情正常时买农产品凑委托必亏（买价 > 委托价）');
@@ -1144,17 +1144,18 @@ section('v1.9 收购箱与统计');
 G.setRng(mulberry32(99));
 let bs = G.createState(); bs.coins = 100;
 G.addStore(bs, 'carrot', 'std', 10);                       // 原价 40 金
-const mktCarrot = G.marketMul(bs, 'carrot');
-ok(G.shopSellValue(bs, 'carrot') === Math.round(32 * mktCarrot), '商店直接收购 8 折 × 市价', G.shopSellValue(bs, 'carrot'));
-const boxExpect = Math.round(40 * mktCarrot);
+const mktCarrot = G.marketMul(bs, 'carrot', 10);
+ok(G.shopSellValue(bs, 'carrot') === Math.round(32 * mktCarrot), '商店直接收购 8 折 × 批次中点市价', G.shopSellValue(bs, 'carrot'));
+const boxExpect = Math.max(1, Math.round(40 * mktCarrot * (1 - G.BALANCE.market.boxFee)));
 ok(G.boxPutCrop(bs, 'carrot').ok && G.boxCount(bs) === 1 && G.storeCount(bs, 'carrot') === 0,
   '作物整批放进收购箱');
-ok(G.boxValue(bs) === boxExpect, '收购箱按原价 × 市价估值', [G.boxValue(bs), boxExpect]);
+ok(G.boxValue(bs) === boxExpect, '收购箱按市价 ×95% 估值', [G.boxValue(bs), boxExpect]);
 
 const beforeShip = bs.coins, shipFee = G.mealFee(bs);
+const shipExpect = G.boxValue(bs);
 G.sleep(bs);
-ok(G.boxCount(bs) === 0 && bs.coins === beforeShip + boxExpect - shipFee, '睡觉时按原价结清收购箱',
-  { coins: bs.coins, expect: beforeShip + boxExpect - shipFee });
+ok(G.boxCount(bs) === 0 && bs.coins === beforeShip + shipExpect - shipFee, '睡觉时按当日市价结清收购箱（扣 5%）',
+  { coins: bs.coins, expect: beforeShip + shipExpect - shipFee });
 
 let bf = G.createState();
 bf.fishBag = [{ name: '鲫鱼', emoji: '🐟', q: 'std', v: 3, d: 1 }];
@@ -1162,8 +1163,8 @@ ok(G.boxPutFish(bf, G.fishKey(bf.fishBag[0])).ok && G.boxCount(bf) === 1 && bf.f
   '渔获也能进收购箱');
 
 const tb = G.createState(); tb.coins = 0;
-tb.box = [{ kind: 'crop', name: '萝卜', emoji: '🥕', n: 10, v: 400 }];
-ok(G.taxBase(tb) === 400, '收购箱里的货也计入税金基数', G.taxBase(tb));
+tb.box = [{ kind: 'crop', id: 'carrot', name: '萝卜', emoji: '🥕', n: 10, raw: 40 }];
+ok(G.boxValue(tb) > 0 && G.taxBase(tb) === G.boxValue(tb), '收购箱里的货按估值计入税金基数', G.taxBase(tb));
 
 let ws = G.createState(); ws.stats.dug = 50; ws.stats.works = 30;
 const unW = G.checkAchievements(ws);
@@ -1233,7 +1234,7 @@ ok(G.achPts(ab) === 7 && G.sellBonus(ab) === 1, '不足 10 点没有加成', [G.
 ab.ach.fish7 = 1;                                                                     // +5 → 12
 ok(G.achPts(ab) === 12 && Math.abs(G.sellBonus(ab) - 1.01) < 1e-9, '满 10 点 +1% 售价', G.sellBonus(ab));
 G.addStore(ab, 'carrot', 'std', 100);          // 原价 400
-ok(G.shopSellValue(ab, 'carrot') === Math.round(400 * 0.8 * 1.01 * G.marketMul(ab, 'carrot')),
+ok(G.shopSellValue(ab, 'carrot') === Math.round(400 * 0.8 * 1.01 * G.marketMul(ab, 'carrot', 100)),
   '售价加成作用于商店收购', G.shopSellValue(ab, 'carrot'));
 
 /* ---------- v2.2 维护费 / 委托优化 / 收购箱 ---------- */
@@ -1509,15 +1510,15 @@ G.addSupply(v25m, 'carrot', 100);
 ok(Math.abs(G.marketInfo(v25m, 'carrot').supply - 0.7) < 1e-9, '供给有 ×0.70 下限');
 ok(Math.abs(G.marketInfo(v25m, 'watermelon').season - 1.7) < 1e-9, '反季作物 ×1.7');
 
-/* 睡觉后销量衰减 30% */
+/* 睡觉后销量衰减 25% */
 const v25d = G.createState();
 v25d.coins = 500;
 G.addStore(v25d, 'carrot', 'std', 10);
 G.sellOne(v25d, 'carrot');
 const v25sold = v25d.market.carrot.sold;
 G.sleep(v25d);
-ok(!v25d.market.carrot || Math.abs(v25d.market.carrot.sold - v25sold * 0.7) < 1e-9,
-  '睡觉后市场销量回落 30%', v25sold);
+ok(!v25d.market.carrot || Math.abs(v25d.market.carrot.sold - v25sold * 0.75) < 1e-9,
+  '睡觉后市场销量回落 25%', v25sold);
 
 /* ---------- 5h. v2.6 渔获合并 / 鱼市价 / 长期订单提前奖励 ---------- */
 section('v2.6 渔获合并与鱼市价');
@@ -1686,7 +1687,8 @@ ok(G.marketMul(v28pl, 'chili') > G.marketMul(v28pl2, 'chili'), '反季辣椒比�
   [G.marketMul(v28pl, 'chili'), G.marketMul(v28pl2, 'chili')]);
 
 /* 商店售价整体降了 */
-ok(G.BALANCE.shop.priceMul === 1.3 && G.BALANCE.shop.cropPriceMul === 1.3, '水产店 / 农产品店进价系数 1.3');
+ok(G.BALANCE.shop.priceMul === 1.25 && G.BALANCE.shop.cropPriceMul === 1.25,
+  '水产店 / 农产品店进价系数 1.25');
 
 /* ---------- 5k. v2.9 渔夫 / 自动重布 / 委托市价溢价 ---------- */
 section('v2.9 渔夫与自动重布');
@@ -1871,9 +1873,9 @@ ok(v31ord2.reward > v31ord1.reward, '村口小摊让委托更值钱', [v31ord1.r
 /* 行情「还能卖多少」 */
 const v31h = G.createState();
 const v31h0 = G.marketHeadroom(v31h, 'carrot');
-ok(v31h0.toCalm === 8 && v31h0.toFloor === 30, '行情提示：再卖 8 件掉档、30 件到底',
+ok(v31h0.toCalm === 10 && v31h0.toFloor === 40, '行情提示：再卖 10 件掉档、40 件到底',
   [v31h0.toCalm, v31h0.toFloor]);
-G.addSupply(v31h, 'carrot', 30);
+G.addSupply(v31h, 'carrot', 40);
 ok(G.marketHeadroom(v31h, 'carrot').atFloor, '卖到底价时提示已到底');
 
 /* ---------- 5m. v2.12 价格历史 / 采集不受天气影响 ---------- */
@@ -2433,6 +2435,61 @@ section('全图鉴成就');
   });
   const ids = G.checkAchievements(c).map(function (a) { return a.id; });
   ok(ids.indexOf('codexall') >= 0, '6 种鱼 + 14 种作物能解锁「全图鉴」', ids);
+}
+
+/* ---------- 11. v2.29 市场重做 ---------- */
+section('v2.29 市场（批次中点 / 收购箱 / 买货影响供需）');
+{
+  /* 批次中点：一次卖 30 ≈ 分三次卖 10 */
+  const one = (function () {
+    const s = G.createState(); s.day = 35; s.coins = 0;
+    G.addStore(s, 'watermelon', 'std', 30);
+    return G.sellCropN(s, 'watermelon', 30).income;
+  })();
+  const three = (function () {
+    const s = G.createState(); s.day = 35; s.coins = 0;
+    G.addStore(s, 'watermelon', 'std', 30);
+    let t = 0;
+    [10, 10, 10].forEach(function (n) { t += G.sellCropN(s, 'watermelon', n).income; });
+    return t;
+  })();
+  ok(one > 0 && Math.abs(one - three) <= 3, '一次卖 30 ≈ 分三次卖 10（批次中点定价）', [one, three]);
+
+  /* 收购箱：入箱不压价，估值 = 市价 × 95% */
+  const cs = G.createState(); cs.day = 35; cs.coins = 100;
+  G.addStore(cs, 'watermelon', 'std', 10);
+  const soldBefore = G.marketInfo(cs, 'watermelon').sold;
+  const put = G.boxPutCrop(cs, 'watermelon', 10);
+  ok(put.ok && G.marketInfo(cs, 'watermelon').sold === soldBefore, '入箱不计销量（不压价）',
+    [soldBefore, G.marketInfo(cs, 'watermelon').sold]);
+  const net = Math.max(1, Math.round(10 * 140 * G.marketMul(cs, 'watermelon', 10) *
+    (1 - G.BALANCE.market.boxFee)));
+  ok(G.boxValue(cs) === net, '箱内估值 = 当时市价 × 95%', [G.boxValue(cs), net]);
+
+  /* 结算：先算钱再压价，并扣手续费 */
+  const coinsBeforeShip = cs.coins;
+  const shipValue = G.boxValue(cs);
+  G.sleep(cs);
+  ok(cs.box.length === 0 && cs.coins === coinsBeforeShip + shipValue - G.mealFee(cs),
+    '睡觉按当时市价结清并扣 5%', { coins: cs.coins, expect: coinsBeforeShip + shipValue - G.mealFee(cs) });
+
+  /* 买货影响供需：越买越贵 */
+  const bs2 = G.createState(); bs2.coins = 10000; bs2.day = 35;
+  bs2.cropShop = { day: 1, stock: { carrot: 5 } };
+  G.addSupply(bs2, 'carrot', 20);
+  const beforeBuy = G.marketMul(bs2, 'carrot');
+  const bought = G.buyCrop(bs2, 'carrot', 5);
+  ok(bought.ok && G.marketMul(bs2, 'carrot') > beforeBuy, '买货把销量往回拉（越买越贵）',
+    [beforeBuy, G.marketMul(bs2, 'carrot')]);
+
+  /* 买低卖高不成立：进价 ×1.25 vs 收购箱 ×0.95 */
+  const arb = G.createState(); arb.coins = 100000; arb.day = 35;
+  arb.cropShop = { day: 1, stock: { watermelon: 3 } };
+  const buyCost = G.cropBuyPrice('watermelon', arb) * 3;
+  G.buyCrop(arb, 'watermelon', 3);
+  const putArb = G.boxPutCrop(arb, 'watermelon', 3);
+  ok(putArb.ok && putArb.v < buyCost, '买完立刻进收购箱仍然亏（5% 手续费 + 1.25 进价）',
+    { buyCost: buyCost, box: putArb.v });
 }
 
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));
