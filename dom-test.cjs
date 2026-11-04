@@ -51,7 +51,7 @@ class El {
     return {
       clearRect() {}, fillRect() {}, beginPath() {}, moveTo() {}, lineTo() {},
       stroke() {}, fillText() {}, arc() {},
-      set fillStyle(v) {}, set strokeStyle(v) {}, set font(v) {}, set textAlign(v) {}
+      set fillStyle(v) {}, set strokeStyle(v) {}, set font(v) {}, set textAlign(v) {}, set textBaseline(v) {}, set lineWidth(v) {}
     };
   }
 }
@@ -308,6 +308,10 @@ console.log('\n== 统计图 ==');
 document.querySelector('#btn-stats').fire('click', { target: {} });
 ok(html('#modal-root').indexOf('收益统计') >= 0 && html('#modal-root').indexOf('canvas') >= 0,
    '统计弹窗能打开并含 canvas');
+ok(html('#modal-root').indexOf('日均') >= 0 && html('#modal-root').indexOf('收支趋势') >= 0,
+   '统计图显示近期日均指标和收支趋势标题');
+ok(html('#modal-root').indexOf('每日收入和支出柱状图') >= 0,
+   '统计趋势图带有辅助技术可读的说明');
 
 console.log('\n== 成就 ==');
 document.querySelector('#btn-ach').fire('click', { target: {} });
@@ -537,7 +541,10 @@ console.log('\n== 每日总结 ==');
 })();
 const sumHtml = html('#modal-root');
 ok(sumHtml.indexOf('每日总结') >= 0, '睡觉后弹出每日总结面板');
-ok(sumHtml.indexOf('今日收支') >= 0 && sumHtml.indexOf('金币') >= 0, '总结列出收支与金币变化');
+ok(sumHtml.indexOf('今日收支明细') >= 0 && sumHtml.indexOf('金币') >= 0, '总结列出收支与金币变化');
+ok(sumHtml.indexOf('现金收入') >= 0 && sumHtml.indexOf('现金支出') >= 0 && sumHtml.indexOf('入库货值') >= 0,
+   '总结用指标卡区分现金收入、支出和入库估值');
+ok(sumHtml.indexOf('余额变化率') >= 0, '总结说明余额变化率只是参考指标');
 ok(sumHtml.indexOf('今日委托') >= 0, '总结带委托状态');
 
 setTimeout(function () {

@@ -11,9 +11,15 @@
     const num = function (v) { return (v > 0 ? '+' : '') + v; };
     const cls = function (v) { return v > 0 ? 'up' : (v < 0 ? 'down' : ''); };
 
+    const cashIn = rep.cash.reduce(function (sum, x) { return sum + Math.max(0, x.value || 0); }, 0);
+    const cashOut = rep.cash.reduce(function (sum, x) { return sum + Math.max(0, -(x.value || 0)); }, 0);
+    const goodsValue = rep.goods.reduce(function (sum, x) { return sum + Math.max(0, x.value || 0); }, 0);
     const money = rep.cash.concat(rep.goods.map(function (g) {
       return { label: g.label, value: g.value, goods: true };
     }));
+    const dailyNet = rep.coins.delta;
+    const netLabel = dailyNet > 0 ? '金币净增加' : (dailyNet < 0 ? '金币净减少' : '金币持平');
+    const cashBalance = rep.coins.before > 0 ? Math.round(rep.coins.after / rep.coins.before * 100) : 0;
     const moneyHtml = money.length ? '<div class="day-list">' + money.map(function (x) {
       return '<div class="day-line' + (x.goods ? ' goods' : '') + '"><span>' + x.label +
         (x.goods ? ' <i>入库</i>' : '') + '</span><b class="' + cls(x.value) + '">' +
@@ -64,14 +70,20 @@
     openModal('📋 每日总结 · 第 ' + rep.day + ' 天',
       '<div class="day-sum-top">' +
         '<div class="dh-coin ' + cls(rep.coins.delta) + '">' + num(rep.coins.delta) + '<small> 金</small></div>' +
-        '<div class="dh-meta">' + rep.weather.emoji + ' ' + rep.weather.name + ' · ' +
-          G.seasonOf(rep.day) + '季<br><small>金币 ' + rep.coins.before + ' → <b>' + rep.coins.after + '</b></small></div>' +
+        '<div class="dh-meta"><b>' + netLabel + '</b><br>' + rep.weather.emoji + ' ' + rep.weather.name + ' · ' +
+          G.seasonOf(rep.day) + '季<br><small>金币 ' + rep.coins.before + ' → <b>' + rep.coins.after + '</b>' +
+          (cashBalance ? ' · 余额 ' + cashBalance + '%' : '') + '</small></div>' +
       '</div>' +
-      '<div class="day-sec"><h4>💰 今日收支</h4>' + moneyHtml + '</div>' +
+      '<div class="day-kpis">' +
+        '<div class="day-kpi"><span>现金收入</span><b class="up">+' + cashIn + '</b><small>金</small></div>' +
+        '<div class="day-kpi"><span>现金支出</span><b class="down">-' + cashOut + '</b><small>金</small></div>' +
+        '<div class="day-kpi"><span>入库货值</span><b>+' + goodsValue + '</b><small>金（估值）</small></div>' +
+      '</div>' +
+      '<div class="day-sec"><h4>💰 今日收支明细</h4>' + moneyHtml + '</div>' +
       sec('🌾 农场', farm) + sec('🌳 果园', orchard) + sec('🐟 渔获', fish) + sec('📋 委托', orders) +
       (rep.tomorrow.length ? '<div class="day-sec"><h4>☀️ 明天</h4><ul class="day-todo">' +
         rep.tomorrow.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ul></div>' : '') +
-      '<div class="shop-tip">硬件自动收获 / 补种 / 浇水都算在这里；「入库」是收进仓库的货值，不是现金。</div>',
+      '<div class="shop-tip">现金收支会改变金币；「入库货值」是收进仓库的估值，不是现金。余额变化率仅供快速参考。</div>',
       '<button class="btn primary" data-close>开始新的一天</button>');
   }
 

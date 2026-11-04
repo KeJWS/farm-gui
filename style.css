@@ -623,6 +623,27 @@ button{ font-family:inherit; }
 .day-line b.down{ color:var(--red); }
 .day-empty{ font-size:11.5px; color:var(--ink-3); font-weight:700; padding:2px 0; }
 .day-todo{ margin:0; padding-left:18px; font-size:12.5px; font-weight:700; color:var(--ink-2); line-height:1.8; }
+.day-kpis{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:12px; }
+.day-kpi{ display:flex; align-items:baseline; flex-wrap:wrap; gap:3px 5px; padding:9px 10px; border-radius:11px;
+  border:1px solid var(--line); background:var(--card); min-width:0; }
+.day-kpi span{ width:100%; color:var(--ink-3); font-size:10.5px; font-weight:800; }
+.day-kpi b{ font-size:18px; line-height:1.15; font-variant-numeric:tabular-nums; }
+.day-kpi b.up{ color:var(--green-d); } .day-kpi b.down{ color:var(--red); }
+.day-kpi small{ color:var(--ink-3); font-size:9.5px; font-weight:700; }
+.stat-kpis{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; margin:0 0 12px; }
+.stat-kpi{ display:flex; flex-direction:column; gap:3px; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--card); }
+.stat-kpi span{ font-size:10.5px; font-weight:800; color:var(--ink-3); }
+.stat-kpi b{ font-size:19px; line-height:1.2; font-variant-numeric:tabular-nums; }
+.stat-kpi small{ color:var(--ink-3); font-size:10px; font-weight:700; }
+.stat-chart-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin:8px 1px 5px; font-size:12px; }
+.stat-chart-head>b{ font-size:12px; }
+.stat-chart-head>span{ color:var(--ink-3); font-size:10px; font-weight:700; white-space:nowrap; }
+.stat-chart-head i{ display:inline-block; width:8px; height:8px; border-radius:3px; margin:0 3px 0 7px; }
+.stat-chart-head .legend-in{ background:#4a9b5b; } .stat-chart-head .legend-out{ background:#d46a5f; }
+.stat-chart-foot{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; color:var(--ink-3); font-size:10px; font-weight:700; }
+.stat-chart-foot b{ color:var(--green-d); }
+@media(max-width:520px){ .day-kpis{ gap:5px; } .day-kpi{ padding:7px; } .day-kpi b{ font-size:15px; } .stat-kpis{ gap:5px; }
+  .stat-kpi{ padding:8px; } .stat-kpi b{ font-size:16px; } .stat-chart-head{ align-items:flex-start; flex-direction:column; gap:3px; } }
 
 /* ---------------- 果园 ---------------- */
 

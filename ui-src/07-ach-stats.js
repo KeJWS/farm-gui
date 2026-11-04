@@ -141,9 +141,13 @@
 
   function statsModal() {
     const days = G.ledgerByDay(state).slice().reverse().slice(-30);
+    const dayCount = days.length;
     const inc = days.reduce(function (a, d) { return a + d.income; }, 0);
     const exp = days.reduce(function (a, d) { return a + d.expense; }, 0);
     const net = inc - exp;
+    const netPerDay = dayCount ? Math.round(net / dayCount) : 0;
+    const avgIncome = dayCount ? Math.round(inc / dayCount) : 0;
+    const avgExpense = dayCount ? Math.round(exp / dayCount) : 0;
     const best = days.slice().sort(function (a, b) {
       return (b.income - b.expense) - (a.income - a.expense);
     })[0];
@@ -176,14 +180,18 @@
         '</span>';
     }).join('') + '</div>';
     openModal('📈 收益统计',
-      '<div class="codex-stat" style="grid-template-columns:repeat(3,1fr)">' +
-        '<div><b>' + inc + '</b><span>总收入</span></div>' +
-        '<div><b>' + exp + '</b><span>总支出</span></div>' +
-        '<div><b>' + (net >= 0 ? '+' : '') + net + '</b><span>净收益</span></div>' +
+      '<div class="stat-kpis">' +
+        '<div class="stat-kpi"><span>收入</span><b class="cat-in">+' + inc + '</b><small>日均 +' + avgIncome + '</small></div>' +
+        '<div class="stat-kpi"><span>支出</span><b class="cat-out">-' + exp + '</b><small>日均 -' + avgExpense + '</small></div>' +
+        '<div class="stat-kpi"><span>净收益</span><b class="' + (net >= 0 ? 'cat-in' : 'cat-out') + '">' +
+          (net >= 0 ? '+' : '') + net + '</b><small>日均 ' + (netPerDay >= 0 ? '+' : '') + netPerDay + '</small></div>' +
       '</div>' +
-      '<canvas id="stat-canvas" width="640" height="220"></canvas>' + catHtml +
-      '<div class="shop-tip">最近 ' + days.length + ' 天 · 绿=收入、红=支出' +
-        (best ? ' · 最赚的一天 D' + best.day + '（' + (best.income - best.expense) + ' 金）' : '') + '</div>',
+      '<div class="stat-chart-head"><b>近 ' + days.length + ' 天收支趋势</b><span><i class="legend-in"></i>收入 <i class="legend-out"></i>支出</span></div>' +
+      '<canvas id="stat-canvas" width="720" height="250" role="img" aria-label="最近 ' + days.length + ' 天每日收入和支出柱状图"></canvas>' +
+      '<div class="stat-chart-foot"><span>柱高表示每日金额；鼠标悬停可查看具体数值</span>' +
+        (best ? '<b>最佳 D' + best.day + ' · +' + (best.income - best.expense) + ' 金</b>' : '') + '</div>' + catHtml +
+      '<div class="shop-tip">按账本统计最近 ' + days.length + ' 天；收入 / 支出分别汇总，净收益 = 收入 - 支出。' +
+        '未发生交易的日期不会显示为零值。</div>',
       '<button class="btn" data-close>关闭</button>');
     setTimeout(function () { drawChart(days); }, 0);
   }
@@ -192,28 +200,63 @@
     const cv = document.getElementById('stat-canvas');
     if (!cv) return;
     const ctx = cv.getContext('2d');
-    const W = cv.width, H = cv.height, pad = 22;
+    if (!ctx) return;
+    const W = cv.width, H = cv.height;
+    const compact = days.length > 14;
+    const pad = { l: 44, r: 12, t: 14, b: 30 };
+    const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
+    const scale = window.devicePixelRatio || 1;
+    const dark = document.documentElement.dataset.theme === 'dark';
+    const grid = dark ? '#353b43' : '#e8e1d4';
+    const ink = dark ? '#a8a294' : '#817b70';
+    const incomeColor = dark ? '#70c783' : '#4a9b5b';
+    const expenseColor = dark ? '#ed8179' : '#d46a5f';
     ctx.clearRect(0, 0, W, H);
     let max = 1;
-    days.forEach(function (d) { max = Math.max(max, d.income, d.expense); });
-    const bw = (W - pad * 2) / Math.max(1, days.length);
-    const mid = H / 2 + 6;
+    days.forEach(function (d) { max = Math.max(max, d.income || 0, d.expense || 0); });
+    const niceMax = Math.pow(10, Math.ceil(Math.log(max) / Math.LN10));
+    const step = niceMax / 4;
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++) {
+      const v = step * i, y = pad.t + plotH - plotH * (v / niceMax);
+      ctx.strokeStyle = grid; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+      ctx.fillStyle = ink;
+      ctx.fillText(v >= 1000 ? (v / 1000) + 'k' : String(v), pad.l - 7, y);
+    }
+    const slot = plotW / Math.max(1, days.length);
+    const gap = Math.min(compact ? 3 : 8, slot * 0.16);
+    const barW = Math.max(1, (slot - gap * 2) / 2);
+    const maxLabels = compact ? 6 : 15;
+    const labelEvery = Math.max(1, Math.ceil(days.length / maxLabels));
     days.forEach(function (d, i) {
-      const x = pad + i * bw + bw * 0.15, w = bw * 0.7;
-      const ih = (d.income / max) * (H / 2 - pad);
-      const eh = (d.expense / max) * (H / 2 - pad);
-      ctx.fillStyle = '#5fb36f';
-      ctx.fillRect(x, mid - ih, w, ih);
-      ctx.fillStyle = '#d9786b';
-      ctx.fillRect(x, mid, w, eh);
-      ctx.fillStyle = '#8a8578';
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('D' + d.day, x + w / 2, H - 6);
+      const groupX = pad.l + i * slot;
+      const ih = Math.max(0, plotH * ((d.income || 0) / niceMax));
+      const eh = Math.max(0, plotH * ((d.expense || 0) / niceMax));
+      const ix = groupX + gap, ex = ix + barW + gap;
+      ctx.fillStyle = incomeColor;
+      if (ih > 0) ctx.fillRect(ix, pad.t + plotH - ih, barW, ih);
+      ctx.fillStyle = expenseColor;
+      if (eh > 0) ctx.fillRect(ex, pad.t + plotH - eh, barW, eh);
+      const showLabel = (i % labelEvery === 0) || i === days.length - 1;
+      if (showLabel) {
+        ctx.fillStyle = ink; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('D' + d.day, groupX + slot / 2, H - 12);
+      }
+      d._chartHit = { x: groupX, width: slot, income: d.income || 0, expense: d.expense || 0 };
     });
-    ctx.strokeStyle = 'rgba(138,133,120,.45)';
-    ctx.beginPath();
-    ctx.moveTo(pad, mid);
-    ctx.lineTo(W - pad, mid);
-    ctx.stroke();
+    cv._chartDays = days;
+    cv._chartScale = scale;
+    cv.onmousemove = function (ev) {
+      if (!cv.getBoundingClientRect || !ev) return;
+      const rect = cv.getBoundingClientRect();
+      const x = (ev.clientX - rect.left) * W / Math.max(1, rect.width);
+      const row = days.find(function (d) { return d._chartHit && x >= d._chartHit.x && x <= d._chartHit.x + d._chartHit.width; });
+      if (row) cv.title = 'D' + row.day + ' · 收入 +' + row._chartHit.income + ' 金 · 支出 -' + row._chartHit.expense + ' 金 · 净收益 ' + (row._chartHit.income - row._chartHit.expense) + ' 金';
+    };
+    cv.onmouseleave = function () { cv.title = '柱高表示每日收入和支出；将鼠标移到柱形上查看具体数值'; };
+    cv.title = '柱高表示每日收入和支出；将鼠标移到柱形上查看具体数值';
+    if (cv.setAttribute) cv.setAttribute('data-chart-ready', 'true');
   }
