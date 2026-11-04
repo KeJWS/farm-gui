@@ -653,6 +653,7 @@
     $('#btn-box').addEventListener('click', boxModal);
     $('#btn-status').addEventListener('click', statusModal);
     $('#btn-codex').addEventListener('click', codexModal);
+    $('#btn-profile').addEventListener('click', profileModal);
     $('#btn-ach').addEventListener('click', achModal);
     const mktBtn = $('#btn-market');
     if (mktBtn) mktBtn.addEventListener('click', marketModal);

@@ -780,6 +780,16 @@
                waterEnergy: 1, harvestEnergy: 1,
                grow: { seed: { days: 90, water: 30 }, sapling: { days: 30, water: 15 } },
                slotCosts: [600, 1000, 1600, 2400, 3200] },
+    /* 经营档案：按净资产给的称号 */
+    profile: {
+      ranks: [
+        { need: 0,      name: '小农户',   emoji: '🌱' },
+        { need: 2000,   name: '家庭农场', emoji: '🏡' },
+        { need: 10000,  name: '种植大户', emoji: '🚜' },
+        { need: 50000,  name: '庄园主',   emoji: '🏰' },
+        { need: 200000, name: '农业大亨', emoji: '👑' }
+      ]
+    },
     /* 图鉴奖励：收集到 need 种鱼 / 作物时自动发一次奖励（按 id 记一次，不可重复领）。
      * 鱼只算 6 种正经鱼（杂物和宝箱不进图鉴），作物算上架的全部 14 种。 */
     codex: {
@@ -1491,6 +1501,7 @@
       fishBook: { count: 0, entries: [], best: null, priciest: null },
       stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0,
                longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0,
+               incomeTotal: 0, expenseTotal: 0,
                wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }
     };
     TREE_LIST.forEach(function (t) {
@@ -1516,8 +1527,50 @@
 
   function addCoins(s, amount, label) {
     s.coins += amount;
-    if (amount >= 0) ledger(s, label, amount, 0);
-    else ledger(s, label, 0, -amount);
+    s.stats = s.stats || {};
+    if (amount >= 0) {
+      s.stats.incomeTotal = (s.stats.incomeTotal || 0) + amount;
+      ledger(s, label, amount, 0);
+    } else {
+      s.stats.expenseTotal = (s.stats.expenseTotal || 0) - amount;
+      ledger(s, label, 0, -amount);
+    }
+  }
+
+  /* ---------------- 经营档案 ---------------- */
+
+  /* 设备 / 果树的账面价值（按买入价折算，不折旧） */
+  function deviceValue(s) {
+    return (s.sprinklers || 0) * BALANCE.device.sprinkler +
+           (s.harvester ? BALANCE.device.harvester : 0) +
+           (s.seeder || 0) * BALANCE.device.seeder +
+           (s.nets || 0) * BALANCE.device.net;
+  }
+  function orchardValue(s) {
+    let v = 0;
+    ((s.orchard && s.orchard.slots) || []).forEach(function (t) {
+      if (t && TREES[t.id]) v += TREES[t.id].sapling;
+    });
+    return v;
+  }
+  /* 净资产 = 现金 + 仓库（收购箱到手口径）+ 收购箱 + 设备 + 果园 */
+  function netWorth(s) {
+    const coins = Math.max(0, Math.round(s.coins || 0));
+    const store = storeTotal(s);
+    const box = boxValue(s);
+    const device = deviceValue(s);
+    const orchard = orchardValue(s);
+    return { coins: coins, store: store, box: box, device: device, orchard: orchard,
+             total: coins + store + box + device + orchard };
+  }
+  /* 称号：按净资产取最高一档，并给出下一档目标 */
+  function profileRank(s) {
+    const R = BALANCE.profile.ranks;
+    const worth = netWorth(s).total;
+    let cur = R[0];
+    R.forEach(function (x) { if (worth >= x.need) cur = x; });
+    const next = R.filter(function (x) { return x.need > worth; })[0] || null;
+    return { cur: cur, next: next, worth: worth };
   }
 
   /* 零工单价：体力 1 点 = 2 金（全天）/ 1.2 金（半天） */
@@ -4432,7 +4485,14 @@
     merged.fishBook.count = Math.round(num(merged.fishBook.count, 0, 0, 1e9));
     merged.fishBook.best = safeBookTop(merged.fishBook.best, merged.day);
     merged.fishBook.priciest = safeBookTop(merged.fishBook.priciest, merged.day);
-    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0, wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }, s.stats || {});
+    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0, incomeTotal: 0, expenseTotal: 0, wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }, s.stats || {});
+    // 老存档没有累计收支：用现有账本（最多 200 笔）估算，之后由 addCoins 继续累加
+    if (s.stats == null || s.stats.incomeTotal == null) {
+      merged.stats.incomeTotal = (s.ledger || []).reduce(function (n, r) { return n + (r.income || 0); }, 0);
+      merged.stats.expenseTotal = (s.ledger || []).reduce(function (n, r) { return n + (r.expense || 0); }, 0);
+    }
+    merged.stats.incomeTotal = Math.round(num(merged.stats.incomeTotal, 0, 0, 1e12));
+    merged.stats.expenseTotal = Math.round(num(merged.stats.expenseTotal, 0, 0, 1e12));
     merged.stats.wild = Object.assign({}, (s.stats && s.stats.wild) || {});
     Object.keys(merged.stats.wild).forEach(function (id) {
       if (!CROPS[id] || !CROPS[id].wild) { delete merged.stats.wild[id]; return; }
@@ -4784,6 +4844,8 @@
     ledgerByDay: ledgerByDay, logByDay: logByDay, ledgerByCategory: ledgerByCategory, LEDGER_CATS: LEDGER_CATS,
     makeOrders: makeOrders, deliverOrder: deliverOrder, orderHave: orderHave, orderPool: orderPool,
     mealFee: mealFee, expandCost: expandCost, upgradeCost: upgradeCost,
+    netWorth: netWorth, profileRank: profileRank, deviceValue: deviceValue, orchardValue: orchardValue,
+    addCoins: addCoins, log: log,
     WORK_RATE_FULL: WORK_RATE_FULL, WORK_RATE_HALF: WORK_RATE_HALF,
     workCost: workCost, workPay: workPay, needOf: needOf, expectedYield: expectedYield,
     canHarvest: canHarvest, stageEmoji: stageEmoji, fertBonus: fertBonus, baitCount: baitCount,

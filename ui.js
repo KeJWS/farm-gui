@@ -2751,6 +2751,101 @@
       '<button class="btn" data-close>关闭</button>');
   }
 
+  /* ---------------- 经营档案 ---------------- */
+
+  function profileModal() {
+    const w = G.netWorth(state);
+    const rank = G.profileRank(state);
+    const st = state.stats || {};
+    const inc = st.incomeTotal || 0;
+    const exp = st.expenseTotal || 0;
+    const net = inc - exp;
+    const days = Math.max(1, state.day || 1);
+    const perDay = Math.round(net / days);
+    const byDay = G.ledgerByDay(state);
+    const best = byDay.slice().sort(function (a, b) {
+      return (b.income - b.expense) - (a.income - a.expense);
+    })[0];
+
+    const bar = function (name, value, max) {
+      return '<div class="stat-bar">' +
+        '<span class="sb-n">' + name + '</span>' +
+        '<span class="sb-t"><i class="in" style="width:' + Math.max(2, Math.round(value / max * 100)) + '%"></i></span>' +
+        '<b>' + value + '</b>' +
+      '</div>';
+    };
+
+    const parts = [
+      ['💰 现金', w.coins], ['🧺 仓库', w.store], ['📦 收购箱', w.box],
+      ['🔧 设备', w.device], ['🍑 果园', w.orchard]
+    ].filter(function (p) { return p[1] > 0; });
+    const maxPart = Math.max(1, parts.reduce(function (m, p) { return Math.max(m, p[1]); }, 0));
+    const partBars = parts.map(function (p) { return bar(p[0], p[1], maxPart); }).join('') ||
+      '<div class="store-empty">身上什么都没有</div>';
+
+    /* 全程收入构成：账本最多保留 200 笔，这里按剩余账本 + 累计值说明 */
+    const cat = G.ledgerByCategory(state, days);
+    const maxCat = Math.max(1, cat.list.reduce(function (m, c) { return Math.max(m, Math.abs(c.total)); }, 0));
+    const catBars = cat.list.map(function (c) {
+      const v = Math.abs(c.total);
+      return '<div class="stat-bar">' +
+        '<span class="sb-n">' + c.name + '</span>' +
+        '<span class="sb-t"><i class="' + (c.total > 0 ? 'in' : 'out') + '" style="width:' +
+          Math.max(2, Math.round(v / maxCat * 100)) + '%"></i></span>' +
+        '<b class="' + (c.total > 0 ? 'up' : 'down') + '">' + (c.total > 0 ? '+' : '−') + v + '</b>' +
+      '</div>';
+    }).join('') || '<div class="store-empty">还没有账目</div>';
+
+    const fx = (state.codex && state.codex.fish) || {};
+    const cx = (state.codex && state.codex.crops) || {};
+    const species = G.FISH.filter(function (f) { return !f.trash && !f.chest; });
+    const fishGot = species.filter(function (f) { return fx[f.id] && fx[f.id].n > 0; }).length;
+    const cropGot = G.CROP_LIST.filter(function (c) { return cx[c.id] && cx[c.id].n > 0; }).length;
+    const fruitGot = G.FRUIT_LIST.filter(function (c) { return cx[c.id] && cx[c.id].n > 0; }).length;
+    const achs = G.achInfo(state);
+    const done = achs.filter(function (a) { return a.done; }).length;
+    const lv = state.levels || {};
+    const topLv = Math.max(lv.farm || 1, lv.fish || 1, lv.dig || 1, lv.forage || 1, lv.trade || 1);
+
+    const body =
+      '<div class="profile-head">' +
+        '<span class="profile-rank">' + rank.cur.emoji + '</span>' +
+        '<div class="profile-title"><b>' + rank.cur.name + '</b>' +
+          '<small>第 ' + state.day + ' 天 · ' + G.seasonOf(state.day) + '季 · ' +
+          state.plots.length + ' 块地</small></div>' +
+        '<div class="profile-worth"><small>净资产</small><b>' + w.total + '</b><small>金</small></div>' +
+      '</div>' +
+      '<div class="stat-kpis">' +
+        '<div class="stat-kpi"><span>累计收入</span><b class="up">+' + inc + '</b><small>日均 +' +
+          Math.round(inc / days) + '</small></div>' +
+        '<div class="stat-kpi"><span>累计支出</span><b class="down">−' + exp + '</b><small>日均 −' +
+          Math.round(exp / days) + '</small></div>' +
+        '<div class="stat-kpi"><span>累计净收益</span><b class="' + (net >= 0 ? 'up' : 'down') + '">' +
+          (net >= 0 ? '+' : '−') + Math.abs(net) + '</b><small>日均 ' + (perDay >= 0 ? '+' : '−') +
+          Math.abs(perDay) + '</small></div>' +
+        '<div class="stat-kpi"><span>经营天数</span><b>' + state.day + '</b><small>' +
+          (best ? '最佳 D' + best.day + ' +' + (best.income - best.expense) : '还没有账目') + '</small></div>' +
+      '</div>' +
+      '<div class="stat-sec"><h4>💰 资产构成 · 合计 ' + w.total + ' 金</h4>' + partBars + '</div>' +
+      '<div class="stat-sec"><h4>📈 收入构成</h4>' + catBars + '</div>' +
+      '<div class="stat-sec"><h4>🏅 经营进度</h4><dl class="kv">' +
+        '<dt>成就</dt><dd>' + done + ' / ' + achs.length + '</dd>' +
+        '<dt>图鉴</dt><dd>🐟 ' + fishGot + '/' + species.length + ' · 🌱 ' + cropGot + '/' +
+          G.CROP_LIST.length + ' · 🍑 ' + fruitGot + '/' + G.FRUIT_LIST.length + '</dd>' +
+        '<dt>最高等级</dt><dd>Lv' + topLv + ' / ' + G.BALANCE.level.max + '</dd>' +
+        '<dt>完成委托</dt><dd>' + (st.orders || 0) + ' 单 · 累计收获 ' + (st.harvests || 0) +
+          ' 次 · 钓鱼 ' + (st.casts || 0) + ' 次</dd>' +
+        '<dt>累计种树</dt><dd>' + (st.orchardPlanted || 0) + ' 棵 · 收果 ' + (st.orchardFruit || 0) + ' 个</dd>' +
+      '</dl></div>' +
+      '<div class="stat-tip">' +
+        (rank.next
+          ? '再攒 <b>' + (rank.next.need - w.total) + '</b> 金净资产 → ' + rank.next.emoji + ' ' + rank.next.name
+          : '已经是最高称号 ' + rank.cur.emoji + ' ' + rank.cur.name) +
+        '。累计收支从本版本开始精确累计，老存档按剩余账本估算。</div>';
+
+    openModal('🗂️ 经营档案', body, '<button class="btn" data-close>关闭</button>');
+  }
+
   function statusModal() {
     const lv = state.levels || { farm: 1, fish: 1, farmXp: 0, fishXp: 0 };
     const nextTax = G.BALANCE.tax.every - (state.day % G.BALANCE.tax.every);
@@ -3875,6 +3970,7 @@
     $('#btn-box').addEventListener('click', boxModal);
     $('#btn-status').addEventListener('click', statusModal);
     $('#btn-codex').addEventListener('click', codexModal);
+    $('#btn-profile').addEventListener('click', profileModal);
     $('#btn-ach').addEventListener('click', achModal);
     const mktBtn = $('#btn-market');
     if (mktBtn) mktBtn.addEventListener('click', marketModal);

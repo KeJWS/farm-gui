@@ -177,7 +177,14 @@
     merged.fishBook.count = Math.round(num(merged.fishBook.count, 0, 0, 1e9));
     merged.fishBook.best = safeBookTop(merged.fishBook.best, merged.day);
     merged.fishBook.priciest = safeBookTop(merged.fishBook.priciest, merged.day);
-    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0, wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }, s.stats || {});
+    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0, incomeTotal: 0, expenseTotal: 0, wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }, s.stats || {});
+    // 老存档没有累计收支：用现有账本（最多 200 笔）估算，之后由 addCoins 继续累加
+    if (s.stats == null || s.stats.incomeTotal == null) {
+      merged.stats.incomeTotal = (s.ledger || []).reduce(function (n, r) { return n + (r.income || 0); }, 0);
+      merged.stats.expenseTotal = (s.ledger || []).reduce(function (n, r) { return n + (r.expense || 0); }, 0);
+    }
+    merged.stats.incomeTotal = Math.round(num(merged.stats.incomeTotal, 0, 0, 1e12));
+    merged.stats.expenseTotal = Math.round(num(merged.stats.expenseTotal, 0, 0, 1e12));
     merged.stats.wild = Object.assign({}, (s.stats && s.stats.wild) || {});
     Object.keys(merged.stats.wild).forEach(function (id) {
       if (!CROPS[id] || !CROPS[id].wild) { delete merged.stats.wild[id]; return; }
@@ -529,6 +536,8 @@
     ledgerByDay: ledgerByDay, logByDay: logByDay, ledgerByCategory: ledgerByCategory, LEDGER_CATS: LEDGER_CATS,
     makeOrders: makeOrders, deliverOrder: deliverOrder, orderHave: orderHave, orderPool: orderPool,
     mealFee: mealFee, expandCost: expandCost, upgradeCost: upgradeCost,
+    netWorth: netWorth, profileRank: profileRank, deviceValue: deviceValue, orchardValue: orchardValue,
+    addCoins: addCoins, log: log,
     WORK_RATE_FULL: WORK_RATE_FULL, WORK_RATE_HALF: WORK_RATE_HALF,
     workCost: workCost, workPay: workPay, needOf: needOf, expectedYield: expectedYield,
     canHarvest: canHarvest, stageEmoji: stageEmoji, fertBonus: fertBonus, baitCount: baitCount,

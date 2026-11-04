@@ -93,6 +93,16 @@
                waterEnergy: 1, harvestEnergy: 1,
                grow: { seed: { days: 90, water: 30 }, sapling: { days: 30, water: 15 } },
                slotCosts: [600, 1000, 1600, 2400, 3200] },
+    /* 经营档案：按净资产给的称号 */
+    profile: {
+      ranks: [
+        { need: 0,      name: '小农户',   emoji: '🌱' },
+        { need: 2000,   name: '家庭农场', emoji: '🏡' },
+        { need: 10000,  name: '种植大户', emoji: '🚜' },
+        { need: 50000,  name: '庄园主',   emoji: '🏰' },
+        { need: 200000, name: '农业大亨', emoji: '👑' }
+      ]
+    },
     /* 图鉴奖励：收集到 need 种鱼 / 作物时自动发一次奖励（按 id 记一次，不可重复领）。
      * 鱼只算 6 种正经鱼（杂物和宝箱不进图鉴），作物算上架的全部 14 种。 */
     codex: {

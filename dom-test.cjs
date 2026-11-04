@@ -353,6 +353,15 @@ ok(html('#modal-root').indexOf('每日收入和支出柱状图') >= 0,
 ok(html('#modal-root').indexOf('收入 / 支出构成') >= 0 && html('#modal-root').indexOf('stat-bar') >= 0,
    '统计弹窗含按活动的收益构成');
 
+console.log('\n== 经营档案 ==');
+ok(indexSource.indexOf('id="btn-profile"') >= 0, '顶栏有经营档案入口');
+document.querySelector('#btn-profile').fire('click', { target: {} });
+const pfHtml = html('#modal-root');
+ok(pfHtml.indexOf('经营档案') >= 0 && pfHtml.indexOf('净资产') >= 0, '经营档案能打开并显示净资产');
+ok(pfHtml.indexOf('资产构成') >= 0 && pfHtml.indexOf('收入构成') >= 0, '经营档案含资产 / 收入构成');
+ok(pfHtml.indexOf('profile-rank') >= 0 && pfHtml.indexOf('经营进度') >= 0,
+   '经营档案含称号徽章与经营进度');
+
 console.log('\n== 成就 ==');
 document.querySelector('#btn-ach').fire('click', { target: {} });
 ok(html('#modal-root').indexOf('成就') >= 0 && html('#modal-root').indexOf('第一筐菜') >= 0,

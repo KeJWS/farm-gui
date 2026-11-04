@@ -1034,3 +1034,15 @@ button{ color:inherit; font:inherit; }
   .stat-bar .sb-n{ width:82px; }
   .stat-bar b{ width:62px; }
 }
+
+/* ---------- 经营档案 ---------- */
+.profile-head{ display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:12px;
+  border-radius:16px; border:1px solid var(--line);
+  background:linear-gradient(135deg, rgba(79,156,95,.14), rgba(217,163,43,.12)); }
+.profile-rank{ font-size:34px; line-height:1; flex:none; }
+.profile-title{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.profile-title b{ font-size:16px; }
+.profile-title small{ font-size:11.5px; color:var(--ink-3); font-weight:600; }
+.profile-worth{ flex:none; display:flex; align-items:baseline; gap:4px; }
+.profile-worth b{ font-size:20px; font-weight:900; color:var(--gold); }
+.profile-worth small{ font-size:10.5px; color:var(--ink-3); font-weight:700; }

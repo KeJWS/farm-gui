@@ -97,6 +97,7 @@
       fishBook: { count: 0, entries: [], best: null, priciest: null },
       stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0,
                longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0,
+               incomeTotal: 0, expenseTotal: 0,
                wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }
     };
     TREE_LIST.forEach(function (t) {
@@ -122,8 +123,50 @@
 
   function addCoins(s, amount, label) {
     s.coins += amount;
-    if (amount >= 0) ledger(s, label, amount, 0);
-    else ledger(s, label, 0, -amount);
+    s.stats = s.stats || {};
+    if (amount >= 0) {
+      s.stats.incomeTotal = (s.stats.incomeTotal || 0) + amount;
+      ledger(s, label, amount, 0);
+    } else {
+      s.stats.expenseTotal = (s.stats.expenseTotal || 0) - amount;
+      ledger(s, label, 0, -amount);
+    }
+  }
+
+  /* ---------------- 经营档案 ---------------- */
+
+  /* 设备 / 果树的账面价值（按买入价折算，不折旧） */
+  function deviceValue(s) {
+    return (s.sprinklers || 0) * BALANCE.device.sprinkler +
+           (s.harvester ? BALANCE.device.harvester : 0) +
+           (s.seeder || 0) * BALANCE.device.seeder +
+           (s.nets || 0) * BALANCE.device.net;
+  }
+  function orchardValue(s) {
+    let v = 0;
+    ((s.orchard && s.orchard.slots) || []).forEach(function (t) {
+      if (t && TREES[t.id]) v += TREES[t.id].sapling;
+    });
+    return v;
+  }
+  /* 净资产 = 现金 + 仓库（收购箱到手口径）+ 收购箱 + 设备 + 果园 */
+  function netWorth(s) {
+    const coins = Math.max(0, Math.round(s.coins || 0));
+    const store = storeTotal(s);
+    const box = boxValue(s);
+    const device = deviceValue(s);
+    const orchard = orchardValue(s);
+    return { coins: coins, store: store, box: box, device: device, orchard: orchard,
+             total: coins + store + box + device + orchard };
+  }
+  /* 称号：按净资产取最高一档，并给出下一档目标 */
+  function profileRank(s) {
+    const R = BALANCE.profile.ranks;
+    const worth = netWorth(s).total;
+    let cur = R[0];
+    R.forEach(function (x) { if (worth >= x.need) cur = x; });
+    const next = R.filter(function (x) { return x.need > worth; })[0] || null;
+    return { cur: cur, next: next, worth: worth };
   }
 
   /* 零工单价：体力 1 点 = 2 金（全天）/ 1.2 金（半天） */

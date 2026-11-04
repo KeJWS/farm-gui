@@ -2588,5 +2588,33 @@ section('账本分类（近 30 天收益）');
   ok(by.fish === 20, '窗口外的旧账不计入', by.fish);
 }
 
+/* ---------- 15. 经营档案 ---------- */
+section('经营档案（净资产 / 称号 / 累计收支）');
+{
+  const s = G.createState();
+  s.coins = 1000;
+  G.addStore(s, 'carrot', 'std', 10);
+  s.sprinklers = 2;
+  const w = G.netWorth(s);
+  ok(w.coins === 1000 && w.device === 2 * G.BALANCE.device.sprinkler, '净资产含现金与设备', w);
+  ok(w.total === w.coins + w.store + w.box + w.device + w.orchard, '净资产 = 各项之和', w);
+
+  G.addCoins(s, 100, '测试收入');
+  G.addCoins(s, -40, '测试支出');
+  ok(s.stats.incomeTotal === 100 && s.stats.expenseTotal === 40, '累计收支随 addCoins 累加',
+    [s.stats.incomeTotal, s.stats.expenseTotal]);
+
+  const r = G.profileRank(s);
+  ok(!!r.cur && !!r.next, '称号给出当前档与下一档', r);
+
+  s.coins = 300000;
+  const top = G.BALANCE.profile.ranks[G.BALANCE.profile.ranks.length - 1];
+  const r2 = G.profileRank(s);
+  ok(r2.next === null && r2.cur.name === top.name, '最高净资产拿到最高称号', r2.cur);
+
+  const round = G.deserialize(G.serialize(s));
+  ok(round.stats.incomeTotal === s.stats.incomeTotal, '累计收支随存档保存', round.stats.incomeTotal);
+}
+
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));
 process.exit(fail ? 1 : 0);
