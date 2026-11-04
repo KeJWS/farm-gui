@@ -34,6 +34,13 @@ class El {
     this.disabled = false;
     this.files = [];
     this._listeners = {};
+    this._ctx = null;
+    if (sel === 'canvas') {
+      this.width = 300;
+      this.height = 150;
+      this.toDataURL = function () { return 'data:image/png;base64,STUB'; };
+      this.toBlob = function (cb) { cb(null); };
+    }
   }
   get innerHTML() { return this._html; }
   set innerHTML(v) { this._html = String(v); }
@@ -48,12 +55,27 @@ class El {
   querySelectorAll() { return []; }
   matches() { return false; }
   getContext() {
-    return {
-      clearRect() {}, fillRect() {}, beginPath() {}, moveTo() {}, lineTo() {},
-      stroke() {}, fillText() {}, arc() {},
-      set fillStyle(v) {}, set strokeStyle(v) {}, set font(v) {}, set textAlign(v) {}, set textBaseline(v) {}, set lineWidth(v) {}
-    };
+    if (!this._ctx) this._ctx = ctxStub();
+    return this._ctx;
   }
+}
+
+/* 记录型 canvas 2d 上下文：够画图表和分享名片，不真的画 */
+function ctxStub() {
+  const grad = { addColorStop() {} };
+  const ctx = {
+    canvas: null, fillStyle: '', strokeStyle: '', lineWidth: 1, font: '',
+    textAlign: 'left', textBaseline: 'alphabetic', globalAlpha: 1,
+    shadowColor: '', shadowBlur: 0, shadowOffsetX: 0, shadowOffsetY: 0,
+    save() {}, restore() {}, scale() {}, translate() {}, rotate() {},
+    beginPath() {}, closePath() {}, moveTo() {}, lineTo() {}, arcTo() {}, arc() {},
+    rect() {}, fill() {}, stroke() {}, fillRect() {}, strokeRect() {}, clearRect() {},
+    fillText() {}, strokeText() {}, setLineDash() {},
+    measureText(t) { return { width: String(t).length * 8 }; },
+    createLinearGradient() { return grad; },
+    createRadialGradient() { return grad; }
+  };
+  return ctx;
 }
 
 const nodes = new Map();
@@ -551,3 +573,21 @@ setTimeout(function () {
   console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));
   process.exit(fail ? 1 : 0);
 }, 30);
+
+/* ---------- 分享名片（v2.26） ---------- */
+console.log('\n== 分享名片 ==');
+ok(indexSource.indexOf('id="btn-share"') < 0, '分享入口不再占用顶栏图标');
+document.getElementById('btn-settings').click();
+ok(html('#modal-root').indexOf('id="set-share"') >= 0, '设置里有分享名片入口');
+(function clickShare() {
+  const target = {
+    closest: function (sel) { return sel === '#set-share' ? { id: 'set-share' } : null; },
+    classList: classList()
+  };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target }); });
+})();
+const shareHtml = html('#modal-root');
+ok(shareHtml.indexOf('分享名片') >= 0, '点设置里的入口能打开名片');
+ok(shareHtml.indexOf('share-preview') >= 0 && shareHtml.indexOf('data:image/png') >= 0,
+   '名片用本地 canvas 生成预览图');
+ok(shareHtml.indexOf('do-share-save') >= 0, '名片可以下载成 PNG');

@@ -125,6 +125,7 @@
       '<div class="action-grid">' +
         '<button class="btn" id="set-help">📖 规则说明</button>' +
         '<button class="btn" id="set-theme">' + (theme === 'dark' ? '🌙 黑夜模式：开' : '☀️ 黑夜模式：关') + '</button>' +
+        '<button class="btn" id="set-share">🖼️ 分享名片<small>当前农场 · PNG</small></button>' +
         '<button class="btn" id="set-export">⬇️ 导出存档<small>.json</small></button>' +
         '<button class="btn" id="set-import">⬆️ 导入存档<small>.json</small></button>' +
         '<button class="btn" id="set-sound">' + (soundOn ? '🔊 音效：开' : '🔇 音效：关') + '</button>' +

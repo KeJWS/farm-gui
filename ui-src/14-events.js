@@ -680,6 +680,7 @@
       if (t.closest('#set-import')) { $('#file-import').click(); return; }
       if (t.closest('#set-sound')) { soundOn = !soundOn; if (soundOn) SFX.good(); settingsModal(); return; }
       if (t.closest('#set-theme')) { toggleTheme(); settingsModal(); return; }
+      if (t.closest('#set-share')) { closeModal(); shareCardModal(); return; }
       if (t.closest('#set-reset')) { closeModal(); resetModal(); return; }
     });
 

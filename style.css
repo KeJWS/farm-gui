@@ -990,3 +990,16 @@ button{ color:inherit; font:inherit; }
 .lock{ font-size:10px; font-weight:800; color:#a9701a; background:rgba(217,159,43,.16);
   border-radius:6px; padding:1px 6px; }
 :root[data-theme="dark"] .lock{ color:#e0b352; }
+
+/* ---------- 分享名片 ---------- */
+.share-preview{ margin:0 auto 12px; max-width:420px; }
+.share-preview img{ display:block; width:100%; height:auto; border-radius:16px;
+  border:1px solid var(--line-2); box-shadow:var(--shadow); }
+.share-fallback{ display:flex; flex-direction:column; gap:10px; }
+.share-fb-day{ font-size:13px; color:var(--ink-2); font-weight:700; }
+.share-fb-coins{ font-size:34px; font-weight:800; color:var(--gold); line-height:1.1; }
+.share-fb-grid{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
+.share-fb-grid>div{ background:var(--card); border:1px solid var(--line); border-radius:12px;
+  padding:9px 10px; display:flex; flex-direction:column; gap:2px; }
+.share-fb-grid b{ font-size:15px; }
+.share-fb-grid span{ font-size:11px; color:var(--ink-3); font-weight:600; }
