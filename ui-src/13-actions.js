@@ -41,6 +41,7 @@
     },
     tea: teaModal,
     depart: departModal,
+    orchard: orchardModal,
     work: function (ev) {
       const r = G.workAuto(state);
       commit(r);

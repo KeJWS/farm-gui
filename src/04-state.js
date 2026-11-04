@@ -71,6 +71,9 @@
       nets: 0,
       netSet: 0,
       fisher: null,
+      orchard: { unlocked: false, wateredDay: 0, slots: [] },
+      treeStock: {},
+      fruits: {},
       townDonated: 0,
       codex: { fish: {}, crops: {} },
       manualRefreshUsed: false,
@@ -94,8 +97,13 @@
       fishBook: { count: 0, entries: [], best: null, priciest: null },
       stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0,
                longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0,
-               wild: {}, forageBest: 0 }
+               wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }
     };
+    TREE_LIST.forEach(function (t) {
+      s.treeStock[t.id] = { seed: 0, sapling: 0 };
+      s.fruits[t.id] = 0;
+    });
+    s.orchard.slots = new Array(BALANCE.orchard.slots).fill(null);
     snapshotMarket(s);
     return s;
   }

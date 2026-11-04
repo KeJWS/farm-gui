@@ -46,6 +46,20 @@
         '（有 ' + rep.longOrder.have + '）· 还剩 ' + rep.longOrder.days + ' 天']);
     }
 
+    const orchard = [];
+    if (rep.orchard) {
+      if (rep.orchard.grown) {
+        orchard.push(['🌱 育苗', '+' + rep.orchard.grown + ' 天' +
+          (rep.orchard.grownReady ? ' · ' + rep.orchard.grownReady + ' 棵成树' : '')]);
+      }
+      if (rep.orchard.fruit) {
+        orchard.push(['🍑 结果', rep.orchard.fruit + ' 个 · 值 ' + rep.orchard.value + ' 金']);
+      }
+      if (rep.orchard.growing) {
+        orchard.push(['💧 待浇水', rep.orchard.growing + ' 棵育苗树（明天睡前浇）']);
+      }
+    }
+
     function sec(title, rows) {
       if (!rows.length) return '';
       return '<div class="day-sec"><h4>' + title + '</h4><dl class="kv">' + rows.map(function (x) {
@@ -60,7 +74,7 @@
           G.seasonOf(rep.day) + '季<br><small>金币 ' + rep.coins.before + ' → <b>' + rep.coins.after + '</b></small></div>' +
       '</div>' +
       '<div class="day-sec"><h4>💰 今日收支</h4>' + moneyHtml + '</div>' +
-      sec('🌾 农场', farm) + sec('🐟 渔获', fish) + sec('📋 委托', orders) +
+      sec('🌾 农场', farm) + sec('🌳 果园', orchard) + sec('🐟 渔获', fish) + sec('📋 委托', orders) +
       (rep.tomorrow.length ? '<div class="day-sec"><h4>☀️ 明天</h4><ul class="day-todo">' +
         rep.tomorrow.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ul></div>' : '') +
       '<div class="shop-tip">硬件自动收获 / 补种 / 浇水都算在这里；「入库」是收进仓库的货值，不是现金。</div>',

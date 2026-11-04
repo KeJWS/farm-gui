@@ -151,6 +151,16 @@
     }
     $('#expand-txt').textContent = '第 ' + (state.plots.length + 1) + ' 块 · ' + G.expandCost(state) + ' 金';
     $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + 5) + ' · ' + G.upgradeCost(state) + ' 金';
+    const orcTxt = $('#orchard-txt');
+    if (orcTxt) {
+      if (!G.orchardUnlocked(state)) {
+        orcTxt.textContent = '种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' +
+          G.BALANCE.orchard.unlockCost + ' 金解锁';
+      } else {
+        const o = G.orchardSummary(state);
+        orcTxt.textContent = '成树 ' + o.mature + ' · 育苗 ' + o.growing + ' · 水果 ' + o.fruit + ' 个';
+      }
+    }
     const sprLock = !G.sprinklerUnlocked(state);
     $('#sprinkler-txt').textContent = sprLock
       ? '需种田 Lv' + G.BALANCE.gate.sprinkler + ' 解锁'

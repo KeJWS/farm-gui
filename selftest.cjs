@@ -2220,7 +2220,57 @@ for (let i = 0; i < 3000; i++) {
 ok(!err, '3000 步随机操作无异常、不变量成立', err && err.message);
 ok(JSON.stringify(s).length > 0, '最终状态可序列化（' + (JSON.stringify(s).length / 1024).toFixed(1) + ' KB）');
 
-/* ---------- 8. 每日总结 ---------- */
+/* ---------- 8. 果园 ---------- */
+section('果园');
+G.setRng(mulberry32(11));
+s = G.createState();
+s.levels.farm = 6;
+s.coins = 5000;
+ok(!G.orchardUnlock(s).ok, '种田 Lv6 不能开垦果园');
+s.levels.farm = 7;
+const unlockRes = G.orchardUnlock(s);
+ok(unlockRes.ok && s.coins === 2500 && s.orchard.slots.length === 8,
+   '种田 Lv7 + 2500 金开垦出 8 个树坑', { coins: s.coins, slots: s.orchard.slots.length });
+
+const stockRes = G.buyTreeStock(s, 'peach', 'seed', 2);
+ok(stockRes.ok && G.treeStockCount(s, 'peach', 'seed') === 2, '百货店买果树种子进库存', stockRes.msg);
+ok(G.treeBuyPrice(s, 'peach', 'sapling') === Math.round(750 * G.tradeCut(s)), '树苗价吃交易等级折扣');
+
+const plantSeed = G.plantTree(s, 0, 'peach', 'seed');
+ok(plantSeed.ok && G.treeStage(s, 0) === 'growing', '种下种子进入育苗');
+ok(!G.plantTree(s, 0, 'peach', 'seed').ok, '同一个树坑不能重复种');
+
+G.waterOrchard(s);
+G.sleep(s);
+const grown1 = G.treeSlot(s, 0).grown;
+ok(grown1 === 1, '浇过水的育苗 +1 天');
+G.sleep(s);
+ok(G.treeSlot(s, 0).grown === grown1, '没浇水的日子不长');
+
+G.buyTreeStock(s, 'apple', 'sapling', 1);
+const plantSap = G.plantTree(s, 1, 'apple', 'sapling');
+ok(plantSap.ok && G.treeStage(s, 1) === 'mature', '树苗种下立刻成树');
+
+s.day = 61;                       // 秋（苹果季）
+G.sleep(s);
+ok((s.fruits.apple || 0) === G.BALANCE.orchard.fruitPerDay, '成树在自己季节每天结果', s.fruits);
+ok((s.fruits.peach || 0) === 0, '不是自己季节的树不结果');
+
+s.day = 91;                       // 冬
+G.sleep(s);
+ok((s.fruits.apple || 0) === G.BALANCE.orchard.fruitPerDay, '休眠季不新增水果', s.fruits);
+
+const coinsBeforeFruit = s.coins;
+const sellRes = G.sellFruits(s);
+ok(sellRes.ok && s.coins > coinsBeforeFruit && G.fruitCount(s) === 0, '水果卖掉换金币并清空', sellRes.msg);
+
+s.orchard.slots[2] = { id: 'orange', grown: 10, day: 1 };
+const orchardRound = G.deserialize(G.serialize(s));
+ok(G.orchardUnlocked(orchardRound) && orchardRound.orchard.slots[2].id === 'orange' &&
+   orchardRound.orchard.slots.length === 8, '果园读档保留树坑与解锁状态');
+ok(G.treeStockCount(orchardRound, 'peach', 'seed') === 1, '读档保留种子库存');
+
+/* ---------- 9. 每日总结 ---------- */
 section('每日总结');
 G.setRng(mulberry32(7));
 s = G.createState();

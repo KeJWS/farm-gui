@@ -455,7 +455,35 @@ console.log('\n== 小镇捐赠（后期金币出口）==');
   console.log('   加成：委托 +5% / 商店进价 −10% / 买卖市价 +8%（可叠加）');
 }
 
-/* ---------- 15. 钓鱼专项 ---------- */
+/* ---------- 15. 果园 ---------- */
+console.log('\n== 果园（种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.BALANCE.orchard.unlockCost +
+  ' 金开垦，' + G.BALANCE.orchard.slots + ' 个树坑）==');
+{
+  const O = G.BALANCE.orchard;
+  const S = ['春', '夏', '秋', '冬'];
+  let saplingSum = 0;
+  G.TREE_LIST.forEach(function (t) {
+    const perDay = O.fruitPerDay * t.price;
+    const perSeason = perDay * 30;
+    saplingSum += t.sapling;
+    console.log('   ' + pad(t.name, 4) + ' ' + S[t.season] + '季 · 种子 ' + pad(t.seed + ' 金', 6) +
+      '（育苗 ' + O.growDays + ' 天）· 树苗 ' + pad(t.sapling + ' 金', 7) +
+      ' · 当季 ' + perDay + ' 金/天（30 天约 ' + perSeason + ' 金）');
+  });
+  const invest = O.unlockCost + saplingSum * 2;
+  const perSeasonSum = G.TREE_LIST.reduce(function (n, t) { return n + O.fruitPerDay * t.price; }, 0);
+  // 每季 2 棵：任意时刻只有当季那 2 棵在结果，全年平均 = 四季各一套 ×2 ÷ 4
+  const perDayAll = Math.round(perSeasonSum * 2 / 4);
+  console.log('   满配（每季 2 棵，共 ' + O.slots + ' 棵）：树苗 ' + saplingSum * 2 + ' + 开垦 ' +
+    O.unlockCost + ' = ' + invest + ' 金 · 全年平均 ' + perDayAll + ' 金/天 · 回本约 ' +
+    Math.ceil(invest / perDayAll) + ' 天');
+  console.log('   种子路线：每棵 ' + G.TREE_LIST.map(function (t) { return t.seed; }).join('/') +
+    ' 金，但要育苗 ' + O.growDays + ' 天（一年，需天天浇水）—— 省 ' +
+    Math.round((1 - 100 / 800) * 100) + '% 的钱，晚一年见收益');
+  console.log('   对比：36 块地图后期日净约 1000，果园满配约 ' + perDayAll + ' 金/天（≈11%）');
+}
+
+/* ---------- 16. 钓鱼专项 ---------- */
 console.log('\n== 钓鱼专项 ==');
 {
   const KIND_LABEL = { dough: '面团饵', worm: '蚯蚓', lure: '假饵', lure2: '高级假饵' };

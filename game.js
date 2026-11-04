@@ -71,7 +71,11 @@
     gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2, fisher: 5,
             seeder: 4, lure2: 6, lure2Trade: 3, goldKeyTrade: 4 },
     /* 宝箱：铁箱 / 金箱按钓鱼等级解锁 */
-    chest: { ironLv: 4, goldLv: 7 }
+    chest: { ironLv: 4, goldLv: 7 },
+    /* 果园：种田 Lv7 + 2500 金开垦，8 个树坑。
+     * 果树种子便宜，但要育苗满 120 天（只有浇过水的日子才算）；树苗贵，种下即成树。
+     * 成树只在自己的季节结果，当季每天 2 个。 */
+    orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, growDays: 120, fruitPerDay: 2 }
   };
 
   /* ---------------- 静态数据 ---------------- */
@@ -209,6 +213,20 @@
               desc: '一口下去，天都亮了' }
   };
   const TEA_LIST = Object.keys(TEAS).map(function (k) { return TEAS[k]; });
+
+  /* 果树：每种只在自己的季节结果（当季每天 BALANCE.orchard.fruitPerDay 个）
+   * seed = 种子价（便宜，育苗 120 天），sapling = 树苗价（贵，种下即成树），price = 果实单价 */
+  const TREES = {
+    peach:  { id: 'peach',  name: '桃树',   fruit: '桃',   emoji: '🍑', season: 0,
+              seed: 90,  sapling: 750, price: 24, desc: '春天开花，夏天摘桃' },
+    mango:  { id: 'mango',  name: '芒果树', fruit: '芒果', emoji: '🥭', season: 1,
+              seed: 110, sapling: 900, price: 30, desc: '晒足太阳才够甜' },
+    apple:  { id: 'apple',  name: '苹果树', fruit: '苹果', emoji: '🍎', season: 2,
+              seed: 95,  sapling: 780, price: 26, desc: '秋天第一口脆' },
+    orange: { id: 'orange', name: '橘子树', fruit: '橘子', emoji: '🍊', season: 3,
+              seed: 105, sapling: 850, price: 28, desc: '冬天也不怕冷' }
+  };
+  const TREE_LIST = Object.keys(TREES).map(function (k) { return TREES[k]; });
 
   /* 水产店每日进货量：[最少, 最多]；越稀有的鱼进得越少 */
   const SHOP_STOCK = {
@@ -785,6 +803,9 @@
       nets: 0,
       netSet: 0,
       fisher: null,
+      orchard: { unlocked: false, wateredDay: 0, slots: [] },
+      treeStock: {},
+      fruits: {},
       townDonated: 0,
       codex: { fish: {}, crops: {} },
       manualRefreshUsed: false,
@@ -808,8 +829,13 @@
       fishBook: { count: 0, entries: [], best: null, priciest: null },
       stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0,
                longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0,
-               wild: {}, forageBest: 0 }
+               wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }
     };
+    TREE_LIST.forEach(function (t) {
+      s.treeStock[t.id] = { seed: 0, sapling: 0 };
+      s.fruits[t.id] = 0;
+    });
+    s.orchard.slots = new Array(BALANCE.orchard.slots).fill(null);
     snapshotMarket(s);
     return s;
   }
@@ -1325,10 +1351,10 @@
     });
     s.plots.forEach(function (p) { p.watered = false; });
 
+    const prevDay = s.day;
     s.day++;
     s.teaUsed = false;
     s.workUsed = false;
-
     // 市场冷却：昨天的销量今天只算 70%（回落 30%）
     const decay = BALANCE.market.decay;
     s.market = s.market || {};
@@ -1371,6 +1397,16 @@
       });
       watered += n; ripened += ripe;
       if (n) notes.push({ kind: 'water', text: '🚿 洒水器浇 ' + n + ' 块' + (ripe ? '，熟 ' + ripe : '') });
+    }
+
+    // 果园：昨天浇过水 → 育苗 +1 天；成树在自己季节每天结果
+    const orc = orchardTick(s, prevDay);
+    if (orc.grown) {
+      notes.push({ kind: 'orchard', text: '🍑 果树育苗 +' + orc.grown + ' 天' +
+        (orc.grownReady ? '（' + orc.grownReady + ' 棵成树）' : '') });
+    }
+    if (orc.fruit) {
+      notes.push({ kind: 'orchard', text: '🍑 果园产出 ' + orc.fruit + ' 个水果（值 ' + orc.value + '）' });
     }
 
     // 渔夫：发工资 → 替你重布渔网 → 自动甩杆（不耗玩家体力、不给玩家经验）
@@ -1469,6 +1505,8 @@
     if (deliverable) tomorrow.push(deliverable + ' 张委托能交');
     if (longLeft !== null) tomorrow.push('长期订单还剩 ' + longLeft + ' 天');
     if (s.coins < fee) tomorrow.push('金币不够明天的伙食（' + fee + ' 金）');
+    const orcSummary = orchardSummary(s);
+    if (orcSummary.growing) tomorrow.push('果园有 ' + orcSummary.growing + ' 棵育苗树要浇水');
     const report = {
       day: s.day,
       weather: { id: s.weather, emoji: w.emoji, name: w.name },
@@ -1480,6 +1518,8 @@
       fisher: fisherReport,
       net: netReport,
       orders: { fresh: (s.orders || []).length, deliverable: deliverable },
+      orchard: { grown: orc.grown, grownReady: orc.grownReady, fruit: orc.fruit, value: orc.value,
+                 growing: orcSummary.growing, mature: orcSummary.mature, stock: orcSummary.fruit },
       longOrder: s.longOrder ? { name: s.longOrder.name, emoji: s.longOrder.emoji,
         qty: s.longOrder.qty, have: orderHave(s, s.longOrder), days: longLeft } : null,
       tomorrow: tomorrow
@@ -2980,6 +3020,193 @@
     return { ok: true, msg: '体力上限 ' + s.maxEnergy, maxEnergy: s.maxEnergy };
   }
 
+/* ==================== src/12-orchard.js ==================== */
+/* 果园：开垦 / 买树苗 / 育苗 / 当季结果 / 卖水果 */
+  /* ---------------- 果园 ---------------- */
+
+  /* 解锁：种田 Lv7 + 2500 金，开垦后给 8 个树坑 */
+  function orchardSlots() { return BALANCE.orchard.slots; }
+
+  function orchardUnlocked(s) { return !!(s && s.orchard && s.orchard.unlocked); }
+
+  function orchardUnlock(s) {
+    if (orchardUnlocked(s)) return { ok: false, msg: '果园已经开垦过了' };
+    const lv = farmLv(s);
+    if (lv < BALANCE.orchard.unlockLv) {
+      return { ok: false, msg: '种田 Lv' + BALANCE.orchard.unlockLv + ' 才能开垦果园（现在 Lv' + lv + '）' };
+    }
+    const cost = BALANCE.orchard.unlockCost;
+    if ((s.coins || 0) < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
+    s.coins -= cost;
+    ledger(s, '开垦果园', 0, cost);
+    s.orchard = { unlocked: true, wateredDay: 0, slots: new Array(BALANCE.orchard.slots).fill(null) };
+    log(s, '🍑 开垦了一片果园（-' + cost + ' 金），有 ' + BALANCE.orchard.slots + ' 个树坑', 'good');
+    return { ok: true, msg: '果园开垦完成，有 ' + BALANCE.orchard.slots + ' 个树坑' };
+  }
+
+  /* ---------------- 树苗 / 种子 ---------------- */
+
+  function treeData(id) { return TREES[id] || null; }
+
+  function treeBuyPrice(s, id, mode) {
+    const t = TREES[id];
+    if (!t) return 0;
+    const base = mode === 'sapling' ? t.sapling : t.seed;
+    return Math.max(1, Math.round(base * tradeCut(s)));
+  }
+
+  function treeStockCount(s, id, mode) {
+    const row = s.treeStock && s.treeStock[id];
+    return (row && row[mode === 'sapling' ? 'sapling' : 'seed']) || 0;
+  }
+
+  /* 百货店买果树种子 / 树苗：买回来存在 stock 里，果园那边再种 */
+  function buyTreeStock(s, id, mode, n) {
+    const t = TREES[id];
+    if (!t) return { ok: false, msg: '没有这种果树' };
+    const m = mode === 'sapling' ? 'sapling' : 'seed';
+    const qty = Math.max(1, Math.min(9, Math.floor(n || 1)));
+    const unit = treeBuyPrice(s, id, m);
+    const cost = unit * qty;
+    if ((s.coins || 0) < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
+    s.coins -= cost;
+    ledger(s, '买' + t.name + (m === 'sapling' ? '树苗' : '种子') + ' ×' + qty, 0, cost);
+    tradeXp(s, cost);
+    s.treeStock = s.treeStock || {};
+    s.treeStock[id] = s.treeStock[id] || { seed: 0, sapling: 0 };
+    s.treeStock[id][m] += qty;
+    log(s, t.emoji + ' 买了' + t.name + (m === 'sapling' ? '树苗' : '种子') + ' ×' + qty + '（-' + cost + ' 金）', 'info');
+    return { ok: true, qty: qty, cost: cost,
+             msg: t.name + (m === 'sapling' ? '树苗' : '种子') + ' ×' + qty + '（-' + cost + ' 金）' };
+  }
+
+  /* ---------------- 树坑 ---------------- */
+
+  function treeSlot(s, i) {
+    const slots = (s.orchard && s.orchard.slots) || [];
+    return slots[i] || null;
+  }
+
+  function treeStage(s, i) {
+    const t = treeSlot(s, i);
+    if (!t) return 'empty';
+    return t.grown >= BALANCE.orchard.growDays ? 'mature' : 'growing';
+  }
+
+  function treeInSeason(s, i) {
+    const t = treeSlot(s, i);
+    if (!t || !TREES[t.id]) return false;
+    return seasonIdx(s.day || 1) === TREES[t.id].season;
+  }
+
+  /* 种树：树苗直接成树，种子要育苗（浇水才长），满 120 天才成树 */
+  function plantTree(s, i, id, mode) {
+    if (!orchardUnlocked(s)) return { ok: false, msg: '先去农场开垦果园' };
+    const t = TREES[id];
+    if (!t) return { ok: false, msg: '没有这种果树' };
+    const slots = s.orchard.slots || [];
+    if (!(i >= 0 && i < slots.length)) return { ok: false, msg: '没有这个树坑' };
+    if (slots[i]) return { ok: false, msg: '这个树坑已经种了 ' + TREES[slots[i].id].name };
+    const m = mode === 'sapling' ? 'sapling' : 'seed';
+    if (treeStockCount(s, id, m) <= 0) {
+      return { ok: false, msg: '没有' + t.name + (m === 'sapling' ? '树苗' : '种子') + '了，先去百货店买' };
+    }
+    s.treeStock[id][m]--;
+    slots[i] = { id: id, grown: m === 'sapling' ? BALANCE.orchard.growDays : 0, day: s.day || 1 };
+    s.orchard.slots = slots;
+    s.stats.orchardPlanted = (s.stats.orchardPlanted || 0) + 1;
+    log(s, t.emoji + ' 在 ' + (i + 1) + ' 号树坑种下' + t.name +
+      (m === 'sapling' ? '（树苗，立刻成树）' : '（种子，育苗 ' + BALANCE.orchard.growDays + ' 天）'), 'info');
+    return { ok: true, slot: i, msg: t.name + (m === 'sapling' ? ' 已经成树' : ' 开始育苗') };
+  }
+
+  /* 浇水：一次浇所有育苗中的树；只有浇过水的当天才会长 */
+  function waterOrchard(s) {
+    if (!orchardUnlocked(s)) return { ok: false, msg: '还没有果园' };
+    if (s.orchard.wateredDay === s.day) return { ok: false, msg: '今天已经浇过果树了' };
+    const growing = (s.orchard.slots || []).filter(function (t) {
+      return t && t.grown < BALANCE.orchard.growDays;
+    }).length;
+    s.orchard.wateredDay = s.day;
+    if (!growing) return { ok: true, n: 0, msg: '果树都成树了，不用浇水' };
+    log(s, '💧 给 ' + growing + ' 棵育苗中的果树浇水', 'info');
+    return { ok: true, n: growing, msg: '给 ' + growing + ' 棵育苗树浇了水' };
+  }
+
+  /* 睡觉结算：浇过水 → 育苗 +1 天；成树在当季每天结果 */
+  function orchardTick(s, prevDay) {
+    if (!orchardUnlocked(s)) return { grown: 0, grownReady: 0, fruit: 0, value: 0, species: [] };
+    const slots = s.orchard.slots || [];
+    const watered = s.orchard.wateredDay === prevDay;
+    let grown = 0, grownReady = 0;
+    const G0 = BALANCE.orchard.growDays;
+    if (watered) {
+      slots.forEach(function (t) {
+        if (!t || t.grown >= G0) return;
+        t.grown++;
+        grown++;
+        if (t.grown === G0) grownReady++;
+      });
+    }
+    const season = seasonIdx(s.day || 1);
+    let fruit = 0, value = 0;
+    const species = [];
+    slots.forEach(function (t) {
+      if (!t || t.grown < G0 || !TREES[t.id]) return;
+      if (TREES[t.id].season !== season) return;
+      const n = BALANCE.orchard.fruitPerDay;
+      s.fruits = s.fruits || {};
+      s.fruits[t.id] = (s.fruits[t.id] || 0) + n;
+      fruit += n;
+      value += n * TREES[t.id].price;
+      species.push(TREES[t.id]);
+    });
+    if (fruit) s.stats.orchardFruit = (s.stats.orchardFruit || 0) + fruit;
+    return { grown: grown, grownReady: grownReady, fruit: fruit, value: value, species: species };
+  }
+
+  /* ---------------- 水果仓库 / 卖出 ---------------- */
+
+  function fruitCount(s) {
+    let n = 0;
+    TREE_LIST.forEach(function (t) { n += (s.fruits && s.fruits[t.id]) || 0; });
+    return n;
+  }
+
+  function fruitValue(s) {
+    let v = 0;
+    TREE_LIST.forEach(function (t) { v += ((s.fruits && s.fruits[t.id]) || 0) * t.price; });
+    return v;
+  }
+
+  function sellFruits(s) {
+    if (!orchardUnlocked(s)) return { ok: false, msg: '还没有果园' };
+    const n = fruitCount(s);
+    if (!n) return { ok: false, msg: '果园里还没有水果' };
+    const raw = fruitValue(s);
+    const gain = Math.max(1, Math.round(raw * sellBonus(s) * (1 + townBonus(s, 'marketBonus'))));
+    s.fruits = {};
+    TREE_LIST.forEach(function (t) { s.fruits[t.id] = 0; });
+    addCoins(s, gain, '卖水果');
+    tradeXp(s, gain);
+    s.stats.fruitSold = (s.stats.fruitSold || 0) + n;
+    log(s, '🍑 卖掉 ' + n + ' 个水果，+' + gain + ' 金', 'good');
+    return { ok: true, n: n, income: gain, msg: '卖掉 ' + n + ' 个水果，+' + gain + ' 金' };
+  }
+
+  /* 果园概况：给界面 / 总结用 */
+  function orchardSummary(s) {
+    const slots = (s.orchard && s.orchard.slots) || [];
+    let mature = 0, growing = 0, inSeason = 0;
+    slots.forEach(function (t, i) {
+      if (!t) return;
+      if (t.grown >= BALANCE.orchard.growDays) { mature++; if (treeInSeason(s, i)) inSeason++; }
+      else growing++;
+    });
+    return { total: slots.length, mature: mature, growing: growing, inSeason: inSeason,
+             fruit: fruitCount(s), value: fruitValue(s) };
+  }
+
 /* ==================== src/12-orders.js ==================== */
 /* 每日委托与长期订单 */
   /* ---------------- 每日委托 ---------------- */
@@ -3248,7 +3475,7 @@
     merged.lure2.dur = Math.round(num(merged.lure2.dur, 0, 0, BALANCE.lure2.dur));
     merged.lure2.owned = !!merged.lure2.owned && merged.lure2.dur > 0;
     merged.fishBook = Object.assign({ count: 0, entries: [], best: null, priciest: null }, s.fishBook || {});
-    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0, wild: {}, forageBest: 0 }, s.stats || {});
+    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0, wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }, s.stats || {});
     merged.stats.wild = Object.assign({}, (s.stats && s.stats.wild) || {});
     Object.keys(merged.stats.wild).forEach(function (id) {
       if (!CROPS[id] || !CROPS[id].wild) { delete merged.stats.wild[id]; return; }
@@ -3257,10 +3484,33 @@
     merged.stats.forages = Math.round(num(merged.stats.forages, 0, 0, 999999));
     merged.stats.forageBest = Math.round(num(merged.stats.forageBest, 0, 0, 3));
     merged.stats.dug = Math.round(num(merged.stats.dug, 0, 0, 999999));
-    merged.teas = Object.assign({ green: 0, black: 0, milk: 0, coffee: 0 }, s.teas || {});
-    Object.keys(merged.teas).forEach(function (id) {
+    merged.stats.orchardFruit = Math.round(num(merged.stats.orchardFruit, 0, 0, 9999999));
+    merged.stats.orchardPlanted = Math.round(num(merged.stats.orchardPlanted, 0, 0, 999));
+    merged.stats.fruitSold = Math.round(num(merged.stats.fruitSold, 0, 0, 9999999));
+    merged.teas = Object.assign({ green: 0, black: 0, milk: 0, coffee: 0 }, s.teas || {});    Object.keys(merged.teas).forEach(function (id) {
       if (!TEAS[id]) { delete merged.teas[id]; return; }
       merged.teas[id] = Math.round(num(merged.teas[id], 0, 0, 999));
+    });
+    merged.orchard = Object.assign({ unlocked: false, wateredDay: 0, slots: [] }, s.orchard || {});
+    merged.orchard.unlocked = !!merged.orchard.unlocked;
+    merged.orchard.wateredDay = Math.round(num(merged.orchard.wateredDay, 0, 0, 100000));
+    const treeSlots = Array.isArray(merged.orchard.slots) ? merged.orchard.slots : [];
+    merged.orchard.slots = Array.from({ length: BALANCE.orchard.slots }).map(function (_, i) {
+      const t = treeSlots[i];
+      if (!t || !TREES[t.id]) return null;
+      return { id: t.id,
+               grown: Math.round(num(t.grown, 0, 0, BALANCE.orchard.growDays)),
+               day: Math.round(num(t.day, 1, 1, 100000)) };
+    });
+    merged.treeStock = {};
+    merged.fruits = {};
+    TREE_LIST.forEach(function (t) {
+      const row = (s.treeStock && s.treeStock[t.id]) || {};
+      merged.treeStock[t.id] = {
+        seed: Math.round(num(row.seed, 0, 0, 999)),
+        sapling: Math.round(num(row.sapling, 0, 0, 999))
+      };
+      merged.fruits[t.id] = Math.round(num(s.fruits && s.fruits[t.id], 0, 0, 99999));
     });
     merged.keys = Object.assign({ iron: 0, gold: 0 }, s.keys || {});
     Object.keys(merged.keys).forEach(function (id) {
@@ -3583,6 +3833,13 @@
     fishMany: fishMany, fishAll: fishAll, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,
     forage: forage, foragePool: foragePool, forageSeedPool: forageSeedPool,
     donate: donate, townTier: townTier, townBonus: townBonus, townNext: townNext,
+    TREES: TREES, TREE_LIST: TREE_LIST,
+    orchardSlots: orchardSlots, orchardUnlocked: orchardUnlocked, orchardUnlock: orchardUnlock,
+    treeData: treeData, treeBuyPrice: treeBuyPrice, treeStockCount: treeStockCount,
+    buyTreeStock: buyTreeStock, treeSlot: treeSlot, treeStage: treeStage, treeInSeason: treeInSeason,
+    plantTree: plantTree, waterOrchard: waterOrchard, orchardTick: orchardTick,
+    fruitCount: fruitCount, fruitValue: fruitValue, sellFruits: sellFruits,
+    orchardSummary: orchardSummary,
     marketHeadroom: marketHeadroom, fishMarketHeadroom: fishMarketHeadroom,
     snapshotMarket: snapshotMarket, marketSeries: marketSeries, pushMarketHist: pushMarketHist,
     cropNextSeasonMul: cropNextSeasonMul, fishNextSeasonMul: fishNextSeasonMul,

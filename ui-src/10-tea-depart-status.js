@@ -46,6 +46,23 @@
         '</div>';
     }).join('');
 
+    const treeRows = G.TREE_LIST.map(function (t) {
+      const seedPrice = G.treeBuyPrice(state, t.id, 'seed');
+      const sapPrice = G.treeBuyPrice(state, t.id, 'sapling');
+      const seedN = G.treeStockCount(state, t.id, 'seed');
+      const sapN = G.treeStockCount(state, t.id, 'sapling');
+      return '<div class="store-row">' +
+        '<span class="se">' + t.emoji + '</span>' +
+        '<div><div class="sn">' + t.name + ' <b class="own">' + G.SEASONS[t.season] + '季结果</b>' +
+          ((seedN || sapN) ? ' <b class="own">库存 ' + (seedN + sapN) + '</b>' : '') + '</div>' +
+          '<div class="sv">种子 ' + seedPrice + ' 金（育苗 ' + G.BALANCE.orchard.growDays + ' 天）· ' +
+            '树苗 ' + sapPrice + ' 金（立刻成树）· ' + t.fruit + ' ' + t.price + ' 金/个</div></div>' +
+        '<button class="btn mini" data-buytree="' + t.id + '" data-mode="seed"' +
+          (state.coins < seedPrice ? ' disabled' : '') + '>种子</button>' +
+        '<button class="btn mini" data-buytree="' + t.id + '" data-mode="sapling"' +
+          (state.coins < sapPrice ? ' disabled' : '') + '>树苗</button></div>';
+    }).join('');
+
     const keyRows = Object.keys(G.KEYS).map(function (id) {
       const k = G.KEYS[id];
       const open = G.keyUnlocked(state, id);
@@ -64,8 +81,7 @@
     }).join('');
 
     // 百货店只收宝箱，杂物一律不收（只能进收购箱）
-    const junk = G.fishGroups(state, 'junk').filter(function (g) { return g.chest; });
-    const CHECK = {
+    const junk = G.fishGroups(state, 'junk').filter(function (g) { return g.chest; });    const CHECK = {
       wood: '开箱 10–26 金',
       iron: '开箱：肥料×6–9 / 种子×8–12 / 面团×12–18 / 蚯蚓×12–18',
       gold: '开箱：200–320 金 + 特效肥×3–5 / 稀有种子×2–3 / 蚯蚓×14–18'
@@ -88,6 +104,9 @@
     openModal('🏬 百货店',
       '<div class="shop-head">💰 <b>' + state.coins + '</b> 金</div>' +
       '<div class="store-sub">🍵 茶叶 · 买回去喝下午茶</div>' + teaRows +
+      '<div class="store-sub" style="margin-top:10px">🌳 果树种子 / 树苗 · ' +
+        (G.orchardUnlocked(state) ? '果园已开垦' : '种田 Lv' + G.BALANCE.orchard.unlockLv + ' 开垦果园后能种') +
+        '</div>' + treeRows +
       '<div class="store-sub" style="margin-top:10px">🗝️ 钥匙 · 钓鱼 Lv' + G.KEYS.iron.lv + ' / Lv' +
         G.KEYS.gold.lv + ' + 交易 Lv' + G.BALANCE.gate.goldKeyTrade + ' 解锁</div>' + keyRows +
       '<div class="store-sub" style="margin-top:10px">♻️ 宝箱回收 · 只收宝箱，杂物不收</div>' + junkRows +
@@ -124,6 +143,14 @@
         '自动播种器 ×' + G.seederCount(state) + (G.seederCount(state) ? '（每晚 ' + G.seederPlots(state) + ' 块）' : '') +
         ' · 渔网 ' + state.nets + ' 张（已布 ' + G.netSetCount(state) + '）' +
         (state.fisher ? ' · 渔夫 Lv' + G.fisherLv(state) : '')],
+      ['果园', (function () {
+        if (!G.orchardUnlocked(state)) {
+          return '未开垦（种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.BALANCE.orchard.unlockCost + ' 金）';
+        }
+        const o = G.orchardSummary(state);
+        return '成树 ' + o.mature + ' · 育苗 ' + o.growing + ' · 当季结果 ' + o.inSeason +
+          ' · 水果 ' + o.fruit + ' 个（' + o.value + ' 金）';
+      })()],
       ['种田等级', 'Lv' + lv.farm + (lv.farm >= G.BALANCE.level.max ? '（满级）' :
         '（' + lv.farmXp + '/' + G.levelNeed(lv.farm) + '）') + ' · ' + G.levelEffectText('farm', lv.farm)],
       ['钓鱼等级', 'Lv' + lv.fish + (lv.fish >= G.BALANCE.level.max ? '（满级）' :

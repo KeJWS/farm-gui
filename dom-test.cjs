@@ -125,6 +125,10 @@ const G = require('./game.js');
   G.boxPutCrop(st, 'cabbage');                 // 收购箱里放一批，便于测取出
   st.longOrder = G.makeLongOrder({ day: 5, levels: { farm: 3 } });
   st.coins = 5000;
+  // 果园已开垦 + 一点桃树种子，方便测树坑 / 种树 / 浇水
+  st.orchard = { unlocked: true, wateredDay: 0, slots: new Array(G.orchardSlots()).fill(null) };
+  st.treeStock = { peach: { seed: 2, sapling: 0 }, mango: { seed: 0, sapling: 0 },
+                   apple: { seed: 0, sapling: 0 }, orange: { seed: 0, sapling: 0 } };
   localStorage.setItem('farm-gui-save-v1', G.serialize(st));
 })();
 
@@ -422,6 +426,45 @@ ok(stHtml.indexOf('挖蚯蚓等级') >= 0 && stHtml.indexOf('采集等级') >= 0
 ok(stHtml.indexOf('交易等级') >= 0, '状态面板列出交易等级');
 ok(stHtml.indexOf('其中自动播种器') < 0, '维护费不再带「其中自动播种器」');
 ok(text('#trade-lv').indexOf('Lv') >= 0, '商店面板显示交易等级', text('#trade-lv'));
+
+console.log('\n== 果园 ==');
+(function openOrchard() {
+  const btn = { dataset: { act: 'orchard' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-act]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+ok(html('#modal-root').indexOf('号树坑') >= 0, '果园弹窗列出树坑');
+ok(html('#modal-root').indexOf('种树') >= 0, '空树坑有「种树」按钮');
+ok(html('#modal-root').indexOf('卖水果') >= 0, '果园有「卖水果」按钮');
+
+(function pickSlot() {
+  const btn = { dataset: { treePick: '0' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-tree-pick]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+ok(html('#modal-root').indexOf('种什么') >= 0 && html('#modal-root').indexOf('桃树') >= 0,
+   '点「种树」弹出树种选择');
+
+(function plantSeed() {
+  const btn = { dataset: { treePlant: '0', tree: 'peach', mode: 'seed' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-tree-plant]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+ok(html('#modal-root').indexOf('育苗 0 / 120 天') >= 0, '种下种子后显示育苗进度');
+
+(function waterOrchard() {
+  const btn = { dataset: { orchardWater: '1' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-orchard-water]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+ok(html('#modal-root').indexOf('今天浇过了') >= 0, '浇过水后按钮显示今天浇过了');
+
+(function openDepart() {
+  const btn = { dataset: { act: 'depart' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-act]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+ok(html('#modal-root').indexOf('果树种子 / 树苗') >= 0, '百货店出售果树种子与树苗');
 
 console.log('\n== 每日总结 ==');
 (function daySummary() {

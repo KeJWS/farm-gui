@@ -64,7 +64,11 @@
     gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2, fisher: 5,
             seeder: 4, lure2: 6, lure2Trade: 3, goldKeyTrade: 4 },
     /* 宝箱：铁箱 / 金箱按钓鱼等级解锁 */
-    chest: { ironLv: 4, goldLv: 7 }
+    chest: { ironLv: 4, goldLv: 7 },
+    /* 果园：种田 Lv7 + 2500 金开垦，8 个树坑。
+     * 果树种子便宜，但要育苗满 120 天（只有浇过水的日子才算）；树苗贵，种下即成树。
+     * 成树只在自己的季节结果，当季每天 2 个。 */
+    orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, growDays: 120, fruitPerDay: 2 }
   };
 
   /* ---------------- 静态数据 ---------------- */
@@ -202,6 +206,20 @@
               desc: '一口下去，天都亮了' }
   };
   const TEA_LIST = Object.keys(TEAS).map(function (k) { return TEAS[k]; });
+
+  /* 果树：每种只在自己的季节结果（当季每天 BALANCE.orchard.fruitPerDay 个）
+   * seed = 种子价（便宜，育苗 120 天），sapling = 树苗价（贵，种下即成树），price = 果实单价 */
+  const TREES = {
+    peach:  { id: 'peach',  name: '桃树',   fruit: '桃',   emoji: '🍑', season: 0,
+              seed: 90,  sapling: 750, price: 24, desc: '春天开花，夏天摘桃' },
+    mango:  { id: 'mango',  name: '芒果树', fruit: '芒果', emoji: '🥭', season: 1,
+              seed: 110, sapling: 900, price: 30, desc: '晒足太阳才够甜' },
+    apple:  { id: 'apple',  name: '苹果树', fruit: '苹果', emoji: '🍎', season: 2,
+              seed: 95,  sapling: 780, price: 26, desc: '秋天第一口脆' },
+    orange: { id: 'orange', name: '橘子树', fruit: '橘子', emoji: '🍊', season: 3,
+              seed: 105, sapling: 850, price: 28, desc: '冬天也不怕冷' }
+  };
+  const TREE_LIST = Object.keys(TREES).map(function (k) { return TREES[k]; });
 
   /* 水产店每日进货量：[最少, 最多]；越稀有的鱼进得越少 */
   const SHOP_STOCK = {

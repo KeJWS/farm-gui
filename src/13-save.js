@@ -79,7 +79,7 @@
     merged.lure2.dur = Math.round(num(merged.lure2.dur, 0, 0, BALANCE.lure2.dur));
     merged.lure2.owned = !!merged.lure2.owned && merged.lure2.dur > 0;
     merged.fishBook = Object.assign({ count: 0, entries: [], best: null, priciest: null }, s.fishBook || {});
-    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0, wild: {}, forageBest: 0 }, s.stats || {});
+    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0, wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }, s.stats || {});
     merged.stats.wild = Object.assign({}, (s.stats && s.stats.wild) || {});
     Object.keys(merged.stats.wild).forEach(function (id) {
       if (!CROPS[id] || !CROPS[id].wild) { delete merged.stats.wild[id]; return; }
@@ -88,10 +88,33 @@
     merged.stats.forages = Math.round(num(merged.stats.forages, 0, 0, 999999));
     merged.stats.forageBest = Math.round(num(merged.stats.forageBest, 0, 0, 3));
     merged.stats.dug = Math.round(num(merged.stats.dug, 0, 0, 999999));
-    merged.teas = Object.assign({ green: 0, black: 0, milk: 0, coffee: 0 }, s.teas || {});
-    Object.keys(merged.teas).forEach(function (id) {
+    merged.stats.orchardFruit = Math.round(num(merged.stats.orchardFruit, 0, 0, 9999999));
+    merged.stats.orchardPlanted = Math.round(num(merged.stats.orchardPlanted, 0, 0, 999));
+    merged.stats.fruitSold = Math.round(num(merged.stats.fruitSold, 0, 0, 9999999));
+    merged.teas = Object.assign({ green: 0, black: 0, milk: 0, coffee: 0 }, s.teas || {});    Object.keys(merged.teas).forEach(function (id) {
       if (!TEAS[id]) { delete merged.teas[id]; return; }
       merged.teas[id] = Math.round(num(merged.teas[id], 0, 0, 999));
+    });
+    merged.orchard = Object.assign({ unlocked: false, wateredDay: 0, slots: [] }, s.orchard || {});
+    merged.orchard.unlocked = !!merged.orchard.unlocked;
+    merged.orchard.wateredDay = Math.round(num(merged.orchard.wateredDay, 0, 0, 100000));
+    const treeSlots = Array.isArray(merged.orchard.slots) ? merged.orchard.slots : [];
+    merged.orchard.slots = Array.from({ length: BALANCE.orchard.slots }).map(function (_, i) {
+      const t = treeSlots[i];
+      if (!t || !TREES[t.id]) return null;
+      return { id: t.id,
+               grown: Math.round(num(t.grown, 0, 0, BALANCE.orchard.growDays)),
+               day: Math.round(num(t.day, 1, 1, 100000)) };
+    });
+    merged.treeStock = {};
+    merged.fruits = {};
+    TREE_LIST.forEach(function (t) {
+      const row = (s.treeStock && s.treeStock[t.id]) || {};
+      merged.treeStock[t.id] = {
+        seed: Math.round(num(row.seed, 0, 0, 999)),
+        sapling: Math.round(num(row.sapling, 0, 0, 999))
+      };
+      merged.fruits[t.id] = Math.round(num(s.fruits && s.fruits[t.id], 0, 0, 99999));
     });
     merged.keys = Object.assign({ iron: 0, gold: 0 }, s.keys || {});
     Object.keys(merged.keys).forEach(function (id) {
@@ -414,6 +437,13 @@
     fishMany: fishMany, fishAll: fishAll, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,
     forage: forage, foragePool: foragePool, forageSeedPool: forageSeedPool,
     donate: donate, townTier: townTier, townBonus: townBonus, townNext: townNext,
+    TREES: TREES, TREE_LIST: TREE_LIST,
+    orchardSlots: orchardSlots, orchardUnlocked: orchardUnlocked, orchardUnlock: orchardUnlock,
+    treeData: treeData, treeBuyPrice: treeBuyPrice, treeStockCount: treeStockCount,
+    buyTreeStock: buyTreeStock, treeSlot: treeSlot, treeStage: treeStage, treeInSeason: treeInSeason,
+    plantTree: plantTree, waterOrchard: waterOrchard, orchardTick: orchardTick,
+    fruitCount: fruitCount, fruitValue: fruitValue, sellFruits: sellFruits,
+    orchardSummary: orchardSummary,
     marketHeadroom: marketHeadroom, fishMarketHeadroom: fishMarketHeadroom,
     snapshotMarket: snapshotMarket, marketSeries: marketSeries, pushMarketHist: pushMarketHist,
     cropNextSeasonMul: cropNextSeasonMul, fishNextSeasonMul: fishNextSeasonMul,

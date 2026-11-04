@@ -406,10 +406,10 @@
     });
     s.plots.forEach(function (p) { p.watered = false; });
 
+    const prevDay = s.day;
     s.day++;
     s.teaUsed = false;
     s.workUsed = false;
-
     // 市场冷却：昨天的销量今天只算 70%（回落 30%）
     const decay = BALANCE.market.decay;
     s.market = s.market || {};
@@ -452,6 +452,16 @@
       });
       watered += n; ripened += ripe;
       if (n) notes.push({ kind: 'water', text: '🚿 洒水器浇 ' + n + ' 块' + (ripe ? '，熟 ' + ripe : '') });
+    }
+
+    // 果园：昨天浇过水 → 育苗 +1 天；成树在自己季节每天结果
+    const orc = orchardTick(s, prevDay);
+    if (orc.grown) {
+      notes.push({ kind: 'orchard', text: '🍑 果树育苗 +' + orc.grown + ' 天' +
+        (orc.grownReady ? '（' + orc.grownReady + ' 棵成树）' : '') });
+    }
+    if (orc.fruit) {
+      notes.push({ kind: 'orchard', text: '🍑 果园产出 ' + orc.fruit + ' 个水果（值 ' + orc.value + '）' });
     }
 
     // 渔夫：发工资 → 替你重布渔网 → 自动甩杆（不耗玩家体力、不给玩家经验）
@@ -550,6 +560,8 @@
     if (deliverable) tomorrow.push(deliverable + ' 张委托能交');
     if (longLeft !== null) tomorrow.push('长期订单还剩 ' + longLeft + ' 天');
     if (s.coins < fee) tomorrow.push('金币不够明天的伙食（' + fee + ' 金）');
+    const orcSummary = orchardSummary(s);
+    if (orcSummary.growing) tomorrow.push('果园有 ' + orcSummary.growing + ' 棵育苗树要浇水');
     const report = {
       day: s.day,
       weather: { id: s.weather, emoji: w.emoji, name: w.name },
@@ -561,6 +573,8 @@
       fisher: fisherReport,
       net: netReport,
       orders: { fresh: (s.orders || []).length, deliverable: deliverable },
+      orchard: { grown: orc.grown, grownReady: orc.grownReady, fruit: orc.fruit, value: orc.value,
+                 growing: orcSummary.growing, mature: orcSummary.mature, stock: orcSummary.fruit },
       longOrder: s.longOrder ? { name: s.longOrder.name, emoji: s.longOrder.emoji,
         qty: s.longOrder.qty, have: orderHave(s, s.longOrder), days: longLeft } : null,
       tomorrow: tomorrow

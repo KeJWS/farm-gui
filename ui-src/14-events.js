@@ -65,6 +65,51 @@
         return;
       }
 
+      // 果园：开垦 / 种树 / 浇水 / 卖水果
+      const orcUnlock = t.closest('[data-orchard-unlock]');
+      if (orcUnlock && !orcUnlock.disabled) {
+        const r = G.orchardUnlock(state);
+        if (r.ok) { commit(r); toast(r.msg, 'good'); SFX.good(); orchardModal(); }
+        else { toast(r.msg, 'warn'); SFX.bad(); }
+        return;
+      }
+      const treePick = t.closest('[data-tree-pick]');
+      if (treePick) { treePicker(Number(treePick.dataset.treePick)); return; }
+      const treePlant = t.closest('[data-tree-plant]');
+      if (treePlant && !treePlant.disabled) {
+        const r = G.plantTree(state, Number(treePlant.dataset.treePlant),
+          treePlant.dataset.tree, treePlant.dataset.mode);
+        if (r.ok) { closeModal(); commit(r); toast(r.msg, 'good'); SFX.plant(); orchardModal(); }
+        else { toast(r.msg, 'bad'); SFX.bad(); }
+        return;
+      }
+      const orcWater = t.closest('[data-orchard-water]');
+      if (orcWater && !orcWater.disabled) {
+        const r = G.waterOrchard(state);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.water();
+        orchardModal();
+        return;
+      }
+      const orcSell = t.closest('[data-orchard-sell]');
+      if (orcSell && !orcSell.disabled) {
+        const r = G.sellFruits(state);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        orchardModal();
+        return;
+      }
+      const buyTree = t.closest('[data-buytree]');
+      if (buyTree && !buyTree.disabled) {
+        const r = G.buyTreeStock(state, buyTree.dataset.buytree, buyTree.dataset.mode, 1);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok && modalOpen()) departModal();
+        return;
+      }
+
       // 地块：熟了一键收，其余（空地/生长中/按住 Shift）进详情
       const plot = t.closest('.plot');
       if (plot) {
