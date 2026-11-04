@@ -7,7 +7,7 @@ const root = __dirname;
 // 先把 src/*.js 拼成 game.js，保证单文件用的是最新源码
 require('./build-modules.cjs');
 
-const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+const read = (f) => fs.readFileSync(path.join(root, f), 'utf8').replace(/\r\n/g, '\n');
 
 let html = read('index.html');
 const css = read('style.css');

@@ -355,8 +355,13 @@
   function sleep(s) {
     const fee = mealFee(s);
     const notes = [];
+    const coinsBefore = s.coins || 0;
+    const cash = [];        // 当日现金收支（正负号）
+    const goods = [];       // 入库产出（折算成金，不算现金）
+    let missedNow = 0;
     if (s.coins >= fee) {
       addCoins(s, -fee, '伙食费');
+      cash.push({ label: '🍖 伙食', value: -fee });
       notes.push({ kind: 'meal', text: '🍖 伙食 -' + fee });
       s.energy = s.maxEnergy;
     } else {
@@ -367,8 +372,8 @@
     }
 
     // 自动收获器：睡觉时把能收的地块收掉，不耗体力
+    let hn = 0, hval = 0, hrp = 0;
     if (s.harvester && s.harvesterOn) {
-      let hn = 0, hval = 0, hrp = 0;
       s.plots.forEach(function (p, i) {
         if (!p.crop || !canHarvest(s, p)) return;
         const hr = harvest(s, i, true);
@@ -379,10 +384,10 @@
     }
 
     // 自动播种器：每台只管自己那 5 块，用自己选的种子把空着的补上（不耗体力）
+    let sn = 0;
     if (s.seeder && s.seederOn && !isWinter(s.day)) {
       const per = BALANCE.device.seederPlots;
       const machines = Math.round(s.seeder || 0);
-      let sn = 0;
       for (let k = 1; k <= machines; k++) {
         const seed = autoSeedOf(s, k);
         if (!seed) continue;
@@ -397,7 +402,7 @@
 
     s.plots.forEach(function (p) {
       if (p.crop && (p.phase === 'growing' || p.phase === 'regrow') && !p.watered &&
-          !(p.auto && p.planted === s.day)) p.missed++;
+          !(p.auto && p.planted === s.day)) { p.missed++; missedNow++; }
     });
     s.plots.forEach(function (p) { p.watered = false; });
 
@@ -426,12 +431,14 @@
     notes.push({ kind: 'weather', text: w.emoji + ' ' + w.name });
     snapshotMarket(s);            // 记一笔今天的市价，攒历史曲线
 
+    let watered = 0, ripened = 0;
     if (w.autoWater) {
       let n = 0, ripe = 0;
       s.plots.forEach(function (p) {
         if (!p.crop || p.phase === 'ripe') return;
         if (!p.watered) { if (grow(p, s)) ripe++; p.watered = true; n++; }
       });
+      watered += n; ripened += ripe;
       if (n) notes.push({ kind: 'water', text: '🌧️ 自动浇 ' + n + ' 块' + (ripe ? '，熟 ' + ripe : '') });
     } else if (s.sprinklers > 0) {
       // 洒水器：每天自动浇前 N 块没浇的地，不耗体力
@@ -443,28 +450,38 @@
         p.watered = true;
         n++;
       });
+      watered += n; ripened += ripe;
       if (n) notes.push({ kind: 'water', text: '🚿 洒水器浇 ' + n + ' 块' + (ripe ? '，熟 ' + ripe : '') });
     }
 
     // 渔夫：发工资 → 替你重布渔网 → 自动甩杆（不耗玩家体力、不给玩家经验）
+    let fisherReport = null;
     if (fisherObj(s) && !isWinter(s.day)) {
       const wage = fisherWage(s);
       if ((s.coins || 0) >= wage) {
         addCoins(s, -wage, '渔夫工资');
+        cash.push({ label: '🧑‍🌾 渔夫工资', value: -wage });
         if (s.nets > 0) s.netSet = s.nets;
         const fr = fisherCatch(s);
+        fisherReport = { lv: fr.lv, got: fr.got, casts: fr.casts, value: fr.value, wage: wage,
+                         leveled: fr.leveled, short: fr.short };
+        if (fr.value) goods.push({ label: '🧑‍🌾 渔夫渔获', value: fr.value });
         notes.push({ kind: 'fisher', text: '🧑‍🌾 渔夫 Lv' + fr.lv + ' · ' + fr.got + '/' + fr.casts +
           ' 条（值 ' + fr.value + '）· 工资 -' + wage +
           (fr.leveled ? ' · 升级 ×' + fr.leveled : '') + (fr.short ? ' · 面团饵不够' : '') });
       } else {
+        fisherReport = { lv: fisherLv(s), got: 0, casts: 0, value: 0, wage: wage, strike: true };
         notes.push({ kind: 'fisher', text: '🧑‍🌾 渔夫没领到工资，今天罢工' });
       }
     }
 
     // 渔网：只算布置好的那些，每天消耗面团饵，有概率上鱼
+    let netReport = null;
     if (s.nets > 0) {
       const nr = netCatch(s);
       if (nr.used) {
+        netReport = { got: nr.got, used: nr.used, value: nr.value, pending: netPending(s) };
+        if (nr.value) goods.push({ label: '🕸️ 渔网渔获', value: nr.value });
         notes.push({ kind: 'net', text: '🕸️ 渔网 ' + nr.got + '/' + nr.used + ' 条' +
           (netPending(s) ? '（' + netPending(s) + ' 张待重布）' : '') });
       }
@@ -472,7 +489,10 @@
 
     // 收购箱：昨晚放进去的货，天亮按原价结清
     const ship = shipBox(s);
-    if (ship.n) notes.push({ kind: 'box', text: '📦 收购箱 +' + ship.value });
+    if (ship.n) {
+      cash.push({ label: '📦 收购箱', value: ship.value });
+      notes.push({ kind: 'box', text: '📦 收购箱 +' + ship.value });
+    }
 
     // 5 块地之后每周要交土地维护费
     const landFee = plotUpkeep(s.plots.length);
@@ -482,6 +502,7 @@
       const pay = Math.min(up, s.coins);
       s.coins -= pay;
       ledger(s, '维护费（周）', 0, pay);
+      cash.push({ label: '🧾 维护费', value: -pay });
       notes.push({ kind: 'upkeep', text: '🧾 维护 -' + pay + '（土地 ' + landFee + ' + 设备 ' + devFee + '）' });
     }
 
@@ -491,6 +512,7 @@
       const pay = Math.min(tax, s.coins);
       s.coins -= pay;
       ledger(s, '月度税金', 0, pay);
+      cash.push({ label: '🏛️ 税金', value: -pay });
       notes.push({ kind: 'tax', text: '🏛️ 税 -' + pay + '（4%）' });
     }
 
@@ -514,8 +536,37 @@
     const body = notes.filter(function (n) { return n.kind !== 'weather'; })
                       .map(function (n) { return n.text; }).join(' · ');
     log(s, '🌙 睡觉 → 第 ' + s.day + ' 天 · ' + w.name, 'sys');
+
+    // 每日总结：把这一晚发生的事整理成结构化数据，给界面做「一天结算」面板
+    const ready = s.plots.filter(function (p) { return p.crop && p.phase === 'ripe'; }).length;
+    const thirsty = s.plots.filter(function (p) {
+      return p.crop && (p.phase === 'growing' || p.phase === 'regrow') && !p.watered;
+    }).length;
+    const deliverable = (s.orders || []).filter(function (o) { return orderHave(s, o) >= o.qty; }).length;
+    const longLeft = s.longOrder && s.longOrder.deadline ? Math.max(0, s.longOrder.deadline - s.day) : null;
+    const tomorrow = [];
+    if (ready) tomorrow.push('有 ' + ready + ' 块地可以收割');
+    if (thirsty) tomorrow.push(thirsty + ' 块地要浇水');
+    if (deliverable) tomorrow.push(deliverable + ' 张委托能交');
+    if (longLeft !== null) tomorrow.push('长期订单还剩 ' + longLeft + ' 天');
+    if (s.coins < fee) tomorrow.push('金币不够明天的伙食（' + fee + ' 金）');
+    const report = {
+      day: s.day,
+      weather: { id: s.weather, emoji: w.emoji, name: w.name },
+      coins: { before: coinsBefore, after: s.coins, delta: s.coins - coinsBefore },
+      cash: cash,
+      goods: goods,
+      farm: { harvested: hn, harvestValue: hval, replanted: hrp, seeder: sn,
+              watered: watered, ripened: ripened, missed: missedNow },
+      fisher: fisherReport,
+      net: netReport,
+      orders: { fresh: (s.orders || []).length, deliverable: deliverable },
+      longOrder: s.longOrder ? { name: s.longOrder.name, emoji: s.longOrder.emoji,
+        qty: s.longOrder.qty, have: orderHave(s, s.longOrder), days: longLeft } : null,
+      tomorrow: tomorrow
+    };
     return { ok: true, msg: '新的一天', day: s.day, notes: notes, weather: s.weather,
-             summary: body ? head + ' ｜ ' + body : head };
+             summary: body ? head + ' ｜ ' + body : head, report: report };
   }
 
   function pickBait(s, prefer) {

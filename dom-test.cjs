@@ -149,7 +149,7 @@ ok(html('#plot-grid').indexOf('class="plot') >= 0 && (html('#plot-grid').match(/
 ok(text('#hud-plots').indexOf('5 块') >= 0, 'HUD 显示 5 块地', text('#hud-plots'));
 ok(text('#farm-lv').indexOf('Lv') >= 0 && text('#fish-lv').indexOf('Lv') >= 0,
    '农田 / 河边显示等级', [text('#farm-lv'), text('#fish-lv')]);
-ok(text('#store-sum').indexOf('总价') >= 0, '仓库显示总价值', text('#store-sum'));
+ok(text('#store-sum').indexOf('估值') >= 0, '仓库显示总价值', text('#store-sum'));
 ok(html('#store-list').indexOf('去水产店卖') < 0, '仓库渔获不再写「去水产店卖」');
 ok(html('#store-list').indexOf('脆生生') >= 0, '仓库作物显示简述');
 ok(html('#store-list').indexOf('松茸') >= 0, '仓库能显示采集来的野货');
@@ -325,15 +325,15 @@ document.querySelector('#btn-analysis').fire('click', { target: {} });
 ok(html('#modal-root').indexOf('市场分析') >= 0, '市场分析面板能打开');
 ok(html('#modal-root').indexOf('供需 ×') >= 0 && html('#modal-root').indexOf('季节 ×') >= 0,
    '分析面板列出供需与季节系数');
-ok(html('#modal-root').indexOf('7 天') >= 0, '分析面板显示 7 天走势');
-ok(html('#modal-root').indexOf('下季 ×') >= 0, '分析面板预测下一季');
+ok(/近 \d+ 点/.test(html('#modal-root')), '分析面板显示 7 天走势');
+ok(html('#modal-root').indexOf('下季开市 ×') >= 0, '分析面板预测下一季');
 ok((html('#modal-root').match(/<svg class="spark"/g) || []).length >= 20, '每种货都有一条价格曲线',
    (html('#modal-root').match(/<svg class="spark"/g) || []).length);
 (function multiPoint() {
   const m = html('#modal-root').match(/polyline points="([^"]+)"/);
   const pts = m ? m[1].trim().split(/\s+/).length : 0;
   ok(pts >= 3, '价格曲线能画出多个点', pts);
-  ok(html('#modal-root').indexOf('7 天 ') >= 0, '分析面板显示 7 天涨跌');
+  ok(/（[+-]?\d+%）/.test(html('#modal-root')), '分析面板显示 7 天涨跌');
 })();
 
 console.log('\n== 小镇 ==');
@@ -422,6 +422,17 @@ ok(stHtml.indexOf('挖蚯蚓等级') >= 0 && stHtml.indexOf('采集等级') >= 0
 ok(stHtml.indexOf('交易等级') >= 0, '状态面板列出交易等级');
 ok(stHtml.indexOf('其中自动播种器') < 0, '维护费不再带「其中自动播种器」');
 ok(text('#trade-lv').indexOf('Lv') >= 0, '商店面板显示交易等级', text('#trade-lv'));
+
+console.log('\n== 每日总结 ==');
+(function daySummary() {
+  const btn = { dataset: { act: 'sleep' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-act]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+const sumHtml = html('#modal-root');
+ok(sumHtml.indexOf('每日总结') >= 0, '睡觉后弹出每日总结面板');
+ok(sumHtml.indexOf('今日收支') >= 0 && sumHtml.indexOf('金币') >= 0, '总结列出收支与金币变化');
+ok(sumHtml.indexOf('今日委托') >= 0, '总结带委托状态');
 
 setTimeout(function () {
   console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));

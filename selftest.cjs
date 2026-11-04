@@ -2220,5 +2220,25 @@ for (let i = 0; i < 3000; i++) {
 ok(!err, '3000 步随机操作无异常、不变量成立', err && err.message);
 ok(JSON.stringify(s).length > 0, '最终状态可序列化（' + (JSON.stringify(s).length / 1024).toFixed(1) + ' KB）');
 
+/* ---------- 8. 每日总结 ---------- */
+section('每日总结');
+G.setRng(mulberry32(7));
+s = G.createState();
+s.coins = 300;
+G.addStore(s, 'carrot', 'std', 3);
+const coinsBeforeSleep = s.coins;
+const sleepRes = G.sleep(s);
+const rep = sleepRes.report;
+ok(!!rep && rep.day === s.day, '睡觉返回结构化的每日总结');
+const cashSum = rep.cash.reduce(function (n, x) { return n + x.value; }, 0);
+ok(cashSum === rep.coins.after - rep.coins.before, '收支明细合计等于金币变化',
+   [cashSum, rep.coins.after - rep.coins.before]);
+ok(rep.coins.before === coinsBeforeSleep && rep.coins.after === s.coins, '总结里的金币前后值正确');
+ok(rep.weather && rep.weather.name && rep.weather.emoji, '总结带当天天气');
+ok(rep.farm && typeof rep.farm.harvested === 'number' && typeof rep.farm.missed === 'number',
+   '总结带农场数据（收获 / 缺水）');
+ok(Array.isArray(rep.tomorrow) && rep.orders && typeof rep.orders.fresh === 'number',
+   '总结带明日提示与新委托数');
+
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));
 process.exit(fail ? 1 : 0);
