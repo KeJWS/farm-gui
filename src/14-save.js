@@ -188,7 +188,8 @@
       // v2.29 起收购箱只记「原价 raw」，结算时才按当日市价算；老存档的 v 直接当 raw
       const raw = Math.round(num(e.raw != null ? e.raw : e.v, 0, 0, 1e9));
       const out = { kind: e.kind, name: plain(e.name, 20), emoji: plain(e.emoji, 4),
-                    n: Math.round(num(e.n, 1, 1, 9999)), raw: raw };
+                    n: Math.round(num(e.n, 1, 1, 9999)), raw: raw,
+                    sold: Math.round(num(e.sold, 0, 0, 1e6)) };
       if (e.kind === 'crop' && CROPS[e.id]) {
         out.id = e.id;
         out.parts = Array.isArray(e.parts) ? e.parts.filter(function (p) {

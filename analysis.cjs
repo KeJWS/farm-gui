@@ -161,7 +161,7 @@ console.log('   农产品店买入：售价 ×' + G.BALANCE.shop.cropPriceMul + 
 console.log('\n== 卖货渠道（1000 金货值）==');
 const saleRows = [
   ['委托', G.BALANCE.order.mult, '立刻（每天 2 作物单 + 1 鱼单）'],
-  ['收购箱', 1 - G.BALANCE.market.boxFee, '下次睡觉按当时市价结算'],
+  ['收购箱', 1 - G.BALANCE.market.boxFee, '按入箱时市价锁价，睡觉结算'],
   ['水产店 / 农产品店', G.BALANCE.shop.sellRate, '立刻']
 ];
 saleRows.forEach(function (r) {

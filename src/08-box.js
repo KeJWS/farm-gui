@@ -1,21 +1,55 @@
-/* 收购箱（隔夜按原价结算） */
+/* 收购箱（按入箱时的市价锁价，睡觉结算） */
   /* ---------------- 收购箱 ---------------- */
 
   function boxCount(s) { return (s.box || []).length; }
 
-  /* 收购箱里的东西按「次日市价 ×（1−手续费）」估值；
-   * 入箱时不压价、也不算销量 —— 真正出货是在睡觉结算那一刻。 */
+  function boxRaw(e) { return e.raw != null ? e.raw : (e.v || 0); }
+  function boxSold(e) { return e.sold != null ? e.sold : 0; }
+  function boxKeyOf(e) { return e.kind === 'crop' ? 'c:' + e.id : 'f:' + e.name; }
+
+  /* 同一品种的几批货合成一批：按「入箱时供需的批次中点」锁价，
+   * 所以拆成几批放进去和一次全放，价格完全一样。
+   * 出箱时只跟随当天季节（换季会影响），不再吃隔夜回落的红利。 */
+  function boxGroups(s) {
+    const map = {}, out = [];
+    (s.box || []).forEach(function (e) {
+      const key = boxKeyOf(e);
+      if (!map[key]) {
+        map[key] = { key: key, kind: e.kind, id: e.id, name: e.name,
+                     junk: e.kind === 'fish' && fishIsJunk(e),
+                     n: 0, raw: 0, sold: boxSold(e) };
+        out.push(map[key]);
+      }
+      const g = map[key];
+      g.n += e.n || 1;
+      g.raw += boxRaw(e);
+      g.sold = Math.min(g.sold, boxSold(e));
+    });
+    return out;
+  }
+
+  /* 一组货的到手金额：锁定供需 × 出箱当天季节 × 成就加成 ×（1−手续费） */
+  function boxGroupNet(s, g) {
+    const mkt = g.junk ? 1
+      : (g.kind === 'fish'
+        ? fishMarketMul(s, g.name, g.n, g.sold)
+        : marketMul(s, g.id, g.n, g.sold));
+    return Math.max(1, Math.round(g.raw * sellBonus(s) * mkt * (1 - BALANCE.market.boxFee)));
+  }
+
+  /* 单个批次的展示金额：按它在同品种里的原价占比分摊 */
   function boxEntryNet(s, e) {
-    const raw = e.raw != null ? e.raw : (e.v || 0);
-    const cnt = e.n || 1;
-    const junk = e.junk || e.chest || e.trash;
-    const mkt = junk ? 1
-      : (e.kind === 'fish' ? fishMarketMul(s, e.name, cnt) : marketMul(s, e.id, cnt));
-    return Math.max(1, Math.round(raw * sellBonus(s) * mkt * (1 - BALANCE.market.boxFee)));
+    const groups = boxGroups(s);
+    let g = null;
+    for (let i = 0; i < groups.length; i++) if (groups[i].key === boxKeyOf(e)) { g = groups[i]; break; }
+    if (!g) return 0;
+    const total = boxGroupNet(s, g);
+    if (g.raw <= 0) return total;
+    return Math.max(0, Math.round(total * boxRaw(e) / g.raw));
   }
 
   function boxValue(s) {
-    return (s.box || []).reduce(function (n, e) { return n + boxEntryNet(s, e); }, 0);
+    return boxGroups(s).reduce(function (n, g) { return n + boxGroupNet(s, g); }, 0);
   }
 
   /* 从仓库按「品质差的先出」取 n 个，返回 parts 与总价值 */
@@ -36,7 +70,7 @@
     return { parts: parts, left: left };
   }
 
-  /* 放进收购箱：只记账，不压价、不计销量；睡觉时按当日市价结算并扣手续费 */
+  /* 放进收购箱：只记账，不压价、不计销量；入箱那一刻的供需被锁进批次里 */
   function boxPutCrop(s, id, n) {
     const have = storeCount(s, id);
     if (!have) return { ok: false, msg: '仓库里没有这种作物' };
@@ -45,10 +79,11 @@
     const t = takeStoreN(s, id, qty);
     const raw = t.parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
     s.box = s.box || [];
-    const entry = { kind: 'crop', id: id, name: c.name, emoji: c.emoji, n: qty, parts: t.parts, raw: raw };
+    const entry = { kind: 'crop', id: id, name: c.name, emoji: c.emoji, n: qty, parts: t.parts,
+                    raw: raw, sold: marketSold(s, id) };
     s.box.push(entry);
-    log(s, '📦 ' + c.name + '×' + qty + ' 放进收购箱（约 ' + boxEntryNet(s, entry) +
-      ' 金，睡觉按当日市价结算，扣 ' + Math.round(BALANCE.market.boxFee * 100) + '% 手续费）', 'info');
+    log(s, '📦 ' + c.name + '×' + qty + ' 放进收购箱（按入箱时市价约 ' + boxEntryNet(s, entry) +
+      ' 金，睡觉结算，扣 ' + Math.round(BALANCE.market.boxFee * 100) + '% 手续费）', 'info');
     return { ok: true, msg: c.name + '×' + qty + ' 已入箱', v: boxEntryNet(s, entry), n: qty };
   }
 
@@ -59,13 +94,15 @@
     const qty = Math.max(1, Math.min(g.count, Math.floor(n || g.count)));
     const parts = takeFishN(s, key, qty);
     const raw = parts.reduce(function (a, p) { return a + p.n * p.unit; }, 0);
+    const soldNow = (s.marketF && s.marketF[g.name] && s.marketF[g.name].sold) || 0;
     s.box = s.box || [];
     const entry = { kind: 'fish', name: g.name, emoji: g.emoji, n: qty, parts: parts, raw: raw,
+                    sold: soldNow,
                     chest: g.chest || undefined, junk: g.junk || undefined,
                     trash: (g.junk && !g.chest) ? true : undefined };
     s.box.push(entry);
-    log(s, '📦 ' + g.emoji + ' ' + g.name + '×' + qty + ' 放进收购箱（约 ' + boxEntryNet(s, entry) +
-      ' 金，睡觉按当日市价结算）', 'info');
+    log(s, '📦 ' + g.emoji + ' ' + g.name + '×' + qty + ' 放进收购箱（按入箱时市价约 ' +
+      boxEntryNet(s, entry) + ' 金，睡觉结算）', 'info');
     return { ok: true, msg: g.name + '×' + qty + ' 已入箱', v: boxEntryNet(s, entry), n: qty };
   }
 
@@ -129,17 +166,20 @@
     return { ok: true, msg: '取回 ' + e.name + ' ×' + took, n: took };
   }
 
-  /* 收购箱出货：睡觉时按当时市价一次性结清（扣手续费，并按批次推进供需） */
+  /* 收购箱出货：睡觉时按入箱时锁定的供需 × 当天季节一次性结清
+   * （先算完所有组的钱，再统一记销量 —— 顺序不影响总价） */
   function shipBox(s) {
     const list = s.box || [];
     if (!list.length) return { n: 0, value: 0 };
+    const groups = boxGroups(s);
     let value = 0, n = 0;
-    list.forEach(function (e) {
-      const cnt = e.n || 1;
-      value += boxEntryNet(s, e);
-      n += cnt;
-      if (e.kind === 'crop' && e.id) addSupply(s, e.id, cnt);
-      else if (e.kind === 'fish' && !e.junk && !e.chest && !e.trash) addFishSupply(s, e.name, cnt);
+    groups.forEach(function (g) {
+      value += boxGroupNet(s, g);
+      n += g.n;
+    });
+    groups.forEach(function (g) {
+      if (g.kind === 'crop' && g.id) addSupply(s, g.id, g.n);
+      else if (g.kind === 'fish' && !g.junk) addFishSupply(s, g.name, g.n);
     });
     s.box = [];
     s.stats.boxItems = (s.stats.boxItems || 0) + n;

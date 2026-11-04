@@ -113,8 +113,9 @@
       '<div class="shop-head">' + name + ' · 仓库有 <b>' + n + '</b> 件</div>' +
       '<label class="buy-custom"><span>放入数量</span>' +
         '<input id="box-put-n" type="number" min="1" max="' + n + '" step="1" value="1" inputmode="numeric"></label>' +
-      '<div class="shop-tip">指定数量会从仓库移入收购箱，剩余库存不变；<b>下次睡觉时</b>按当时的市价结算，' +
-        '并扣 ' + Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费。入箱时不会马上压价。</div>',
+      '<div class="shop-tip">指定数量会从仓库移入收购箱，剩余库存不变；<b>按入箱时的市价锁价</b>，' +
+        '睡觉结算时只跟随<b>当天季节</b>，并扣 ' + Math.round(G.BALANCE.market.boxFee * 100) +
+        '% 手续费。入箱不压价，拆几批放和一次放价格一样。</div>',
       '<button class="btn primary" data-boxput-kind="' + kind + '" data-boxput-key="' + key + '">放入收购箱</button>' +
       '<button class="btn" data-close>取消</button>');
   }
@@ -141,7 +142,7 @@
 
     openModal('📦 收购箱',
       '<div class="shop-head">待出货 <b>' + list.length + '</b> 批 · 预计到手 <b>' + total + '</b> 金' +
-        '（按当前市价 ×' + Math.round((1 - G.BALANCE.market.boxFee) * 100) + '%）</div>' +
+        '（按入箱时市价 ×' + Math.round((1 - G.BALANCE.market.boxFee) * 100) + '%）</div>' +
       rows +
       (list.length
         ? '<div class="buy-custom"><span>🧮 自定义取出</span>' +
@@ -152,8 +153,8 @@
             '<button class="btn mini" data-boxtaken="1">取出</button>' +
             '<span class="bc-tip">共 ' + list.reduce(function (a, e) { return a + (e.n || 1); }, 0) + ' 件</span></div>'
         : '') +
-      '<div class="shop-tip">放进去的货会在<b>下次睡觉时</b>按当时的市价结算，扣 ' +
-      Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费（市价可能比现在高，也可能更低）；' +
+      '<div class="shop-tip">放进去的货按<b>入箱时的市价锁价</b>，睡觉结算时只跟随<b>出箱当天的季节</b>' +
+      '（换季会变），扣 ' + Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费；' +
       '直接卖给水产店 / 农产品店只有 ' + Math.round(G.BALANCE.shop.sellRate * 100) + '%。<br>' +
       '放错了可以取出放回仓库，入箱 / 取出都不影响市价。</div>',
       '<button class="btn" data-boxtake' + (list.length ? '' : ' disabled') + '>全部取出</button>' +

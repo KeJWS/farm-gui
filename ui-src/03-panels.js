@@ -123,7 +123,7 @@
     if (boxBtn) {
       const n = G.boxCount(state);
       boxBtn.textContent = '📦 收购箱' + (n ? ' (' + n + ')' : '');
-      boxBtn.title = n ? '待出货 ' + G.boxValue(state) + ' 金（按次日市价，含 5% 费）' : '仓库里点 📦 放货进去';
+      boxBtn.title = n ? '待出货 ' + G.boxValue(state) + ' 金（入箱锁价，含 5% 费）' : '仓库里点 📦 放货进去';
     }
   }
 

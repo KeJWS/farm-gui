@@ -2492,5 +2492,45 @@ section('v2.29 市场（批次中点 / 收购箱 / 买货影响供需）');
     { buyCost: buyCost, box: putArb.v });
 }
 
+/* ---------- 12. v2.30 收购箱锁价 ---------- */
+section('v2.30 收购箱锁价（合并定价 / 入箱快照）');
+{
+  const shipTotal = function (fn) {
+    const s = G.createState(); s.day = 35; s.coins = 100;
+    G.addStore(s, 'watermelon', 'std', 20);
+    fn(s);
+    const est = G.boxValue(s);
+    G.sleep(s);
+    return { est: est, got: s.coins - 100 + G.mealFee(s) };
+  };
+  const whole = shipTotal(function (s) { G.boxPutCrop(s, 'watermelon', 20); });
+  const split = shipTotal(function (s) {
+    G.boxPutCrop(s, 'watermelon', 10);
+    G.boxPutCrop(s, 'watermelon', 10);
+  });
+  ok(split.est === whole.est && split.got === whole.got,
+    '拆成两批放 = 一次放（合并定价）', [whole, split]);
+
+  /* 入箱后市场被砸烂：箱内估值与结算都不受影响（锁定入箱时的供需） */
+  const snap = G.createState(); snap.day = 35; snap.coins = 100;
+  G.addStore(snap, 'watermelon', 'std', 10);
+  G.boxPutCrop(snap, 'watermelon', 10);
+  const est = G.boxValue(snap);
+  G.addSupply(snap, 'watermelon', 40);
+  ok(G.boxValue(snap) === est, '入箱后砸盘不影响箱内估值', [est, G.boxValue(snap)]);
+  G.sleep(snap);
+  ok(snap.coins === 100 + est - G.mealFee(snap), '结算按入箱时锁定的供需',
+    { coins: snap.coins, expect: 100 + est - G.mealFee(snap) });
+
+  /* 换季仍然影响：反季锁价，出箱变当季 → 少钱 */
+  const season = G.createState(); season.day = 30; season.coins = 100;
+  G.addStore(season, 'watermelon', 'std', 10);
+  G.boxPutCrop(season, 'watermelon', 10);
+  const estOff = G.boxValue(season);
+  G.sleep(season);
+  const gotSeason = season.coins - 100 + G.mealFee(season);
+  ok(gotSeason < estOff, '换季按出箱当天的季节重算', { est: estOff, got: gotSeason });
+}
+
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));
 process.exit(fail ? 1 : 0);

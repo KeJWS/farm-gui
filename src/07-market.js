@@ -26,9 +26,9 @@
   }
   function marketSold(s, id) { return (s.market && s.market[id] && s.market[id].sold) || 0; }
 
-  function marketInfo(s, id, n) {
+  function marketInfo(s, id, n, soldBase) {
     const M = BALANCE.market;
-    const sold = marketSold(s, id);
+    const sold = soldBase == null ? marketSold(s, id) : soldBase;
     const supply = clamp(M.supplyMax - M.cropStep * midSold(sold, n), M.supplyMin, M.supplyMax);
     const inSeason = CROPS[id] ? cropSeasonOk(id, s.day) : true;
     const season = inSeason ? 1 : M.offSeason;
@@ -36,7 +36,7 @@
     return { sold: sold, supply: supply, season: season, inSeason: inSeason, total: total,
              tag: marketTag(supply) };
   }
-  function marketMul(s, id, n) { return marketInfo(s, id, n).total; }
+  function marketMul(s, id, n, soldBase) { return marketInfo(s, id, n, soldBase).total; }
   function addSupply(s, id, n) { marketOf(s, id).sold += Math.max(0, n || 0); }
   function removeSupply(s, id, n) {
     const m = s.market && s.market[id];
@@ -51,9 +51,11 @@
     if (!s.marketF[name]) s.marketF[name] = { sold: 0 };
     return s.marketF[name];
   }
-  function fishMarketInfo(s, name, n) {
+  function fishMarketInfo(s, name, n, soldBase) {
     const M = BALANCE.market;
-    const sold = (s.marketF && s.marketF[name] && s.marketF[name].sold) || 0;
+    const sold = soldBase == null
+      ? ((s.marketF && s.marketF[name] && s.marketF[name].sold) || 0)
+      : soldBase;
     const supply = clamp(M.supplyMax - M.fishStep * midSold(sold, n), M.supplyMin, M.supplyMax);
     const f = fishByName(name);
     const inRun = f && f.seasons ? f.seasons.indexOf(seasonIdx(s.day)) >= 0 : true;
@@ -62,7 +64,7 @@
     return { sold: sold, supply: supply, season: season, inRun: inRun, total: total,
              tag: marketTag(supply) };
   }
-  function fishMarketMul(s, name, n) { return fishMarketInfo(s, name, n).total; }
+  function fishMarketMul(s, name, n, soldBase) { return fishMarketInfo(s, name, n, soldBase).total; }
   function addFishSupply(s, name, n) { fishMarketOf(s, name).sold += Math.max(0, n || 0); }
   function removeFishSupply(s, name, n) {
     const m = s.marketF && s.marketF[name];

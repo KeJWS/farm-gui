@@ -102,7 +102,7 @@
       '<div class="store-sub" style="margin-top:10px">🐟 水产 · 汛期 ×1 / 非汛期 ×' + OFF + '</div>' + fishRows +
       '<div class="shop-tip">右侧是当前市价系数；每行显示供需状态和距离下个价格档位的销量。' +
       '一批货按<b>批次中点</b>定价 —— 一次卖 30 件和分三次卖 10 件到手一样多；' +
-      '收购箱次日按市价结算、扣 ' + Math.round(G.BALANCE.market.boxFee * 100) + '%。' +
+      '收购箱<b>按入箱时市价锁价</b>、扣 ' + Math.round(G.BALANCE.market.boxFee * 100) + '%。' +
       '成本、利润、走势与下季估值见「分析」。</div>',
       '<button class="btn" data-close>关闭</button>');
   }
