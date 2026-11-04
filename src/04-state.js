@@ -139,7 +139,7 @@
     const U = BALANCE.upkeep;
     let fee = 0;
     for (let i = U.free; i < plots; i++) {
-      fee += i < 20 ? U.plotPerWeek : (i < 30 ? U.plotMid : U.plotHigh);
+      fee += i < U.midAt ? U.plotPerWeek : (i < U.highAt ? U.plotMid : U.plotHigh);
     }
     return fee;
   }

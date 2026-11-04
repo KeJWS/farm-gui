@@ -32,14 +32,21 @@
         '<table class="rule-table"><tr><th>作物</th><th>种子</th><th>生长</th><th>产量/块</th><th>单果</th><th>季节</th><th>解锁</th></tr>' +
         cropRows + '</table>' +
         '<p>生长按浇水天数推进，成熟当天不能收、<b>次日</b>才能收。<br>' +
-        '普通作物产量 = 基础 ±1 − 漏浇 + 施肥 + 等级加成（每 4 级 +1，最低 1）；' +
+        '普通作物产量 = 基础 ±1 − 漏浇 + 施肥 + 等级加成（每 ' +
+        G.BALANCE.level.yieldEvery + ' 级 +1，最低 1）；' +
         '<b>南瓜 / 西瓜固定 1 个</b>，不吃等级和产量肥料，只有<b>肥料品质加成</b>（见「肥料」）。<br>' +
-        '高级种子要<b>种田等级</b>解锁：玉米 Lv2、茄子/番茄/辣椒 Lv3、黄瓜/葡萄/草莓 Lv4、南瓜 Lv5、西瓜 Lv6。</p>' +
+        '高级种子要<b>种田等级</b>解锁：' +
+        G.CROP_LIST.filter(function (c) { return (c.lv || 1) > 1; })
+          .map(function (c) { return c.name + ' Lv' + c.lv; }).join('、') + '。</p>' +
       '</div>' +
 
       '<div class="rule-sec">' +
         '<h4>🍂 季节</h4>' +
-        '<p>每 <b>30 天</b>换一季：<b>春（1–30）/ 夏（31–60）/ 秋（61–90）/ 冬（91–120）</b>，然后循环。<br>' +
+        '<p>每 <b>' + G.BALANCE.seasonDays + ' 天</b>换一季：' +
+        G.SEASONS.map(function (s, i) {
+          return '<b>' + s + '（' + (i * G.BALANCE.seasonDays + 1) + '–' +
+            ((i + 1) * G.BALANCE.seasonDays) + '）</b>';
+        }).join('/') + '，然后循环。<br>' +
         '当季的种子按<b>原价</b>卖；<b>反季的种子也卖，但贵 ×' + G.BALANCE.seed.offSeasonMul + '</b>，' +
         '种下去第一茬多花 ' + G.BALANCE.seed.offSeasonDays + ' 天（南瓜 / 西瓜直接翻倍）、每茬少结 ' +
         G.BALANCE.seed.offSeasonYield + ' 个 —— 换来的好处是反季的收成卖价 <b>×' +
@@ -47,11 +54,11 @@
         '<b>冬天土地封冻、河面结冰</b>——不能播种、不能钓鱼（渔网也收不了），种子店歇业，只能打工、卖库存、交委托。<br>' +
         '已经种下的作物不受换季影响，该熟还会熟。</p>' +
         '<table class="rule-table"><tr><th>季节</th><th>特点</th></tr>' +
-        '<tr><td>🌱 春</td><td><b>多雨</b>（雨天 50%，自动浇水）</td></tr>' +
-        '<tr><td>☀️ 夏</td><td><b>多晴</b>（晴天 60%）· <b>浇水要 ' + G.BALANCE.energy.waterSummer +
+        '<tr><td>🌱 春</td><td><b>多雨</b>（雨天 ' + G.SEASON_WEATHER[0].rain + '%，自动浇水）</td></tr>' +
+        '<tr><td>☀️ 夏</td><td><b>多晴</b>（晴天 ' + G.SEASON_WEATHER[1].sunny + '%）· <b>浇水要 ' + G.BALANCE.energy.waterSummer +
           ' 体力</b>（其他季节 ' + G.BALANCE.energy.water + ' 点）</td></tr>' +
         '<tr><td>🍂 秋</td><td><b>丰收</b>：普通作物每次收获 <b>+1 个</b>（大作物不算）</td></tr>' +
-        '<tr><td>❄️ 冬</td><td>会<b>下雪</b>（45%，化雪等于自动浇水）· 不能种也不能钓</td></tr>' +
+        '<tr><td>❄️ 冬</td><td>会<b>下雪</b>（' + G.SEASON_WEATHER[3].snow + '%，化雪等于自动浇水）· 不能种也不能钓</td></tr>' +
         '</table>' +
       '</div>';
 
@@ -63,22 +70,28 @@
         '%、假饵 ' + Math.round(G.BALANCE.hook.lure * 100) + '%，晴天 ' +
         Math.round(G.BALANCE.weatherHook.sunny * 100) + '%、雨天 +' +
         Math.round(G.BALANCE.weatherHook.rain * 100) + '%。<br>' +
-        '🐟 <b>鱼汛</b>：每种鱼只在特定季节成群——汛期上钩权重 ×1.25，非汛期 ×0.3。' +
+        '🐟 <b>鱼汛</b>：每种鱼只在特定季节成群——汛期上钩权重 ×' + G.BALANCE.fishSeason.in +
+        '，非汛期 ×' + G.BALANCE.fishSeason.off + '。' +
         '鲫鱼 春·秋 / 鲤鱼 春夏秋 / 鳜鱼 春·夏 / 鲈鱼 夏·秋 / 河豚 秋 / 锦鲤 春。<br>' +
-        '咬钩之后才抽鱼种：蚯蚓好鱼 ×1.35 且品质取两次较好；假饵杂物 ×0.3、好鱼 ×1.15、耐用 ' +
+        '咬钩之后才抽鱼种：蚯蚓好鱼 ×' + G.BALANCE.bait.wormGood + ' 且品质取两次较好；假饵杂物 ×' +
+        G.BALANCE.bait.lureTrash + '、好鱼 ×' + G.BALANCE.bait.lureGood + '、耐用 ' +
         G.BALANCE.lure.dur + ' 次。<br>' +
         '🪝 <b>高级假饵</b>（钓鱼 Lv' + G.BALANCE.gate.lure2 + ' + <b>交易 Lv' +
         G.BALANCE.gate.lure2Trade + '</b> 解锁）：' + G.BALANCE.lure2.price +
-        ' 金 / 耐用 <b>' + G.BALANCE.lure2.dur + '</b> 次 —— <b>咬钩率同面团饵（92%）、好鱼率同假饵</b>' +
-        '（杂物 ×0.3、好鱼 ×1.15、品质取两次较好），是后期最省心的饵。<br>' +
+        ' 金 / 耐用 <b>' + G.BALANCE.lure2.dur + '</b> 次 —— <b>咬钩率同面团饵（' +
+        Math.round(G.BALANCE.hook.dough * 100) + '%）、好鱼率同假饵</b>' +
+        '（杂物 ×' + G.BALANCE.bait.lureTrash + '、好鱼 ×' + G.BALANCE.bait.lureGood +
+        '、品质取两次较好），是后期最省心的饵。<br>' +
         '🕸️ 渔网：<b>' + G.NET_COST + ' 金/张，不缴维护费</b>。晚上耗 1 份面团饵，<b>' +
         Math.round(G.NET_CHANCE * 100) + '%</b> 网到 1 条标准及以下的普通鱼，' +
-        '<b>不会出杂物和宝箱</b>；要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b> 解锁，上限 = 2 + 钓鱼等级（最多 ' + G.NET_MAX + ' 张）。<br>' +
+        '<b>不会出杂物和宝箱</b>；要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b> 解锁，上限 = ' +
+        G.BALANCE.gate.netBase + ' + 钓鱼等级（最多 ' + G.NET_MAX + ' 张）。<br>' +
         '网到鱼就得下水把鱼取下来，<b>这张网要花 ' + G.BALANCE.netReset.energy + ' 体力重新布置</b>（没布置的网当晚不出货）；' +
         '河边那张「渔网」卡上有「重新布置」按钮。<br>' +
         '🧑‍🌾 <b>渔夫</b>（钓鱼 Lv' + G.BALANCE.gate.fisher + '）：花 ' + G.BALANCE.fisher.hire +
         ' 金雇一个，每天工资 <b>' + G.BALANCE.fisher.wageBase + ' + ' + G.BALANCE.fisher.wageStep +
-        '×(等级−1)</b> 金；他每天替你<b>重布全部渔网</b>（不花你的体力）+ 自动甩 <b>2 + 等级</b> 杆' +
+        '×(等级−1)</b> 金；他每天替你<b>重布全部渔网</b>（不花你的体力）+ 自动甩 <b>' +
+        G.BALANCE.fisher.baseCasts + ' + 等级</b> 杆' +
         '（耗你的面团饵，不给经验）。<br>' +
         '渔夫<b>自己会练级</b>：每钓到 1 条 +1 经验，够 <b>' + G.BALANCE.fisher.needBase + ' + ' +
         G.BALANCE.fisher.needStep + '×(等级−1)</b> 就升一级，也可以花 ' + G.BALANCE.fisher.upCost +
@@ -182,37 +195,54 @@
     const P4 =
       '<div class="rule-sec">' +
         '<h4>💰 经济</h4>' +
-        '<p>· 睡觉推进 1 天，扣伙食费 <b>' + G.mealFee(state) + ' 金</b>，体力回满；没钱只回 5 点（不会扣掉已有的）<br>' +
+        '<p>· 睡觉推进 1 天，扣伙食费 <b>' + G.mealFee(state) + ' 金</b>，体力回满；没钱只回 ' +
+        G.BALANCE.meal.noMoneyMin + ' 点（不会扣掉已有的）<br>' +
         '· 睡醒会弹出<b>每日总结</b>：金币收支、农场自动操作、渔获、委托和明日提示<br>' +
-        '· 开局体力上限 <b>15</b>，强化 +5/级（成本每级 ×1.2）<br>' +
-        '· 打零工：<b>每天只能打一次</b>，全天 ×2.0 金/体力、半天 ×1.2，不够半天就把剩下的体力用光<br>' +
+        '· 开局体力上限 <b>' + G.BALANCE.start.maxEnergy + '</b>，强化 +' + G.BALANCE.upgrade.step +
+        '/级（成本每级 ×' + G.BALANCE.upgrade.costMul + '）<br>' +
+        '· 打零工：<b>每天只能打一次</b>，全天 ×' + G.BALANCE.work.full + ' 金/体力、半天 ×' +
+        G.BALANCE.work.half + '，不够半天就把剩下的体力用光<br>' +
         '· 挖蚯蚓 ' + G.BALANCE.dig.energy + ' 体力一次（挖蚯蚓满级 ' + (G.BALANCE.dig.energy - 1) +
         ' 体力，Lv4 / Lv8 各 +1 条），晴天 −1 条、阴雨 +1 条，最多 ' +
         (G.BALANCE.dig.cap + Math.floor(G.BALANCE.level.max / G.BALANCE.dig.yieldAt)) + ' 条<br>' +
         '· 强化体力 ' + G.upgradeCost(state) + ' 金 · 扩张土地 ' + G.expandCost(state) + ' 金<br>' +
         '· 🔧 <b>设备</b>都攒在右栏的「设备」面板里<br>' +
         '· 🚿 洒水器 ' + G.SPRINKLER_COST + ' 金/个（需种田 Lv' + G.BALANCE.gate.sprinkler +
-        '）：每天自动浇 1 块地，不耗体力（雨天自动浇，不叠加）<br>' +
+        '）：每天自动浇 ' + G.BALANCE.device.sprinklerPerDay + ' 块地，不耗体力（雨天自动浇，不叠加）<br>' +
         '· 🤖 自动收获器 ' + G.HARVESTER_COST + ' 金（需种田 Lv' + G.BALANCE.gate.harvester +
         '）：睡觉时自动收走成熟作物，不耗体力<br>' +
         '· 🌱 自动播种器 ' + G.SEEDER_COST + ' 金/台（需种田 Lv' + G.BALANCE.gate.seeder +
-        '）：<b>一台只管自己的 ' + G.SEEDER_PLOTS + ' 块地</b>（第 1 台管 1–5 块、第 2 台管 6–10 块…），' +
+        '）：<b>一台只管自己的 ' + G.SEEDER_PLOTS + ' 块地</b>（第 1 台管 1–' + G.SEEDER_PLOTS +
+        ' 块、第 2 台管 ' + (G.SEEDER_PLOTS + 1) + '–' + (G.SEEDER_PLOTS * 2) + ' 块…），' +
         '那块地<b>收完立刻补种</b>，睡觉时再把空着的补上；用你选的种子、不耗体力，每台每周维护 ' +
         G.BALANCE.upkeep.seeder + ' 金<br>' +
         '· 🍑 果园：种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.BALANCE.orchard.unlockCost +
-        ' 金开垦，先给 ' + G.BALANCE.orchard.free + ' 个树坑，第 4~' + G.BALANCE.orchard.slots +
-        ' 个树坑要花钱开（' + G.BALANCE.orchard.slotCosts.join(' / ') + ' 金）；种子要<b>浇水 ' +
+        ' 金开垦，先给 ' + G.BALANCE.orchard.free + ' 个树坑，第 ' + (G.BALANCE.orchard.free + 1) +
+        '~' + G.BALANCE.orchard.slots + ' 个树坑要花钱开（' + G.BALANCE.orchard.slotCosts.join(' / ') + ' 金）；种子要<b>浇水 ' +
         G.BALANCE.orchard.grow.seed.water + ' 天 + 生长 ' + G.BALANCE.orchard.grow.seed.days +
         ' 天</b>，树苗要<b>浇水 ' + G.BALANCE.orchard.grow.sapling.water + ' 天 + 生长 ' +
         G.BALANCE.orchard.grow.sapling.days + ' 天</b>（两项都满足才成树）；浇水 ' +
         G.BALANCE.orchard.waterEnergy + ' 体力 / 收获 ' + G.BALANCE.orchard.harvestEnergy + ' 体力；' +
         '成树只在自己的季节每天挂 ' + G.BALANCE.orchard.fruitPerDay + ' 个水果，收进仓库后去农产品店卖<br>' +
-        '· 💰 税：每 30 天按（金币 + 仓库价值）<b>累进</b>收一次——前 2000 收 2%、2000~1 万收 4%、1 万以上收 6%，最低 ' +
+        '· 💰 税：每 ' + G.BALANCE.tax.every + ' 天按（金币 + 仓库价值）<b>累进</b>收一次——' +
+        G.BALANCE.tax.bands.map(function (b, i) {
+          const from = i ? G.BALANCE.tax.bands[i - 1].upTo : 0;
+          const rate = Math.round(b.rate * 100) + '%';
+          if (b.upTo == null) return from + ' 以上收 ' + rate;
+          return (i ? from + '~' + b.upTo : '前 ' + b.upTo) + ' 收 ' + rate;
+        }).join('、') + '，最低 ' +
         G.BALANCE.tax.min + ' 金（当前约 ' + G.taxDue(state) + ' 金）<br>' +
-        '· 🧾 维护费：每 7 天收一次，土地 ' + G.plotUpkeep(state.plots.length) + ' 金（6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 ' +
-        G.BALANCE.upkeep.plotHigh + ' 金/周） + 设备 ' + G.deviceUpkeep(state) + ' 金（洒水器 3、自动收获器 5、自动播种器 ' +
-        G.BALANCE.upkeep.seeder + '/台，<b>渔网不收维护费</b>）<br>' +
-        '· 没钱吃饭只恢复到体力上限的 30%（至少 5 点），不会扣掉已有的体力<br>' +
+        '· 🧾 维护费：每 7 天收一次，土地 ' + G.plotUpkeep(state.plots.length) + ' 金（' +
+        G.BALANCE.upkeep.free + ' 块以内免费，第 ' + (G.BALANCE.upkeep.free + 1) + '–' +
+        G.BALANCE.upkeep.midAt + ' 块 ' + G.BALANCE.upkeep.plotPerWeek + ' 金/块/周、第 ' +
+        (G.BALANCE.upkeep.midAt + 1) + '–' + G.BALANCE.upkeep.highAt + ' 块 ' +
+        G.BALANCE.upkeep.plotMid + ' 金/块/周、' + (G.BALANCE.upkeep.highAt + 1) + ' 块以上 ' +
+        G.BALANCE.upkeep.plotHigh + ' 金/块/周） + 设备 ' +
+        G.deviceUpkeep(state) + ' 金（洒水器 ' + G.BALANCE.upkeep.sprinkle + '、自动收获器 ' +
+        G.BALANCE.upkeep.harvester + '、自动播种器 ' + G.BALANCE.upkeep.seeder +
+        '/台，<b>渔网不收维护费</b>）<br>' +
+        '· 没钱吃饭只恢复到体力上限的 ' + Math.round(G.BALANCE.meal.noMoneyPct * 100) + '%（至少 ' +
+        G.BALANCE.meal.noMoneyMin + ' 点），不会扣掉已有的体力<br>' +
         '· 种子 / 肥料都在种子店买卖（半价回收），肥料也只能在种子店卖；蚯蚓只能在渔具店卖（' + G.WORM_VALUE + ' 金/条）</p>' +
       '</div>' +
 
@@ -233,9 +263,15 @@
       '<div class="rule-sec">' +
         '<h4>⭐ 等级</h4>' +
         '<p>四条技能线：<b>种田 / 钓鱼 / 挖蚯蚓 / 采集</b>，各自独立升级，满级 Lv' + G.BALANCE.level.max +
-        '，每级所需 ' + G.levelNeed(1) + ' + 10×(级−1)。<br>' +
-        '· <b>种田</b>：收获作物 +1 经验，每 4 级 +1 产量（Lv4 / Lv8，大作物不吃）<br>' +
-        '· <b>钓鱼</b>：每 2 杆 1 点（完美品质 +2），每级咬钩 +1.1%（≤+10%）、好鱼 +2.5%（≤+22.5%）<br>' +
+        '，每级所需 ' + G.BALANCE.level.xpBase + ' + ' + G.BALANCE.level.xpStep + '×(级−1)。<br>' +
+        '· <b>种田</b>：收获作物 +' + G.BALANCE.level.farmXpHarvest + ' 经验，每 ' +
+        G.BALANCE.level.yieldEvery + ' 级 +1 产量（Lv' + G.BALANCE.level.yieldEvery + ' / Lv' +
+        (G.BALANCE.level.yieldEvery * 2) + '，大作物不吃）<br>' +
+        '· <b>钓鱼</b>：每 ' + G.BALANCE.level.fishXpEvery + ' 杆 1 点（完美品质 +' +
+        G.BALANCE.level.fishXpPerfect + '），每级咬钩 +' + (G.BALANCE.level.hookPerLv * 100).toFixed(1) +
+        '%（≤+' + Math.round(G.BALANCE.level.hookMax * 100) + '%）、好鱼 +' +
+        (G.BALANCE.level.goodPerLv * 100).toFixed(1) + '%（≤+' +
+        Math.round(G.BALANCE.level.goodMax * 100) + '%）<br>' +
         '· <b>挖蚯蚓</b>：每次 +' + G.BALANCE.dig.xp + ' 经验；<b>Lv4 / Lv8 各 +1 条</b>；<b>满级后只要 ' +
         (G.BALANCE.dig.energy - 1) + ' 体力</b><br>' +
         '· <b>采集</b>：每次 +' + G.BALANCE.forage.xp + ' 经验（采到 3 件 +1）；<b>Lv4 / Lv8 各多取一次品质</b>；<b>满级后只要 ' +

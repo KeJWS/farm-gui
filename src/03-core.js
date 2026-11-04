@@ -21,7 +21,9 @@
   /* 季节：每 30 天换一季，冬天（第 4 季）土地封冻、河面结冰 */
   const SEASONS = ['春', '夏', '秋', '冬'];
   const WINTER = 3;
-  function seasonIdx(day) { return Math.floor((Math.max(1, day || 1) - 1) / 30) % 4; }
+  function seasonIdx(day) {
+    return Math.floor((Math.max(1, day || 1) - 1) / BALANCE.seasonDays) % 4;
+  }
   function seasonOf(day) { return SEASONS[seasonIdx(day)]; }
   function isWinter(day) { return seasonIdx(day) === WINTER; }
 
@@ -153,16 +155,18 @@
     return ups;
   }
 
-  /* 种田等级：每 4 级 +1 产量（普通作物）；大作物不吃等级 */
+  /* 种田等级：每 yieldEvery 级 +1 产量（普通作物）；大作物不吃等级 */
   function farmYieldBonus(s) {
-    return Math.floor((((s.levels && s.levels.farm) || 1)) / 4);
+    return Math.floor((((s.levels && s.levels.farm) || 1)) / BALANCE.level.yieldEvery);
   }
-  /* 钓鱼等级：咬钩率 +1.1%/级（最多 +10%），好鱼权重 +2.5%/级（最多 +22.5%） */
+  /* 钓鱼等级：咬钩率 +hookPerLv/级（上限 +hookMax），好鱼权重 +goodPerLv/级（上限 +goodMax） */
   function fishHookBonus(s) {
-    return Math.min(0.10, 0.011 * ((((s.levels && s.levels.fish) || 1)) - 1));
+    const L = BALANCE.level;
+    return Math.min(L.hookMax, L.hookPerLv * ((((s.levels && s.levels.fish) || 1)) - 1));
   }
   function fishGoodBonus(s) {
-    return 1 + Math.min(0.225, 0.025 * ((((s.levels && s.levels.fish) || 1)) - 1));
+    const L = BALANCE.level;
+    return 1 + Math.min(L.goodMax, L.goodPerLv * ((((s.levels && s.levels.fish) || 1)) - 1));
   }
 
   /* ---------------- 等级解锁 ---------------- */

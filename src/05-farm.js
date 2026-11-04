@@ -145,7 +145,7 @@
       extraSeed = true;
     }
     s.stats.harvests++;
-    const levelUp = addLevelXp(s, 'farm', 1);
+    const levelUp = addLevelXp(s, 'farm', BALANCE.level.farmXpHarvest);
 
     let regrown = false;
     if (willRegrow) {
@@ -367,8 +367,9 @@
       notes.push({ kind: 'meal', text: '🍖 伙食 -' + fee });
       s.energy = s.maxEnergy;
     } else {
-      // 没钱只恢复到「上限的 30%，至少 5 点」，但不会扣掉已有的体力
-      const floor = Math.max(5, Math.round(s.maxEnergy * 0.3));
+      // 没钱只恢复到「上限的 pct，至少 min」，但不会扣掉已有的体力
+      const floor = Math.max(BALANCE.meal.noMoneyMin,
+        Math.round(s.maxEnergy * BALANCE.meal.noMoneyPct));
       s.energy = Math.max(s.energy, Math.min(floor, s.maxEnergy));
       notes.push({ kind: 'meal', text: '😵 没钱吃饭，只回 ' + floor + ' 体力' });
     }
@@ -446,7 +447,7 @@
       // 洒水器：每天自动浇前 N 块没浇的地，不耗体力
       let n = 0, ripe = 0;
       s.plots.forEach(function (p) {
-        if (n >= s.sprinklers) return;
+        if (n >= s.sprinklers * BALANCE.device.sprinklerPerDay) return;
         if (!p.crop || p.phase === 'ripe' || p.watered) return;
         if (grow(p, s)) ripe++;
         p.watered = true;
@@ -686,9 +687,10 @@
     const entry = { day: s.day, fish: name, emoji: emoji, quality: q, price: value,
                     base: f.base, bait: kind, trash: !!f.trash, chest: f.chest || null, noOrder: noOrder };
     s.fishBook.count++;
-    // 经验：每 2 杆 1 点，完美品质额外 +1（渔夫代钓不给经验）
+    // 经验：每 fishXpEvery 杆 1 点，完美品质给 fishXpPerfect（渔夫代钓不给经验）
+    const L = BALANCE.level;
     const xpGain = opts.noXp ? 0
-      : ((q && q.id === 'perfect') ? 2 : ((s.stats.casts % 2 === 0) ? 1 : 0));
+      : ((q && q.id === 'perfect') ? L.fishXpPerfect : ((s.stats.casts % L.fishXpEvery === 0) ? 1 : 0));
     const levelUp = xpGain ? addLevelXp(s, 'fish', xpGain) : false;
     s.fishBook.entries.unshift(entry);
     if (s.fishBook.entries.length > 40) s.fishBook.entries.length = 40;

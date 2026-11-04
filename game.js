@@ -22,10 +22,14 @@
     start: { coins: 50, energy: 15, maxEnergy: 15, plots: 5 },
     /* 各动作体力消耗（统一在这里改，不要在逻辑里写死数字） */
     energy: { plant: 1, water: 1, waterSummer: 2, harvest: 1, fert: 1, fish: 2 },
-    /* 伙食费：base + (上限 − from) / perEnergy，最低 min */
-    meal: { base: 3, perEnergy: 5, from: 10, min: 1 },
+    /* 伙食费：base + (上限 − from) / perEnergy，最低 min；没钱吃饭只回 pct（至少 noMoneyMin） */
+    meal: { base: 3, perEnergy: 5, from: 10, min: 1, noMoneyPct: 0.3, noMoneyMin: 5 },
     /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
     upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
+    /* 一季 30 天（春 1–30 / 夏 31–60 / 秋 61–90 / 冬 91–120） */
+    seasonDays: 30,
+    /* 鱼汛：汛期权重 ×in、非汛期 ×off */
+    fishSeason: { in: 1.25, off: 0.3 },
 
     hook: { dough: 0.92, worm: 0.95, lure: 0.72, lure2: 0.92 },
     weatherHook: { sunny: -0.12, cloudy: 0, rain: 0.08 },
@@ -40,13 +44,13 @@
     fisher: { hire: 300, baseCasts: 2, wageBase: 8, wageStep: 4,
               needBase: 5, needStep: 2, upCost: 100, max: 10 },
     work: { full: 2.0, half: 1.2 },
-    upkeep: { plotPerWeek: 3, plotMid: 6, plotHigh: 14, free: 5, sprinkle: 3, net: 0, harvester: 5,
-              seeder: 6 },
+    upkeep: { plotPerWeek: 3, plotMid: 6, plotHigh: 14, free: 5, midAt: 20, highAt: 30,
+              sprinkle: 3, net: 0, harvester: 5, seeder: 6 },
     order: { mult: 1.35, seasonStep: 0.6 },
     expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
     /* 自动播种器：一台只管 5 块地，买几台就播几块（每台每天 5 块），每台每周要交维护费 */
     device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5,
-              seederMax: 9, netMax: 9 },
+              seederMax: 9, netMax: 9, sprinklerPerDay: 1 },
     lure: { price: 5, dur: 25 },
     /* 高级假饵：钓鱼 Lv6 解锁，20 金 / 100 次；咬钩率跟面团饵一样，好鱼率跟假饵一样 */
     lure2: { price: 20, dur: 100 },
@@ -77,8 +81,11 @@
     /* 累进税：0~2000 收 2%、2000~10000 收 4%、10000 以上收 6%，最低 30 金 */
     tax: { min: 30, every: 30,
            bands: [{ upTo: 2000, rate: 0.02 }, { upTo: 10000, rate: 0.04 }, { upTo: null, rate: 0.06 }] },
-    /* 等级：每级所需经验 = 15 + 10×(级-1)，满级 10；满级时挖蚯蚓 / 采集各少花 1 点体力 */
-    level: { max: 10, xpBase: 15, xpStep: 10, maxEnergySave: 1 },
+    /* 等级：每级所需经验 = 15 + 10×(级-1)，满级 10；满级时挖蚯蚓 / 采集各少花 1 点体力。
+     * 种田每 yieldEvery 级 +1 产量；钓鱼每级咬钩 +hookPerLv（上限 hookMax）、好鱼 +goodPerLv（上限 goodMax） */
+    level: { max: 10, xpBase: 15, xpStep: 10, maxEnergySave: 1, yieldEvery: 4,
+             hookPerLv: 0.011, hookMax: 0.10, goodPerLv: 0.025, goodMax: 0.225,
+             farmXpHarvest: 1, fishXpEvery: 2, fishXpPerfect: 2 },
     /* 等级解锁：商店设备 / 高级种子 / 特效肥 / 渔网 / 渔夫 / 高级假饵 / 自动播种器 */
     gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2, fisher: 5,
             seeder: 4, lure2: 6, lure2Trade: 3, goldKeyTrade: 4 },
@@ -264,8 +271,8 @@
   const CROP_UNLOCK = { pumpkin: 18, watermelon: 24 };
 
   /* 鱼群季节：汛期权重 ×1.25，非汛期 ×0.3（还能钓到，但明显少） */
-  const FISH_OFF_SEASON = 0.3;
-  const FISH_IN_SEASON = 1.25;
+  const FISH_OFF_SEASON = BALANCE.fishSeason.off;
+  const FISH_IN_SEASON = BALANCE.fishSeason.in;
 
   function fishSeasonOk(id, day) {
     const f = FISH.filter(function (x) { return x.id === id; })[0];
@@ -583,7 +590,9 @@
   /* 季节：每 30 天换一季，冬天（第 4 季）土地封冻、河面结冰 */
   const SEASONS = ['春', '夏', '秋', '冬'];
   const WINTER = 3;
-  function seasonIdx(day) { return Math.floor((Math.max(1, day || 1) - 1) / 30) % 4; }
+  function seasonIdx(day) {
+    return Math.floor((Math.max(1, day || 1) - 1) / BALANCE.seasonDays) % 4;
+  }
   function seasonOf(day) { return SEASONS[seasonIdx(day)]; }
   function isWinter(day) { return seasonIdx(day) === WINTER; }
 
@@ -715,16 +724,18 @@
     return ups;
   }
 
-  /* 种田等级：每 4 级 +1 产量（普通作物）；大作物不吃等级 */
+  /* 种田等级：每 yieldEvery 级 +1 产量（普通作物）；大作物不吃等级 */
   function farmYieldBonus(s) {
-    return Math.floor((((s.levels && s.levels.farm) || 1)) / 4);
+    return Math.floor((((s.levels && s.levels.farm) || 1)) / BALANCE.level.yieldEvery);
   }
-  /* 钓鱼等级：咬钩率 +1.1%/级（最多 +10%），好鱼权重 +2.5%/级（最多 +22.5%） */
+  /* 钓鱼等级：咬钩率 +hookPerLv/级（上限 +hookMax），好鱼权重 +goodPerLv/级（上限 +goodMax） */
   function fishHookBonus(s) {
-    return Math.min(0.10, 0.011 * ((((s.levels && s.levels.fish) || 1)) - 1));
+    const L = BALANCE.level;
+    return Math.min(L.hookMax, L.hookPerLv * ((((s.levels && s.levels.fish) || 1)) - 1));
   }
   function fishGoodBonus(s) {
-    return 1 + Math.min(0.225, 0.025 * ((((s.levels && s.levels.fish) || 1)) - 1));
+    const L = BALANCE.level;
+    return 1 + Math.min(L.goodMax, L.goodPerLv * ((((s.levels && s.levels.fish) || 1)) - 1));
   }
 
   /* ---------------- 等级解锁 ---------------- */
@@ -896,7 +907,7 @@
     const U = BALANCE.upkeep;
     let fee = 0;
     for (let i = U.free; i < plots; i++) {
-      fee += i < 20 ? U.plotPerWeek : (i < 30 ? U.plotMid : U.plotHigh);
+      fee += i < U.midAt ? U.plotPerWeek : (i < U.highAt ? U.plotMid : U.plotHigh);
     }
     return fee;
   }
@@ -1117,7 +1128,7 @@
       extraSeed = true;
     }
     s.stats.harvests++;
-    const levelUp = addLevelXp(s, 'farm', 1);
+    const levelUp = addLevelXp(s, 'farm', BALANCE.level.farmXpHarvest);
 
     let regrown = false;
     if (willRegrow) {
@@ -1339,8 +1350,9 @@
       notes.push({ kind: 'meal', text: '🍖 伙食 -' + fee });
       s.energy = s.maxEnergy;
     } else {
-      // 没钱只恢复到「上限的 30%，至少 5 点」，但不会扣掉已有的体力
-      const floor = Math.max(5, Math.round(s.maxEnergy * 0.3));
+      // 没钱只恢复到「上限的 pct，至少 min」，但不会扣掉已有的体力
+      const floor = Math.max(BALANCE.meal.noMoneyMin,
+        Math.round(s.maxEnergy * BALANCE.meal.noMoneyPct));
       s.energy = Math.max(s.energy, Math.min(floor, s.maxEnergy));
       notes.push({ kind: 'meal', text: '😵 没钱吃饭，只回 ' + floor + ' 体力' });
     }
@@ -1418,7 +1430,7 @@
       // 洒水器：每天自动浇前 N 块没浇的地，不耗体力
       let n = 0, ripe = 0;
       s.plots.forEach(function (p) {
-        if (n >= s.sprinklers) return;
+        if (n >= s.sprinklers * BALANCE.device.sprinklerPerDay) return;
         if (!p.crop || p.phase === 'ripe' || p.watered) return;
         if (grow(p, s)) ripe++;
         p.watered = true;
@@ -1658,9 +1670,10 @@
     const entry = { day: s.day, fish: name, emoji: emoji, quality: q, price: value,
                     base: f.base, bait: kind, trash: !!f.trash, chest: f.chest || null, noOrder: noOrder };
     s.fishBook.count++;
-    // 经验：每 2 杆 1 点，完美品质额外 +1（渔夫代钓不给经验）
+    // 经验：每 fishXpEvery 杆 1 点，完美品质给 fishXpPerfect（渔夫代钓不给经验）
+    const L = BALANCE.level;
     const xpGain = opts.noXp ? 0
-      : ((q && q.id === 'perfect') ? 2 : ((s.stats.casts % 2 === 0) ? 1 : 0));
+      : ((q && q.id === 'perfect') ? L.fishXpPerfect : ((s.stats.casts % L.fishXpEvery === 0) ? 1 : 0));
     const levelUp = xpGain ? addLevelXp(s, 'fish', xpGain) : false;
     s.fishBook.entries.unshift(entry);
     if (s.fishBook.entries.length > 40) s.fishBook.entries.length = 40;

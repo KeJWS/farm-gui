@@ -236,6 +236,7 @@ build-modules.cjs / build-ui.cjs / build-single.cjs   三个拼装脚本
 - **界面层**通过 `G.BALANCE` 读取；`index.html` 里不带具体数值（「几体力 / 几金」都由 `ui.js` 渲染时填）
 - **新增数值**先加进 `BALANCE`，再在逻辑 / 界面里引用
 - `node check-config.cjs` 会检查：BALANCE 顶层键不重复、逻辑层没有写死的体力、界面没有写死的「N 体力」、HTML 的 `<small>` 不带死数字
+- `node check-docs.cjs` 会检查：README 里的关键数值和 BALANCE 一致、游戏内规则说明没有再写死这些数字
 
 ## 开发者命令
 
@@ -245,6 +246,7 @@ node build-ui.cjs      # ui-src/*.js → ui.js（改了界面层就要跑）
 node selftest.cjs      # 562 项逻辑自测：播种/种子店/肥料/品质/收获器/钓鱼/天气/经济/委托/等级/解锁/农产品店/水产库存/成就/税金/采集/小镇/市场历史/高级假饵/自动播种器/交易等级/果园/每日总结/存读档/3000 步压测
 node check-ui.cjs      # 校验 ui.js 用到的 id、data-act 在 index.html 里都存在
 node check-config.cjs  # 数值来源检查：BALANCE 无重复键、逻辑 / 界面不写死体力、HTML 不带死数字
+node check-docs.cjs    # 文档一致性：README 关键数值与 BALANCE 对齐、规则说明不写死数字
 node dom-test.cjs      # DOM 冒烟：用最小 DOM 桩把 ui.js 跑起来，测渲染与弹窗
 node balance.cjs       # 数值体检：钓鱼期望 / 三种活计收益 / 委托样本 / 设备回本 / 套利检查
 node analysis.cjs      # 收益分析：作物 / 钓鱼（专项）/ 渔网 / 渔夫 / 采集 / 小镇 / 早中后期日净收入
@@ -254,6 +256,13 @@ node build-single.cjs  # 把三件套内联成 我的小农场.html
 （`selftest` / `dom-test` / `check-ui` / `balance` / `analysis` 都会先检查 `src/` 与 `ui-src/` 有没有比产物新，自动补拼装。）
 
 ## 更新记录
+
+**v2.22.1（文档 / 规则说明 / 更新记录同步）**
+
+- **游戏内规则说明**的数字全部改为从 `BALANCE` 读取：天气概率、季节天数与区间、鱼汛倍率、饵料倍率、抛竿体力、种田 / 钓鱼等级加成、税档、维护费、伙食兜底、升级曲线
+- **README** 关键数值（果园、设备、扩张、强化、钓鱼、挖蚯蚓、采集、税）与 `BALANCE` 对齐
+- **新增 `check-docs.cjs`**（29 项）：README 的 18 条关键事实必须和 `BALANCE` 一致；规则说明里不许再写死这些数字
+- 更新记录保持一致：v2.19.0 → v2.22.0 的条目都在，本轮补 v2.22.1
 
 **v2.22.0（统一数值来源）**
 
