@@ -78,7 +78,7 @@
       codexClaim: {},
       manualRefreshUsed: false,
       workUsed: false,
-      bait: { worm: 0, dough: 0 },
+      bait: { worm: 0, dough: 0, premium: 0 },
       lure: { owned: false, dur: 0 },
       lure2: { owned: false, dur: 0 },
       teas: { green: 0, black: 0, milk: 0, coffee: 0 },

@@ -334,7 +334,10 @@ ok(html('#modal-root').indexOf('渔夫') >= 0 && html('#modal-root').indexOf('da
    '渔具店能花钱升级渔夫');
 ok(html('#modal-root').indexOf('高级假饵') >= 0 && html('#modal-root').indexOf('data-buy="lure2"') >= 0,
    '渔具店卖高级假饵');
-ok(html('#modal-root').indexOf('需钓鱼 Lv6') >= 0, '高级假饵按钓鱼等级锁定');
+ok(html('#modal-root').indexOf('需钓鱼 Lv' + G.BALANCE.gate.lure2) >= 0, '高级假饵按钓鱼等级锁定');
+ok(html('#modal-root').indexOf('特级饵料') >= 0 && html('#modal-root').indexOf('data-buy="premium"') >= 0,
+   '渔具店卖特级饵料');
+ok(html('#bait-row').indexOf('特级饵料') >= 0, '河边饵料栏含特级饵料');
 ok(html('#modal-root').indexOf('不收维护费') < 0, '渔具店不再写「不收维护费」');
 ok(html('#modal-root').indexOf('data-resetnets') < 0, '渔具店没有「重新布置」按钮');
 clickAct('fertilizeAll');

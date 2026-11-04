@@ -21,9 +21,9 @@
     /* 鱼汛：汛期权重 ×in、非汛期 ×off */
     fishSeason: { in: 1.25, off: 0.3 },
 
-    hook: { dough: 0.92, worm: 0.95, lure: 0.72, lure2: 0.92 },
+    hook: { dough: 0.92, worm: 0.97, lure: 0.72, lure2: 0.92, premium: 0.95 },
     weatherHook: { sunny: -0.12, cloudy: 0, rain: 0.08 },
-    bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.15 },
+    bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.10, premiumGood: 1.25 },
     netChance: 0.8,
     /* 渔网抓完鱼要重新布置：每张 1 体力 */
     netReset: { energy: 1 },
@@ -83,7 +83,8 @@
              farmXpHarvest: 1, fishXpEvery: 2, fishXpPerfect: 2 },
     /* 等级解锁：商店设备 / 高级种子 / 特效肥 / 渔网 / 渔夫 / 高级假饵 / 自动播种器 */
     gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2, fisher: 5,
-            seeder: 4, lure2: 6, lure2Trade: 3, goldKeyTrade: 4 },
+            seeder: 4, lure2: 7, lure2Trade: 5, goldKeyTrade: 4,
+            premium: 9, premiumTrade: 7 },
     /* 宝箱：铁箱 / 金箱按钓鱼等级解锁 */
     chest: { ironLv: 4, goldLv: 7 },
     /* 果园：种田 Lv7 + 2500 金开垦，先给 3 个树坑，后面每个花钱开（第 4~8 个）。
@@ -189,11 +190,18 @@
 
   /* 鱼饵：名称 / 价格 / 说明，咬钩率走 BALANCE.hook */
   const BAIT = {
-    worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '好鱼概率 ×1.35 · 品质取两次较好' },
-    dough: { id: 'dough', name: '面团饵', emoji: '🍞', price: 1, desc: '标准钓鱼体验 · 92% 咬钩' },
-    lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 25 次 · 杂物少、品质取两次较好，但只有 72% 咬钩' },
+    worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '好鱼概率 ×' + BALANCE.bait.wormGood + ' · 品质取两次较好' },
+    dough: { id: 'dough', name: '面团饵', emoji: '🍞', price: 1, desc: '标准钓鱼体验 · ' + Math.round(BALANCE.hook.dough * 100) + '% 咬钩' },
+    lure:  { id: 'lure',  name: '假饵',   emoji: '🎣',
+             desc: '耐用 ' + BALANCE.lure.dur + ' 次 · 杂物少、品质取两次较好，但只有 ' + Math.round(BALANCE.hook.lure * 100) + '% 咬钩' },
     lure2: { id: 'lure2', name: '高级假饵', emoji: '🪝',
-             desc: '耐用 100 次 · 咬钩率跟面团饵一样（92%），好鱼率跟假饵一样 · 钓鱼 Lv' + BALANCE.gate.lure2 + ' 解锁' }
+             desc: '耐用 ' + BALANCE.lure2.dur + ' 次 · 咬钩率跟面团饵一样（' + Math.round(BALANCE.hook.lure2 * 100) +
+               '%），好鱼 ×' + BALANCE.bait.lureGood + ' · 钓鱼 Lv' + BALANCE.gate.lure2 + ' + 交易 Lv' +
+               BALANCE.gate.lure2Trade + ' 解锁' },
+    premium: { id: 'premium', name: '特级饵料', emoji: '🍤', price: 5,
+               desc: '一次一份 · ' + Math.round(BALANCE.hook.premium * 100) + '% 咬钩、好鱼 ×' +
+                 BALANCE.bait.premiumGood + '、品质取两次较好 · 钓鱼 Lv' + BALANCE.gate.premium +
+                 ' + 交易 Lv' + BALANCE.gate.premiumTrade + ' 解锁' }
   };
   /* 各饵的咬钩基础概率（天气再加减） */
   const HOOK = BALANCE.hook;

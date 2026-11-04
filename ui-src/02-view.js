@@ -306,12 +306,18 @@
   /* ---------------- 钓鱼 ---------------- */
 
   function renderBait() {
-    const lure2Open = G.fishLv(state) >= G.BALANCE.gate.lure2;
+    const lure2Open = G.fishLv(state) >= G.BALANCE.gate.lure2 &&
+      G.tradeLv(state) >= G.BALANCE.gate.lure2Trade;
+    const premiumOpen = G.fishLv(state) >= G.BALANCE.gate.premium &&
+      G.tradeLv(state) >= G.BALANCE.gate.premiumTrade;
     const list = [
       { id: 'worm', n: state.bait.worm },
       { id: 'dough', n: state.bait.dough },
+      { id: 'premium', n: state.bait.premium || 0, lock: !premiumOpen,
+        lockTxt: 'Lv' + G.BALANCE.gate.premium + '·交易' + G.BALANCE.gate.premiumTrade },
       { id: 'lure', n: state.lure.owned ? state.lure.dur : 0 },
-      { id: 'lure2', n: (state.lure2 && state.lure2.owned) ? state.lure2.dur : 0, lock: !lure2Open }
+      { id: 'lure2', n: (state.lure2 && state.lure2.owned) ? state.lure2.dur : 0, lock: !lure2Open,
+        lockTxt: 'Lv' + G.BALANCE.gate.lure2 + '·交易' + G.BALANCE.gate.lure2Trade }
     ];
     if (!list.some(function (b) { return b.id === baitSel && b.n > 0; })) {
       const first = list.filter(function (b) { return b.n > 0; })[0];
@@ -321,7 +327,7 @@
       const bd = G.BAIT[b.id];
       const max = b.id === 'lure' ? G.BALANCE.lure.dur : (b.id === 'lure2' ? G.BALANCE.lure2.dur : 0);
       const cnt = max
-        ? (b.n ? b.n + '/' + max : (b.lock ? 'Lv' + G.BALANCE.gate.lure2 : '无'))
+        ? (b.n ? b.n + '/' + max : (b.lock ? (b.lockTxt || '未解锁') : '无'))
         : '×' + b.n;
       return '<div class="bait ' + (b.id === baitSel ? 'sel ' : '') + (b.n || b.lock ? '' : 'off') +
         '" data-bait="' + b.id + '" title="' + bd.desc + '"' +
@@ -347,6 +353,8 @@
             (mod ? '<i class="' + (mod > 0 ? 'up' : 'down') + '">' + (mod > 0 ? '+' : '') +
               Math.round(mod * 100) + '%</i>' : '') + '</span>' +
           '<span>好鱼 <b>×' + f.good.toFixed(2) + '</b></span>' +
+          (f.bonusHook > 0
+            ? '<span>双咬钩 <b class="up">+' + Math.round(f.bonusHook * 100) + '%</b></span>' : '') +
           '<span>每杆 <b class="' + (f.net >= 0 ? 'up' : 'down') + '">' +
             (f.net >= 0 ? '+' : '') + f.net.toFixed(1) + '</b> 金' +
             '<i>毛 ' + f.ev.toFixed(1) + ' · 饵 ' + f.cost.toFixed(1) + '</i></span>';

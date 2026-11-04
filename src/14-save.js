@@ -147,9 +147,10 @@
       return plot;
     });
 
-    merged.bait = Object.assign({ worm: 0, dough: 0 }, s.bait || {});
+    merged.bait = Object.assign({ worm: 0, dough: 0, premium: 0 }, s.bait || {});
     merged.bait.worm = Math.round(num(merged.bait.worm, 0, 0, 9999));
     merged.bait.dough = Math.round(num(merged.bait.dough, 0, 0, 9999));
+    merged.bait.premium = Math.round(num(merged.bait.premium, 0, 0, 9999));
     merged.lure = Object.assign({ owned: false, dur: 0 }, s.lure || {});
     merged.lure.dur = Math.round(num(merged.lure.dur, 0, 0, BALANCE.lure.dur));
     merged.lure.owned = !!merged.lure.owned && merged.lure.dur > 0;

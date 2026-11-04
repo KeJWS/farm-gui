@@ -544,12 +544,18 @@
   /* ---------------- 钓鱼 ---------------- */
 
   function renderBait() {
-    const lure2Open = G.fishLv(state) >= G.BALANCE.gate.lure2;
+    const lure2Open = G.fishLv(state) >= G.BALANCE.gate.lure2 &&
+      G.tradeLv(state) >= G.BALANCE.gate.lure2Trade;
+    const premiumOpen = G.fishLv(state) >= G.BALANCE.gate.premium &&
+      G.tradeLv(state) >= G.BALANCE.gate.premiumTrade;
     const list = [
       { id: 'worm', n: state.bait.worm },
       { id: 'dough', n: state.bait.dough },
+      { id: 'premium', n: state.bait.premium || 0, lock: !premiumOpen,
+        lockTxt: 'Lv' + G.BALANCE.gate.premium + '·交易' + G.BALANCE.gate.premiumTrade },
       { id: 'lure', n: state.lure.owned ? state.lure.dur : 0 },
-      { id: 'lure2', n: (state.lure2 && state.lure2.owned) ? state.lure2.dur : 0, lock: !lure2Open }
+      { id: 'lure2', n: (state.lure2 && state.lure2.owned) ? state.lure2.dur : 0, lock: !lure2Open,
+        lockTxt: 'Lv' + G.BALANCE.gate.lure2 + '·交易' + G.BALANCE.gate.lure2Trade }
     ];
     if (!list.some(function (b) { return b.id === baitSel && b.n > 0; })) {
       const first = list.filter(function (b) { return b.n > 0; })[0];
@@ -559,7 +565,7 @@
       const bd = G.BAIT[b.id];
       const max = b.id === 'lure' ? G.BALANCE.lure.dur : (b.id === 'lure2' ? G.BALANCE.lure2.dur : 0);
       const cnt = max
-        ? (b.n ? b.n + '/' + max : (b.lock ? 'Lv' + G.BALANCE.gate.lure2 : '无'))
+        ? (b.n ? b.n + '/' + max : (b.lock ? (b.lockTxt || '未解锁') : '无'))
         : '×' + b.n;
       return '<div class="bait ' + (b.id === baitSel ? 'sel ' : '') + (b.n || b.lock ? '' : 'off') +
         '" data-bait="' + b.id + '" title="' + bd.desc + '"' +
@@ -585,6 +591,8 @@
             (mod ? '<i class="' + (mod > 0 ? 'up' : 'down') + '">' + (mod > 0 ? '+' : '') +
               Math.round(mod * 100) + '%</i>' : '') + '</span>' +
           '<span>好鱼 <b>×' + f.good.toFixed(2) + '</b></span>' +
+          (f.bonusHook > 0
+            ? '<span>双咬钩 <b class="up">+' + Math.round(f.bonusHook * 100) + '%</b></span>' : '') +
           '<span>每杆 <b class="' + (f.net >= 0 ? 'up' : 'down') + '">' +
             (f.net >= 0 ? '+' : '') + f.net.toFixed(1) + '</b> 金' +
             '<i>毛 ' + f.ev.toFixed(1) + ' · 饵 ' + f.cost.toFixed(1) + '</i></span>';
@@ -1322,6 +1330,12 @@
       ? '需钓鱼 Lv' + G.BALANCE.gate.lure2
       : '还需交易 Lv' + G.BALANCE.gate.lure2Trade;
     const lure2Have = (state.lure2 && state.lure2.owned) ? state.lure2.dur : 0;
+    const premFishOk = G.fishLv(state) >= G.BALANCE.gate.premium;
+    const premTradeOk = G.tradeLv(state) >= G.BALANCE.gate.premiumTrade;
+    const premOpen = premFishOk && premTradeOk;
+    const premLockTxt = !premFishOk
+      ? '需钓鱼 Lv' + G.BALANCE.gate.premium
+      : '还需交易 Lv' + G.BALANCE.gate.premiumTrade;
     const netLock = !G.netUnlocked(state);
     const netCap = G.netMax(state);
     const body =
@@ -1330,6 +1344,10 @@
       '<dt>🪝 高级假饵</dt><dd>' + (lure2Open
         ? lure2.price + ' 金/个 · 耐用 ' + lure2.dur + ' 次 · 现有 ' + lure2Have + ' 次'
         : lure2LockTxt + ' 解锁') + '</dd>' +
+      '<dt>🍤 特级饵料</dt><dd>' + (premOpen
+        ? G.BAIT.premium.price + ' 金/份 · 现有 ' + (state.bait.premium || 0) + ' 份 · ' +
+          Math.round(G.BALANCE.hook.premium * 100) + '% 咬钩 / 好鱼 ×' + G.BALANCE.bait.premiumGood
+        : premLockTxt + ' 解锁') + '</dd>' +
       '<dt>🪱 蚯蚓</dt><dd>' + G.BALANCE.dig.energy + ' 体力挖 ' + G.BALANCE.dig.min + '~' +
         G.BALANCE.dig.max + ' 条（晴天 −1、阴雨 +1）</dd></dl>' +
       '<div class="action-grid">' +
@@ -1341,6 +1359,10 @@
           (lure2Open && state.coins >= lure2.price ? '' : ' disabled') + '>' +
           '🪝 买高级假饵<small>' + (lure2Open ? lure2.price + ' 金 · ' + lure2.dur + ' 次'
             : lure2LockTxt) + '</small></button>' +
+        '<button class="btn' + (premOpen ? '' : ' locked') + '" data-buy="premium" data-n="1"' +
+          (premOpen && state.coins >= G.BAIT.premium.price ? '' : ' disabled') + '>' +
+          '🍤 买特级饵料<small>' + (premOpen ? G.BAIT.premium.price + ' 金 · 1 次' : premLockTxt) +
+          '</small></button>' +
       '</div>' +
       '<div class="buy-custom">' +
         '<span>🍞 面团饵自定义数量</span>' +
@@ -1525,6 +1547,11 @@
         Math.round(G.BALANCE.hook.dough * 100) + '%）、好鱼率同假饵</b>' +
         '（杂物 ×' + G.BALANCE.bait.lureTrash + '、好鱼 ×' + G.BALANCE.bait.lureGood +
         '、品质取两次较好），是后期最省心的饵。<br>' +
+        '🍤 <b>特级饵料</b>（钓鱼 Lv' + G.BALANCE.gate.premium + ' + <b>交易 Lv' +
+        G.BALANCE.gate.premiumTrade + '</b> 解锁）：' + G.BAIT.premium.price + ' 金 / 份，' +
+        Math.round(G.BALANCE.hook.premium * 100) + '% 咬钩、好鱼 ×' + G.BALANCE.bait.premiumGood +
+        '、品质取两次较好，冲好鱼用。<br>' +
+        '⚡ <b>咬钩超过 100% 不浪费</b>：多出来的概率再判定一次（例如 108% = 98% 上一条 + 8% 双咬钩）。<br>' +
         '🕸️ 渔网：<b>' + G.NET_COST + ' 金/张，不缴维护费</b>。晚上耗 1 份面团饵，<b>' +
         Math.round(G.NET_CHANCE * 100) + '%</b> 网到 1 条标准及以下的普通鱼，' +
         '<b>不会出杂物和宝箱</b>；要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b> 解锁，上限 = ' +
@@ -3304,10 +3331,10 @@
         return;
       }
       if (r.ok) {
-        pushCatch(r.entry);
-        toast(r.msg, r.entry.trash ? 'warn' : 'good');
+        (r.entries || [r.entry]).forEach(function (e) { pushCatch(e); });
+        toast(r.msg + (r.bonus ? '（双咬钩！）' : ''), r.entry.trash ? 'warn' : 'good');
         SFX.catch();
-        floatAt(ev, '+' + r.entry.price + ' 金', '');
+        floatAt(ev, '+' + (r.entries || [r.entry]).reduce(function (n, e) { return n + e.price; }, 0) + ' 金', '');
       }
     },
     cast5: function () {

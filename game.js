@@ -708,9 +708,9 @@
     /* 鱼汛：汛期权重 ×in、非汛期 ×off */
     fishSeason: { in: 1.25, off: 0.3 },
 
-    hook: { dough: 0.92, worm: 0.95, lure: 0.72, lure2: 0.92 },
+    hook: { dough: 0.92, worm: 0.97, lure: 0.72, lure2: 0.92, premium: 0.95 },
     weatherHook: { sunny: -0.12, cloudy: 0, rain: 0.08 },
-    bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.15 },
+    bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.10, premiumGood: 1.25 },
     netChance: 0.8,
     /* 渔网抓完鱼要重新布置：每张 1 体力 */
     netReset: { energy: 1 },
@@ -770,7 +770,8 @@
              farmXpHarvest: 1, fishXpEvery: 2, fishXpPerfect: 2 },
     /* 等级解锁：商店设备 / 高级种子 / 特效肥 / 渔网 / 渔夫 / 高级假饵 / 自动播种器 */
     gate: { sprinkler: 2, harvester: 6, net: 2, specialFert: 4, netBase: 2, fisher: 5,
-            seeder: 4, lure2: 6, lure2Trade: 3, goldKeyTrade: 4 },
+            seeder: 4, lure2: 7, lure2Trade: 5, goldKeyTrade: 4,
+            premium: 9, premiumTrade: 7 },
     /* 宝箱：铁箱 / 金箱按钓鱼等级解锁 */
     chest: { ironLv: 4, goldLv: 7 },
     /* 果园：种田 Lv7 + 2500 金开垦，先给 3 个树坑，后面每个花钱开（第 4~8 个）。
@@ -876,11 +877,18 @@
 
   /* 鱼饵：名称 / 价格 / 说明，咬钩率走 BALANCE.hook */
   const BAIT = {
-    worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '好鱼概率 ×1.35 · 品质取两次较好' },
-    dough: { id: 'dough', name: '面团饵', emoji: '🍞', price: 1, desc: '标准钓鱼体验 · 92% 咬钩' },
-    lure:  { id: 'lure',  name: '假饵',   emoji: '🎣', desc: '耐用 25 次 · 杂物少、品质取两次较好，但只有 72% 咬钩' },
+    worm:  { id: 'worm',  name: '蚯蚓',   emoji: '🪱', desc: '好鱼概率 ×' + BALANCE.bait.wormGood + ' · 品质取两次较好' },
+    dough: { id: 'dough', name: '面团饵', emoji: '🍞', price: 1, desc: '标准钓鱼体验 · ' + Math.round(BALANCE.hook.dough * 100) + '% 咬钩' },
+    lure:  { id: 'lure',  name: '假饵',   emoji: '🎣',
+             desc: '耐用 ' + BALANCE.lure.dur + ' 次 · 杂物少、品质取两次较好，但只有 ' + Math.round(BALANCE.hook.lure * 100) + '% 咬钩' },
     lure2: { id: 'lure2', name: '高级假饵', emoji: '🪝',
-             desc: '耐用 100 次 · 咬钩率跟面团饵一样（92%），好鱼率跟假饵一样 · 钓鱼 Lv' + BALANCE.gate.lure2 + ' 解锁' }
+             desc: '耐用 ' + BALANCE.lure2.dur + ' 次 · 咬钩率跟面团饵一样（' + Math.round(BALANCE.hook.lure2 * 100) +
+               '%），好鱼 ×' + BALANCE.bait.lureGood + ' · 钓鱼 Lv' + BALANCE.gate.lure2 + ' + 交易 Lv' +
+               BALANCE.gate.lure2Trade + ' 解锁' },
+    premium: { id: 'premium', name: '特级饵料', emoji: '🍤', price: 5,
+               desc: '一次一份 · ' + Math.round(BALANCE.hook.premium * 100) + '% 咬钩、好鱼 ×' +
+                 BALANCE.bait.premiumGood + '、品质取两次较好 · 钓鱼 Lv' + BALANCE.gate.premium +
+                 ' + 交易 Lv' + BALANCE.gate.premiumTrade + ' 解锁' }
   };
   /* 各饵的咬钩基础概率（天气再加减） */
   const HOOK = BALANCE.hook;
@@ -1482,7 +1490,7 @@
       codexClaim: {},
       manualRefreshUsed: false,
       workUsed: false,
-      bait: { worm: 0, dough: 0 },
+      bait: { worm: 0, dough: 0, premium: 0 },
       lure: { owned: false, dur: 0 },
       lure2: { owned: false, dur: 0 },
       teas: { green: 0, black: 0, milk: 0, coffee: 0 },
@@ -2268,7 +2276,9 @@
   function fishForecast(s, kind) {
     kind = kind || 'dough';
     const w = WEATHER[s.weather] || { hookMod: 0 };
-    const hook = clamp((HOOK[kind] || 0.9) + (w.hookMod || 0) + fishHookBonus(s), 0.3, 0.98);
+    const rawHook = (HOOK[kind] || 0.9) + (w.hookMod || 0) + fishHookBonus(s);
+    const hook = clamp(rawHook, 0.3, 0.98);
+    const bonusHook = Math.max(0, rawHook - 1);      // 超过 100% 的部分 = 再来一条的概率
     const lvNow = fishLv(s);
     const lureLike = kind === 'lure' || kind === 'lure2';
     let total = 0;
@@ -2278,6 +2288,7 @@
       if (f.trash) mul = lureLike ? BALANCE.bait.lureTrash : 1;
       else if (f.chest) mul = lureLike ? 1.4 : 1;
       else if (kind === 'worm') mul = BALANCE.bait.wormGood;
+      else if (kind === 'premium') mul = BALANCE.bait.premiumGood;
       else if (lureLike) mul = BALANCE.bait.lureGood;
       if (!f.trash && !f.chest) mul *= fishGoodBonus(s);
       if (f.seasons) mul *= f.seasons.indexOf(seasonIdx(s.day)) >= 0 ? FISH_IN_SEASON : FISH_OFF_SEASON;
@@ -2285,28 +2296,35 @@
       total += ww;
       return { f: f, w: ww };
     }).filter(Boolean);
-    const qMul = expectedQualityMul((kind === 'worm' || kind === 'lure2') ? 2 : 1);
+    const qMul = expectedQualityMul((kind === 'worm' || kind === 'lure2' || kind === 'premium') ? 2 : 1);
     let ev = 0;
     table.forEach(function (x) {
       const f = x.f;
       const v = f.trash ? 1 : (f.chest ? f.base : f.base * qMul);
       ev += (x.w / total) * v;
     });
-    ev *= hook;
+    ev *= hook * (1 + bonusHook);                    // 双咬钩把每杆期望抬高
     const cost = kind === 'worm' ? BALANCE.dig.value
       : (kind === 'dough' ? BAIT.dough.price
-        : (kind === 'lure' ? BALANCE.lure.price / BALANCE.lure.dur
-          : BALANCE.lure2.price / BALANCE.lure2.dur));
-    return { hook: hook, ev: ev, cost: cost, net: ev - cost, good: fishGoodBonus(s),
-             qMul: qMul, kind: kind };
+        : (kind === 'premium' ? BAIT.premium.price
+          : (kind === 'lure' ? BALANCE.lure.price / BALANCE.lure.dur
+            : BALANCE.lure2.price / BALANCE.lure2.dur)));
+    const baitGood = kind === 'worm' ? BALANCE.bait.wormGood
+      : (kind === 'premium' ? BALANCE.bait.premiumGood
+        : (kind === 'lure' || kind === 'lure2' ? BALANCE.bait.lureGood : 1));
+    return { hook: hook, bonusHook: bonusHook, ev: ev, cost: cost, net: ev - cost,
+             good: fishGoodBonus(s) * baitGood, qMul: qMul, kind: kind };
   }
 
-  function pickBait(s, prefer) {    if (prefer === 'worm' && s.bait.worm > 0) return 'worm';
+  function pickBait(s, prefer) {
+    if (prefer === 'worm' && s.bait.worm > 0) return 'worm';
     if (prefer === 'dough' && s.bait.dough > 0) return 'dough';
+    if (prefer === 'premium' && s.bait.premium > 0) return 'premium';
     if (prefer === 'lure' && s.lure.owned && s.lure.dur > 0) return 'lure';
     if (prefer === 'lure2' && s.lure2 && s.lure2.owned && s.lure2.dur > 0) return 'lure2';
     if (s.bait.worm > 0) return 'worm';
     if (s.bait.dough > 0) return 'dough';
+    if (s.bait.premium > 0) return 'premium';
     if (s.lure.owned && s.lure.dur > 0) return 'lure';
     if (s.lure2 && s.lure2.owned && s.lure2.dur > 0) return 'lure2';
     return null;
@@ -2315,46 +2333,15 @@
   function baitCount(s, kind) {
     if (kind === 'worm') return s.bait.worm;
     if (kind === 'dough') return s.bait.dough;
+    if (kind === 'premium') return s.bait.premium || 0;
     if (kind === 'lure') return s.lure.owned ? s.lure.dur : 0;
     if (kind === 'lure2') return (s.lure2 && s.lure2.owned) ? s.lure2.dur : 0;
     return 0;
   }
 
-  function fish(s, preferBait, opts) {
+  /* 上钩之后：抽鱼种 / 品质 / 图鉴 / 入包（不含咬钩判定、体力与饵料消耗） */
+  function landFish(s, kind, opts) {
     opts = opts || {};
-    const w = WEATHER[s.weather];
-    if (isWinter(s.day)) return { ok: false, msg: '河面结冰了，冬天钓不了鱼' };
-    if (!opts.free && s.energy < BALANCE.energy.fish) {
-      return { ok: false, msg: '体力不够（钓鱼要 ' + BALANCE.energy.fish + ' 点）' };
-    }
-    const kind = opts.forceKind || pickBait(s, preferBait);
-    if (!kind) return { ok: false, msg: '没有饵料了，先去挖蚯蚓或买面团饵' };
-
-    if (!opts.free) s.energy -= BALANCE.energy.fish;
-    if (!opts.noBait) {
-      if (kind === 'worm') {
-        s.bait.worm--;
-      } else if (kind === 'dough') {
-        s.bait.dough--;
-      } else if (kind === 'lure2') {
-        s.lure2.dur--;
-        if (s.lure2.dur <= 0) { s.lure2.owned = false; s.lure2.dur = 0; }
-      } else {
-        s.lure.dur--;
-        if (s.lure.dur <= 0) { s.lure.owned = false; s.lure.dur = 0; }
-      }
-    }
-
-    // 先判定咬钩：天气与饵决定「有没有鱼咬」，鱼种权重不再受天气影响
-    s.stats.casts++;
-    const hookExtra = (opts.hookBonus == null) ? fishHookBonus(s) : opts.hookBonus;
-    const hook = clamp((HOOK[kind] || 0.9) + (w.hookMod || 0) + hookExtra, 0.3, 0.98);
-    if (rand() > hook) {
-      if (!opts.quiet) log(s, '💨 空竿：' + w.name + '，没有鱼咬钩', 'warn');
-      return { ok: true, empty: true, entry: null, msg: '空竿了' };
-    }
-
-    // 鱼种权重只由饵决定：蚯蚓多好鱼、假饵（含高级假饵）少杂物；宝箱按钓鱼等级解锁
     const lvNow = fishLv(s);
     const lureLike = kind === 'lure' || kind === 'lure2';
     const table = FISH.map(function (f) {
@@ -2363,6 +2350,7 @@
       if (f.trash) mul = lureLike ? BALANCE.bait.lureTrash : 1;
       else if (f.chest) mul = lureLike ? 1.4 : 1;
       else if (kind === 'worm') mul = BALANCE.bait.wormGood;
+      else if (kind === 'premium') mul = BALANCE.bait.premiumGood;
       else if (lureLike) mul = BALANCE.bait.lureGood;
       if (!f.trash && !f.chest) mul *= (opts.goodBonus == null ? fishGoodBonus(s) : opts.goodBonus);
       if (f.seasons) {
@@ -2371,7 +2359,8 @@
       return Object.assign({}, f, { w: f.w * mul });
     }).filter(Boolean);
     const f = weighted(table, 'w');
-    const q = (f.trash || f.chest) ? null : rollQuality(kind === 'worm' ? 2 : (kind === 'lure2' ? 2 : 1));
+    const rolls = (kind === 'worm' || kind === 'lure2' || kind === 'premium') ? 2 : 1;
+    const q = (f.trash || f.chest) ? null : rollQuality(rolls);
     const value = f.trash ? 1 : (f.chest ? f.base : Math.max(1, Math.round(f.base * q.mul)));
 
     let name = f.name, emoji = f.emoji;
@@ -2401,11 +2390,6 @@
     const entry = { day: s.day, fish: name, emoji: emoji, quality: q, price: value,
                     base: f.base, bait: kind, trash: !!f.trash, chest: f.chest || null, noOrder: noOrder };
     s.fishBook.count++;
-    // 经验：每 fishXpEvery 杆 1 点，完美品质给 fishXpPerfect（渔夫代钓不给经验）
-    const L = BALANCE.level;
-    const xpGain = opts.noXp ? 0
-      : ((q && q.id === 'perfect') ? L.fishXpPerfect : ((s.stats.casts % L.fishXpEvery === 0) ? 1 : 0));
-    const levelUp = xpGain ? addLevelXp(s, 'fish', xpGain) : false;
     s.fishBook.entries.unshift(entry);
     if (s.fishBook.entries.length > 40) s.fishBook.entries.length = 40;
     if (!f.trash && !f.chest) {
@@ -2424,7 +2408,69 @@
           : '🎣 钓到 ' + emoji + ' ' + name + ' · ' + q.emoji + q.name + ' · 值 ' + value + ' 金（已入仓库）',
         f.trash ? 'warn' : 'good');
     }
-    return { ok: true, entry: entry, msg: name + ' 值 ' + value + ' 金', levelUp: levelUp };
+    return entry;
+  }
+
+  function fish(s, preferBait, opts) {
+    opts = opts || {};
+    const w = WEATHER[s.weather];
+    if (isWinter(s.day)) return { ok: false, msg: '河面结冰了，冬天钓不了鱼' };
+    if (!opts.free && s.energy < BALANCE.energy.fish) {
+      return { ok: false, msg: '体力不够（钓鱼要 ' + BALANCE.energy.fish + ' 点）' };
+    }
+    const kind = opts.forceKind || pickBait(s, preferBait);
+    if (!kind) return { ok: false, msg: '没有饵料了，先去挖蚯蚓或买饵' };
+
+    if (!opts.free) s.energy -= BALANCE.energy.fish;
+    if (!opts.noBait) {
+      if (kind === 'worm') {
+        s.bait.worm--;
+      } else if (kind === 'dough') {
+        s.bait.dough--;
+      } else if (kind === 'premium') {
+        s.bait.premium--;
+      } else if (kind === 'lure2') {
+        s.lure2.dur--;
+        if (s.lure2.dur <= 0) { s.lure2.owned = false; s.lure2.dur = 0; }
+      } else {
+        s.lure.dur--;
+        if (s.lure.dur <= 0) { s.lure.owned = false; s.lure.dur = 0; }
+      }
+    }
+
+    // 先判定咬钩：天气与饵决定「有没有鱼咬」，鱼种权重不再受天气影响
+    s.stats.casts++;
+    const hookExtra = (opts.hookBonus == null) ? fishHookBonus(s) : opts.hookBonus;
+    // 超过 100% 的咬钩率不浪费：多出来的部分再判定一次（当前理论上限约 1.15）
+    const rawHook = (HOOK[kind] || 0.9) + (w.hookMod || 0) + hookExtra;
+    const hook = clamp(rawHook, 0.3, 0.98);
+    if (rand() > hook) {
+      if (!opts.quiet) log(s, '💨 空竿：' + w.name + '，没有鱼咬钩', 'warn');
+      return { ok: true, empty: true, entry: null, entries: [], bonus: 0, msg: '空竿了' };
+    }
+
+    const entries = [landFish(s, kind, opts)];
+    let over = Math.max(0, rawHook - 1);
+    while (over > 0 && rand() < Math.min(1, over)) {
+      entries.push(landFish(s, kind, Object.assign({}, opts, { quiet: true })));
+      over -= 1;
+    }
+    const entry = entries[0];
+    const total = entries.reduce(function (n, e) { return n + e.price; }, 0);
+
+    // 经验：每 fishXpEvery 杆 1 点，完美品质给 fishXpPerfect（渔夫代钓不给经验）
+    const L = BALANCE.level;
+    const q = entry.quality;
+    const xpGain = opts.noXp ? 0
+      : ((q && q.id === 'perfect') ? L.fishXpPerfect : ((s.stats.casts % L.fishXpEvery === 0) ? 1 : 0));
+    const levelUp = xpGain ? addLevelXp(s, 'fish', xpGain) : false;
+    if (!opts.quiet && entries.length > 1) {
+      log(s, '🎣 双咬钩！这一杆上了 ' + entries.length + ' 条', 'good');
+    }
+    return { ok: true, entry: entry, entries: entries, bonus: entries.length - 1,
+             levelUp: levelUp, msg: entries.length > 1
+               ? entries.length + ' 条 · 值 ' + total + ' 金'
+               : entry.fish + ' 值 ' + entry.price + ' 金' };
   }
 
   /* 全体力钓鱼：一直甩到体力不够 / 没饵，日志只留一条汇总 */
@@ -2437,9 +2483,11 @@
       n++;
       if (r.empty) empty++;
       else {
-        value += r.entry.price;
-        if (r.entry.chest) chests++;
-        got.unshift(r.entry);
+        (r.entries || [r.entry]).forEach(function (e) {
+          value += e.price;
+          if (e.chest) chests++;
+          got.unshift(e);
+        });
         if (got.length > 12) got.length = 12;
       }
       ups += r.levelUp || 0;
@@ -2457,7 +2505,9 @@
     for (let i = 0; i < times; i++) {
       const r = fish(s, preferBait);
       if (!r.ok) { results.push(r); break; }
-      if (r.empty) empty++; else value += r.entry.price;
+      if (r.empty) empty++; else {
+        (r.entries || [r.entry]).forEach(function (e) { value += e.price; });
+      }
       results.push(r);
     }
     const okCount = results.filter(function (r) { return r.ok; }).length;
@@ -3175,6 +3225,21 @@
       s.lure2.owned = true; s.lure2.dur = L.dur;
       log(s, '🪝 买了一个高级假饵（耐用 ' + L.dur + ' 次，咬钩同面团饵、好鱼同假饵）', 'info');
       return { ok: true, msg: '高级假饵到手' };
+    }
+    if (kind === 'premium') {
+      if (fishLv(s) < BALANCE.gate.premium) {
+        return { ok: false, msg: '特级饵料要钓鱼 Lv' + BALANCE.gate.premium + ' 才解锁（现在 Lv' + fishLv(s) + '）' };
+      }
+      if (tradeLv(s) < BALANCE.gate.premiumTrade) {
+        return { ok: false, msg: '特级饵料要交易 Lv' + BALANCE.gate.premiumTrade + ' 才解锁（现在 Lv' + tradeLv(s) + '）' };
+      }
+      const price = Math.round(BAIT.premium.price * tradeCut(s)) * n;
+      if (s.coins < price) return { ok: false, msg: '金币不够（' + price + ' 金）' };
+      s.coins -= price; ledger(s, '买特级饵料 ×' + n, 0, price);
+      tradeXp(s, price);
+      s.bait.premium = (s.bait.premium || 0) + n;
+      log(s, '🍤 买了特级饵料 ×' + n + '（-' + price + ' 金）', 'info');
+      return { ok: true, qty: n, cost: price, msg: '特级饵料 ×' + n };
     }
     return { ok: false, msg: '这种饵料买不到' };
   }
@@ -4507,9 +4572,10 @@
       return plot;
     });
 
-    merged.bait = Object.assign({ worm: 0, dough: 0 }, s.bait || {});
+    merged.bait = Object.assign({ worm: 0, dough: 0, premium: 0 }, s.bait || {});
     merged.bait.worm = Math.round(num(merged.bait.worm, 0, 0, 9999));
     merged.bait.dough = Math.round(num(merged.bait.dough, 0, 0, 9999));
+    merged.bait.premium = Math.round(num(merged.bait.premium, 0, 0, 9999));
     merged.lure = Object.assign({ owned: false, dur: 0 }, s.lure || {});
     merged.lure.dur = Math.round(num(merged.lure.dur, 0, 0, BALANCE.lure.dur));
     merged.lure.owned = !!merged.lure.owned && merged.lure.dur > 0;

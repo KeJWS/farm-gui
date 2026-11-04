@@ -84,6 +84,21 @@
       log(s, '🪝 买了一个高级假饵（耐用 ' + L.dur + ' 次，咬钩同面团饵、好鱼同假饵）', 'info');
       return { ok: true, msg: '高级假饵到手' };
     }
+    if (kind === 'premium') {
+      if (fishLv(s) < BALANCE.gate.premium) {
+        return { ok: false, msg: '特级饵料要钓鱼 Lv' + BALANCE.gate.premium + ' 才解锁（现在 Lv' + fishLv(s) + '）' };
+      }
+      if (tradeLv(s) < BALANCE.gate.premiumTrade) {
+        return { ok: false, msg: '特级饵料要交易 Lv' + BALANCE.gate.premiumTrade + ' 才解锁（现在 Lv' + tradeLv(s) + '）' };
+      }
+      const price = Math.round(BAIT.premium.price * tradeCut(s)) * n;
+      if (s.coins < price) return { ok: false, msg: '金币不够（' + price + ' 金）' };
+      s.coins -= price; ledger(s, '买特级饵料 ×' + n, 0, price);
+      tradeXp(s, price);
+      s.bait.premium = (s.bait.premium || 0) + n;
+      log(s, '🍤 买了特级饵料 ×' + n + '（-' + price + ' 金）', 'info');
+      return { ok: true, qty: n, cost: price, msg: '特级饵料 ×' + n };
+    }
     return { ok: false, msg: '这种饵料买不到' };
   }
 

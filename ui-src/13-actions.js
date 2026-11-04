@@ -106,10 +106,10 @@
         return;
       }
       if (r.ok) {
-        pushCatch(r.entry);
-        toast(r.msg, r.entry.trash ? 'warn' : 'good');
+        (r.entries || [r.entry]).forEach(function (e) { pushCatch(e); });
+        toast(r.msg + (r.bonus ? '（双咬钩！）' : ''), r.entry.trash ? 'warn' : 'good');
         SFX.catch();
-        floatAt(ev, '+' + r.entry.price + ' 金', '');
+        floatAt(ev, '+' + (r.entries || [r.entry]).reduce(function (n, e) { return n + e.price; }, 0) + ' 金', '');
       }
     },
     cast5: function () {

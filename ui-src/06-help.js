@@ -109,6 +109,11 @@
         Math.round(G.BALANCE.hook.dough * 100) + '%）、好鱼率同假饵</b>' +
         '（杂物 ×' + G.BALANCE.bait.lureTrash + '、好鱼 ×' + G.BALANCE.bait.lureGood +
         '、品质取两次较好），是后期最省心的饵。<br>' +
+        '🍤 <b>特级饵料</b>（钓鱼 Lv' + G.BALANCE.gate.premium + ' + <b>交易 Lv' +
+        G.BALANCE.gate.premiumTrade + '</b> 解锁）：' + G.BAIT.premium.price + ' 金 / 份，' +
+        Math.round(G.BALANCE.hook.premium * 100) + '% 咬钩、好鱼 ×' + G.BALANCE.bait.premiumGood +
+        '、品质取两次较好，冲好鱼用。<br>' +
+        '⚡ <b>咬钩超过 100% 不浪费</b>：多出来的概率再判定一次（例如 108% = 98% 上一条 + 8% 双咬钩）。<br>' +
         '🕸️ 渔网：<b>' + G.NET_COST + ' 金/张，不缴维护费</b>。晚上耗 1 份面团饵，<b>' +
         Math.round(G.NET_CHANCE * 100) + '%</b> 网到 1 条标准及以下的普通鱼，' +
         '<b>不会出杂物和宝箱</b>；要<b>钓鱼 Lv' + G.BALANCE.gate.net + '</b> 解锁，上限 = ' +

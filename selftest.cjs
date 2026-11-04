@@ -177,7 +177,7 @@ const fishN0 = fishLeft();
 const groups = G.fishGroups(s, "fish");
 ok(groups.length >= 1 && groups.reduce((n, g) => n + g.count, 0) === fishN0, '渔获按鱼种分组（不同品质合并）', groups.length);
 const g0 = groups[0], coinsBeforeGroup = s.coins;
-const expectGroup = Math.max(1, Math.round(G.shopValue(g0.total) * G.sellBonus(s) * G.fishMarketMul(s, g0.name)));
+const expectGroup = Math.max(1, Math.round(G.shopValue(g0.total) * G.sellBonus(s) * G.fishMarketMul(s, g0.name, g0.count)));
 const rGroup = G.sellFishGroup(s, g0.key);
 ok(rGroup.ok && s.coins === coinsBeforeGroup + expectGroup && fishLeft() === fishN0 - g0.count,
    '卖一组鱼结算正确（8 折 × 市价）', { key: g0.key, gain: rGroup.income });
@@ -1957,9 +1957,10 @@ ok(!G.buyBait(v33f, 'lure2', 1).ok, '钓鱼到级但交易等级不够也买不�
 v33f.levels.trade = G.BALANCE.gate.lure2Trade;
 const v33buy = G.buyBait(v33f, 'lure2', 1);
 ok(v33buy.ok && v33f.lure2.owned && v33f.lure2.dur === 100 && v33f.coins === 1000 - 20,
-  'Lv6 + 交易 Lv3 能买高级假饵（20 金 / 100 耐久）', v33f.coins);
+  '钓鱼 Lv' + G.BALANCE.gate.lure2 + ' + 交易 Lv' + G.BALANCE.gate.lure2Trade +
+  ' 能买高级假饵（20 金 / 100 耐久）', v33f.coins);
 ok(Math.abs(G.HOOK.lure2 - G.HOOK.dough) < 1e-9, '高级假饵咬钩率 = 面团饵');
-ok(G.BALANCE.bait.lureGood === 1.15 && G.BALANCE.bait.lureTrash === 0.3, '高级假饵好鱼率 = 假饵');
+ok(G.BALANCE.bait.lureGood === 1.10 && G.BALANCE.bait.lureTrash === 0.3, '假饵 / 高级假饵好鱼率 ×1.10');
 
 const v33c = G.createState();
 v33c.lure2 = { owned: true, dur: 5 };
@@ -2641,6 +2642,42 @@ section('河边预估与交易折扣');
   const fert = G.buyFertItem(s2, 'special', 1);
   ok(fert.ok && fert.cost === Math.round(G.FERT.special.cost * G.tradeCut(s2)),
     '肥料吃交易折扣', fert);
+}
+
+/* ---------- 17. v2.35 饵料调整 / 双咬钩 / 特级饵料 ---------- */
+section('饵料调整与双咬钩');
+{
+  ok(G.BALANCE.hook.worm === 0.97 && G.BALANCE.bait.lureGood === 1.10,
+    '蚯蚓 97% 咬钩、假饵好鱼 ×1.10', [G.BALANCE.hook.worm, G.BALANCE.bait.lureGood]);
+
+  const s = G.createState();
+  s.day = 35; s.weather = 'rain'; s.levels.fish = 10;
+  s.bait.worm = 5; s.energy = 20;
+  G.setRng(function () { return 0; });
+  const beforeE = s.energy, beforeW = s.bait.worm;
+  const r = G.fish(s, 'worm');
+  ok(r.ok && r.entries.length === 2 && r.bonus === 1, '咬钩超过 100% 触发双咬钩',
+    r && r.entries && r.entries.length);
+  ok(s.energy === beforeE - 2 && s.bait.worm === beforeW - 1, '双咬钩只消耗一份体力和饵',
+    [s.energy, s.bait.worm]);
+
+  const p = G.createState();
+  p.coins = 100; p.levels.fish = G.BALANCE.gate.premium - 1;
+  ok(!G.buyBait(p, 'premium', 1).ok, '钓鱼等级不够买不到特级饵料');
+  p.levels.fish = G.BALANCE.gate.premium;
+  ok(!G.buyBait(p, 'premium', 1).ok, '交易等级不够也买不到特级饵料');
+  p.levels.trade = G.BALANCE.gate.premiumTrade;
+  const buy = G.buyBait(p, 'premium', 2);
+  ok(buy.ok && p.bait.premium === 2 && p.coins < 100, '特级饵料可购买并进背包', p.coins);
+
+  const f = G.fishForecast(p, 'premium');
+  ok(f.cost === G.BAIT.premium.price && f.good > 1.2, '特级饵料预估成本与好鱼率正确', f);
+
+  p.weather = 'cloudy';
+  G.setRng(function () { return 0.9; });
+  const premBefore = p.bait.premium;
+  const rp = G.fish(p, 'premium');
+  ok(rp.ok && p.bait.premium === premBefore - 1, '特级饵料钓一杆扣 1 份', p.bait.premium);
 }
 
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));
