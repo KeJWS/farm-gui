@@ -4276,6 +4276,54 @@
     return days;
   }
 
+  /* 账本按类别汇总：给状态页的「近 30 天收益构成」用。
+   * 账本 label 是自由文本，这里按前缀归类；认不出的条目不进任何一类。 */
+  const LEDGER_CATS = [
+    { id: 'crop',   name: '🌾 卖作物',      kind: 'in',  test: /^农产品店/ },
+    { id: 'box',    name: '📦 收购箱',      kind: 'in',  test: /^收购箱/ },
+    { id: 'order',  name: '📋 委托',        kind: 'in',  test: /^(委托|长期订单)/ },
+    { id: 'fish',   name: '🎣 卖鱼',        kind: 'in',  test: /^卖鱼/ },
+    { id: 'dig',    name: '🪱 挖蚯蚓',      kind: 'in',  test: /^卖蚯蚓/ },
+    { id: 'junk',   name: '🎁 开箱 / 回收', kind: 'in',  test: /^(回收|开.*宝箱|卖种子|卖肥料)/ },
+    { id: 'work',   name: '🕐 打零工',      kind: 'in',  test: /零工/ },
+    { id: 'reward', name: '🏆 奖励',        kind: 'in',  test: /奖励/ },
+    { id: 'food',   name: '🍖 伙食',        kind: 'out', test: /^伙食/ },
+    { id: 'upkeep', name: '🧾 维护 / 税',   kind: 'out', test: /^(维护|月度税金)/ },
+    { id: 'buy',    name: '🛒 采购',        kind: 'out', test: /^买/ },
+    { id: 'build',  name: '🏗️ 建设 / 升级', kind: 'out', test: /^(开垦|体力上限|雇佣|渔夫升)/ },
+    { id: 'wage',   name: '🧑‍🌾 渔夫工资',  kind: 'out', test: /^渔夫工资/ },
+    { id: 'donate', name: '🏘️ 捐赠',        kind: 'out', test: /^捐赠/ }
+  ];
+
+  function ledgerByCategory(s, days) {
+    const span = days || 30;
+    const from = Math.max(1, (s.day || 1) - span + 1);
+    const map = {};
+    LEDGER_CATS.forEach(function (c) {
+      map[c.id] = { id: c.id, name: c.name, kind: c.kind, total: 0, n: 0 };
+    });
+    (s.ledger || []).forEach(function (r) {
+      if ((r.day || 0) < from) return;
+      const v = (r.income || 0) - (r.expense || 0);
+      if (!v) return;
+      const label = String(r.label || '');
+      const cat = LEDGER_CATS.filter(function (c) { return c.test.test(label); })[0];
+      if (!cat) return;
+      map[cat.id].total += v;
+      map[cat.id].n++;
+    });
+    const list = Object.keys(map).map(function (k) { return map[k]; })
+      .filter(function (c) { return c.n > 0; })
+      .sort(function (a, b) { return Math.abs(b.total) - Math.abs(a.total); });
+    return {
+      days: span,
+      list: list,
+      income: list.reduce(function (n, c) { return n + Math.max(0, c.total); }, 0),
+      expense: list.reduce(function (n, c) { return n + Math.max(0, -c.total); }, 0)
+    };
+  }
+
+
   /* 日志按天汇总：每天一条，items 里是当天的记录（新→旧） */
   function logByDay(s) {
     const days = [];
@@ -4733,7 +4781,7 @@
     waterCost: waterCost, seasonWeatherTable: seasonWeatherTable, SEASON_WEATHER: SEASON_WEATHER,
     marketInfo: marketInfo, marketMul: marketMul, addSupply: addSupply,
     createState: createState, serialize: serialize, deserialize: deserialize,
-    ledgerByDay: ledgerByDay, logByDay: logByDay,
+    ledgerByDay: ledgerByDay, logByDay: logByDay, ledgerByCategory: ledgerByCategory, LEDGER_CATS: LEDGER_CATS,
     makeOrders: makeOrders, deliverOrder: deliverOrder, orderHave: orderHave, orderPool: orderPool,
     mealFee: mealFee, expandCost: expandCost, upgradeCost: upgradeCost,
     WORK_RATE_FULL: WORK_RATE_FULL, WORK_RATE_HALF: WORK_RATE_HALF,

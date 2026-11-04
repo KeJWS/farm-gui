@@ -2761,7 +2761,14 @@
   function statusModal() {
     const lv = state.levels || { farm: 1, fish: 1, farmXp: 0, fishXp: 0 };
     const nextTax = G.BALANCE.tax.every - (state.day % G.BALANCE.tax.every);
-    const rows = [
+
+    const sec = function (title, rows) {
+      return '<div class="stat-sec"><h4>' + title + '</h4><dl class="kv">' +
+        rows.map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('') +
+      '</dl></div>';
+    };
+
+    const progress = [
       ['进度', '第 ' + state.day + ' 天 · ' + G.seasonOf(state.day) + '季'],
       ['金币', state.coins + ' 金'],
       ['体力', state.energy + ' / ' + state.maxEnergy + ' · 伙食 ' + G.mealFee(state) + ' 金/天'],
@@ -2787,7 +2794,28 @@
         return '种树 ' + ((state.stats && state.stats.orchardPlanted) || 0) + ' 棵 · 收果 ' +
           ((state.stats && state.stats.orchardFruit) || 0) + ' 个 · 水果图鉴 ' + got + '/' +
           G.FRUIT_LIST.length + ' · 价值 ' + val + ' 金';
+      })()]
+    ];
+
+    const assets = [
+      ['仓库', '收购箱到手约 ' + G.storeNetEstimate(state) + ' 金'],
+      ['收购箱', G.boxCount(state) + ' 批 · 预计 ' + G.boxValue(state) + ' 金（睡觉结算，扣 5%）'],
+      ['茶叶', (function () {
+        const list = G.teaStock(state);
+        return list.length ? list.map(function (t) { return t.emoji + t.name + '×' + state.teas[t.id]; }).join(' · ')
+          : '没有茶了（百货店有卖）';
       })()],
+      ['钥匙', '🗝️ 铁 ×' + ((state.keys && state.keys.iron) || 0) + ' · 🔑 金 ×' + ((state.keys && state.keys.gold) || 0)],
+      ['宝箱', '已开 ' + (state.stats.chests || 0) + ' 个 · 待开 ' +
+        G.fishGroups(state, 'junk').filter(function (g) { return g.chest; })
+          .reduce(function (n, g) { return n + g.count; }, 0) + ' 个'],
+      ['维护费', '每周 ' + (G.plotUpkeep(state.plots.length) + G.deviceUpkeep(state)) +
+        ' 金（土地 ' + G.plotUpkeep(state.plots.length) + ' + 设备 ' + G.deviceUpkeep(state) + '）'],
+      ['税金', '还有 ' + nextTax + ' 天 · 约 ' + G.taxDue(state) + ' 金（累进 2% / 4% / 6%，最低 ' +
+        G.BALANCE.tax.min + '）']
+    ];
+
+    const levels = [
       ['种田等级', 'Lv' + lv.farm + (lv.farm >= G.BALANCE.level.max ? '（满级）' :
         '（' + lv.farmXp + '/' + G.levelNeed(lv.farm) + '）') + ' · ' + G.levelEffectText('farm', lv.farm)],
       ['钓鱼等级', 'Lv' + lv.fish + (lv.fish >= G.BALANCE.level.max ? '（满级）' :
@@ -2800,22 +2828,10 @@
         G.levelEffectText('forage', lv.forage || 1)],
       ['交易等级', 'Lv' + (lv.trade || 1) + ((lv.trade || 1) >= G.BALANCE.level.max ? '（满级）' :
         '（' + (lv.tradeXp || 0) + '/' + G.levelNeed(lv.trade || 1, 'trade') + '）') + ' · ' +
-        G.levelEffectText('trade', lv.trade || 1)],
-      ['维护费', '每周 ' + (G.plotUpkeep(state.plots.length) + G.deviceUpkeep(state)) +
-        ' 金（土地 ' + G.plotUpkeep(state.plots.length) + ' + 设备 ' + G.deviceUpkeep(state) + '）'],
-      ['税金', '还有 ' + nextTax + ' 天 · 约 ' + G.taxDue(state) + ' 金（累进 2% / 4% / 6%，最低 ' +
-        G.BALANCE.tax.min + '）'],
-      ['仓库总价', '收购箱到手约 ' + G.storeNetEstimate(state) + ' 金'],
-      ['收购箱', G.boxCount(state) + ' 批 · 预计 ' + G.boxValue(state) + ' 金（睡觉结算，扣 5%）'],
-      ['茶叶', (function () {
-        const list = G.teaStock(state);
-        return list.length ? list.map(function (t) { return t.emoji + t.name + '×' + state.teas[t.id]; }).join(' · ')
-          : '没有茶了（百货店有卖）';
-      })()],
-      ['钥匙', '🗝️ 铁 ×' + ((state.keys && state.keys.iron) || 0) + ' · 🔑 金 ×' + ((state.keys && state.keys.gold) || 0)],
-      ['宝箱', '已开 ' + (state.stats.chests || 0) + ' 个 · 待开 ' +
-        G.fishGroups(state, 'junk').filter(function (g) { return g.chest; })
-          .reduce(function (n, g) { return n + g.count; }, 0) + ' 个'],
+        G.levelEffectText('trade', lv.trade || 1)]
+    ];
+
+    const totals = [
       ['累计播种', state.stats.planted + ' 次'],
       ['累计收获', state.stats.harvests + ' 次'],
       ['累计钓鱼', state.stats.casts + ' 次'],
@@ -2836,10 +2852,31 @@
         return list.filter(function (a) { return a.done; }).length + ' / ' + list.length;
       })()]
     ];
+
+    /* 近 30 天收益构成：按账本类别归类，条形按最大项归一 */
+    const inc = G.ledgerByCategory(state, 30);
+    const net = inc.income - inc.expense;
+    const maxAbs = Math.max(1, inc.list.reduce(function (m, c) { return Math.max(m, Math.abs(c.total)); }, 0));
+    const bars = inc.list.map(function (c) {
+      const v = Math.abs(c.total);
+      return '<div class="stat-bar">' +
+        '<span class="sb-n">' + c.name + '</span>' +
+        '<span class="sb-t"><i class="' + (c.total > 0 ? 'in' : 'out') + '" style="width:' +
+          Math.max(2, Math.round(v / maxAbs * 100)) + '%"></i></span>' +
+        '<b class="' + (c.total > 0 ? 'up' : 'down') + '">' + (c.total > 0 ? '+' : '−') + v + '</b>' +
+      '</div>';
+    }).join('');
+    const incomeBlock = '<div class="stat-sec"><h4>📊 近 30 天收益</h4>' +
+      '<div class="stat-sum">收入 <b class="up">+' + inc.income + '</b> · 支出 <b class="down">−' +
+        inc.expense + '</b> · 净 <b class="' + (net >= 0 ? 'up' : 'down') + '">' +
+        (net >= 0 ? '+' : '−') + Math.abs(net) + '</b></div>' +
+      (bars || '<div class="store-empty">最近 30 天还没有账目</div>') +
+      '<div class="stat-tip">按账本标签归类：卖种子 / 卖肥料 / 回收 / 开箱并入「开箱 · 回收」。</div>' +
+    '</div>';
+
     openModal('📊 当前状态',
-      '<dl class="kv">' + rows.map(function (r) {
-        return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>';
-      }).join('') + '</dl>',
+      sec('🌱 农场与进度', progress) + sec('💰 资产与开销', assets) + incomeBlock +
+      sec('📈 等级', levels) + sec('🏆 累计', totals),
       '<button class="btn" data-close>关闭</button>');
   }
 

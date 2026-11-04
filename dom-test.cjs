@@ -522,6 +522,7 @@ ok(stHtml.indexOf('采集记录') >= 0, '状态面板新增采集记录');
 ok(stHtml.indexOf('挖蚯蚓等级') >= 0 && stHtml.indexOf('采集等级') >= 0, '状态面板列出两条新等级');
 ok(stHtml.indexOf('交易等级') >= 0, '状态面板列出交易等级');
 ok(stHtml.indexOf('果园累计') >= 0 && stHtml.indexOf('水果图鉴') >= 0, '状态面板列出果园累计');
+ok(stHtml.indexOf('近 30 天收益') >= 0 && stHtml.indexOf('stat-sec') >= 0, '状态面板分区块 + 收益构成');
 ok(stHtml.indexOf('其中自动播种器') < 0, '维护费不再带「其中自动播种器」');
 ok(text('#trade-lv').indexOf('Lv') >= 0, '商店面板显示交易等级', text('#trade-lv'));
 

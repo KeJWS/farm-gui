@@ -1019,3 +1019,22 @@ button{ color:inherit; font:inherit; }
   .codex-rw{ flex-wrap:wrap; }
   .codex-rw .cw-bar{ order:5; flex-basis:100%; }
 }
+
+/* ---------- 状态页分区 / 收益条形 ---------- */
+.stat-sec{ margin-bottom:14px; }
+.stat-sec:last-child{ margin-bottom:0; }
+.stat-sec h4{ margin:0 0 7px; font-size:12.5px; font-weight:800; color:var(--ink-2); letter-spacing:.3px; }
+.stat-sec .kv{ margin:0; }
+.stat-sum{ font-size:12.5px; font-weight:700; color:var(--ink-2); margin:0 0 8px; }
+.stat-bar{ display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:11.5px; font-weight:700; }
+.stat-bar .sb-n{ width:104px; flex:none; color:var(--ink-2); }
+.stat-bar .sb-t{ flex:1; height:7px; border-radius:99px; background:rgba(122,96,60,.14); overflow:hidden; }
+.stat-bar .sb-t i{ display:block; height:100%; border-radius:99px; }
+.stat-bar .sb-t i.in{ background:linear-gradient(90deg,var(--green),var(--green-d)); }
+.stat-bar .sb-t i.out{ background:linear-gradient(90deg,#d98b7f,var(--red)); }
+.stat-bar b{ width:74px; flex:none; text-align:right; font-variant-numeric:tabular-nums; }
+.stat-tip{ font-size:11px; color:var(--ink-3); font-weight:600; margin-top:6px; line-height:1.55; }
+@media (max-width:560px){
+  .stat-bar .sb-n{ width:82px; }
+  .stat-bar b{ width:62px; }
+}

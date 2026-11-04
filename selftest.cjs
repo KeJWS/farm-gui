@@ -2557,5 +2557,36 @@ section('果园图鉴与成就');
   ok(ids2.indexOf('tree8') >= 0, '8 个树坑解锁「满园果树」', ids2);
 }
 
+/* ---------- 14. 账本分类 ---------- */
+section('账本分类（近 30 天收益）');
+{
+  const s = G.createState(); s.day = 40;
+  s.ledger = [
+    { day: 39, label: '农产品店 · 卖 萝卜×3', income: 30, expense: 0 },
+    { day: 39, label: '卖鱼 鲫鱼', income: 20, expense: 0 },
+    { day: 39, label: '收购箱出货', income: 100, expense: 0 },
+    { day: 39, label: '委托 · 萝卜×3', income: 50, expense: 0 },
+    { day: 39, label: '卖蚯蚓', income: 9, expense: 0 },
+    { day: 39, label: '开木制宝箱', income: 20, expense: 0 },
+    { day: 39, label: '全天零工', income: 30, expense: 0 },
+    { day: 39, label: '成就奖励', income: 15, expense: 0 },
+    { day: 39, label: '伙食费', income: 0, expense: 4 },
+    { day: 39, label: '买种子 萝卜', income: 0, expense: 5 },
+    { day: 39, label: '月度税金', income: 0, expense: 40 },
+    { day: 39, label: '捐赠小镇', income: 0, expense: 100 },
+    { day: 5,  label: '卖鱼 鲤鱼', income: 999, expense: 0 }   // 窗口外
+  ];
+  const c = G.ledgerByCategory(s, 30);
+  const by = {};
+  c.list.forEach(function (x) { by[x.id] = x.total; });
+  ok(c.income === 274 && c.expense === 149, '收入 / 支出合计正确', [c.income, c.expense]);
+  ok(by.crop === 30 && by.fish === 20 && by.box === 100 && by.order === 50 &&
+     by.dig === 9 && by.junk === 20 && by.work === 30 && by.reward === 15,
+     '收入按活动归类', by);
+  ok(by.food === -4 && by.buy === -5 && by.upkeep === -40 && by.donate === -100,
+     '支出按类别归类', by);
+  ok(by.fish === 20, '窗口外的旧账不计入', by.fish);
+}
+
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));
 process.exit(fail ? 1 : 0);

@@ -720,3 +720,38 @@ console.log('\n== 成就（' + G.ACH.length + ' 项）==');
   const easy = G.ACH.filter(function (a) { return a.goal <= 5; }).slice(0, 6);
   console.log('   顺手就能拿的低门槛项：' + easy.map(function (a) { return a.emoji + a.name + '(' + a.goal + ')'; }).join(' · '));
 }
+
+/* ---------- 12. 其他活动的收益 ---------- */
+console.log('\n== 其他活动收益（每体力 / 每天）==');
+{
+  const B = G.BALANCE;
+  const q = 1.03;                                   // 平均品质倍率（不用肥）
+  const line = function (name, gold, energy, note) {
+    const per = energy ? (gold / energy).toFixed(2) + ' 金/体力' : '—';
+    console.log('   ' + pad(name, 16) + pad(gold.toFixed(1) + ' 金', 10) + pad(per, 14) + (note || ''));
+  };
+
+  line('打零工（全天）', B.start.maxEnergy * B.work.full, B.start.maxEnergy, '每天 1 次');
+  [1, 4, 8].forEach(function (lv) {
+    const ev = (B.dig.min + B.dig.max) / 2 + Math.floor(lv / B.dig.yieldAt);
+    line('挖蚯蚓 Lv' + lv, ev * B.dig.value, B.dig.energy, '期望 ' + ev + ' 条');
+  });
+  const avgWild = G.WILD_LIST.reduce(function (a, w) { return a + w.price; }, 0) / G.WILD_LIST.length;
+  const evQty = 1 + B.forage.qty2 + B.forage.qty3;
+  line('采集 Lv1', evQty * avgWild * q, B.forage.energy, '期望 ' + evQty.toFixed(2) + ' 件 · 均 ' + avgWild.toFixed(1) + ' 金');
+  const fishEV = G.FISH.filter(function (f) { return !f.trash && !f.chest; })
+    .reduce(function (a, f) { return a + f.w * f.base * q; }, 0) /
+    G.FISH.filter(function (f) { return !f.trash && !f.chest; }).reduce(function (a, f) { return a + f.w; }, 0);
+  line('渔网（每张）', G.NET_CHANCE * fishEV - B.lure.price, G.NET_CHANCE * B.netReset.energy,
+    '每天 1 份面团饵');
+  [3, G.BALANCE.fisher.max].forEach(function (lv) {
+    const casts = B.fisher.baseCasts + lv;
+    const wage = B.fisher.wageBase + B.fisher.wageStep * (lv - 1);
+    line('渔夫 Lv' + lv, casts * (fishEV - B.lure.price) - wage, 0, casts + ' 杆 / 天，工资 ' + wage);
+  });
+  G.TREE_LIST.forEach(function (t) {
+    const perDay = (B.orchard.fruitMin + B.orchard.fruitMax) / 2;
+    line(t.emoji + ' ' + t.name, perDay * t.price, 0,
+      '当季 ' + perDay + ' 个/天 · 一季 ' + Math.round(perDay * B.seasonDays * t.price) + ' 金 · 树苗 ' + t.sapling);
+  });
+}
