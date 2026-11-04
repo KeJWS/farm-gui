@@ -1,0 +1,38 @@
+{
+  "green": {
+    "id": "green",
+    "name": "绿茶",
+    "emoji": "🍵",
+    "price": 12,
+    "energy": 4,
+    "day": 1,
+    "desc": "清清爽爽，提神又不腻"
+  },
+  "black": {
+    "id": "black",
+    "name": "红茶",
+    "emoji": "🫖",
+    "price": 17,
+    "energy": 6,
+    "day": 5,
+    "desc": "加一块方糖，暖到心里"
+  },
+  "milk": {
+    "id": "milk",
+    "name": "奶茶",
+    "emoji": "🧋",
+    "price": 24,
+    "energy": 9,
+    "day": 10,
+    "desc": "三分糖，珍珠要多"
+  },
+  "coffee": {
+    "id": "coffee",
+    "name": "咖啡",
+    "emoji": "☕",
+    "price": 30,
+    "energy": 12,
+    "day": 16,
+    "desc": "一口下去，天都亮了"
+  }
+}

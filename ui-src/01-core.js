@@ -25,8 +25,28 @@
 
   /* ---------------- 存档 ---------------- */
 
-  function save() {
+  /* 写入去抖：连续操作（连点、连甩、全部浇水）只落一次盘；
+   * 页面隐藏 / 关闭时用 flushSave() 同步补写，保证不丢最后一笔。 */
+  const SAVE_DEBOUNCE = 400;
+  let saveTimer = null;
+
+  function saveNow() {
     try { localStorage.setItem(SAVE_KEY, G.serialize(state)); } catch (e) { /* 忽略 */ }
+  }
+
+  function save() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      saveTimer = null;
+      saveNow();
+    }, SAVE_DEBOUNCE);
+    // Node 下（dom-test）不要因为这个定时器拖住进程
+    if (saveTimer && typeof saveTimer.unref === 'function') saveTimer.unref();
+  }
+
+  function flushSave() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    if (state) saveNow();
   }
 
   function load() {

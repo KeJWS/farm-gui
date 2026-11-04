@@ -1,0 +1,114 @@
+[
+  {
+    "id": "trash",
+    "name": "垃圾",
+    "emoji": "🗑️",
+    "base": 1,
+    "w": 18,
+    "trash": true,
+    "desc": "河里捞上来的不是鱼"
+  },
+  {
+    "id": "crucian",
+    "name": "鲫鱼",
+    "emoji": "🐟",
+    "base": 3,
+    "w": 24,
+    "seasons": [
+      0,
+      2
+    ],
+    "desc": "肉嫩刺多，熬汤最鲜"
+  },
+  {
+    "id": "carp",
+    "name": "鲤鱼",
+    "emoji": "🐟",
+    "base": 6,
+    "w": 20,
+    "seasons": [
+      0,
+      1,
+      2
+    ],
+    "desc": "常见河鱼，红烧一绝"
+  },
+  {
+    "id": "mandarin",
+    "name": "鳜鱼",
+    "emoji": "🐠",
+    "base": 10,
+    "w": 13,
+    "seasons": [
+      0,
+      1
+    ],
+    "desc": "桃花流水鳜鱼肥"
+  },
+  {
+    "id": "bass",
+    "name": "鲈鱼",
+    "emoji": "🐟",
+    "base": 12,
+    "w": 11,
+    "seasons": [
+      1,
+      2
+    ],
+    "desc": "清蒸最见功夫"
+  },
+  {
+    "id": "puffer",
+    "name": "河豚",
+    "emoji": "🐡",
+    "base": 20,
+    "w": 9,
+    "seasons": [
+      2
+    ],
+    "desc": "有毒性，老饕甘愿冒险"
+  },
+  {
+    "id": "koi",
+    "name": "锦鲤",
+    "emoji": "🐉",
+    "base": 25,
+    "w": 6,
+    "seasons": [
+      0
+    ],
+    "desc": "好运的象征，卖价不菲"
+  },
+  {
+    "id": "chestWood",
+    "name": "木制宝箱",
+    "emoji": "🪵",
+    "base": 10,
+    "w": 5,
+    "chest": "wood",
+    "noOrder": true,
+    "desc": "木头做的，直接撬开就是几枚铜板"
+  },
+  {
+    "id": "chestIron",
+    "name": "铁制宝箱",
+    "emoji": "🧰",
+    "base": 25,
+    "w": 2.5,
+    "chest": "iron",
+    "lv": 4,
+    "noOrder": true,
+    "desc": "上了锁，得用铁钥匙"
+  },
+  {
+    "id": "chestGold",
+    "name": "黄金宝箱",
+    "emoji": "👑",
+    "base": 130,
+    "w": 1,
+    "chest": "gold",
+    "lv": 7,
+    "noOrder": true,
+    "desc": "沉甸甸的，金钥匙才打得开"
+  }
+]

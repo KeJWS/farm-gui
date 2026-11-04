@@ -49,7 +49,7 @@ class El {
   click() { this.fire('click', { target: this }); }
   appendChild(c) { this._text = (this._text || '') + (c && c.textContent || ''); }
   remove() {}
-  focus() {}
+  focus() { document.activeElement = this; }
   closest() { return null; }
   querySelector() { return null; }
   querySelectorAll() { return []; }
@@ -83,6 +83,7 @@ const docListeners = {};
 const document = {
   documentElement: { dataset: {} },
   body: new El('body'),
+  activeElement: null,
   querySelector(sel) {
     if (!nodes.has(sel)) nodes.set(sel, new El(sel));
     return nodes.get(sel);
@@ -606,3 +607,11 @@ ok(shareHtml.indexOf('分享名片') >= 0, '点设置里的入口能打开名片
 ok(shareHtml.indexOf('share-preview') >= 0 && shareHtml.indexOf('data:image/png') >= 0,
    '名片用本地 canvas 生成预览图');
 ok(shareHtml.indexOf('do-share-save') >= 0, '名片可以下载成 PNG');
+
+/* ---------- 重绘后的焦点保持（v2.27） ---------- */
+console.log('\n== 焦点保持 ==');
+document.activeElement = { dataset: { i: '2' }, closest: function () { return null; } };
+clickAct('waterAll');
+ok(document.activeElement && document.activeElement.sel === '[data-i="2"]',
+   '全量重绘后焦点回到原来那块地', document.activeElement && document.activeElement.sel);
+document.activeElement = null;

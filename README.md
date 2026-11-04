@@ -206,12 +206,16 @@
 ## 代码结构
 
 ```
-src/            逻辑层（14 个模块 → 拼成 game.js）
+src/            逻辑层（14 个模块 + 10 张数据表 → 拼成 game.js）
+src/data/       静态内容表（作物 / 鱼 / 品质 / 天气 / 果树 / 茶 / 宝箱 / 钥匙 / 肥料）
 ui-src/         界面层（16 个模块 → 拼成 ui.js）
 style.css       样式
 index.html      开发版入口
 build-modules.cjs / build-ui.cjs / build-single.cjs   三个拼装脚本
 ```
+
+`build-modules.cjs` 会先把 `src/data/*.json` 内联成 `const` 声明，再拼 `src/*.js`，最后补上闭包头尾 ——
+所以加逻辑模块只要按 `15-xxx.js` 这样编号即可（顺序＝文件名排序），不必操心闭包开在哪里。
 
 界面层模块（按文件名顺序拼进同一个 IIFE，共享作用域）：
 
@@ -241,16 +245,19 @@ build-modules.cjs / build-ui.cjs / build-single.cjs   三个拼装脚本
 - **逻辑层**通过 `BALANCE.xxx` 读取，不写死数字；体力消耗统一在 `BALANCE.energy`，挖蚯蚓 / 采集 / 果园各有自己的小节
 - **界面层**通过 `G.BALANCE` 读取；`index.html` 里不带具体数值（「几体力 / 几金」都由 `ui.js` 渲染时填）
 - **新增数值**先加进 `BALANCE`，再在逻辑 / 界面里引用
+- **内容表**（作物 / 鱼 / 品质 / 天气 / 果树 / 茶 / 宝箱 / 钥匙 / 肥料）在 `src/data/*.json`，改完跑 `node build-modules.cjs` 就会内联进 `game.js`；`file://` 下不能 fetch，所以不能运行时读 JSON
 - `node check-config.cjs` 会检查：BALANCE 顶层键不重复、逻辑层没有写死的体力、界面没有写死的「N 体力」、HTML 的 `<small>` 不带死数字
+- `node check-data.cjs` 会检查：JSON 能解析且都被拼进产物、id 与键名一致、季节 / 权重 / 价格合法、宝箱等级与 `BALANCE.chest` 一致、果树指向真实水果
 - `node check-docs.cjs` 会检查：README 里的关键数值和 BALANCE 一致、游戏内规则说明没有再写死这些数字
 
 ## 开发者命令
 
 ```bash
-node build-modules.cjs # src/*.js → game.js（改了 src/ 就要跑；build-single 会自动先跑）
+node build-modules.cjs # src/data/*.json + src/*.js → game.js（改了数据表或逻辑就要跑）
 node build-ui.cjs      # ui-src/*.js → ui.js（改了界面层就要跑）
 node selftest.cjs      # 570 项逻辑自测：播种/种子店/肥料/品质/收获器/钓鱼/天气/经济/委托/等级/解锁/农产品店/水产库存/成就/税金/采集/小镇/市场历史/高级假饵/自动播种器/交易等级/果园/每日总结/存读档/3000 步压测
 node check-ui.cjs      # 校验 ui.js 用到的 id、data-act 在 index.html 里都存在
+node check-data.cjs    # 数据表检查：JSON 合法、都被拼进产物、id / 引用 / 数值 / 跨表一致
 node check-config.cjs  # 数值来源检查：BALANCE 无重复键、逻辑 / 界面不写死体力、HTML 不带死数字
 node check-docs.cjs    # 文档一致性：README 关键数值与 BALANCE 对齐、规则说明不写死数字
 node dom-test.cjs      # DOM 冒烟：用最小 DOM 桩把 ui.js 跑起来，测渲染与弹窗
@@ -259,9 +266,17 @@ node analysis.cjs      # 收益分析：作物 / 钓鱼（专项）/ 渔网 / �
 node build-single.cjs  # 把三件套内联成 我的小农场.html（CI 会再跑一次并校验 git diff）
 ```
 
-（`selftest` / `dom-test` / `check-ui` / `balance` / `analysis` 都会先检查 `src/` 与 `ui-src/` 有没有比产物新，自动补拼装。）
+（`selftest` / `dom-test` / `check-ui` / `check-data` / `check-config` / `balance` / `analysis` 都会先检查 `src/`、`src/data/`、`ui-src/` 有没有比产物新，自动补拼装。）
 
 ## 更新记录
+
+**v2.27.0（数据外置 / 焦点与存档手感）**
+
+- **静态内容表外置**：作物 / 鱼 / 品质 / 天气 / 四季权重 / 果树 / 茶 / 宝箱 / 钥匙 / 肥料移到 `src/data/*.json`，构建时由 `build-modules.cjs` 内联进 `game.js`；`src/01-data.js` 只剩 `BALANCE` 与派生结构，改内容不用再动逻辑代码
+- 闭包头尾改由构建脚本生成，逻辑模块不再自己开闭包：以后加 `15-xxx.js` 不会因为排在 `14-save.js` 后面而跑到闭包外
+- 新增 `check-data.cjs`（31 项）并接入 CI：id 与键名一致、季节 / 权重 / 价格合法、宝箱解锁等级与 `BALANCE.chest` 一致、果树指向真实水果、每个 JSON 都确实被拼进 `game.js`
+- **焦点保持**：全量重绘后按 `data-*` 标识把焦点还给原来那块地 / 那行账本，键盘玩家不用每次从头 Tab（`dom-test` 有回归）
+- **存档写入去抖**：连续操作只落一次盘（400ms），`pagehide` / 切到后台时同步补写，不会丢最后一笔
 
 **v2.26.1（存档安全 / 一致性收尾）**
 
@@ -723,7 +738,7 @@ node build-single.cjs  # 把三件套内联成 我的小农场.html（CI 会再�
 farm-gui/
 ├── index.html         # 开发版入口（直接引 game.js / ui.js / style.css）
 ├── src/               # 逻辑层源码，按职责分成 14 个模块
-│   ├── 01-data.js     # 数值表与静态数据（作物 / 鱼 / 品质 / 天气 / 宝箱 / 茶）
+│   ├── 01-data.js     # BALANCE 数值表 + 派生结构（静态内容表在 src/data/）
 │   ├── 02-ach.js      # 成就
 │   ├── 03-core.js     # 随机、季节、等级
 │   ├── 04-state.js    # createState 与通用工具（log / ledger / addCoins）
@@ -736,7 +751,18 @@ farm-gui/
 │   ├── 11-shops.js    # 农产品店 / 渔夫 / 种子店
 │   ├── 12-orchard.js  # 果园：开垦 / 扩坑 / 种树 / 浇水 / 收获
 │   ├── 13-orders.js   # 每日委托与长期订单
-│   └── 14-save.js     # 存读档与对外导出（FarmGame API）
+│   ├── 14-save.js     # 存读档与对外导出（FarmGame API）
+│   └── data/          # 静态内容表（10 个 JSON，构建时内联进 game.js）
+│       ├── crops.json         # 作物 / 野货 / 水果
+│       ├── fish.json          # 鱼与宝箱鱼
+│       ├── quality.json       # 7 档品质
+│       ├── weather.json       # 四种天气
+│       ├── season-weather.json# 四季天气权重
+│       ├── trees.json         # 果树
+│       ├── teas.json          # 茶
+│       ├── chests.json        # 宝箱
+│       ├── keys.json          # 钥匙
+│       └── fert.json          # 肥料
 ├── game.js            # ⚙️ 由 src/ 拼装生成，不要手改
 ├── ui.js              # 渲染 + 交互 + 存档 + 音效
 ├── style.css          # 全部样式
@@ -744,12 +770,13 @@ farm-gui/
 ├── selftest.cjs       # 逻辑自测
 ├── dom-test.cjs       # 界面冒烟测试（假 DOM）
 ├── check-ui.cjs       # 界面绑定自检
+├── check-data.cjs     # 数据表检查
 ├── balance.cjs        # 数值体检
 ├── analysis.cjs       # 收益分析
-├── build-modules.cjs  # src/*.js → game.js
+├── build-modules.cjs  # src/data/*.json + src/*.js → game.js
 ├── build-single.cjs   # 单文件打包（会先跑 build-modules）
 └── preview.png        # 界面截图
 ```
 
 > 模块共享同一个闭包：`game.js` 由 14 个模块拼成一个 IIFE。这样既能分文件维护，
-> 又不依赖打包器，`file://` 双击也能直接跑。
+> 又不依赖打包器，`file://` 双击也能直接跑。闭包的头尾由构建脚本生成，模块只管写自己的部分。

@@ -1,0 +1,18 @@
+{
+  "normal": {
+    "id": "normal",
+    "name": "普通肥料",
+    "emoji": "🧪",
+    "cost": 8,
+    "add": 1,
+    "lv": 1
+  },
+  "special": {
+    "id": "special",
+    "name": "特效肥料",
+    "emoji": "💊",
+    "cost": 18,
+    "add": 2,
+    "lv": 4
+  }
+}

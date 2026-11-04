@@ -1,0 +1,58 @@
+[
+  {
+    "id": "bad",
+    "name": "劣质",
+    "emoji": "⬜",
+    "mul": 0.4,
+    "w": 10,
+    "color": "#8d939a"
+  },
+  {
+    "id": "common",
+    "name": "普通",
+    "emoji": "🥉",
+    "mul": 0.7,
+    "w": 25,
+    "color": "#b07a45"
+  },
+  {
+    "id": "std",
+    "name": "标准",
+    "emoji": "🥈",
+    "mul": 1,
+    "w": 35,
+    "color": "#4a86c8"
+  },
+  {
+    "id": "good",
+    "name": "优良",
+    "emoji": "🥇",
+    "mul": 1.3,
+    "w": 18,
+    "color": "#2f9e63"
+  },
+  {
+    "id": "fine",
+    "name": "优质",
+    "emoji": "💎",
+    "mul": 1.7,
+    "w": 8,
+    "color": "#7b5cd6"
+  },
+  {
+    "id": "perfect",
+    "name": "完美",
+    "emoji": "🌟",
+    "mul": 2.2,
+    "w": 3,
+    "color": "#d99f2b"
+  },
+  {
+    "id": "legend",
+    "name": "传说",
+    "emoji": "🏆",
+    "mul": 3,
+    "w": 1,
+    "color": "#d2453a"
+  }
+]

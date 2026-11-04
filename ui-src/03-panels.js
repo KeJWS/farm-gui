@@ -278,9 +278,45 @@
     $('#log').innerHTML = rows || '<div class="store-empty">还没有记录</div>';
   }
 
+  /* ---------------- 焦点保持 ---------------- */
+  /* 每次操作都会全量重绘面板，DOM 节点被换掉，键盘用户的焦点会掉回 body，
+   * 得从头 Tab。这里在重绘前记下焦点元素的 data 标识，重绘后按同样的标识找回来。
+   * 弹窗（#modal-root）里的焦点不归这里管，直接跳过。 */
+
+  const FOCUS_DATA = ['i', 'bait', 'ledday', 'logday', 'order', 'long', 'tree', 'orc',
+                      'marketPage', 'storeFilter'];
+
+  function dataAttr(key) {
+    return 'data-' + key.replace(/[A-Z]/g, function (c) { return '-' + c.toLowerCase(); });
+  }
+
+  function focusSnapshot() {
+    const el = document.activeElement;
+    if (!el || el === document.body || !el.dataset) return null;
+    if (el.closest && el.closest('#modal-root')) return null;
+    const keys = Object.keys(el.dataset);
+    if (!keys.length) return null;
+    for (let i = 0; i < FOCUS_DATA.length; i++) {
+      const k = FOCUS_DATA[i];
+      if (el.dataset[k] !== undefined && el.dataset[k] !== '') {
+        return { key: k, value: String(el.dataset[k]) };
+      }
+    }
+    return { key: keys[0], value: String(el.dataset[keys[0]]) };
+  }
+
+  function restoreFocus(snap) {
+    if (!snap) return;
+    const value = snap.value.replace(/["\\]/g, '\\$&');
+    const next = document.querySelector('[' + dataAttr(snap.key) + '="' + value + '"]');
+    if (!next || !next.focus) return;
+    try { next.focus({ preventScroll: true }); } catch (e) { next.focus(); }
+  }
+
   /* ---------------- 总渲染 ---------------- */
 
   function renderAll() {
+    const focus = focusSnapshot();
     renderHud();
     renderPlots();
     renderOrchard();
@@ -292,6 +328,7 @@
     renderLedger();
     renderBook();
     renderLog();
+    restoreFocus(focus);
   }
 
   function commit(result) {

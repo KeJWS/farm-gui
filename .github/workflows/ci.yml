@@ -21,6 +21,8 @@ jobs:
         run: node check-config.cjs
       - name: 文档一致性
         run: node check-docs.cjs
+      - name: 数据表检查
+        run: node check-data.cjs
       - name: DOM 冒烟测试
         run: node dom-test.cjs
       - name: 数值体检

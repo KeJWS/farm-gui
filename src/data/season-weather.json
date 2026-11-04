@@ -1,0 +1,26 @@
+[
+  {
+    "sunny": 25,
+    "cloudy": 25,
+    "rain": 50,
+    "snow": 0
+  },
+  {
+    "sunny": 60,
+    "cloudy": 25,
+    "rain": 15,
+    "snow": 0
+  },
+  {
+    "sunny": 45,
+    "cloudy": 30,
+    "rain": 25,
+    "snow": 0
+  },
+  {
+    "sunny": 25,
+    "cloudy": 30,
+    "rain": 0,
+    "snow": 45
+  }
+]

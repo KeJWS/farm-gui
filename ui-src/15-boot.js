@@ -10,6 +10,11 @@
       console.error(e.error || e.message);
       toast('出错了：' + (e.message || '未知错误'), 'bad');
     });
+    // 存档写入去抖：离开页面 / 切到后台时同步补写最后一笔
+    window.addEventListener('pagehide', flushSave);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') flushSave();
+    });
     if (location.hash === '#fresh') {
       try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* 忽略 */ }
     }

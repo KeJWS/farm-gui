@@ -1,0 +1,18 @@
+{
+  "iron": {
+    "id": "iron",
+    "name": "铁钥匙",
+    "emoji": "🗝️",
+    "price": 40,
+    "lv": 4,
+    "opens": "铁制宝箱"
+  },
+  "gold": {
+    "id": "gold",
+    "name": "金钥匙",
+    "emoji": "🔑",
+    "price": 120,
+    "lv": 7,
+    "opens": "黄金宝箱"
+  }
+}

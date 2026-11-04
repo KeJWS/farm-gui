@@ -1,0 +1,285 @@
+{
+  "carrot": {
+    "name": "萝卜",
+    "emoji": "🥕",
+    "seed": 5,
+    "days": 2,
+    "base": 3,
+    "price": 4,
+    "big": false,
+    "lv": 1,
+    "seasons": [
+      0,
+      2
+    ],
+    "desc": "脆生生，炖汤最甜"
+  },
+  "cabbage": {
+    "name": "白菜",
+    "emoji": "🥬",
+    "seed": 7,
+    "days": 2,
+    "base": 2,
+    "price": 8,
+    "big": false,
+    "lv": 1,
+    "seasons": [
+      0,
+      2
+    ],
+    "desc": "冬天囤一车也不坏"
+  },
+  "potato": {
+    "name": "土豆",
+    "emoji": "🥔",
+    "seed": 9,
+    "days": 3,
+    "base": 3,
+    "price": 8,
+    "big": false,
+    "lv": 1,
+    "seasons": [
+      0,
+      1
+    ],
+    "desc": "怎么做都好吃，管饱"
+  },
+  "spinach": {
+    "name": "菠菜",
+    "emoji": "🥬",
+    "seed": 6,
+    "days": 2,
+    "base": 2,
+    "price": 7,
+    "big": false,
+    "lv": 1,
+    "seasons": [
+      0,
+      2
+    ],
+    "desc": "一茬接一茬，凉拌最爽口"
+  },
+  "corn": {
+    "name": "玉米",
+    "emoji": "🌽",
+    "seed": 14,
+    "days": 3,
+    "base": 2,
+    "price": 16,
+    "big": false,
+    "lv": 2,
+    "seasons": [
+      0,
+      1
+    ],
+    "desc": "刚摘的最甜，能磨面"
+  },
+  "eggplant": {
+    "name": "茄子",
+    "emoji": "🍆",
+    "seed": 17,
+    "days": 4,
+    "base": 2,
+    "price": 22,
+    "big": false,
+    "lv": 3,
+    "seasons": [
+      1,
+      2
+    ],
+    "desc": "紫得发亮，红烧下饭"
+  },
+  "tomato": {
+    "name": "番茄",
+    "emoji": "🍅",
+    "seed": 19,
+    "days": 4,
+    "base": 3,
+    "price": 16,
+    "big": false,
+    "lv": 3,
+    "seasons": [
+      1,
+      2
+    ],
+    "desc": "沙瓤，生吃拌糖也行"
+  },
+  "chili": {
+    "name": "辣椒",
+    "emoji": "🌶️",
+    "seed": 20,
+    "days": 4,
+    "base": 3,
+    "price": 21,
+    "big": false,
+    "lv": 3,
+    "seasons": [
+      1,
+      2
+    ],
+    "desc": "够辣，晒干了更好卖"
+  },
+  "pumpkin": {
+    "name": "南瓜",
+    "emoji": "🎃",
+    "seed": 26,
+    "days": 5,
+    "base": 1,
+    "price": 110,
+    "big": true,
+    "lv": 5,
+    "seasons": [
+      2
+    ],
+    "desc": "一株一个，个头抵一筐；施肥只提品质"
+  },
+  "watermelon": {
+    "name": "西瓜",
+    "emoji": "🍉",
+    "seed": 36,
+    "days": 5,
+    "base": 1,
+    "price": 140,
+    "big": true,
+    "lv": 6,
+    "seasons": [
+      1
+    ],
+    "desc": "沙甜起沙，一个顶一车；施肥只提品质"
+  },
+  "sweetpotato": {
+    "name": "红薯",
+    "emoji": "🍠",
+    "seed": 12,
+    "days": 4,
+    "base": 4,
+    "price": 10,
+    "big": false,
+    "lv": 2,
+    "seasons": [
+      2
+    ],
+    "desc": "烤着吃最香，管饱又耐放"
+  },
+  "cucumber": {
+    "name": "黄瓜",
+    "emoji": "🥒",
+    "seed": 19,
+    "days": 3,
+    "price": 13,
+    "multi": true,
+    "lv": 4,
+    "seasons": [
+      1
+    ],
+    "firstQty": 2,
+    "regrowDays": 2,
+    "regrowQty": 2,
+    "regrowTimes": 2,
+    "desc": "顶花带刺，摘了还能再长"
+  },
+  "grape": {
+    "name": "葡萄",
+    "emoji": "🍇",
+    "seed": 26,
+    "days": 4,
+    "price": 12,
+    "multi": true,
+    "lv": 4,
+    "seasons": [
+      1
+    ],
+    "firstQty": 3,
+    "regrowDays": 2,
+    "regrowQty": 3,
+    "regrowTimes": 2,
+    "desc": "一串一串地结，越摘越有"
+  },
+  "strawberry": {
+    "name": "草莓",
+    "emoji": "🍓",
+    "seed": 22,
+    "days": 3,
+    "price": 9,
+    "multi": true,
+    "lv": 4,
+    "seasons": [
+      0
+    ],
+    "firstQty": 3,
+    "regrowDays": 1,
+    "regrowQty": 2,
+    "regrowTimes": 3,
+    "desc": "娇气，但一直能摘"
+  },
+  "shepherd": {
+    "name": "荠菜",
+    "emoji": "🌿",
+    "price": 12,
+    "wild": true,
+    "seasons": [
+      0
+    ],
+    "desc": "田埂上一抓一把，包饺子最香"
+  },
+  "berry": {
+    "name": "野莓",
+    "emoji": "🫐",
+    "price": 18,
+    "wild": true,
+    "seasons": [
+      1
+    ],
+    "desc": "灌木丛里一串串，酸甜"
+  },
+  "mushroom": {
+    "name": "松茸",
+    "emoji": "🍄",
+    "price": 24,
+    "wild": true,
+    "seasons": [
+      2
+    ],
+    "desc": "雨后林子里的宝贝，城里人抢着要"
+  },
+  "frozenpear": {
+    "name": "冻梨",
+    "emoji": "🍐",
+    "price": 22,
+    "wild": true,
+    "seasons": [
+      3
+    ],
+    "desc": "冻得梆硬，化开了甜到心里"
+  },
+  "fruit_peach": {
+    "name": "桃",
+    "emoji": "🍑",
+    "price": 24,
+    "fruit": true,
+    "seasons": [
+      0
+    ],
+    "desc": "果园当季现摘，软甜多汁"
+  },
+  "fruit_mango": {
+    "name": "芒果",
+    "emoji": "🥭",
+    "price": 30,
+    "fruit": true,
+    "seasons": [
+      1
+    ],
+    "desc": "晒足太阳的热带甜"
+  },
+  "fruit_apple": {
+    "name": "苹果",
+    "emoji": "🍎",
+    "price": 26,
+    "fruit": true,
+    "seasons": [
+      2
+    ],
+    "desc": "秋天第一口脆"
+  }
+}

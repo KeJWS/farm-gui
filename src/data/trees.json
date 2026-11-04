@@ -1,0 +1,38 @@
+{
+  "peach": {
+    "id": "peach",
+    "name": "桃树",
+    "fruit": "桃",
+    "fruitId": "fruit_peach",
+    "emoji": "🍑",
+    "season": 0,
+    "seed": 90,
+    "sapling": 750,
+    "price": 24,
+    "desc": "春天开花，夏天摘桃"
+  },
+  "mango": {
+    "id": "mango",
+    "name": "芒果树",
+    "fruit": "芒果",
+    "fruitId": "fruit_mango",
+    "emoji": "🥭",
+    "season": 1,
+    "seed": 110,
+    "sapling": 900,
+    "price": 30,
+    "desc": "晒足太阳才够甜"
+  },
+  "apple": {
+    "id": "apple",
+    "name": "苹果树",
+    "fruit": "苹果",
+    "fruitId": "fruit_apple",
+    "emoji": "🍎",
+    "season": 2,
+    "seed": 95,
+    "sapling": 780,
+    "price": 26,
+    "desc": "秋天第一口脆"
+  }
+}

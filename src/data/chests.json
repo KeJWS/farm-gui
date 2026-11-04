@@ -1,0 +1,23 @@
+{
+  "wood": {
+    "id": "wood",
+    "name": "木制宝箱",
+    "emoji": "🪵",
+    "key": null,
+    "value": 10
+  },
+  "iron": {
+    "id": "iron",
+    "name": "铁制宝箱",
+    "emoji": "🧰",
+    "key": "iron",
+    "value": 25
+  },
+  "gold": {
+    "id": "gold",
+    "name": "黄金宝箱",
+    "emoji": "👑",
+    "key": "gold",
+    "value": 130
+  }
+}

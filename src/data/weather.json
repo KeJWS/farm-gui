@@ -1,0 +1,40 @@
+{
+  "sunny": {
+    "id": "sunny",
+    "name": "晴天",
+    "emoji": "☀️",
+    "w": 45,
+    "hookMod": -0.12,
+    "wormMod": -1,
+    "note": "咬钩率 -12% · 挖蚯蚓 -1 份"
+  },
+  "cloudy": {
+    "id": "cloudy",
+    "name": "阴天",
+    "emoji": "⛅",
+    "w": 30,
+    "hookMod": 0,
+    "wormMod": 1,
+    "note": "咬钩率默认 · 挖蚯蚓 +1 份"
+  },
+  "rain": {
+    "id": "rain",
+    "name": "雨天",
+    "emoji": "🌧️",
+    "w": 25,
+    "hookMod": 0.08,
+    "wormMod": 1,
+    "autoWater": true,
+    "note": "自动浇水 · 咬钩率 +8% · 挖蚯蚓 +1 份"
+  },
+  "snow": {
+    "id": "snow",
+    "name": "雪天",
+    "emoji": "❄️",
+    "w": 0,
+    "hookMod": -0.3,
+    "wormMod": -1,
+    "autoWater": true,
+    "note": "自动浇水（化雪）· 河面结冰，冬天本来就钓不了鱼"
+  }
+}

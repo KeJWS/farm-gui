@@ -545,4 +545,3 @@
 
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   root.FarmGame = API;
-})(typeof window !== 'undefined' ? window : globalThis);
