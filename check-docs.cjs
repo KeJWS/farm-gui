@@ -28,6 +28,8 @@ const facts = [
     '种田 Lv' + O.unlockLv + ' + ' + O.unlockCost + ' 金开垦，先给 **' + O.free +
     ' 个树坑**，第 ' + (O.free + 1) + '~' + O.slots + ' 个树坑花钱开（' + O.slotCosts.join(' / ') + ' 金）'],
   ['果园育苗进度', '浇水 x/' + O.grow.seed.water + ' · 生长 y/' + O.grow.seed.days + ' 天'],
+  ['果园果实产量', '每天随机挂 **' + O.fruitMin + '~' + O.fruitMax + ' 个**水果'],
+  ['树苗浇水上限', '浇足水后不必继续浇'],
   ['果园体力', '**浇果树**（' + O.waterEnergy + ' 体力/棵）、**收获全部**（' +
     O.harvestEnergy + ' 体力/棵）'],
   ['设备价格', '**洒水器**（' + B.device.sprinkler + ' 金/个）、**自动收获器**（' +

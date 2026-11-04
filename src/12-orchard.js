@@ -107,6 +107,11 @@
     return treeAge(s, t) >= need.days && (t.water || 0) >= need.water;
   }
 
+  function treeNeedsWater(s, i) {
+    const t = treeSlot(s, i);
+    return !!t && (t.water || 0) < treeNeed(t).water;
+  }
+
   function treeStage(s, i) {
     const t = treeSlot(s, i);
     if (!t) return 'empty';
@@ -119,7 +124,7 @@
     return seasonIdx(s.day || 1) === TREES[t.id].season;
   }
 
-  /* 育苗进度：给界面显示「浇水 x/30 · 生长 y/120 天」 */
+  /* 育苗进度：给界面显示已浇水天数与自然生长天数 */
   function treeProgress(s, i) {
     const t = treeSlot(s, i);
     if (!t) return null;
@@ -129,7 +134,7 @@
              done: treeMature(s, i), ripe: t.ripe || 0, mode: t.mode || 'seed' };
   }
 
-  /* 种树：种子要浇水 30 天 + 满 120 天；树苗浇水 15 天 + 满 30 天 */
+  /* 种树：种子要浇水 30 天 + 满 90 天；树苗浇水 15 天 + 满 30 天 */
   function plantTree(s, i, id, mode) {
     if (!orchardUnlocked(s)) return { ok: false, msg: '先去农场开垦果园' };
     const t = TREES[id];
@@ -151,22 +156,42 @@
     return { ok: true, slot: i, msg: t.name + ' 种下了（浇水 ' + need.water + ' 天 · 生长 ' + need.days + ' 天）' };
   }
 
-  /* 浇水：一次浇所有今天还没浇的育苗树，每棵 1 体力 */
+  /* 单棵浇水；完成该树苗所需浇水天数后，无需再浇 */
+  function waterTree(s, i) {
+    if (!orchardUnlocked(s)) return { ok: false, msg: '还没有果园' };
+    const t = treeSlot(s, i);
+    if (!t) return { ok: false, msg: '这个树坑还是空的' };
+    if (!treeNeedsWater(s, i)) return { ok: false, msg: '这棵树苗已经浇足水了' };
+    if (t.lastWater === s.day) return { ok: false, msg: '这棵树今天已经浇过了' };
+    const E = BALANCE.orchard.waterEnergy;
+    if ((s.energy || 0) < E) return { ok: false, msg: '体力不够，浇水要 ' + E + ' 点' };
+    t.lastWater = s.day;
+    t.water = Math.min(treeNeed(t).water, (t.water || 0) + 1);
+    s.energy -= E;
+    log(s, '💧 给第 ' + (i + 1) + ' 棵育苗树浇水（-' + E + ' 体力）', 'info');
+    return { ok: true, n: 1, cost: E, msg: '给第 ' + (i + 1) + ' 棵育苗树浇水（-' + E + ' 体力）' };
+  }
+
+  /* 批量浇水：依序浇所有今天还需浇水的育苗树，每棵 1 体力 */
   function waterOrchard(s) {
     if (!orchardUnlocked(s)) return { ok: false, msg: '还没有果园' };
     const E = BALANCE.orchard.waterEnergy;
     const slots = s.orchard.slots || [];
     const todo = [];
     slots.forEach(function (t, i) {
-      if (!t || treeMature(s, i)) return;
+      if (!t || !treeNeedsWater(s, i)) return;
       if (t.lastWater === s.day) return;
-      todo.push(t);
+      todo.push({ tree: t, index: i });
     });
     if (!todo.length) return { ok: false, msg: '今天没有要浇水的果树' };
     const canPay = Math.floor((s.energy || 0) / E);
     if (canPay <= 0) return { ok: false, msg: '体力不够，浇水要 ' + E + ' 点/棵' };
     const n = Math.min(canPay, todo.length);
-    for (let k = 0; k < n; k++) { todo[k].lastWater = s.day; todo[k].water = (todo[k].water || 0) + 1; }
+    for (let k = 0; k < n; k++) {
+      const t = todo[k].tree;
+      t.lastWater = s.day;
+      t.water = Math.min(treeNeed(t).water, (t.water || 0) + 1);
+    }
     s.energy -= n * E;
     log(s, '💧 给 ' + n + ' 棵果树浇水（-' + (n * E) + ' 体力）', 'info');
     return { ok: true, n: n, cost: n * E,
@@ -208,7 +233,7 @@
              msg: '收了 ' + n + ' 棵树共 ' + fruit + ' 个水果（-' + (n * E) + ' 体力）' };
   }
 
-  /* 睡觉结算：成树在当季每天挂 2 个果实，等人来收 */
+  /* 睡觉结算：成树在当季每天随机挂 1~3 个果实，等人来收 */
   function orchardTick(s, prevDay) {
     if (!orchardUnlocked(s)) return { fruit: 0, mature: 0, growing: 0, thirsty: 0, ripe: 0 };
     const slots = s.orchard.slots || [];
@@ -219,13 +244,13 @@
       if (treeMature(s, i)) {
         mature++;
         if (TREES[t.id].season === season) {
-          const n = BALANCE.orchard.fruitPerDay;
+          const n = randInt(BALANCE.orchard.fruitMin, BALANCE.orchard.fruitMax);
           t.ripe = (t.ripe || 0) + n;
           fruit += n;
         }
       } else {
         growing++;
-        if (t.lastWater !== s.day) thirsty++;
+        if (treeNeedsWater(s, i) && t.lastWater !== s.day) thirsty++;
       }
       ripe += t.ripe || 0;
     });
@@ -244,7 +269,7 @@
         if (treeInSeason(s, i)) inSeason++;
       } else {
         growing++;
-        if (t.lastWater !== s.day) thirsty++;
+        if (treeNeedsWater(s, i) && t.lastWater !== s.day) thirsty++;
       }
     });
     return { total: slots.length, max: BALANCE.orchard.slots, mature: mature, growing: growing,

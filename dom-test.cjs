@@ -157,6 +157,11 @@ function clickMarketPage(page) {
 }
 
 console.log('== 首屏渲染 ==');
+const indexSource = fs.readFileSync('index.html', 'utf8');
+ok(indexSource.indexOf('id="btn-market"') >= 0 &&
+   indexSource.indexOf('id="btn-market"') < indexSource.indexOf('<main class="layout">') &&
+   indexSource.indexOf('id="btn-analysis"') < 0,
+   '市场入口位于顶栏，商店区没有重复入口');
 ok(html('#plot-grid').indexOf('class="plot') >= 0 && (html('#plot-grid').match(/class="plot /g) || []).length === 5,
    '农田渲染出 5 块地');
 ok(text('#hud-plots').indexOf('5 块') >= 0, 'HUD 显示 5 块地', text('#hud-plots'));
@@ -260,6 +265,26 @@ ok(html('#modal-root').indexOf('收购箱') >= 0 && html('#modal-root').indexOf(
    '收购箱弹窗能打开并说明原价结算');
 ok(html('#modal-root').indexOf('全部取出') >= 0, '收购箱有「全部取出」');
 ok(html('#modal-root').indexOf('box-pick') >= 0, '收购箱可取指定批次');
+(function customBoxPut() {
+  const cropBtn = { dataset: { boxcrop: 'carrot' } };
+  const cropTarget = {
+    closest: function (sel) { return sel === '[data-boxcrop]' ? cropBtn : null; },
+    classList: classList()
+  };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: cropTarget, clientX: 0, clientY: 0 }); });
+  ok(html('#modal-root').indexOf('box-put-n') >= 0 && html('#modal-root').indexOf('仓库有 <b>12</b> 件') >= 0,
+     '仓库点 📦 后可输入放入数量');
+  document.querySelector('#box-put-n').value = '2';
+  const confirm = { dataset: { boxputKind: 'crop', boxputKey: 'carrot' }, disabled: false };
+  const confirmTarget = {
+    closest: function (sel) { return sel === '[data-boxput-kind]' ? confirm : null; },
+    classList: classList()
+  };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: confirmTarget, clientX: 0, clientY: 0 }); });
+  document.querySelector('#btn-box').fire('click', { target: {} });
+  ok(html('#modal-root').indexOf('萝卜 ×2') >= 0, '只把指定数量的作物放进收购箱');
+  ok(html('#store-list').indexOf('萝卜 ×10') >= 0, '自定义入箱后其余库存仍留在仓库');
+})();
 clickAct('shop');
 ok(html('#modal-root').indexOf('面团饵自定义数量') >= 0 && html('#modal-root').indexOf('dough-qty') >= 0,
    '渔具店有面团饵自定义数量输入');
@@ -475,14 +500,27 @@ ok(html('#modal-root').indexOf('种什么') >= 0 && html('#modal-root').indexOf(
   (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
 })();
 ok(html('#orchard-grid').indexOf('育苗') >= 0 && html('#orchard-grid').indexOf('0/30') >= 0,
-   '种下种子后显示育苗进度');
+   '种下种子后显示浇水进度');
+ok(html('#orchard-grid').indexOf('0/90') >= 0 && html('#orchard-grid').indexOf('data-tree-water="0"') >= 0,
+   '种子显示 90 天成长并提供单棵浇水按钮');
+
+(function plantSecondSeed() {
+  const pick = { dataset: { treePick: '1' }, disabled: false };
+  const pickTarget = { closest: function (s) { return s === '[data-tree-pick]' ? pick : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: pickTarget, clientX: 0, clientY: 0 }); });
+  const plant = { dataset: { treePlant: '1', tree: 'peach', mode: 'seed' }, disabled: false };
+  const plantTarget = { closest: function (s) { return s === '[data-tree-plant]' ? plant : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: plantTarget, clientX: 0, clientY: 0 }); });
+})();
 
 (function waterTrees() {
-  const btn = { dataset: { act: 'orchardWater' }, disabled: false };
-  const target = { closest: function (s) { return s === '[data-act]' ? btn : null; }, classList: classList() };
+  const btn = { dataset: { treeWater: '0' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-tree-water]' ? btn : null; }, classList: classList() };
   (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
 })();
-ok(html('#orchard-grid').indexOf('今天浇过') >= 0, '浇水后面板显示今天浇过');
+ok(html('#orchard-grid').indexOf('今天浇过') >= 0 && html('#orchard-grid').indexOf('1/30') >= 0 &&
+   (html('#orchard-grid').match(/0\/30/g) || []).length >= 1,
+   '独立浇水只推进指定果树的育苗进度');
 
 (function openDepart() {
   const btn = { dataset: { act: 'depart' }, disabled: false };

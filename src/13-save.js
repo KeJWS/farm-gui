@@ -107,7 +107,7 @@
       if (!t || !TREES[t.id]) return null;
       const mode = t.mode === 'sapling' ? 'sapling' : 'seed';
       const need = BALANCE.orchard.grow[mode];
-      const water = Math.round(num(t.water, 0, 0, 9999));
+      const water = Math.min(need.water, Math.round(num(t.water, 0, 0, 9999)));
       /* v2.20 的老存档只有 grown，这里换算成新的成长进度 */
       const planted = t.planted != null
         ? Math.round(num(t.planted, 1, 1, 100000))
@@ -449,13 +449,13 @@
     forage: forage, foragePool: foragePool, forageSeedPool: forageSeedPool,
     donate: donate, townTier: townTier, townBonus: townBonus, townNext: townNext,
     TREES: TREES, TREE_LIST: TREE_LIST, FRUIT_LIST: FRUIT_LIST,
-    orchardSlots: orchardSlots, orchardFree: orchardFree, orchardUnlocked: orchardUnlocked,
+     orchardSlots: orchardSlots, orchardFree: orchardFree, orchardUnlocked: orchardUnlocked,
     orchardUnlock: orchardUnlock, orchardSlotCount: orchardSlotCount,
     orchardExpandCost: orchardExpandCost, expandOrchard: expandOrchard,
     treeData: treeData, treeBuyPrice: treeBuyPrice, treeStockCount: treeStockCount,
     buyTreeStock: buyTreeStock, treeSlot: treeSlot, treeStage: treeStage, treeInSeason: treeInSeason,
-    treeNeed: treeNeed, treeAge: treeAge, treeMature: treeMature, treeProgress: treeProgress,
-    plantTree: plantTree, waterOrchard: waterOrchard, orchardTick: orchardTick,
+     treeNeed: treeNeed, treeAge: treeAge, treeMature: treeMature, treeNeedsWater: treeNeedsWater, treeProgress: treeProgress,
+     plantTree: plantTree, waterTree: waterTree, waterOrchard: waterOrchard, orchardTick: orchardTick,
     harvestTree: harvestTree, harvestOrchard: harvestOrchard, orchardSummary: orchardSummary,
     marketHeadroom: marketHeadroom, fishMarketHeadroom: fishMarketHeadroom,
     snapshotMarket: snapshotMarket, marketSeries: marketSeries, pushMarketHist: pushMarketHist,
@@ -471,4 +471,3 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   root.FarmGame = API;
 })(typeof window !== 'undefined' ? window : globalThis);
-

@@ -464,10 +464,11 @@ console.log('\n== 果园（种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.B
   const off = G.BALANCE.market.offSeason;
   const fresh = G.BALANCE.market.supplyMax;
   const DAYS = 120;                       // 一年 = 4 季 × 30 天
-  console.log('   卖价：收购箱按原价结算，当季刚上市 ×' + fresh + '，囤到反季 ×' +
+  const avgFruit = (O.fruitMin + O.fruitMax) / 2;
+  console.log('   产量：当季每天随机 ' + O.fruitMin + '–' + O.fruitMax + ' 个/棵，期望 ' + avgFruit.toFixed(1) + ' 个；卖价：收购箱按原价结算，当季刚上市 ×' + fresh + '，囤到反季 ×' +
     (fresh * off).toFixed(2) + '（每季只产 30 天，囤起来卖得掉吗？见文末）');
   const list = G.TREE_LIST.map(function (t) {
-    const perDay = O.fruitPerDay * t.price;
+    const perDay = avgFruit * t.price;
     const season = perDay * 30;
     return { t: t, perDay: perDay, season: season, offSeason: Math.round(season * off) };
   });

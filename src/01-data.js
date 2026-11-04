@@ -84,11 +84,11 @@
     /* 宝箱：铁箱 / 金箱按钓鱼等级解锁 */
     chest: { ironLv: 4, goldLv: 7 },
     /* 果园：种田 Lv7 + 2500 金开垦，先给 3 个树坑，后面每个花钱开（第 4~8 个）。
-     * 种子：浇水 30 天 + 生长满 120 天才成树；树苗：浇水 15 天 + 生长满 30 天。
-     * 成树只在自己季节结果，当季每天 2 个；浇水 / 收获各 1 体力。 */
-    orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, free: 3, fruitPerDay: 2,
+     * 种子：浇水 30 天 + 生长满 90 天才成树；树苗：浇水 15 天 + 生长满 30 天，浇足后无需再浇。
+     * 成树只在自己季节结果，当季每天随机 1~3 个；浇水 / 收获各 1 体力。 */
+    orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, free: 3, fruitMin: 1, fruitMax: 3,
                waterEnergy: 1, harvestEnergy: 1,
-               grow: { seed: { days: 120, water: 30 }, sapling: { days: 30, water: 15 } },
+               grow: { seed: { days: 90, water: 30 }, sapling: { days: 30, water: 15 } },
                slotCosts: [600, 1000, 1600, 2400, 3200] }
   };
 
@@ -239,8 +239,8 @@
   };
   const TEA_LIST = Object.keys(TEAS).map(function (k) { return TEAS[k]; });
 
-  /* 果树：每种只在自己的季节结果（当季每天 BALANCE.orchard.fruitPerDay 个）
-   * seed = 种子价（便宜，要浇水 30 天 + 满 120 天），sapling = 树苗价（贵，浇水 15 天 + 满 30 天）
+  /* 果树：每种只在自己的季节结果（当季每天随机 BALANCE.orchard.fruitMin~fruitMax 个）
+   * seed = 种子价（便宜，要浇水 30 天 + 满 90 天），sapling = 树苗价（贵，浇水 15 天 + 满 30 天）
    * price = 果实单价，fruitId 指向 CROPS 里对应的水果（收获进仓库） */
   const TREES = {
     peach:  { id: 'peach',  name: '桃树',   fruit: '桃',   fruitId: 'fruit_peach',
@@ -308,4 +308,3 @@
   };
   /* 各饵的咬钩基础概率（天气再加减） */
   const HOOK = BALANCE.hook;
-

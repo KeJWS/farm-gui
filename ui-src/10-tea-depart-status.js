@@ -58,7 +58,8 @@
           '<div class="sv">种子 ' + seedPrice + ' 金（浇水 ' + G.BALANCE.orchard.grow.seed.water +
             ' 天 + 生长 ' + G.BALANCE.orchard.grow.seed.days + ' 天）· 树苗 ' + sapPrice + ' 金（浇水 ' +
             G.BALANCE.orchard.grow.sapling.water + ' 天 + 生长 ' + G.BALANCE.orchard.grow.sapling.days +
-            ' 天）· ' + t.fruit + ' ' + t.price + ' 金/个</div></div>' +
+            ' 天）· 成树当季每天 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax +
+            ' 个 · ' + t.fruit + ' ' + t.price + ' 金/个</div></div>' +
         '<button class="btn mini" data-buytree="' + t.id + '" data-mode="seed"' +
           (state.coins < seedPrice ? ' disabled' : '') + '>种子</button>' +
         '<button class="btn mini" data-buytree="' + t.id + '" data-mode="sapling"' +

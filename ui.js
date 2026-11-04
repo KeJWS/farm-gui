@@ -634,7 +634,7 @@
             '<div class="sv"><span class="sf-note">' + (c.desc || '') + '</span> · ' + mixTxt +
               ' · 均 ' + (val / n).toFixed(1) + ' 金 · ' + mk.tag + '</div></div>' +
             '<span class="sp">' + val + ' 金</span>' +
-            '<button class="btn mini" data-boxcrop="' + id + '" title="整批放进收购箱，原价结算">📦</button>' +
+             '<button class="btn mini" data-boxcrop="' + id + '" title="自定义数量放进收购箱">📦</button>' +
           '</div>';
         }).join('');
     }
@@ -658,7 +658,7 @@
               fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) + ' 金/条' +
               (priced ? ' · ' + mk.tag : (g.chest ? ' · 宝箱' : '')) + '</div></div>' +
             '<span class="sp">' + g.total + ' 金</span>' +
-            '<button class="btn mini" data-boxfish="' + g.key + '" title="整批放进收购箱，原价结算">📦</button>' +
+             '<button class="btn mini" data-boxfish="' + g.key + '" title="自定义数量放进收购箱">📦</button>' +
           '</div>';
         }).join('');
     }
@@ -1545,9 +1545,10 @@
         '~' + G.BALANCE.orchard.slots + ' 个树坑要花钱开（' + G.BALANCE.orchard.slotCosts.join(' / ') + ' 金）；种子要<b>浇水 ' +
         G.BALANCE.orchard.grow.seed.water + ' 天 + 生长 ' + G.BALANCE.orchard.grow.seed.days +
         ' 天</b>，树苗要<b>浇水 ' + G.BALANCE.orchard.grow.sapling.water + ' 天 + 生长 ' +
-        G.BALANCE.orchard.grow.sapling.days + ' 天</b>（两项都满足才成树）；浇水 ' +
+        G.BALANCE.orchard.grow.sapling.days + ' 天</b>（浇够水后不必继续浇，两项都满足才成树）；每棵树可独立浇水，浇水 ' +
         G.BALANCE.orchard.waterEnergy + ' 体力 / 收获 ' + G.BALANCE.orchard.harvestEnergy + ' 体力；' +
-        '成树只在自己的季节每天挂 ' + G.BALANCE.orchard.fruitPerDay + ' 个水果，收进仓库后去农产品店卖<br>' +
+        '成树只在自己的季节每天随机挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax +
+        ' 个水果，收进仓库后去农产品店卖<br>' +
         '· 💰 税：每 ' + G.BALANCE.tax.every + ' 天按（金币 + 仓库价值）<b>累进</b>收一次——' +
         G.BALANCE.tax.bands.map(function (b, i) {
           const from = i ? G.BALANCE.tax.bands[i - 1].upTo : 0;
@@ -1998,6 +1999,17 @@
   }
 
   /* ---------------- 收购箱 ---------------- */
+
+  function boxPutModal(kind, key, name, available) {
+    const n = Math.max(1, Math.floor(available || 1));
+    openModal('📦 放入收购箱',
+      '<div class="shop-head">' + name + ' · 仓库有 <b>' + n + '</b> 件</div>' +
+      '<label class="buy-custom"><span>放入数量</span>' +
+        '<input id="box-put-n" type="number" min="1" max="' + n + '" step="1" value="1" inputmode="numeric"></label>' +
+      '<div class="shop-tip">指定数量会从仓库移入收购箱，剩余库存不变；下次睡觉按放入时的金额结算。</div>',
+      '<button class="btn primary" data-boxput-kind="' + kind + '" data-boxput-key="' + key + '">放入收购箱</button>' +
+      '<button class="btn" data-close>取消</button>');
+  }
 
   function boxModal() {
     const list = state.box || [];
@@ -2460,7 +2472,8 @@
           '<div class="sv">种子 ' + seedPrice + ' 金（浇水 ' + G.BALANCE.orchard.grow.seed.water +
             ' 天 + 生长 ' + G.BALANCE.orchard.grow.seed.days + ' 天）· 树苗 ' + sapPrice + ' 金（浇水 ' +
             G.BALANCE.orchard.grow.sapling.water + ' 天 + 生长 ' + G.BALANCE.orchard.grow.sapling.days +
-            ' 天）· ' + t.fruit + ' ' + t.price + ' 金/个</div></div>' +
+            ' 天）· 成树当季每天 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax +
+            ' 个 · ' + t.fruit + ' ' + t.price + ' 金/个</div></div>' +
         '<button class="btn mini" data-buytree="' + t.id + '" data-mode="seed"' +
           (state.coins < seedPrice ? ' disabled' : '') + '>种子</button>' +
         '<button class="btn mini" data-buytree="' + t.id + '" data-mode="sapling"' +
@@ -2715,6 +2728,7 @@
     const t = G.TREES[slot.id];
     const p = G.treeProgress(state, i);
     if (!p.done) {
+      const needsWater = G.treeNeedsWater(state, i);
       const watered = slot.lastWater === state.day;
       const pct = Math.min(100, Math.round(Math.min(p.water / p.needWater, p.age / p.needDays) * 100));
       return '<div class="orc-card">' +
@@ -2723,15 +2737,18 @@
         '<div class="orc-mid">' + t.name + ' · ' + (p.mode === 'sapling' ? '树苗' : '种子') + '<br>' +
           '💧 ' + p.water + '/' + p.needWater + ' 天 · 🌱 ' + p.age + '/' + p.needDays + ' 天</div>' +
         '<div class="cc-bar orc-bar"><i style="width:' + pct + '%"></i></div>' +
-        '<div class="orc-act"><span class="orc-note">' + (watered ? '✅ 今天浇过' : '💧 待浇水（' +
-          G.BALANCE.orchard.waterEnergy + ' 体力）') + '</span></div></div>';
+        '<div class="orc-act"><span class="orc-note">' + (!needsWater ? '✅ 育苗浇水已完成' :
+          (watered ? '✅ 今天浇过' : '💧 待浇水（' + G.BALANCE.orchard.waterEnergy + ' 体力）')) + '</span>' +
+        (needsWater ? '<button class="btn mini" data-tree-water="' + i + '"' +
+          (watered || state.energy < G.BALANCE.orchard.waterEnergy ? ' disabled' : '') + '>浇水</button>' : '') +
+        '</div></div>';
     }
     const inSeason = G.treeInSeason(state, i);
     return '<div class="orc-card mature' + (inSeason ? ' on' : '') + '">' +
       '<div class="orc-top"><span class="orc-emoji">' + t.emoji + '</span><span class="orc-no">' + no + ' 号坑</span>' +
         '<b class="orc-tag' + (inSeason ? '' : ' off') + '">' + (inSeason ? '当季' : '休眠') + '</b></div>' +
       '<div class="orc-mid">' + t.name + '<br>' +
-        (inSeason ? '每天挂 ' + G.BALANCE.orchard.fruitPerDay + ' 个 · 待收 ' + p.ripe
+        (inSeason ? '每天挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax + ' 个 · 待收 ' + p.ripe
                   : G.SEASONS[t.season] + '季结果') + '</div>' +
       '<div class="orc-act">' +
         '<button class="btn mini primary" data-tree-harvest="' + i + '"' + (p.ripe ? '' : ' disabled') + '>' +
@@ -2773,7 +2790,7 @@
     if (waterTxt) {
       waterTxt.textContent = sum.thirsty
         ? sum.thirsty + ' 棵 · ' + (sum.thirsty * G.BALANCE.orchard.waterEnergy) + ' 体力'
-        : (sum.growing ? '今天都浇过了' : '没有育苗树');
+        : (sum.growing ? '今天没有待浇树' : '没有育苗树');
     }
     const harvTxt = $('#orchard-harvest-txt');
     if (harvTxt) {
@@ -2800,7 +2817,8 @@
       return '<div class="store-row">' +
         '<span class="se">' + t.emoji + '</span>' +
         '<div><div class="sn">' + t.name + ' <b class="own">' + G.SEASONS[t.season] + '季结果</b></div>' +
-          '<div class="sv">' + t.fruit + ' ' + t.price + ' 金/个 · 种子需 浇水 ' + need.grow.seed.water +
+           '<div class="sv">' + t.fruit + ' ' + t.price + ' 金/个 · 成树后当季每天 ' + need.fruitMin + '–' + need.fruitMax +
+             ' 个 · 种子需浇水 ' + need.grow.seed.water +
             ' 天 + 生长 ' + need.grow.seed.days + ' 天 · 树苗需 浇水 ' + need.grow.sapling.water +
             ' 天 + 生长 ' + need.grow.sapling.days + ' 天</div>' +
           '<div class="sv">种子有 ' + seedN + ' · 树苗有 ' + sapN + '</div></div>' +
@@ -2811,10 +2829,11 @@
       '</div>';
     }).join('');
     openModal('🌰 ' + (i + 1) + ' 号树坑 · 种什么',
-      '<div class="shop-head">🍑 当季每天挂 ' + need.fruitPerDay + ' 个水果 · 每棵果树只在自己的季节结果</div>' + rows +
-      '<div class="shop-tip">种子便宜，但要<b>浇水 ' + need.grow.seed.water + ' 天</b>并且<b>生长满 ' +
+      '<div class="shop-head">🍑 当季每天随机挂 ' + need.fruitMin + '–' + need.fruitMax +
+        ' 个水果 · 每棵果树只在自己的季节结果</div>' + rows +
+      '<div class="shop-tip">果树可以逐棵浇水。种子便宜，但要<b>浇水 ' + need.grow.seed.water + ' 天</b>并且<b>生长满 ' +
         need.grow.seed.days + ' 天</b>才成树；树苗贵，<b>浇水 ' + need.grow.sapling.water +
-        ' 天</b>、生长满 ' + need.grow.sapling.days + ' 天就成树。浇水 ' + need.waterEnergy +
+        ' 天后不再需要浇水，生长满 ' + need.grow.sapling.days + ' 天才成树。浇水 ' + need.waterEnergy +
         ' 体力/棵、收获 ' + need.harvestEnergy + ' 体力/棵。</div>',
       '<button class="btn" data-act="depart">🏬 去百货店买</button>' +
       '<button class="btn" data-close>取消</button>');
@@ -3052,6 +3071,14 @@
         else { toast(r.msg, 'bad'); SFX.bad(); }
         return;
       }
+      const treeWater = t.closest('[data-tree-water]');
+      if (treeWater && !treeWater.disabled) {
+        const r = G.waterTree(state, Number(treeWater.dataset.treeWater));
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.water();
+        return;
+      }
       const treeHarvest = t.closest('[data-tree-harvest]');
       if (treeHarvest && !treeHarvest.disabled) {
         const r = G.harvestTree(state, Number(treeHarvest.dataset.treeHarvest));
@@ -3241,21 +3268,37 @@
         return;
       }
 
-      // 收购箱：放货
-      const boxCrop = t.closest('[data-boxcrop]');
-      if (boxCrop) {
-        const r = G.boxPutCrop(state, boxCrop.dataset.boxcrop);
+      // 收购箱：确认自定义放货数量
+      const boxPut = t.closest('[data-boxput-kind]');
+      if (boxPut) {
+        const kind = boxPut.dataset.boxputKind;
+        const key = boxPut.dataset.boxputKey;
+        const qty = Math.floor(Number($('#box-put-n').value) || 0);
+        const available = kind === 'crop'
+          ? G.storeCount(state, key)
+          : ((G.fishGroups(state).filter(function (g) { return g.key === key; })[0] || {}).count || 0);
+        if (!(qty > 0)) { toast('请输入 1 以上的数量', 'warn'); return; }
+        if (qty > available) { toast('仓库只有 ' + available + ' 件', 'warn'); return; }
+        const r = kind === 'crop' ? G.boxPutCrop(state, key, qty) : G.boxPutFish(state, key, qty);
+        if (r.ok) closeModal();
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();
         return;
       }
+
+      // 仓库点 📦 后选择放入收购箱的数量
+      const boxCrop = t.closest('[data-boxcrop]');
+      if (boxCrop) {
+        const id = boxCrop.dataset.boxcrop;
+        boxPutModal('crop', id, G.CROPS[id].name, G.storeCount(state, id));
+        return;
+      }
       const boxFish = t.closest('[data-boxfish]');
       if (boxFish) {
-        const r = G.boxPutFish(state, boxFish.dataset.boxfish);
-        commit(r);
-        toast(r.msg, r.ok ? 'good' : 'warn');
-        if (r.ok) SFX.coin();
+        const key = boxFish.dataset.boxfish;
+        const g = G.fishGroups(state).filter(function (x) { return x.key === key; })[0];
+        if (g) boxPutModal('fish', key, g.name, g.count);
         return;
       }
 

@@ -46,7 +46,7 @@
             '<div class="sv"><span class="sf-note">' + (c.desc || '') + '</span> · ' + mixTxt +
               ' · 均 ' + (val / n).toFixed(1) + ' 金 · ' + mk.tag + '</div></div>' +
             '<span class="sp">' + val + ' 金</span>' +
-            '<button class="btn mini" data-boxcrop="' + id + '" title="整批放进收购箱，原价结算">📦</button>' +
+             '<button class="btn mini" data-boxcrop="' + id + '" title="自定义数量放进收购箱">📦</button>' +
           '</div>';
         }).join('');
     }
@@ -70,7 +70,7 @@
               fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) + ' 金/条' +
               (priced ? ' · ' + mk.tag : (g.chest ? ' · 宝箱' : '')) + '</div></div>' +
             '<span class="sp">' + g.total + ' 金</span>' +
-            '<button class="btn mini" data-boxfish="' + g.key + '" title="整批放进收购箱，原价结算">📦</button>' +
+             '<button class="btn mini" data-boxfish="' + g.key + '" title="自定义数量放进收购箱">📦</button>' +
           '</div>';
         }).join('');
     }

@@ -105,6 +105,17 @@
 
   /* ---------------- 收购箱 ---------------- */
 
+  function boxPutModal(kind, key, name, available) {
+    const n = Math.max(1, Math.floor(available || 1));
+    openModal('📦 放入收购箱',
+      '<div class="shop-head">' + name + ' · 仓库有 <b>' + n + '</b> 件</div>' +
+      '<label class="buy-custom"><span>放入数量</span>' +
+        '<input id="box-put-n" type="number" min="1" max="' + n + '" step="1" value="1" inputmode="numeric"></label>' +
+      '<div class="shop-tip">指定数量会从仓库移入收购箱，剩余库存不变；下次睡觉按放入时的金额结算。</div>',
+      '<button class="btn primary" data-boxput-kind="' + kind + '" data-boxput-key="' + key + '">放入收购箱</button>' +
+      '<button class="btn" data-close>取消</button>');
+  }
+
   function boxModal() {
     const list = state.box || [];
     const total = G.boxValue(state);

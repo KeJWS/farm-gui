@@ -2251,15 +2251,17 @@ ok(plantSeed.ok && G.treeStage(s, 0) === 'growing', '种下种子进入育苗');
 ok(!G.plantTree(s, 0, 'peach', 'seed').ok, '同一个树坑不能重复种');
 
 s.energy = 10;
-const water1 = G.waterOrchard(s);
-ok(water1.ok && water1.n === 1 && s.energy === 9, '浇水 1 棵花 1 体力', { n: water1.n, e: s.energy });
-ok(!G.waterOrchard(s).ok, '同一天不能重复浇同一棵树');
+const water1 = G.waterTree(s, 0);
+ok(water1.ok && water1.n === 1 && s.energy === 9, '可单独给指定树坑浇水，消耗 1 体力', { n: water1.n, e: s.energy });
+ok(!G.waterTree(s, 0).ok, '同一天不能重复浇同一棵树');
 
-s.day = 125;                       // 长满 120 天，但只浇过 1 天
-ok(!G.treeMature(s, 0), '只长够天数、没浇够水也不成树');
+ok(!G.treeMature(s, 0), '种子尚未浇足并长够天数时不成树');
 s.energy = 60;
 for (let k = 1; k < 30; k++) { s.day++; G.waterOrchard(s); }
-ok(G.treeProgress(s, 0).water === 30 && G.treeMature(s, 0), '浇水 30 天 + 生长 120 天 → 成树',
+ok(G.treeProgress(s, 0).water === 30 && !G.treeNeedsWater(s, 0) && !G.treeMature(s, 0),
+   '种子浇足 30 天后不必再浇，仍需等满 90 天', G.treeProgress(s, 0));
+s.day = 95;
+ok(G.treeMature(s, 0), '种子浇水 30 天 + 生长 90 天 → 成树',
    G.treeProgress(s, 0));
 
 // 树苗：浇水 15 天 + 生长 30 天
@@ -2269,14 +2271,30 @@ G.plantTree(s, 1, 'apple', 'sapling');
 s.energy = 60;
 for (let k = 0; k < 15; k++) { G.waterOrchard(s); s.day++; }
 ok(G.treeProgress(s, 1).water === 15 && !G.treeMature(s, 1), '树苗浇够 15 天但还没长满 30 天不算成树');
+ok(!G.treeNeedsWater(s, 1) && !G.waterTree(s, 1).ok && !G.waterOrchard(s).ok,
+   '树苗浇够 15 天后不可再浇，即使尚未成熟');
 s.day = 230;
 ok(G.treeMature(s, 1), '树苗浇水 15 天 + 生长 30 天 → 成树');
 
+function orchardYieldAt(rng) {
+  const st = G.createState();
+  st.day = 301;
+  st.orchard = { unlocked: true, slots: [
+    { id: 'apple', mode: 'sapling', planted: 1, water: 15, lastWater: 1, ripe: 0 }
+  ] };
+  G.setRng(() => rng);
+  return G.orchardTick(st, 300).fruit;
+}
+ok(orchardYieldAt(0) === 1 && orchardYieldAt(0.9999) === 3,
+   '果树每个结果日随机产出 1~3 个', [orchardYieldAt(0), orchardYieldAt(0.9999)]);
+
 // 结果与收获（第 301 天起是秋天，苹果当季）
 s.day = 301;
+G.setRng(mulberry32(301));
 G.sleep(s);
 const ripe1 = G.treeSlot(s, 1).ripe;
-ok(ripe1 === G.BALANCE.orchard.fruitPerDay, '成树当季每天挂果', { ripe: ripe1 });
+ok(ripe1 >= G.BALANCE.orchard.fruitMin && ripe1 <= G.BALANCE.orchard.fruitMax,
+   '成树当季每天随机挂果', { ripe: ripe1 });
 ok(G.treeSlot(s, 0).ripe === 0, '不是当季的树不结果');
 
 s.energy = 5;

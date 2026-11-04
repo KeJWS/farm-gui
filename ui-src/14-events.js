@@ -90,6 +90,14 @@
         else { toast(r.msg, 'bad'); SFX.bad(); }
         return;
       }
+      const treeWater = t.closest('[data-tree-water]');
+      if (treeWater && !treeWater.disabled) {
+        const r = G.waterTree(state, Number(treeWater.dataset.treeWater));
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.water();
+        return;
+      }
       const treeHarvest = t.closest('[data-tree-harvest]');
       if (treeHarvest && !treeHarvest.disabled) {
         const r = G.harvestTree(state, Number(treeHarvest.dataset.treeHarvest));
@@ -279,21 +287,37 @@
         return;
       }
 
-      // 收购箱：放货
-      const boxCrop = t.closest('[data-boxcrop]');
-      if (boxCrop) {
-        const r = G.boxPutCrop(state, boxCrop.dataset.boxcrop);
+      // 收购箱：确认自定义放货数量
+      const boxPut = t.closest('[data-boxput-kind]');
+      if (boxPut) {
+        const kind = boxPut.dataset.boxputKind;
+        const key = boxPut.dataset.boxputKey;
+        const qty = Math.floor(Number($('#box-put-n').value) || 0);
+        const available = kind === 'crop'
+          ? G.storeCount(state, key)
+          : ((G.fishGroups(state).filter(function (g) { return g.key === key; })[0] || {}).count || 0);
+        if (!(qty > 0)) { toast('请输入 1 以上的数量', 'warn'); return; }
+        if (qty > available) { toast('仓库只有 ' + available + ' 件', 'warn'); return; }
+        const r = kind === 'crop' ? G.boxPutCrop(state, key, qty) : G.boxPutFish(state, key, qty);
+        if (r.ok) closeModal();
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();
         return;
       }
+
+      // 仓库点 📦 后选择放入收购箱的数量
+      const boxCrop = t.closest('[data-boxcrop]');
+      if (boxCrop) {
+        const id = boxCrop.dataset.boxcrop;
+        boxPutModal('crop', id, G.CROPS[id].name, G.storeCount(state, id));
+        return;
+      }
       const boxFish = t.closest('[data-boxfish]');
       if (boxFish) {
-        const r = G.boxPutFish(state, boxFish.dataset.boxfish);
-        commit(r);
-        toast(r.msg, r.ok ? 'good' : 'warn');
-        if (r.ok) SFX.coin();
+        const key = boxFish.dataset.boxfish;
+        const g = G.fishGroups(state).filter(function (x) { return x.key === key; })[0];
+        if (g) boxPutModal('fish', key, g.name, g.count);
         return;
       }
 

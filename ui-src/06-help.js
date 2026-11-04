@@ -221,9 +221,10 @@
         '~' + G.BALANCE.orchard.slots + ' 个树坑要花钱开（' + G.BALANCE.orchard.slotCosts.join(' / ') + ' 金）；种子要<b>浇水 ' +
         G.BALANCE.orchard.grow.seed.water + ' 天 + 生长 ' + G.BALANCE.orchard.grow.seed.days +
         ' 天</b>，树苗要<b>浇水 ' + G.BALANCE.orchard.grow.sapling.water + ' 天 + 生长 ' +
-        G.BALANCE.orchard.grow.sapling.days + ' 天</b>（两项都满足才成树）；浇水 ' +
+        G.BALANCE.orchard.grow.sapling.days + ' 天</b>（浇够水后不必继续浇，两项都满足才成树）；每棵树可独立浇水，浇水 ' +
         G.BALANCE.orchard.waterEnergy + ' 体力 / 收获 ' + G.BALANCE.orchard.harvestEnergy + ' 体力；' +
-        '成树只在自己的季节每天挂 ' + G.BALANCE.orchard.fruitPerDay + ' 个水果，收进仓库后去农产品店卖<br>' +
+        '成树只在自己的季节每天随机挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax +
+        ' 个水果，收进仓库后去农产品店卖<br>' +
         '· 💰 税：每 ' + G.BALANCE.tax.every + ' 天按（金币 + 仓库价值）<b>累进</b>收一次——' +
         G.BALANCE.tax.bands.map(function (b, i) {
           const from = i ? G.BALANCE.tax.bands[i - 1].upTo : 0;
