@@ -1046,3 +1046,12 @@ button{ color:inherit; font:inherit; }
 .profile-worth{ flex:none; display:flex; align-items:baseline; gap:4px; }
 .profile-worth b{ font-size:20px; font-weight:900; color:var(--gold); }
 .profile-worth small{ font-size:10.5px; color:var(--ink-3); font-weight:700; }
+
+/* ---------- 河边：每杆预估 ---------- */
+.fish-forecast{ display:flex; flex-wrap:wrap; gap:3px 12px; margin:7px 0 2px;
+  font-size:11.5px; font-weight:700; color:var(--ink-3); }
+.fish-forecast b{ color:var(--ink); font-weight:900; }
+.fish-forecast i{ font-style:normal; font-size:10.5px; margin-left:4px; color:var(--ink-3); }
+.fish-forecast b.up, .fish-forecast i.up{ color:var(--green-d); }
+.fish-forecast b.down, .fish-forecast i.down{ color:var(--red); }
+.fish-forecast .ff-warn{ color:var(--blue); }

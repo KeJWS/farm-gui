@@ -49,7 +49,7 @@
   function buyBait(s, kind, n) {
     n = n || 1;
     if (kind === 'dough') {
-      const cost = BAIT.dough.price * n;
+      const cost = Math.round(BAIT.dough.price * tradeCut(s)) * n;
       if (s.coins < cost) return { ok: false, msg: '金币不够' };
       s.coins -= cost; ledger(s, '买面团饵 ×' + n, 0, cost);
       tradeXp(s, cost);
@@ -58,7 +58,7 @@
       return { ok: true, msg: '面团饵 ×' + n };
     }
     if (kind === 'lure') {
-      const price = BALANCE.lure.price, dur = BALANCE.lure.dur;
+      const price = Math.round(BALANCE.lure.price * tradeCut(s)), dur = BALANCE.lure.dur;
       if (s.lure.owned) return { ok: false, msg: '假饵一次只能持 1 个' };
       if (s.coins < price) return { ok: false, msg: '金币不够（' + price + ' 金）' };
       s.coins -= price; ledger(s, '买假饵', 0, price);
@@ -76,9 +76,10 @@
         return { ok: false, msg: '高级假饵要交易 Lv' + BALANCE.gate.lure2Trade + ' 才解锁（现在 Lv' + tradeLv(s) + '）' };
       }
       if (s.lure2.owned) return { ok: false, msg: '高级假饵一次只能持 1 个' };
-      if (s.coins < L.price) return { ok: false, msg: '金币不够（' + L.price + ' 金）' };
-      s.coins -= L.price; ledger(s, '买高级假饵', 0, L.price);
-      tradeXp(s, L.price);
+      const price2 = Math.round(L.price * tradeCut(s));
+      if (s.coins < price2) return { ok: false, msg: '金币不够（' + price2 + ' 金）' };
+      s.coins -= price2; ledger(s, '买高级假饵', 0, price2);
+      tradeXp(s, price2);
       s.lure2.owned = true; s.lure2.dur = L.dur;
       log(s, '🪝 买了一个高级假饵（耐用 ' + L.dur + ' 次，咬钩同面团饵、好鱼同假饵）', 'info');
       return { ok: true, msg: '高级假饵到手' };

@@ -96,7 +96,7 @@
         Math.round(G.BALANCE.hook.dough * 100) + '%、蚯蚓 ' + Math.round(G.BALANCE.hook.worm * 100) +
         '%、假饵 ' + Math.round(G.BALANCE.hook.lure * 100) + '%，晴天 ' +
         Math.round(G.BALANCE.weatherHook.sunny * 100) + '%、雨天 +' +
-        Math.round(G.BALANCE.weatherHook.rain * 100) + '%。<br>' +
+        Math.round(G.BALANCE.weatherHook.rain * 100) + '%。河面上方会实时显示当前<b>咬钩率与每杆期望</b>（毛收益 − 饵成本）。<br>' +
         '🐟 <b>鱼汛</b>：每种鱼只在特定季节成群——汛期上钩权重 ×' + G.BALANCE.fishSeason.in +
         '，非汛期 ×' + G.BALANCE.fishSeason.off + '。' +
         '鲫鱼 春·秋 / 鲤鱼 春夏秋 / 鳜鱼 春·夏 / 鲈鱼 夏·秋 / 河豚 秋 / 锦鲤 春。<br>' +
@@ -177,9 +177,10 @@
         '商店的<b>买价</b>也会跟着市价走 —— 缺货 / 反季时买得更贵，而且<b>买货会把销量往回拉</b>（越买越贵）。点商店面板的 <b>📈 行情</b> 看全部系数。<br>' +
         '店里每天同样进一批作物（一般品质），买价 = 售价 × ' + G.BALANCE.shop.cropPriceMul +
         ' <b>再乘市价</b>，转手必亏，只在凑委托或应急时买。<br>' +
-        '🤝 <b>交易等级</b>会把所有商店的<b>进价</b>往下压（每级 −' +
+        '🤝 <b>交易等级</b>会把商店的<b>进价</b>往下压（每级 −' +
         (G.BALANCE.trade.buyCut * 100).toFixed(1) + '%，满级 −' +
-        (G.BALANCE.trade.maxCut * 100).toFixed(1) + '%）：买种子 / 茶 / 钥匙 / 鲜活水产都算，钱花得多、卖得勤，等级就涨。<br>' +
+        (G.BALANCE.trade.maxCut * 100).toFixed(1) + '%）：种子 / 饵料 / 肥料 / 茶 / 钥匙 / 水产 / 农产品 / 果树苗都算（设备按标价）；' +
+        '钱花得多、卖得勤，等级就涨。<br>' +
         '南瓜 <b>D' + G.CROP_UNLOCK.pumpkin + '</b> 起、西瓜 <b>D' + G.CROP_UNLOCK.watermelon + '</b> 起才进货。</p>' +
       '</div>' +
 

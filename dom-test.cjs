@@ -362,6 +362,16 @@ ok(pfHtml.indexOf('资产构成') >= 0 && pfHtml.indexOf('收入构成') >= 0, '
 ok(pfHtml.indexOf('profile-rank') >= 0 && pfHtml.indexOf('经营进度') >= 0,
    '经营档案含称号徽章与经营进度');
 
+console.log('\n== 河边预估 / 收购箱全部放入 ==');
+ok(html('#fish-forecast').indexOf('咬钩') >= 0 && html('#fish-forecast').indexOf('每杆') >= 0,
+   '河边显示咬钩率与每杆期望', html('#fish-forecast'));
+(function openBoxPut() {
+  const btn = { dataset: { boxcrop: 'carrot' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-boxcrop]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target }); });
+})();
+ok(html('#modal-root').indexOf('全部放入') >= 0, '单物品放箱弹窗有「全部放入」');
+
 console.log('\n== 成就 ==');
 document.querySelector('#btn-ach').fire('click', { target: {} });
 ok(html('#modal-root').indexOf('成就') >= 0 && html('#modal-root').indexOf('第一筐菜') >= 0,

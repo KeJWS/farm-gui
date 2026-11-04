@@ -287,6 +287,27 @@
         return;
       }
 
+      // 收购箱：全部放入（单物品）
+      const boxAll = t.closest('[data-boxput-all]');
+      if (boxAll) {
+        const raw = String(boxAll.dataset.boxputAll || '');
+        const cut = raw.indexOf('|');
+        const kind = raw.slice(0, cut);
+        const key = raw.slice(cut + 1);
+        const available = kind === 'crop'
+          ? G.storeCount(state, key)
+          : ((G.fishGroups(state).filter(function (g) { return g.key === key; })[0] || {}).count || 0);
+        if (!(available > 0)) { toast('仓库里已经没有这件了', 'warn'); return; }
+        const r = kind === 'crop'
+          ? G.boxPutCrop(state, key, available)
+          : G.boxPutFish(state, key, available);
+        if (r.ok) closeModal();
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        return;
+      }
+
       // 收购箱：确认自定义放货数量
       const boxPut = t.closest('[data-boxput-kind]');
       if (boxPut) {

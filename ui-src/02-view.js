@@ -334,6 +334,24 @@
     const frozen = G.isWinter(state.day);
     const FISH_E = G.BALANCE.energy.fish;
     const BATCH = G.BALANCE.fishBatch;
+    const ff = $('#fish-forecast');
+    if (ff) {
+      if (frozen) {
+        ff.innerHTML = '<span class="ff-warn">❄️ 河面结冰，冬天钓不了鱼</span>';
+      } else {
+        const f = G.fishForecast(state, baitSel);
+        const w = G.WEATHER[state.weather] || {};
+        const mod = w.hookMod || 0;
+        ff.innerHTML =
+          '<span>咬钩 <b>' + Math.round(f.hook * 100) + '%</b>' +
+            (mod ? '<i class="' + (mod > 0 ? 'up' : 'down') + '">' + (mod > 0 ? '+' : '') +
+              Math.round(mod * 100) + '%</i>' : '') + '</span>' +
+          '<span>好鱼 <b>×' + f.good.toFixed(2) + '</b></span>' +
+          '<span>每杆 <b class="' + (f.net >= 0 ? 'up' : 'down') + '">' +
+            (f.net >= 0 ? '+' : '') + f.net.toFixed(1) + '</b> 金' +
+            '<i>毛 ' + f.ev.toFixed(1) + ' · 饵 ' + f.cost.toFixed(1) + '</i></span>';
+      }
+    }
     const castBtn = $('[data-act="cast"]');
     castBtn.disabled = frozen || state.energy < FISH_E;
     castBtn.title = frozen ? '河面结冰，冬天钓不了鱼' : '';

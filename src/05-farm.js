@@ -276,7 +276,8 @@
       return { ok: false, msg: f.name + '要种田 Lv' + f.lv + ' 才解锁（现在 Lv' + farmLv(s) + '）' };
     }
     const qty = Math.max(1, Math.floor(n || 1));
-    const cost = f.cost * qty;
+    const unit = Math.round(f.cost * tradeCut(s));
+    const cost = unit * qty;
     if (s.coins < cost) return { ok: false, msg: '金币不够（需要 ' + cost + ' 金）' };
     s.coins -= cost;
     ledger(s, '买肥料 ' + f.name + '×' + qty, 0, cost);
@@ -586,8 +587,58 @@
              summary: body ? head + ' ｜ ' + body : head, report: report };
   }
 
-  function pickBait(s, prefer) {
-    if (prefer === 'worm' && s.bait.worm > 0) return 'worm';
+  /* 品质取 r 次最好的期望倍率（r=1 单次；r=2 蚯蚓 / 高级假饵） */
+  function expectedQualityMul(rolls) {
+    const r = Math.max(1, Math.round(rolls || 1));
+    const total = QUALITY.reduce(function (a, q) { return a + q.w; }, 0);
+    let out = 0, prev = 0, cum = 0;
+    QUALITY.forEach(function (q) {
+      cum += q.w;
+      const p = cum / total;
+      out += q.mul * (Math.pow(p, r) - Math.pow(prev, r));
+      prev = p;
+    });
+    return out;
+  }
+
+  /* 钓鱼预估：当前饵 / 天气 / 等级下的一杆期望（河边面板 + 分析脚本共用） */
+  function fishForecast(s, kind) {
+    kind = kind || 'dough';
+    const w = WEATHER[s.weather] || { hookMod: 0 };
+    const hook = clamp((HOOK[kind] || 0.9) + (w.hookMod || 0) + fishHookBonus(s), 0.3, 0.98);
+    const lvNow = fishLv(s);
+    const lureLike = kind === 'lure' || kind === 'lure2';
+    let total = 0;
+    const table = FISH.map(function (f) {
+      if (f.chest && lvNow < (f.lv || 1)) return null;
+      let mul = 1;
+      if (f.trash) mul = lureLike ? BALANCE.bait.lureTrash : 1;
+      else if (f.chest) mul = lureLike ? 1.4 : 1;
+      else if (kind === 'worm') mul = BALANCE.bait.wormGood;
+      else if (lureLike) mul = BALANCE.bait.lureGood;
+      if (!f.trash && !f.chest) mul *= fishGoodBonus(s);
+      if (f.seasons) mul *= f.seasons.indexOf(seasonIdx(s.day)) >= 0 ? FISH_IN_SEASON : FISH_OFF_SEASON;
+      const ww = f.w * mul;
+      total += ww;
+      return { f: f, w: ww };
+    }).filter(Boolean);
+    const qMul = expectedQualityMul((kind === 'worm' || kind === 'lure2') ? 2 : 1);
+    let ev = 0;
+    table.forEach(function (x) {
+      const f = x.f;
+      const v = f.trash ? 1 : (f.chest ? f.base : f.base * qMul);
+      ev += (x.w / total) * v;
+    });
+    ev *= hook;
+    const cost = kind === 'worm' ? BALANCE.dig.value
+      : (kind === 'dough' ? BAIT.dough.price
+        : (kind === 'lure' ? BALANCE.lure.price / BALANCE.lure.dur
+          : BALANCE.lure2.price / BALANCE.lure2.dur));
+    return { hook: hook, ev: ev, cost: cost, net: ev - cost, good: fishGoodBonus(s),
+             qMul: qMul, kind: kind };
+  }
+
+  function pickBait(s, prefer) {    if (prefer === 'worm' && s.bait.worm > 0) return 'worm';
     if (prefer === 'dough' && s.bait.dough > 0) return 'dough';
     if (prefer === 'lure' && s.lure.owned && s.lure.dur > 0) return 'lure';
     if (prefer === 'lure2' && s.lure2 && s.lure2.owned && s.lure2.dur > 0) return 'lure2';

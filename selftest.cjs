@@ -2616,5 +2616,32 @@ section('经营档案（净资产 / 称号 / 累计收支）');
   ok(round.stats.incomeTotal === s.stats.incomeTotal, '累计收支随存档保存', round.stats.incomeTotal);
 }
 
+/* ---------- 16. 河边预估 / 交易折扣 ---------- */
+section('河边预估与交易折扣');
+{
+  const s = G.createState();
+  s.day = 35; s.weather = 'rain';
+  const fd = G.fishForecast(s, 'dough');
+  const fw = G.fishForecast(s, 'worm');
+  ok(fd.hook > 0.9 && fd.hook <= 0.98, '预估咬钩率在 30%~98% 区间内', fd.hook);
+  ok(fd.cost === G.BAIT.dough.price && fw.cost === G.BALANCE.dig.value, '预估成本用真实饵价',
+    [fd.cost, fw.cost]);
+  ok(fd.net > 0, '面团饵每杆期望为正', fd.net);
+
+  const hi = G.createState(); hi.day = 35; hi.weather = 'rain';
+  hi.levels.fish = 10;
+  ok(G.fishForecast(hi, 'dough').net > fd.net, '钓鱼等级越高每杆期望越高',
+    [fd.net, G.fishForecast(hi, 'dough').net]);
+
+  const s2 = G.createState();
+  s2.coins = 1000; s2.levels.trade = 10; s2.levels.fish = 10; s2.levels.farm = 10;
+  const lure = G.buyBait(s2, 'lure2', 1);
+  ok(lure.ok && s2.coins === 1000 - Math.round(G.BALANCE.lure2.price * G.tradeCut(s2)),
+    '高级假饵吃交易折扣', { cost: 1000 - s2.coins, cut: G.tradeCut(s2) });
+  const fert = G.buyFertItem(s2, 'special', 1);
+  ok(fert.ok && fert.cost === Math.round(G.FERT.special.cost * G.tradeCut(s2)),
+    '肥料吃交易折扣', fert);
+}
+
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));
 process.exit(fail ? 1 : 0);

@@ -116,7 +116,8 @@
       '<div class="shop-tip">指定数量会从仓库移入收购箱，剩余库存不变；<b>按入箱时的市价锁价</b>，' +
         '睡觉结算时只跟随<b>当天季节</b>，并扣 ' + Math.round(G.BALANCE.market.boxFee * 100) +
         '% 手续费。入箱不压价，拆几批放和一次放价格一样。</div>',
-      '<button class="btn primary" data-boxput-kind="' + kind + '" data-boxput-key="' + key + '">放入收购箱</button>' +
+      '<button class="btn primary" data-boxput-all="' + kind + '|' + key + '">全部放入（' + n + ' 件）</button>' +
+      '<button class="btn" data-boxput-kind="' + kind + '" data-boxput-key="' + key + '">按数量放入</button>' +
       '<button class="btn" data-close>取消</button>');
   }
 

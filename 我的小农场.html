@@ -1056,6 +1056,15 @@ button{ color:inherit; font:inherit; }
 .profile-worth b{ font-size:20px; font-weight:900; color:var(--gold); }
 .profile-worth small{ font-size:10.5px; color:var(--ink-3); font-weight:700; }
 
+/* ---------- 河边：每杆预估 ---------- */
+.fish-forecast{ display:flex; flex-wrap:wrap; gap:3px 12px; margin:7px 0 2px;
+  font-size:11.5px; font-weight:700; color:var(--ink-3); }
+.fish-forecast b{ color:var(--ink); font-weight:900; }
+.fish-forecast i{ font-style:normal; font-size:10.5px; margin-left:4px; color:var(--ink-3); }
+.fish-forecast b.up, .fish-forecast i.up{ color:var(--green-d); }
+.fish-forecast b.down, .fish-forecast i.down{ color:var(--red); }
+.fish-forecast .ff-warn{ color:var(--blue); }
+
 </style>
 </head>
 <body>
@@ -1122,6 +1131,7 @@ button{ color:inherit; font:inherit; }
         <span class="lv-chip" id="fish-lv">🎣 Lv1</span>
       </div>
       <div class="bait-row" id="bait-row"></div>
+      <div class="fish-forecast" id="fish-forecast"></div>
       <div class="fish-row">
         <button class="btn primary big" data-act="cast">🎣 甩一杆<small id="cast-cost"></small></button>
         <button class="btn big" data-act="cast5">⚡ 连甩 <span id="cast5-n">5</span> 杆</button>
@@ -3196,7 +3206,8 @@ button{ color:inherit; font:inherit; }
       return { ok: false, msg: f.name + '要种田 Lv' + f.lv + ' 才解锁（现在 Lv' + farmLv(s) + '）' };
     }
     const qty = Math.max(1, Math.floor(n || 1));
-    const cost = f.cost * qty;
+    const unit = Math.round(f.cost * tradeCut(s));
+    const cost = unit * qty;
     if (s.coins < cost) return { ok: false, msg: '金币不够（需要 ' + cost + ' 金）' };
     s.coins -= cost;
     ledger(s, '买肥料 ' + f.name + '×' + qty, 0, cost);
@@ -3506,8 +3517,58 @@ button{ color:inherit; font:inherit; }
              summary: body ? head + ' ｜ ' + body : head, report: report };
   }
 
-  function pickBait(s, prefer) {
-    if (prefer === 'worm' && s.bait.worm > 0) return 'worm';
+  /* 品质取 r 次最好的期望倍率（r=1 单次；r=2 蚯蚓 / 高级假饵） */
+  function expectedQualityMul(rolls) {
+    const r = Math.max(1, Math.round(rolls || 1));
+    const total = QUALITY.reduce(function (a, q) { return a + q.w; }, 0);
+    let out = 0, prev = 0, cum = 0;
+    QUALITY.forEach(function (q) {
+      cum += q.w;
+      const p = cum / total;
+      out += q.mul * (Math.pow(p, r) - Math.pow(prev, r));
+      prev = p;
+    });
+    return out;
+  }
+
+  /* 钓鱼预估：当前饵 / 天气 / 等级下的一杆期望（河边面板 + 分析脚本共用） */
+  function fishForecast(s, kind) {
+    kind = kind || 'dough';
+    const w = WEATHER[s.weather] || { hookMod: 0 };
+    const hook = clamp((HOOK[kind] || 0.9) + (w.hookMod || 0) + fishHookBonus(s), 0.3, 0.98);
+    const lvNow = fishLv(s);
+    const lureLike = kind === 'lure' || kind === 'lure2';
+    let total = 0;
+    const table = FISH.map(function (f) {
+      if (f.chest && lvNow < (f.lv || 1)) return null;
+      let mul = 1;
+      if (f.trash) mul = lureLike ? BALANCE.bait.lureTrash : 1;
+      else if (f.chest) mul = lureLike ? 1.4 : 1;
+      else if (kind === 'worm') mul = BALANCE.bait.wormGood;
+      else if (lureLike) mul = BALANCE.bait.lureGood;
+      if (!f.trash && !f.chest) mul *= fishGoodBonus(s);
+      if (f.seasons) mul *= f.seasons.indexOf(seasonIdx(s.day)) >= 0 ? FISH_IN_SEASON : FISH_OFF_SEASON;
+      const ww = f.w * mul;
+      total += ww;
+      return { f: f, w: ww };
+    }).filter(Boolean);
+    const qMul = expectedQualityMul((kind === 'worm' || kind === 'lure2') ? 2 : 1);
+    let ev = 0;
+    table.forEach(function (x) {
+      const f = x.f;
+      const v = f.trash ? 1 : (f.chest ? f.base : f.base * qMul);
+      ev += (x.w / total) * v;
+    });
+    ev *= hook;
+    const cost = kind === 'worm' ? BALANCE.dig.value
+      : (kind === 'dough' ? BAIT.dough.price
+        : (kind === 'lure' ? BALANCE.lure.price / BALANCE.lure.dur
+          : BALANCE.lure2.price / BALANCE.lure2.dur));
+    return { hook: hook, ev: ev, cost: cost, net: ev - cost, good: fishGoodBonus(s),
+             qMul: qMul, kind: kind };
+  }
+
+  function pickBait(s, prefer) {    if (prefer === 'worm' && s.bait.worm > 0) return 'worm';
     if (prefer === 'dough' && s.bait.dough > 0) return 'dough';
     if (prefer === 'lure' && s.lure.owned && s.lure.dur > 0) return 'lure';
     if (prefer === 'lure2' && s.lure2 && s.lure2.owned && s.lure2.dur > 0) return 'lure2';
@@ -4347,7 +4408,7 @@ button{ color:inherit; font:inherit; }
   function buyBait(s, kind, n) {
     n = n || 1;
     if (kind === 'dough') {
-      const cost = BAIT.dough.price * n;
+      const cost = Math.round(BAIT.dough.price * tradeCut(s)) * n;
       if (s.coins < cost) return { ok: false, msg: '金币不够' };
       s.coins -= cost; ledger(s, '买面团饵 ×' + n, 0, cost);
       tradeXp(s, cost);
@@ -4356,7 +4417,7 @@ button{ color:inherit; font:inherit; }
       return { ok: true, msg: '面团饵 ×' + n };
     }
     if (kind === 'lure') {
-      const price = BALANCE.lure.price, dur = BALANCE.lure.dur;
+      const price = Math.round(BALANCE.lure.price * tradeCut(s)), dur = BALANCE.lure.dur;
       if (s.lure.owned) return { ok: false, msg: '假饵一次只能持 1 个' };
       if (s.coins < price) return { ok: false, msg: '金币不够（' + price + ' 金）' };
       s.coins -= price; ledger(s, '买假饵', 0, price);
@@ -4374,9 +4435,10 @@ button{ color:inherit; font:inherit; }
         return { ok: false, msg: '高级假饵要交易 Lv' + BALANCE.gate.lure2Trade + ' 才解锁（现在 Lv' + tradeLv(s) + '）' };
       }
       if (s.lure2.owned) return { ok: false, msg: '高级假饵一次只能持 1 个' };
-      if (s.coins < L.price) return { ok: false, msg: '金币不够（' + L.price + ' 金）' };
-      s.coins -= L.price; ledger(s, '买高级假饵', 0, L.price);
-      tradeXp(s, L.price);
+      const price2 = Math.round(L.price * tradeCut(s));
+      if (s.coins < price2) return { ok: false, msg: '金币不够（' + price2 + ' 金）' };
+      s.coins -= price2; ledger(s, '买高级假饵', 0, price2);
+      tradeXp(s, price2);
       s.lure2.owned = true; s.lure2.dur = L.dur;
       log(s, '🪝 买了一个高级假饵（耐用 ' + L.dur + ' 次，咬钩同面团饵、好鱼同假饵）', 'info');
       return { ok: true, msg: '高级假饵到手' };
@@ -6156,6 +6218,7 @@ button{ color:inherit; font:inherit; }
     CODEX_TOTAL: CODEX_TOTAL, codexRewards: codexRewards, checkCodexRewards: checkCodexRewards,
     achPts: achPts, sellBonus: sellBonus, makeLongOrder: makeLongOrder, deliverLong: deliverLong,
     fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
+    fishForecast: fishForecast, expectedQualityMul: expectedQualityMul,
     fishMany: fishMany, fishAll: fishAll, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,
     forage: forage, foragePool: foragePool, forageSeedPool: forageSeedPool,
     donate: donate, townTier: townTier, townBonus: townBonus, townNext: townNext,
@@ -6760,6 +6823,24 @@ button{ color:inherit; font:inherit; }
     const frozen = G.isWinter(state.day);
     const FISH_E = G.BALANCE.energy.fish;
     const BATCH = G.BALANCE.fishBatch;
+    const ff = $('#fish-forecast');
+    if (ff) {
+      if (frozen) {
+        ff.innerHTML = '<span class="ff-warn">❄️ 河面结冰，冬天钓不了鱼</span>';
+      } else {
+        const f = G.fishForecast(state, baitSel);
+        const w = G.WEATHER[state.weather] || {};
+        const mod = w.hookMod || 0;
+        ff.innerHTML =
+          '<span>咬钩 <b>' + Math.round(f.hook * 100) + '%</b>' +
+            (mod ? '<i class="' + (mod > 0 ? 'up' : 'down') + '">' + (mod > 0 ? '+' : '') +
+              Math.round(mod * 100) + '%</i>' : '') + '</span>' +
+          '<span>好鱼 <b>×' + f.good.toFixed(2) + '</b></span>' +
+          '<span>每杆 <b class="' + (f.net >= 0 ? 'up' : 'down') + '">' +
+            (f.net >= 0 ? '+' : '') + f.net.toFixed(1) + '</b> 金' +
+            '<i>毛 ' + f.ev.toFixed(1) + ' · 饵 ' + f.cost.toFixed(1) + '</i></span>';
+      }
+    }
     const castBtn = $('[data-act="cast"]');
     castBtn.disabled = frozen || state.energy < FISH_E;
     castBtn.title = frozen ? '河面结冰，冬天钓不了鱼' : '';
@@ -7682,7 +7763,7 @@ button{ color:inherit; font:inherit; }
         Math.round(G.BALANCE.hook.dough * 100) + '%、蚯蚓 ' + Math.round(G.BALANCE.hook.worm * 100) +
         '%、假饵 ' + Math.round(G.BALANCE.hook.lure * 100) + '%，晴天 ' +
         Math.round(G.BALANCE.weatherHook.sunny * 100) + '%、雨天 +' +
-        Math.round(G.BALANCE.weatherHook.rain * 100) + '%。<br>' +
+        Math.round(G.BALANCE.weatherHook.rain * 100) + '%。河面上方会实时显示当前<b>咬钩率与每杆期望</b>（毛收益 − 饵成本）。<br>' +
         '🐟 <b>鱼汛</b>：每种鱼只在特定季节成群——汛期上钩权重 ×' + G.BALANCE.fishSeason.in +
         '，非汛期 ×' + G.BALANCE.fishSeason.off + '。' +
         '鲫鱼 春·秋 / 鲤鱼 春夏秋 / 鳜鱼 春·夏 / 鲈鱼 夏·秋 / 河豚 秋 / 锦鲤 春。<br>' +
@@ -7763,9 +7844,10 @@ button{ color:inherit; font:inherit; }
         '商店的<b>买价</b>也会跟着市价走 —— 缺货 / 反季时买得更贵，而且<b>买货会把销量往回拉</b>（越买越贵）。点商店面板的 <b>📈 行情</b> 看全部系数。<br>' +
         '店里每天同样进一批作物（一般品质），买价 = 售价 × ' + G.BALANCE.shop.cropPriceMul +
         ' <b>再乘市价</b>，转手必亏，只在凑委托或应急时买。<br>' +
-        '🤝 <b>交易等级</b>会把所有商店的<b>进价</b>往下压（每级 −' +
+        '🤝 <b>交易等级</b>会把商店的<b>进价</b>往下压（每级 −' +
         (G.BALANCE.trade.buyCut * 100).toFixed(1) + '%，满级 −' +
-        (G.BALANCE.trade.maxCut * 100).toFixed(1) + '%）：买种子 / 茶 / 钥匙 / 鲜活水产都算，钱花得多、卖得勤，等级就涨。<br>' +
+        (G.BALANCE.trade.maxCut * 100).toFixed(1) + '%）：种子 / 饵料 / 肥料 / 茶 / 钥匙 / 水产 / 农产品 / 果树苗都算（设备按标价）；' +
+        '钱花得多、卖得勤，等级就涨。<br>' +
         '南瓜 <b>D' + G.CROP_UNLOCK.pumpkin + '</b> 起、西瓜 <b>D' + G.CROP_UNLOCK.watermelon + '</b> 起才进货。</p>' +
       '</div>' +
 
@@ -8386,7 +8468,8 @@ button{ color:inherit; font:inherit; }
       '<div class="shop-tip">指定数量会从仓库移入收购箱，剩余库存不变；<b>按入箱时的市价锁价</b>，' +
         '睡觉结算时只跟随<b>当天季节</b>，并扣 ' + Math.round(G.BALANCE.market.boxFee * 100) +
         '% 手续费。入箱不压价，拆几批放和一次放价格一样。</div>',
-      '<button class="btn primary" data-boxput-kind="' + kind + '" data-boxput-key="' + key + '">放入收购箱</button>' +
+      '<button class="btn primary" data-boxput-all="' + kind + '|' + key + '">全部放入（' + n + ' 件）</button>' +
+      '<button class="btn" data-boxput-kind="' + kind + '" data-boxput-key="' + key + '">按数量放入</button>' +
       '<button class="btn" data-close>取消</button>');
   }
 
@@ -9789,6 +9872,27 @@ button{ color:inherit; font:inherit; }
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();
         if (modalOpen()) cropShop();
+        return;
+      }
+
+      // 收购箱：全部放入（单物品）
+      const boxAll = t.closest('[data-boxput-all]');
+      if (boxAll) {
+        const raw = String(boxAll.dataset.boxputAll || '');
+        const cut = raw.indexOf('|');
+        const kind = raw.slice(0, cut);
+        const key = raw.slice(cut + 1);
+        const available = kind === 'crop'
+          ? G.storeCount(state, key)
+          : ((G.fishGroups(state).filter(function (g) { return g.key === key; })[0] || {}).count || 0);
+        if (!(available > 0)) { toast('仓库里已经没有这件了', 'warn'); return; }
+        const r = kind === 'crop'
+          ? G.boxPutCrop(state, key, available)
+          : G.boxPutFish(state, key, available);
+        if (r.ok) closeModal();
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
         return;
       }
 
