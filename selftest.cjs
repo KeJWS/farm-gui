@@ -2188,6 +2188,31 @@ const round = G.deserialize(G.serialize(s));
 ok(round.plots[0].crop === 'corn' && round.coins === s.coins, '序列化往返一致');
 ok(round.plots.length === 5 && round.fishBook.count === 0, '结构完整');
 
+/* 存档导入是唯一的外部输入：自由文本必须洗掉能组成标签 / 属性的字符 */
+const dirtySave = JSON.parse(G.serialize(G.createState()));
+dirtySave.log = [{ day: 1, text: '<img src=x onerror=alert(1)>', kind: 'info' }];
+dirtySave.ledger = [{ day: 1, label: '<b>注入</b>', income: 1, expense: 0, balance: 50 }];
+dirtySave.fishBag = [{ name: '<iframe src=//x>', emoji: '<u>', q: 'std', v: 3, d: 1 }];
+dirtySave.seeds = { '<img>': 2, carrot: 1 };
+dirtySave.fishBook = {
+  count: 1,
+  entries: [{ day: 1, fish: '<svg onload=alert(2)>', emoji: '<i>', quality: { id: 'fake', color: 'red' }, price: 3 }],
+  best: { fish: '<img>', quality: null, price: 3, day: 1 },
+  priciest: { fish: '<img>', quality: null, price: 3, day: 1 }
+};
+const cleanSave = G.deserialize(dirtySave);
+ok(cleanSave.log[0].text.indexOf('<') < 0 && cleanSave.log[0].text.indexOf('onerror') >= 0,
+   '导入日志文本被清洗', cleanSave.log[0].text);
+ok(cleanSave.ledger[0].label.indexOf('<') < 0, '导入账本标签被清洗', cleanSave.ledger[0].label);
+ok(cleanSave.fishBag[0].name.indexOf('<') < 0 && cleanSave.fishBag[0].emoji.indexOf('<') < 0,
+   '导入渔获名称 / emoji 被清洗', [cleanSave.fishBag[0].name, cleanSave.fishBag[0].emoji]);
+ok(cleanSave.fishBook.entries[0].fish.indexOf('<') < 0 &&
+   cleanSave.fishBook.entries[0].quality === null &&
+   cleanSave.fishBook.best.fish.indexOf('<') < 0,
+   '导入钓鱼记录 / 假品质被清洗');
+ok(Object.keys(cleanSave.seeds).join() === 'carrot' && cleanSave.seeds.carrot === 1,
+   '导入的种子只保留认识的作物', cleanSave.seeds);
+
 /* ---------- 7. 随机压测 ---------- */
 section('随机压测 3000 步');
 G.setRng(mulberry32(2024));

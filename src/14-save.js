@@ -40,6 +40,29 @@
                     Math.max(min == null ? -Infinity : min, n));
   }
 
+  /* 存档是唯一的外部输入：日志 / 账本 / 鱼名这些自由文本最终会拼进 innerHTML，
+   * 导入时就把能组成标签或属性的字符去掉。正常游戏文本不含这些字符，显示不受影响。 */
+  function plain(v, max) {
+    return String(v == null ? '' : v).replace(/[<>&"']/g, '').slice(0, max || 40);
+  }
+
+  /* 品质只认 QUALITY 里的对象，防止存档塞进来的假品质被当成颜色 / 文本直接使用 */
+  function safeQuality(q) {
+    if (!q || typeof q !== 'object' || !q.id) return null;
+    return qualityById(q.id) || null;
+  }
+
+  /* 钓鱼记录本的「最高品质 / 最贵一条」：只保留展示字段并清洗 */
+  function safeBookTop(v, day) {
+    if (!v || typeof v !== 'object') return null;
+    const out = Object.assign({}, v);
+    out.fish = plain(out.fish, 20);
+    out.quality = safeQuality(out.quality);
+    out.price = Math.round(num(out.price, 0, 0, 1e9));
+    out.day = Math.round(num(out.day, day, 1, 100000));
+    return out.fish ? out : null;
+  }
+
   function deserialize(json) {
     const s = typeof json === 'string' ? JSON.parse(json) : json;
     if (!s || typeof s !== 'object') throw new Error('bad save');
@@ -79,6 +102,26 @@
     merged.lure2.dur = Math.round(num(merged.lure2.dur, 0, 0, BALANCE.lure2.dur));
     merged.lure2.owned = !!merged.lure2.owned && merged.lure2.dur > 0;
     merged.fishBook = Object.assign({ count: 0, entries: [], best: null, priciest: null }, s.fishBook || {});
+    const bookEntries = Array.isArray(merged.fishBook.entries) ? merged.fishBook.entries : [];
+    merged.fishBook.entries = bookEntries.slice(0, 200).filter(function (e) {
+      return e && typeof e === 'object';
+    }).map(function (e) {
+      const out = Object.assign({}, e);
+      out.day = Math.round(num(e.day, merged.day, 1, 100000));
+      out.fish = plain(e.fish, 20);
+      out.emoji = plain(e.emoji, 4);
+      out.quality = safeQuality(e.quality);
+      out.price = Math.round(num(e.price, 0, 0, 1e9));
+      out.base = Math.round(num(e.base, 0, 0, 1e9));
+      out.bait = plain(e.bait, 12) || undefined;
+      out.trash = !!e.trash;
+      out.chest = CHESTS[e.chest] ? e.chest : null;
+      out.noOrder = !!e.noOrder;
+      return out;
+    }).filter(function (e) { return e.fish; });
+    merged.fishBook.count = Math.round(num(merged.fishBook.count, 0, 0, 1e9));
+    merged.fishBook.best = safeBookTop(merged.fishBook.best, merged.day);
+    merged.fishBook.priciest = safeBookTop(merged.fishBook.priciest, merged.day);
     merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0, wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }, s.stats || {});
     merged.stats.wild = Object.assign({}, (s.stats && s.stats.wild) || {});
     Object.keys(merged.stats.wild).forEach(function (id) {
@@ -135,7 +178,7 @@
     merged.box = Array.isArray(s.box) ? s.box.slice(0, 500).filter(function (e) {
       return e && (e.kind === 'crop' || e.kind === 'fish') && e.name;
     }).map(function (e) {
-      const out = { kind: e.kind, name: String(e.name).slice(0, 20), emoji: String(e.emoji || '').slice(0, 4),
+      const out = { kind: e.kind, name: plain(e.name, 20), emoji: plain(e.emoji, 4),
                     n: Math.round(num(e.n, 1, 1, 9999)), v: Math.round(num(e.v, 0, 0, 1e9)) };
       const marketable = e.kind === 'crop'
         ? !!CROPS[e.id]
@@ -190,7 +233,14 @@
       merged.longOrder = makeLongOrder(merged);
       merged.longOrderReadyDay = 0;
     }
-    merged.seeds = s.seeds && typeof s.seeds === 'object' ? s.seeds : {};
+    // 种子只认认识的作物：存档里塞进来的杂键会让仓库的种子行直接崩
+    merged.seeds = {};
+    const rawSeeds = s.seeds && typeof s.seeds === 'object' ? s.seeds : {};
+    Object.keys(rawSeeds).forEach(function (id) {
+      if (!CROPS[id]) return;
+      const n = Math.round(num(rawSeeds[id], 0, 0, 9999));
+      if (n > 0) merged.seeds[id] = n;
+    });
     // 老存档的仓库是「作物: 数量」，这里迁移成「作物: {品质: 数量}」
     merged.store = {};
     const rawStore = s.store && typeof s.store === 'object' ? s.store : {};
@@ -210,6 +260,10 @@
     merged.fishBag = Array.isArray(s.fishBag) ? s.fishBag.slice(0, 5000).map(function (e) {
       if (!e || typeof e !== 'object') return null;
       const out = Object.assign({}, e);
+      // 鱼名 / 杂物名 / emoji 会拼进 innerHTML，先洗掉能组成标签的字符
+      out.name = plain(out.name, 20);
+      out.emoji = plain(out.emoji, 4);
+      out.v = Math.round(num(out.v, 0, 0, 1e9));
       // v2.2 之前的「宝箱」不分级，统一当木制宝箱
       if (out.name === '宝箱') {
         out.name = '木制宝箱'; out.emoji = '🪵'; out.v = CHESTS.wood.value;
@@ -370,8 +424,29 @@
         }
       });
     }
-    merged.ledger = Array.isArray(s.ledger) ? s.ledger : base.ledger;
-    merged.log = Array.isArray(s.log) ? s.log.slice(0, 400) : base.log;
+    // 账本 / 日志：导入的文本会直接拼进 innerHTML，数量和文本都要过一遍
+    const rawLedger = Array.isArray(s.ledger) ? s.ledger : base.ledger;
+    merged.ledger = rawLedger.slice(0, 200).filter(function (r) {
+      return r && typeof r === 'object';
+    }).map(function (r) {
+      return {
+        day: Math.round(num(r.day, merged.day, 1, 100000)),
+        label: plain(r.label, 60),
+        income: Math.round(num(r.income, 0, 0, 1e9)),
+        expense: Math.round(num(r.expense, 0, 0, 1e9)),
+        balance: Math.round(num(r.balance, 0, 0, 1e12))
+      };
+    });
+    const rawLog = Array.isArray(s.log) ? s.log : base.log;
+    merged.log = rawLog.slice(0, 400).filter(function (r) {
+      return r && typeof r === 'object';
+    }).map(function (r) {
+      return {
+        day: Math.round(num(r.day, merged.day, 1, 100000)),
+        text: plain(r.text, 240),
+        kind: plain(r.kind, 12) || 'info'
+      };
+    }).filter(function (r) { return r.text; });
     // 旧存档迁移：垃圾不参与品质判定（早期版本会给出「优质垃圾」）
     if (merged.fishBook.entries) {
       merged.fishBook.entries.forEach(function (e) { if (e && e.trash) e.quality = null; });

@@ -25,5 +25,8 @@ jobs:
         run: node dom-test.cjs
       - name: 数值体检
         run: node balance.cjs
-      - name: 单文件打包
-        run: node build-single.cjs
+      - name: 单文件打包 + 生成物同步检查
+        run: |
+          node build-single.cjs
+          # 生成物（game.js / ui.js / 我的小农场.html）必须和源码一致，否则 CI 失败
+          git diff --exit-code

@@ -128,8 +128,8 @@
         }).join(' · ') + ' · 原价 ' + e.v + ' 金';
       }
       return '<div class="store-row">' +
-        '<span class="se">' + (e.emoji || '📦') + '</span>' +
-        '<div><div class="sn">' + e.name + ' ×' + e.n + '</div>' +
+        '<span class="se">' + esc(e.emoji || '📦') + '</span>' +
+        '<div><div class="sn">' + esc(e.name) + ' ×' + e.n + '</div>' +
         '<div class="sv">' + sub + '</div></div>' +
         '<span class="sp">' + e.v + ' 金</span>' +
       '</div>';
@@ -141,7 +141,7 @@
       (list.length
         ? '<div class="buy-custom"><span>🧮 自定义取出</span>' +
             '<select id="box-pick">' + list.map(function (e, i) {
-              return '<option value="' + i + '">' + (e.emoji || '📦') + ' ' + e.name + ' ×' + e.n + '</option>';
+              return '<option value="' + i + '">' + esc(e.emoji || '📦') + ' ' + esc(e.name) + ' ×' + e.n + '</option>';
             }).join('') + '</select>' +
             '<input id="box-take" type="number" min="1" step="1" value="1" inputmode="numeric">' +
             '<button class="btn mini" data-boxtaken="1">取出</button>' +
@@ -157,7 +157,7 @@
   /* 渔获品质构成（和作物仓库一个写法） */
   function fishMix(g) {
     return g.mix.map(function (m) {
-      return '<span style="color:' + m.color + '">' + m.emoji + ' ' + m.name + ' ' + m.n + '</span>';
+      return '<span style="color:' + esc(m.color) + '">' + esc(m.emoji) + ' ' + esc(m.name) + ' ' + m.n + '</span>';
     }).join(' · ');
   }
 
@@ -167,15 +167,15 @@
     const sellRows = groups.length ? groups.map(function (g) {
       const mk = G.fishMarketInfo(state, g.name);
       return '<div class="store-row">' +
-        '<span class="se">' + g.emoji + '</span>' +
-        '<div><div class="sn">' + g.name + ' ×' + g.count +
+        '<span class="se">' + esc(g.emoji) + '</span>' +
+        '<div><div class="sn">' + esc(g.name) + ' ×' + g.count +
           ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b>' +
           (mk.inRun ? ' <b class="own">汛期</b>' : ' <b class="lock">非汛期 ×' + mk.season + '</b>') + '</div>' +
         '<div class="sv">' + fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) +
           ' 金/条 · ' + (mk.inRun ? '汛期 ×1' : '非汛期 ×' + mk.season) + ' · ' + mk.tag +
           ' · ' + headroomShort(G.fishMarketHeadroom(state, g.name), '条') + '</div></div>' +
         '<span class="sp">' + g.total + ' 金</span>' +
-        '<button class="btn mini" data-sellfish="' + g.key + '">卖出</button>' +
+        '<button class="btn mini" data-sellfish="' + esc(g.key) + '">卖出</button>' +
       '</div>';
     }).join('') : '<div class="store-empty">还没有渔获，先去河边甩两杆</div>';
 
@@ -218,7 +218,7 @@
       (groups.length
         ? '<div class="buy-custom"><span>🧮 自定义卖出</span>' +
             '<select id="fish-sell-id">' + groups.map(function (g) {
-              return '<option value="' + g.key + '">' + g.emoji + ' ' + g.name + ' ×' + g.count + '</option>';
+              return '<option value="' + esc(g.key) + '">' + esc(g.emoji) + ' ' + esc(g.name) + ' ×' + g.count + '</option>';
             }).join('') + '</select>' +
             '<input id="fish-sell-n" type="number" min="1" step="1" value="1" inputmode="numeric">' +
             '<button class="btn mini" data-sellfishn="1">卖出</button>' +

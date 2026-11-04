@@ -207,7 +207,7 @@
 
 ```
 src/            逻辑层（14 个模块 → 拼成 game.js）
-ui-src/         界面层（15 个模块 → 拼成 ui.js）
+ui-src/         界面层（16 个模块 → 拼成 ui.js）
 style.css       样式
 index.html      开发版入口
 build-modules.cjs / build-ui.cjs / build-single.cjs   三个拼装脚本
@@ -232,6 +232,7 @@ build-modules.cjs / build-ui.cjs / build-single.cjs   三个拼装脚本
 | `13-actions.js` | 重置确认、ACTIONS 动作表、飘字定位 |
 | `14-events.js` | 全部事件绑定（点击委托、输入、快捷键、文件导入） |
 | `15-boot.js` | 启动：读档、渲染、成就检查、欢迎提示 |
+| `16-share.js` | 分享名片：canvas 绘制 720×980 的 PNG（纯本地，不联网） |
 
 ## 数值来源
 
@@ -248,19 +249,29 @@ build-modules.cjs / build-ui.cjs / build-single.cjs   三个拼装脚本
 ```bash
 node build-modules.cjs # src/*.js → game.js（改了 src/ 就要跑；build-single 会自动先跑）
 node build-ui.cjs      # ui-src/*.js → ui.js（改了界面层就要跑）
-node selftest.cjs      # 562 项逻辑自测：播种/种子店/肥料/品质/收获器/钓鱼/天气/经济/委托/等级/解锁/农产品店/水产库存/成就/税金/采集/小镇/市场历史/高级假饵/自动播种器/交易等级/果园/每日总结/存读档/3000 步压测
+node selftest.cjs      # 570 项逻辑自测：播种/种子店/肥料/品质/收获器/钓鱼/天气/经济/委托/等级/解锁/农产品店/水产库存/成就/税金/采集/小镇/市场历史/高级假饵/自动播种器/交易等级/果园/每日总结/存读档/3000 步压测
 node check-ui.cjs      # 校验 ui.js 用到的 id、data-act 在 index.html 里都存在
 node check-config.cjs  # 数值来源检查：BALANCE 无重复键、逻辑 / 界面不写死体力、HTML 不带死数字
 node check-docs.cjs    # 文档一致性：README 关键数值与 BALANCE 对齐、规则说明不写死数字
 node dom-test.cjs      # DOM 冒烟：用最小 DOM 桩把 ui.js 跑起来，测渲染与弹窗
 node balance.cjs       # 数值体检：钓鱼期望 / 三种活计收益 / 委托样本 / 设备回本 / 套利检查
 node analysis.cjs      # 收益分析：作物 / 钓鱼（专项）/ 渔网 / 渔夫 / 采集 / 小镇 / 早中后期日净收入
-node build-single.cjs  # 把三件套内联成 我的小农场.html
+node build-single.cjs  # 把三件套内联成 我的小农场.html（CI 会再跑一次并校验 git diff）
 ```
 
 （`selftest` / `dom-test` / `check-ui` / `balance` / `analysis` 都会先检查 `src/` 与 `ui-src/` 有没有比产物新，自动补拼装。）
 
 ## 更新记录
+
+**v2.26.1（存档安全 / 一致性收尾）**
+
+- **修复存档注入**：导入的日志、账本、钓鱼记录、渔获名原本会原样拼进 `innerHTML`，一份恶意存档就能在页面里塞标签；现在 `deserialize` 统一清洗，渲染日志 / 账本 / 图鉴 / 最近渔获 / 仓库渔获时再转义一层
+- 新增回归：`selftest` 5 项（导入文本 / 假品质 / 陌生种子键被清洗）+ `dom-test` 5 项（带 `<img onerror>`、`<b>`、`<iframe>` 的存档渲染后不会变成 DOM）
+- 体力强化按钮的「上限 X→Y」改为读 `BALANCE.upgrade.step`，不再写死 `+5`
+- `src/` 模块编号去重：`12-orders.js` → `13-orders.js`、`13-save.js` → `14-save.js`，和 `12-orchard.js` 不再撞前缀
+- CI 打包后增加 `git diff --exit-code`：生成物和源码不同步会直接失败
+- 换行统一成 LF（`game.js` / `index.html` / `style.css` / `dom-test.cjs` 之前是 CRLF）
+- 文档：README 的模块数 / 目录补齐 `12-orchard.js`、`16-share.js`，`15-boot.js` 头注释修正
 
 **v2.26.0（分享名片）**
 
@@ -723,8 +734,9 @@ farm-gui/
 │   ├── 09-forage.js   # 采集
 │   ├── 10-depart.js   # 百货店
 │   ├── 11-shops.js    # 农产品店 / 渔夫 / 种子店
-│   ├── 12-orders.js   # 每日委托与长期订单
-│   └── 13-save.js     # 存读档与对外导出（FarmGame API）
+│   ├── 12-orchard.js  # 果园：开垦 / 扩坑 / 种树 / 浇水 / 收获
+│   ├── 13-orders.js   # 每日委托与长期订单
+│   └── 14-save.js     # 存读档与对外导出（FarmGame API）
 ├── game.js            # ⚙️ 由 src/ 拼装生成，不要手改
 ├── ui.js              # 渲染 + 交互 + 存档 + 音效
 ├── style.css          # 全部样式

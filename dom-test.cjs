@@ -128,6 +128,11 @@ const G = require('./game.js');
   st.fishBag.push({ name: '鲫鱼', emoji: '🐟', q: 'std', v: 3, d: 1 });
   st.fishBag.push({ name: '木制宝箱', emoji: '🪵', q: null, v: 8, d: 1, no: true, chest: 'wood' });
   st.fishBag.push({ name: '水草', emoji: '🌿', q: null, v: 1, d: 1, no: true, trash: true });
+  /* 恶意存档文本：验证导入后不会被当成 HTML 执行（见下方「存档文本安全」一节） */
+  st.log.unshift({ day: 5, text: '<img src=x onerror=alert(1)> 假日志', kind: 'info' });
+  st.ledger.unshift({ day: 5, label: '<b>注入</b>', income: 1, expense: 0, balance: 5001 });
+  st.fishBook.entries.unshift({ day: 5, fish: '<svg onload=alert(2)>', emoji: '<i>', quality: null, price: 1 });
+  st.fishBag.push({ name: '<iframe src=//x>', emoji: '<u>', q: 'std', v: 3, d: 5 });
   st.nets = 2;
   st.netSet = 2;
   st.levels.fish = 5;
@@ -224,6 +229,16 @@ ok(html('#order-list').indexOf('含市价') >= 0, '委托面板标出市价溢�
 ok(html('#order-list').indexOf('长期') >= 0, '委托面板显示长期订单');
 ok(html('#ledger').indexOf('D1') >= 0, '账本渲染出 D1');
 ok(html('#log').indexOf('D1') >= 0, '日志渲染出 D1');
+
+console.log('\n== 存档文本安全 ==');
+/* 存档是唯一的外部输入：恶意 JSON 里的标签不能变成真 DOM 节点 */
+ok(html('#log').indexOf('<img') < 0 && html('#log').indexOf('假日志') >= 0,
+   '导入的日志文本被清洗（不会变成 <img>）', html('#log').slice(0, 160));
+ok(html('#ledger').indexOf('<b>注入') < 0 && html('#ledger').indexOf('注入') >= 0,
+   '导入的账本标签被清洗', html('#ledger').slice(0, 160));
+ok(html('#book-list').indexOf('<svg') < 0, '导入的钓鱼记录被清洗');
+ok(html('#catch-area').indexOf('<svg') < 0, '最近渔获渲染也会清洗');
+ok(html('#store-list').indexOf('<iframe') < 0, '仓库里的渔获名会被清洗');
 
 console.log('\n== 弹窗 ==');
 clickAct('seedshop');

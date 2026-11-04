@@ -23,6 +23,14 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.prototype.slice.call(document.querySelectorAll(sel));
 
+  /* HTML 转义：日志 / 账本 / 鱼名这些来自存档的文本，拼进 innerHTML 前一律先过一遍。
+   * 存档导入（G.deserialize）已经清洗过一轮，这里是输出侧的第二层保险。 */
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
   /* ---------------- 存档 ---------------- */
 
   function save() {
@@ -353,7 +361,7 @@
       $('#work-txt').textContent = '体力不足 · 先睡觉';
     }
     $('#expand-txt').textContent = '第 ' + (state.plots.length + 1) + ' 块 · ' + G.expandCost(state) + ' 金';
-    $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + 5) + ' · ' + G.upgradeCost(state) + ' 金';
+    $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + G.BALANCE.upgrade.step) + ' · ' + G.upgradeCost(state) + ' 金';
     const sprLock = !G.sprinklerUnlocked(state);
     $('#sprinkler-txt').textContent = sprLock
       ? '需种田 Lv' + G.BALANCE.gate.sprinkler + ' 解锁'
@@ -563,12 +571,12 @@
     box.innerHTML =
       '<div class="catch-sum">最近 ' + catchLog.length + ' 条 · 共值 ' + sum + ' 金（已入仓库）</div>' +
       '<div class="catch-list">' + catchLog.map(function (e) {
-        const col = e.quality ? e.quality.color : '#9a866c';
+        const col = esc(e.quality ? e.quality.color : '#9a866c');
         return '<div class="catch-item" style="border-left-color:' + col + '">' +
-          '<span class="ce">' + e.emoji + '</span>' +
-          '<span class="cn2">' + e.fish + '</span>' +
+          '<span class="ce">' + esc(e.emoji) + '</span>' +
+          '<span class="cn2">' + esc(e.fish) + '</span>' +
           '<span class="cq2" style="color:' + col + '">' +
-            (e.quality ? e.quality.emoji + ' ' + e.quality.name : (e.chest ? '宝箱' : '杂物')) + '</span>' +
+            (e.quality ? esc(e.quality.emoji) + ' ' + esc(e.quality.name) : (e.chest ? '宝箱' : '杂物')) + '</span>' +
           '<span class="cp2">值 ' + e.price + '</span>' +
         '</div>';
       }).join('') + '</div>';
@@ -651,14 +659,14 @@
           const priced = !g.junk && !g.chest;
           const mk = priced ? G.fishMarketInfo(state, g.name) : null;
           return '<div class="store-row">' +
-            '<span class="se">' + g.emoji + '</span>' +
-            '<div><div class="sn">' + g.name + ' ×' + g.count +
+            '<span class="se">' + esc(g.emoji) + '</span>' +
+            '<div><div class="sn">' + esc(g.name) + ' ×' + g.count +
               (priced ? ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b>' : '') + '</div>' +
-            '<div class="sv">' + (desc ? '<span class="sf-note">' + desc + '</span> · ' : '') +
+            '<div class="sv">' + (desc ? '<span class="sf-note">' + esc(desc) + '</span> · ' : '') +
               fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) + ' 金/条' +
               (priced ? ' · ' + mk.tag : (g.chest ? ' · 宝箱' : '')) + '</div></div>' +
             '<span class="sp">' + g.total + ' 金</span>' +
-             '<button class="btn mini" data-boxfish="' + g.key + '" title="自定义数量放进收购箱">📦</button>' +
+             '<button class="btn mini" data-boxfish="' + esc(g.key) + '" title="自定义数量放进收购箱">📦</button>' +
           '</div>';
         }).join('');
     }
@@ -795,7 +803,7 @@
         ' role="button" tabindex="0" aria-expanded="' + open + '"' +
         ' title="' + d.items.length + ' 笔，点击' + (open ? '收起' : '展开') + '">' +
         '<span class="led-day">D' + d.day + '</span>' +
-        '<span class="led-label">' + (d.items.length > 1 ? d.items.length + ' 笔' : d.items[0].label) + '</span>' +
+        '<span class="led-label">' + (d.items.length > 1 ? d.items.length + ' 笔' : esc(d.items[0].label)) + '</span>' +
         '<span class="led-val">' + head + '</span>' +
         '<span class="led-bal">' + d.balance + '</span>' +
       '</div>';
@@ -804,7 +812,7 @@
         html += '<div class="led-detail">' + d.items.map(function (it) {
           const v = it.income > 0 ? '+' + it.income : (it.expense > 0 ? '-' + it.expense : '—');
           const cls = it.income > 0 ? 'led-inc' : (it.expense > 0 ? 'led-exp' : '');
-          return '<div class="dline"><span>' + it.label + '</span><b class="' + cls + '">' + v + '</b></div>';
+          return '<div class="dline"><span>' + esc(it.label) + '</span><b class="' + cls + '">' + v + '</b></div>';
         }).join('') + '</div>';
       }
       return html;
@@ -821,18 +829,18 @@
     $('#book-stats').innerHTML =
       '<div class="bstat"><div class="bl">累计渔获</div><div class="bv">' + b.count + ' 条</div></div>' +
       '<div class="bstat"><div class="bl">最高品质</div><div class="bv" style="color:' +
-        (b.best && b.best.quality ? b.best.quality.color : 'var(--ink-3)') + '">' +
-        (b.best && b.best.quality ? b.best.quality.emoji + ' ' + b.best.quality.name + ' · ' + b.best.fish : '—') + '</div></div>' +
+        esc(b.best && b.best.quality ? b.best.quality.color : 'var(--ink-3)') + '">' +
+        (b.best && b.best.quality ? esc(b.best.quality.emoji) + ' ' + esc(b.best.quality.name) + ' · ' + esc(b.best.fish) : '—') + '</div></div>' +
       '<div class="bstat"><div class="bl">最贵一条</div><div class="bv" style="color:var(--gold)">' +
-        (b.priciest ? b.priciest.fish + ' · ' + b.priciest.price + ' 金' : '—') + '</div></div>';
+        (b.priciest ? esc(b.priciest.fish) + ' · ' + b.priciest.price + ' 金' : '—') + '</div></div>';
 
     $('#book-list').innerHTML = b.entries.length
       ? b.entries.map(function (e) {
-          const col = e.quality ? e.quality.color : 'var(--ink-3)';
-          const qtxt = e.quality ? (e.quality.emoji + e.quality.name) : '—';
+          const col = esc(e.quality ? e.quality.color : 'var(--ink-3)');
+          const qtxt = e.quality ? (esc(e.quality.emoji) + esc(e.quality.name)) : '—';
           return '<div class="book-row">' +
-            '<span class="be">' + e.emoji + '</span>' +
-            '<span class="bn2">' + e.fish + '</span>' +
+            '<span class="be">' + esc(e.emoji) + '</span>' +
+            '<span class="bn2">' + esc(e.fish) + '</span>' +
             '<span class="bq" style="color:' + col + '">' + qtxt + '</span>' +
             '<span class="bp">' + e.price + '</span></div>';
         }).join('')
@@ -853,12 +861,12 @@
         ' title="' + d.items.length + ' 条记录，点击' + (open ? '收起' : '展开') + '">' +
         '<span class="ld">D' + d.day + '</span>' +
         '<span class="ld-count">' + d.items.length + ' 条</span>' +
-        '<span class="ld-last">' + (open ? '（点击收起）' : last) + '</span>' +
+        '<span class="ld-last">' + (open ? '（点击收起）' : esc(last)) + '</span>' +
         '<span class="ld-caret">' + (open ? '▾' : '▸') + '</span>' +
       '</div>';
       if (open) {
         html += d.items.map(function (r) {
-          return '<div class="log-row ' + (r.kind || '') + '"><span>' + r.text + '</span></div>';
+          return '<div class="log-row ' + esc(r.kind || '') + '"><span>' + esc(r.text) + '</span></div>';
         }).join('');
       }
       return html;
@@ -2066,8 +2074,8 @@
         }).join(' · ') + ' · 原价 ' + e.v + ' 金';
       }
       return '<div class="store-row">' +
-        '<span class="se">' + (e.emoji || '📦') + '</span>' +
-        '<div><div class="sn">' + e.name + ' ×' + e.n + '</div>' +
+        '<span class="se">' + esc(e.emoji || '📦') + '</span>' +
+        '<div><div class="sn">' + esc(e.name) + ' ×' + e.n + '</div>' +
         '<div class="sv">' + sub + '</div></div>' +
         '<span class="sp">' + e.v + ' 金</span>' +
       '</div>';
@@ -2079,7 +2087,7 @@
       (list.length
         ? '<div class="buy-custom"><span>🧮 自定义取出</span>' +
             '<select id="box-pick">' + list.map(function (e, i) {
-              return '<option value="' + i + '">' + (e.emoji || '📦') + ' ' + e.name + ' ×' + e.n + '</option>';
+              return '<option value="' + i + '">' + esc(e.emoji || '📦') + ' ' + esc(e.name) + ' ×' + e.n + '</option>';
             }).join('') + '</select>' +
             '<input id="box-take" type="number" min="1" step="1" value="1" inputmode="numeric">' +
             '<button class="btn mini" data-boxtaken="1">取出</button>' +
@@ -2095,7 +2103,7 @@
   /* 渔获品质构成（和作物仓库一个写法） */
   function fishMix(g) {
     return g.mix.map(function (m) {
-      return '<span style="color:' + m.color + '">' + m.emoji + ' ' + m.name + ' ' + m.n + '</span>';
+      return '<span style="color:' + esc(m.color) + '">' + esc(m.emoji) + ' ' + esc(m.name) + ' ' + m.n + '</span>';
     }).join(' · ');
   }
 
@@ -2105,15 +2113,15 @@
     const sellRows = groups.length ? groups.map(function (g) {
       const mk = G.fishMarketInfo(state, g.name);
       return '<div class="store-row">' +
-        '<span class="se">' + g.emoji + '</span>' +
-        '<div><div class="sn">' + g.name + ' ×' + g.count +
+        '<span class="se">' + esc(g.emoji) + '</span>' +
+        '<div><div class="sn">' + esc(g.name) + ' ×' + g.count +
           ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b>' +
           (mk.inRun ? ' <b class="own">汛期</b>' : ' <b class="lock">非汛期 ×' + mk.season + '</b>') + '</div>' +
         '<div class="sv">' + fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) +
           ' 金/条 · ' + (mk.inRun ? '汛期 ×1' : '非汛期 ×' + mk.season) + ' · ' + mk.tag +
           ' · ' + headroomShort(G.fishMarketHeadroom(state, g.name), '条') + '</div></div>' +
         '<span class="sp">' + g.total + ' 金</span>' +
-        '<button class="btn mini" data-sellfish="' + g.key + '">卖出</button>' +
+        '<button class="btn mini" data-sellfish="' + esc(g.key) + '">卖出</button>' +
       '</div>';
     }).join('') : '<div class="store-empty">还没有渔获，先去河边甩两杆</div>';
 
@@ -2156,7 +2164,7 @@
       (groups.length
         ? '<div class="buy-custom"><span>🧮 自定义卖出</span>' +
             '<select id="fish-sell-id">' + groups.map(function (g) {
-              return '<option value="' + g.key + '">' + g.emoji + ' ' + g.name + ' ×' + g.count + '</option>';
+              return '<option value="' + esc(g.key) + '">' + esc(g.emoji) + ' ' + esc(g.name) + ' ×' + g.count + '</option>';
             }).join('') + '</select>' +
             '<input id="fish-sell-n" type="number" min="1" step="1" value="1" inputmode="numeric">' +
             '<button class="btn mini" data-sellfishn="1">卖出</button>' +
@@ -2896,7 +2904,7 @@
   }
 
   /* ===== 13-actions.js ===== */
-/* 我的小农场 · 界面层 / 12-actions.js
+/* 我的小农场 · 界面层 / 13-actions.js
  * 重置确认 / ACTIONS 动作表 / 飘字定位
  * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
  */
@@ -3035,7 +3043,7 @@
   }
 
   /* ===== 14-events.js ===== */
-/* 我的小农场 · 界面层 / 13-events.js
+/* 我的小农场 · 界面层 / 14-events.js
  * 全部事件绑定：点击委托、输入、快捷键、文件导入
  * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
  */
@@ -3744,7 +3752,7 @@
   }
 
   /* ===== 15-boot.js ===== */
-/* 我的小农场 · 界面层 / 14-boot.js
+/* 我的小农场 · 界面层 / 15-boot.js
  * 启动：读档、渲染、成就检查、欢迎提示
  * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
  */

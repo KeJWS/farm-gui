@@ -15,6 +15,14 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.prototype.slice.call(document.querySelectorAll(sel));
 
+  /* HTML 转义：日志 / 账本 / 鱼名这些来自存档的文本，拼进 innerHTML 前一律先过一遍。
+   * 存档导入（G.deserialize）已经清洗过一轮，这里是输出侧的第二层保险。 */
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
   /* ---------------- 存档 ---------------- */
 
   function save() {

@@ -150,7 +150,7 @@
       $('#work-txt').textContent = '体力不足 · 先睡觉';
     }
     $('#expand-txt').textContent = '第 ' + (state.plots.length + 1) + ' 块 · ' + G.expandCost(state) + ' 金';
-    $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + 5) + ' · ' + G.upgradeCost(state) + ' 金';
+    $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + G.BALANCE.upgrade.step) + ' · ' + G.upgradeCost(state) + ' 金';
     const sprLock = !G.sprinklerUnlocked(state);
     $('#sprinkler-txt').textContent = sprLock
       ? '需种田 Lv' + G.BALANCE.gate.sprinkler + ' 解锁'
@@ -360,12 +360,12 @@
     box.innerHTML =
       '<div class="catch-sum">最近 ' + catchLog.length + ' 条 · 共值 ' + sum + ' 金（已入仓库）</div>' +
       '<div class="catch-list">' + catchLog.map(function (e) {
-        const col = e.quality ? e.quality.color : '#9a866c';
+        const col = esc(e.quality ? e.quality.color : '#9a866c');
         return '<div class="catch-item" style="border-left-color:' + col + '">' +
-          '<span class="ce">' + e.emoji + '</span>' +
-          '<span class="cn2">' + e.fish + '</span>' +
+          '<span class="ce">' + esc(e.emoji) + '</span>' +
+          '<span class="cn2">' + esc(e.fish) + '</span>' +
           '<span class="cq2" style="color:' + col + '">' +
-            (e.quality ? e.quality.emoji + ' ' + e.quality.name : (e.chest ? '宝箱' : '杂物')) + '</span>' +
+            (e.quality ? esc(e.quality.emoji) + ' ' + esc(e.quality.name) : (e.chest ? '宝箱' : '杂物')) + '</span>' +
           '<span class="cp2">值 ' + e.price + '</span>' +
         '</div>';
       }).join('') + '</div>';

@@ -63,14 +63,14 @@
           const priced = !g.junk && !g.chest;
           const mk = priced ? G.fishMarketInfo(state, g.name) : null;
           return '<div class="store-row">' +
-            '<span class="se">' + g.emoji + '</span>' +
-            '<div><div class="sn">' + g.name + ' ×' + g.count +
+            '<span class="se">' + esc(g.emoji) + '</span>' +
+            '<div><div class="sn">' + esc(g.name) + ' ×' + g.count +
               (priced ? ' <b class="own">市价 ×' + mk.total.toFixed(2) + '</b>' : '') + '</div>' +
-            '<div class="sv">' + (desc ? '<span class="sf-note">' + desc + '</span> · ' : '') +
+            '<div class="sv">' + (desc ? '<span class="sf-note">' + esc(desc) + '</span> · ' : '') +
               fishMix(g) + ' · 均 ' + (g.total / g.count).toFixed(1) + ' 金/条' +
               (priced ? ' · ' + mk.tag : (g.chest ? ' · 宝箱' : '')) + '</div></div>' +
             '<span class="sp">' + g.total + ' 金</span>' +
-             '<button class="btn mini" data-boxfish="' + g.key + '" title="自定义数量放进收购箱">📦</button>' +
+             '<button class="btn mini" data-boxfish="' + esc(g.key) + '" title="自定义数量放进收购箱">📦</button>' +
           '</div>';
         }).join('');
     }
@@ -207,7 +207,7 @@
         ' role="button" tabindex="0" aria-expanded="' + open + '"' +
         ' title="' + d.items.length + ' 笔，点击' + (open ? '收起' : '展开') + '">' +
         '<span class="led-day">D' + d.day + '</span>' +
-        '<span class="led-label">' + (d.items.length > 1 ? d.items.length + ' 笔' : d.items[0].label) + '</span>' +
+        '<span class="led-label">' + (d.items.length > 1 ? d.items.length + ' 笔' : esc(d.items[0].label)) + '</span>' +
         '<span class="led-val">' + head + '</span>' +
         '<span class="led-bal">' + d.balance + '</span>' +
       '</div>';
@@ -216,7 +216,7 @@
         html += '<div class="led-detail">' + d.items.map(function (it) {
           const v = it.income > 0 ? '+' + it.income : (it.expense > 0 ? '-' + it.expense : '—');
           const cls = it.income > 0 ? 'led-inc' : (it.expense > 0 ? 'led-exp' : '');
-          return '<div class="dline"><span>' + it.label + '</span><b class="' + cls + '">' + v + '</b></div>';
+          return '<div class="dline"><span>' + esc(it.label) + '</span><b class="' + cls + '">' + v + '</b></div>';
         }).join('') + '</div>';
       }
       return html;
@@ -233,18 +233,18 @@
     $('#book-stats').innerHTML =
       '<div class="bstat"><div class="bl">累计渔获</div><div class="bv">' + b.count + ' 条</div></div>' +
       '<div class="bstat"><div class="bl">最高品质</div><div class="bv" style="color:' +
-        (b.best && b.best.quality ? b.best.quality.color : 'var(--ink-3)') + '">' +
-        (b.best && b.best.quality ? b.best.quality.emoji + ' ' + b.best.quality.name + ' · ' + b.best.fish : '—') + '</div></div>' +
+        esc(b.best && b.best.quality ? b.best.quality.color : 'var(--ink-3)') + '">' +
+        (b.best && b.best.quality ? esc(b.best.quality.emoji) + ' ' + esc(b.best.quality.name) + ' · ' + esc(b.best.fish) : '—') + '</div></div>' +
       '<div class="bstat"><div class="bl">最贵一条</div><div class="bv" style="color:var(--gold)">' +
-        (b.priciest ? b.priciest.fish + ' · ' + b.priciest.price + ' 金' : '—') + '</div></div>';
+        (b.priciest ? esc(b.priciest.fish) + ' · ' + b.priciest.price + ' 金' : '—') + '</div></div>';
 
     $('#book-list').innerHTML = b.entries.length
       ? b.entries.map(function (e) {
-          const col = e.quality ? e.quality.color : 'var(--ink-3)';
-          const qtxt = e.quality ? (e.quality.emoji + e.quality.name) : '—';
+          const col = esc(e.quality ? e.quality.color : 'var(--ink-3)');
+          const qtxt = e.quality ? (esc(e.quality.emoji) + esc(e.quality.name)) : '—';
           return '<div class="book-row">' +
-            '<span class="be">' + e.emoji + '</span>' +
-            '<span class="bn2">' + e.fish + '</span>' +
+            '<span class="be">' + esc(e.emoji) + '</span>' +
+            '<span class="bn2">' + esc(e.fish) + '</span>' +
             '<span class="bq" style="color:' + col + '">' + qtxt + '</span>' +
             '<span class="bp">' + e.price + '</span></div>';
         }).join('')
@@ -265,12 +265,12 @@
         ' title="' + d.items.length + ' 条记录，点击' + (open ? '收起' : '展开') + '">' +
         '<span class="ld">D' + d.day + '</span>' +
         '<span class="ld-count">' + d.items.length + ' 条</span>' +
-        '<span class="ld-last">' + (open ? '（点击收起）' : last) + '</span>' +
+        '<span class="ld-last">' + (open ? '（点击收起）' : esc(last)) + '</span>' +
         '<span class="ld-caret">' + (open ? '▾' : '▸') + '</span>' +
       '</div>';
       if (open) {
         html += d.items.map(function (r) {
-          return '<div class="log-row ' + (r.kind || '') + '"><span>' + r.text + '</span></div>';
+          return '<div class="log-row ' + esc(r.kind || '') + '"><span>' + esc(r.text) + '</span></div>';
         }).join('');
       }
       return html;
