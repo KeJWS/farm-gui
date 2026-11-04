@@ -30,15 +30,21 @@
     }
     bind();
     const unlocked = G.checkAchievements(state);
+    const codexGot = G.checkCodexRewards(state);
     renderAll();
     save();
 
-    if (saved) {
+    if (futureSave) {
+      setTimeout(function () {
+        toast('存档来自更新的版本，已备份为 farm-gui-save-v1-future，本次从新农场开始', 'warn');
+      }, 300);
+    } else if (saved) {
       setTimeout(function () { toast('读取存档：第 ' + state.day + ' 天 · ' + state.coins + ' 金', 'good'); }, 300);
     } else {
       setTimeout(function () { toast('🌾 欢迎来到我的小农场！先给空地播种吧', 'good'); }, 300);
     }
     if (unlocked.length) setTimeout(function () { achToasts(unlocked); }, 900);
+    if (codexGot.length) setTimeout(function () { codexToasts(codexGot); }, 1400);
   }
 
   boot();

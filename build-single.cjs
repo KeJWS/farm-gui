@@ -27,6 +27,17 @@ if (html.includes('src="game.js"') || html.includes('href="style.css"')) {
   process.exit(1);
 }
 
+// 内联进 <script> 的内容里出现 </script 会让 HTML 解析器提前收尾，整页静默变白。
+// 数据表现在可以直接改 JSON，这个坑只要一次内容编辑就会踩，所以打包时先挡一道。
+const risky = [['game.js', game], ['ui.js', ui], ['style.css', css]].filter(function (pair) {
+  return /<\/script/i.test(pair[1]);
+});
+if (risky.length) {
+  console.error('❌ 内联内容里出现 </script：' + risky.map(function (p) { return p[0]; }).join(' / ') +
+    '（单文件会被截断，请把内容里的 </script 改成别的写法）');
+  process.exit(1);
+}
+
 const out = path.join(root, '我的小农场.html');
 fs.writeFileSync(out, html, 'utf8');
 console.log('✅ 已生成 ' + out + '（' + (Buffer.byteLength(html) / 1024).toFixed(1) + ' KB）');

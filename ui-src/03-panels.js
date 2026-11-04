@@ -333,9 +333,11 @@
 
   function commit(result) {
     const unlocked = G.checkAchievements(state);
+    const codexGot = G.checkCodexRewards(state);
     renderAll();
     save();
     if (result && !result.ok && result.msg) toast(result.msg, 'warn');
     achToasts(unlocked);
+    codexToasts(codexGot);
     return result;
   }

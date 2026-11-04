@@ -1013,6 +1013,22 @@ button{ color:inherit; font:inherit; }
 .share-fb-grid b{ font-size:15px; }
 .share-fb-grid span{ font-size:11px; color:var(--ink-3); font-weight:600; }
 
+/* ---------- 图鉴奖励 ---------- */
+.codex-rw{ display:flex; align-items:center; gap:8px; padding:6px 9px; margin-bottom:6px;
+  border-radius:10px; background:var(--card); border:1px solid var(--line);
+  font-size:11.5px; font-weight:700; color:var(--ink-2); }
+.codex-rw.got{ opacity:.55; }
+.codex-rw .cw-k{ flex:none; }
+.codex-rw .cw-bar{ flex:1 1 auto; min-width:36px; height:6px; border-radius:99px;
+  background:rgba(122,96,60,.14); overflow:hidden; }
+.codex-rw .cw-bar i{ display:block; height:100%; background:linear-gradient(90deg,var(--green),var(--green-d)); }
+.codex-rw .cw-n{ flex:none; color:var(--ink-3); font-variant-numeric:tabular-nums; }
+.codex-rw .cw-r{ flex:none; color:var(--gold); white-space:nowrap; }
+@media (max-width:560px){
+  .codex-rw{ flex-wrap:wrap; }
+  .codex-rw .cw-bar{ order:5; flex-basis:100%; }
+}
+
 </style>
 </head>
 <body>
@@ -1987,7 +2003,21 @@ button{ color:inherit; font:inherit; }
     orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, free: 3, fruitMin: 1, fruitMax: 3,
                waterEnergy: 1, harvestEnergy: 1,
                grow: { seed: { days: 90, water: 30 }, sapling: { days: 30, water: 15 } },
-               slotCosts: [600, 1000, 1600, 2400, 3200] }
+               slotCosts: [600, 1000, 1600, 2400, 3200] },
+    /* 图鉴奖励：收集到 need 种鱼 / 作物时自动发一次奖励（按 id 记一次，不可重复领）。
+     * 鱼只算 6 种正经鱼（杂物和宝箱不进图鉴），作物算上架的全部 14 种。 */
+    codex: {
+      fish: [
+        { id: 'fish2', need: 2, reward: { coins: 150 } },
+        { id: 'fish4', need: 4, reward: { coins: 400, bait: { dough: 5 } } },
+        { id: 'fish6', need: 6, reward: { coins: 1000, bait: { dough: 10 } } }
+      ],
+      crops: [
+        { id: 'crop5', need: 5, reward: { coins: 200 } },
+        { id: 'crop10', need: 10, reward: { coins: 600, ferts: { normal: 3 } } },
+        { id: 'crop14', need: 14, reward: { coins: 1800, ferts: { special: 3 } } }
+      ]
+    }
   };
 
   /* ---------------- 静态数据 ---------------- */
@@ -2094,6 +2124,56 @@ button{ color:inherit; font:inherit; }
     return Object.keys(cx).reduce(function (a, k) { return a + (cx[k].value || 0); }, 0);
   }
 
+  /* ---------------- 图鉴奖励 ---------------- */
+  /* 鱼只算 6 种正经鱼（杂物 / 宝箱不进图鉴），作物算上架的全部 14 种。
+   * 每档按 id 记一次，跨存档恢复也不会重复领。 */
+
+  const CODEX_TOTAL = {
+    fish: FISH.filter(function (f) { return !f.trash && !f.chest; }).length,
+    crops: CROP_LIST.length
+  };
+  const CODEX_LABEL = { fish: '🐟 鱼类', crops: '🌾 作物' };
+
+  function codexSpecies(s, kind) {
+    return kind === 'fish' ? fishSpeciesOwned(s) : cropSpeciesOwned(s);
+  }
+
+  /* 每档奖励 + 当前进度，给界面用 */
+  function codexRewards(s) {
+    s.codexClaim = s.codexClaim || {};
+    const out = { fish: [], crops: [] };
+    ['fish', 'crops'].forEach(function (kind) {
+      const have = codexSpecies(s, kind);
+      (BALANCE.codex[kind] || []).forEach(function (m) {
+        out[kind].push({
+          id: m.id, kind: kind, label: CODEX_LABEL[kind], need: m.need,
+          total: CODEX_TOTAL[kind], have: have, got: Math.min(have, m.need),
+          claimed: !!s.codexClaim[m.id], day: s.codexClaim[m.id] || 0,
+          text: rewardText({ reward: m.reward })
+        });
+      });
+    });
+    return out;
+  }
+
+  /* 达标就发奖，每个 id 只发一次；返回本次新领到的档位 */
+  function checkCodexRewards(s) {
+    s.codexClaim = s.codexClaim || {};
+    const out = [];
+    ['fish', 'crops'].forEach(function (kind) {
+      const have = codexSpecies(s, kind);
+      (BALANCE.codex[kind] || []).forEach(function (m) {
+        if (s.codexClaim[m.id] || have < m.need) return;
+        s.codexClaim[m.id] = s.day || 1;
+        applyReward(s, m.reward, '图鉴奖励');
+        const text = rewardText({ reward: m.reward });
+        log(s, '📖 图鉴奖励：' + CODEX_LABEL[kind] + '收集 ' + m.need + ' 种（' + text + '）', 'good');
+        out.push({ id: m.id, kind: kind, label: CODEX_LABEL[kind], need: m.need, text: text });
+      });
+    });
+    return out;
+  }
+
   /* 成就表：val(s) 是当前进度，达到 goal 就算解锁，奖励自动发放 */
   const ACH = [
     /* 种田 */
@@ -2140,8 +2220,8 @@ button{ color:inherit; font:inherit; }
     { id: 'day100',    cat: 'biz',  emoji: '🏡', name: '百日农场',   desc: '经营满 100 天',        goal: 100,
       val: function (s) { return s.day || 1; }, reward: { coins: 400 }, pts: 4 },
 
-    /* 收集 */
-    { id: 'codexall',  cat: 'all',  emoji: '📖', name: '全图鉴',     desc: '7 种鱼 + 14 种作物都收过', goal: 21,
+    /* 收集：6 种正经鱼 + 14 种作物 = 20（杂物和宝箱不进图鉴） */
+    { id: 'codexall',  cat: 'all',  emoji: '📖', name: '全图鉴',     desc: '6 种鱼 + 14 种作物都收过', goal: 20,
       val: function (s) { return fishSpeciesOwned(s) + cropSpeciesOwned(s); },
       reward: { coins: 500, ferts: { special: 5 } }, pts: 8 },
 
@@ -2241,7 +2321,8 @@ button{ color:inherit; font:inherit; }
 
   /* 成就奖励文案：成就点 + 金币 / 种子 / 肥料 / 饵料 / 茶 / 钥匙 */
   function rewardText(a) {
-    const parts = [(a.pts || 0) + ' 点'];
+    const parts = [];
+    if (a.pts) parts.push(a.pts + ' 点');
     const r = a.reward || {};
     if (r.coins) parts.push(r.coins + ' 金');
     ['seeds', 'ferts', 'bait', 'teas', 'keys'].forEach(function (k) {
@@ -2259,9 +2340,9 @@ button{ color:inherit; font:inherit; }
     return '奖励 ' + parts.join(' · ');
   }
 
-  function applyReward(s, r) {
+  function applyReward(s, r, label) {
     r = r || {};
-    if (r.coins) addCoins(s, r.coins, '成就奖励');
+    if (r.coins) addCoins(s, r.coins, label || '成就奖励');
     Object.keys(r.seeds || {}).forEach(function (id) {
       s.seeds[id] = (s.seeds[id] || 0) + r.seeds[id];
     });
@@ -2595,6 +2676,7 @@ button{ color:inherit; font:inherit; }
       treeStock: {},
       townDonated: 0,
       codex: { fish: {}, crops: {} },
+      codexClaim: {},
       manualRefreshUsed: false,
       workUsed: false,
       bait: { worm: 0, dough: 0 },
@@ -5350,8 +5432,15 @@ button{ color:inherit; font:inherit; }
   function deserialize(json) {
     const s = typeof json === 'string' ? JSON.parse(json) : json;
     if (!s || typeof s !== 'object') throw new Error('bad save');
+    // 版本门禁：来自更新版本的存档，旧代码不该假装能读懂（否则会静默改坏数据）
+    if (s.v && s.v > SAVE_VERSION) {
+      const err = new Error('存档来自更新的版本（v' + s.v + '）');
+      err.code = 'FUTURE_SAVE';
+      throw err;
+    }
     const base = createState();
     const merged = Object.assign(base, s);
+    merged.v = SAVE_VERSION;
 
     // 数值清洗：导入的存档不能带 NaN / 负数 / 离谱的地块数
     merged.maxEnergy = Math.round(num(s.maxEnergy, 10, 5, 100) / 5) * 5;
@@ -5625,6 +5714,15 @@ button{ color:inherit; font:inherit; }
       const c = merged.codex.crops[k] || {};
       merged.codex.crops[k] = { n: c.n || 0, best: c.best || null, first: c.first || null, value: c.value || 0 };
     });
+    // 图鉴奖励：只保留表里存在的档位 id（老存档没有这一项，首次检查时会补发）
+    merged.codexClaim = {};
+    const claimable = {};
+    ['fish', 'crops'].forEach(function (kind) {
+      (BALANCE.codex[kind] || []).forEach(function (m) { claimable[m.id] = 1; });
+    });
+    Object.keys(s.codexClaim || {}).forEach(function (id) {
+      if (claimable[id]) merged.codexClaim[id] = Math.round(num(s.codexClaim[id], 1, 1, 100000));
+    });
     // 老存档回填：从最近 40 条钓鱼记录里反推图鉴
     if (!Object.keys(merged.codex.fish).length) {
       ((merged.fishBook && merged.fishBook.entries) || []).forEach(function (e) {
@@ -5802,6 +5900,7 @@ button{ color:inherit; font:inherit; }
     farmYieldBonus: farmYieldBonus, fishHookBonus: fishHookBonus, fishGoodBonus: fishGoodBonus,
     taxBase: taxBase, taxInDays: taxInDays, orderWeight: orderWeight, ORDER_TIERS: ORDER_TIERS,
     ACH: ACH, ACH_CATS: ACH_CATS, checkAchievements: checkAchievements, achInfo: achInfo, rewardText: rewardText,
+    CODEX_TOTAL: CODEX_TOTAL, codexRewards: codexRewards, checkCodexRewards: checkCodexRewards,
     achPts: achPts, sellBonus: sellBonus, makeLongOrder: makeLongOrder, deliverLong: deliverLong,
     fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
     fishMany: fishMany, fishAll: fishAll, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,
@@ -5855,6 +5954,7 @@ button{ color:inherit; font:inherit; }
   let soundOn = true;
   let storeFilter = 'all';
   let storeQuery = '';
+  let futureSave = false;   // 读档时发现「来自更新版本」的存档 → 备份并提示
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.prototype.slice.call(document.querySelectorAll(sel));
@@ -5897,7 +5997,13 @@ button{ color:inherit; font:inherit; }
     try {
       const raw = localStorage.getItem(SAVE_KEY);
       if (raw) return G.deserialize(raw);
-    } catch (e) { /* 忽略 */ }
+    } catch (e) {
+      // 存档来自更新的版本：先把原文另存一份，免得被新档覆盖丢掉
+      if (e && e.code === 'FUTURE_SAVE') {
+        futureSave = true;
+        try { localStorage.setItem(SAVE_KEY + '-future', localStorage.getItem(SAVE_KEY) || ''); } catch (e2) { /* 忽略 */ }
+      }
+    }
     return null;
   }
 
@@ -6785,10 +6891,12 @@ button{ color:inherit; font:inherit; }
 
   function commit(result) {
     const unlocked = G.checkAchievements(state);
+    const codexGot = G.checkCodexRewards(state);
     renderAll();
     save();
     if (result && !result.ok && result.msg) toast(result.msg, 'warn');
     achToasts(unlocked);
+    codexToasts(codexGot);
     return result;
   }
 
@@ -7537,6 +7645,15 @@ button{ color:inherit; font:inherit; }
       '</div>' +
 
       '<div class="rule-sec">' +
+        '<h4>📖 图鉴奖励</h4>' +
+        '<p>第一次钓到 / 收到某种鱼或作物就进图鉴。收集到一定数量会<b>自动发奖</b>：' +
+        '鱼类分 ' + G.BALANCE.codex.fish.map(function (m) { return m.need; }).join(' / ') + ' 种，' +
+        '作物分 ' + G.BALANCE.codex.crops.map(function (m) { return m.need; }).join(' / ') + ' 种，' +
+        '每档只发一次（金币 / 饵料 / 肥料）。<br>' +
+        '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态；旧存档按现有进度补发。</p>' +
+      '</div>' +
+
+      '<div class="rule-sec">' +
         '<h4>⌨️ 操作</h4>' +
         '<p>· 成熟地块<b>左键直接收</b>；右键或 Shift + 点击看详情（可铲除、看产量）<br>' +
         '· 顶栏 <b>📊 状态</b> 看累计数据；<b>⚙️ 设置</b> 里有规则说明（分 4 页）/ 分享名片（导出 PNG）/ 导入导出 / 音效 / 重新开始<br>' +
@@ -7601,6 +7718,23 @@ button{ color:inherit; font:inherit; }
       '<div><b>' + cropValue + '</b><span>作物总价值</span></div>' +
     '</div>';
 
+    /* 图鉴奖励：收集到 N 种鱼 / 作物自动发奖，这里显示进度和领取状态 */
+    const rw = G.codexRewards(state);
+    const rwAll = rw.fish.concat(rw.crops);
+    const rwDone = rwAll.filter(function (m) { return m.claimed; }).length;
+    const rewardHtml =
+      '<div class="store-sub">🎁 图鉴奖励 · ' + rwDone + '/' + rwAll.length + ' 已领取</div>' +
+      rwAll.map(function (m) {
+        const pct = Math.max(0, Math.min(100, Math.round(m.got / m.need * 100)));
+        const ico = m.claimed ? '✅' : (m.got >= m.need ? '🎁' : '🔒');
+        return '<div class="codex-rw' + (m.claimed ? ' got' : '') + '">' +
+          '<span class="cw-k">' + ico + ' ' + m.label + ' ' + m.need + ' 种</span>' +
+          '<span class="cw-bar"><i style="width:' + pct + '%"></i></span>' +
+          '<span class="cw-n">' + m.got + '/' + m.need + '</span>' +
+          '<span class="cw-r">' + (m.claimed ? '已领取' : m.text.replace(/^奖励\s*/, '')) + '</span>' +
+        '</div>';
+      }).join('');
+
     const bookRow = function (item, rec, emptyText) {
       const q = G.qualityById(rec.best);
       return '<div class="book-row">' +
@@ -7636,6 +7770,7 @@ button{ color:inherit; font:inherit; }
     }).join('');
 
     openModal('📖 图鉴', stat +
+      rewardHtml +
       '<div class="store-sub">🐟 鱼类 · 首次 / 次数 / 累计价值</div>' + fishRows +
       '<div class="store-sub" style="margin-top:10px">🎁 宝箱 · 首次 / 数量 / 累计价值</div>' + chestRows +
       '<div class="store-sub" style="margin-top:10px">🌱 作物 · 首次 / 数量 / 累计价值</div>' + cropRows,
@@ -7712,6 +7847,17 @@ button{ color:inherit; font:inherit; }
         SFX.good();
       }, 260 + i * 620);
     });
+  }
+
+  /* 图鉴奖励提示：一次可能同时解锁好几档 */
+  function codexToasts(list) {
+    if (!list || !list.length) return;
+    setTimeout(function () {
+      toast(list.length === 1
+        ? '📖 图鉴奖励：' + list[0].label + ' ' + list[0].need + ' 种 · ' + list[0].text
+        : '📖 图鉴奖励 ×' + list.length + ' 档，奖励已到账', 'good');
+      SFX.good();
+    }, 500);
   }
 
   function statsModal() {
@@ -9677,15 +9823,21 @@ button{ color:inherit; font:inherit; }
     }
     bind();
     const unlocked = G.checkAchievements(state);
+    const codexGot = G.checkCodexRewards(state);
     renderAll();
     save();
 
-    if (saved) {
+    if (futureSave) {
+      setTimeout(function () {
+        toast('存档来自更新的版本，已备份为 farm-gui-save-v1-future，本次从新农场开始', 'warn');
+      }, 300);
+    } else if (saved) {
       setTimeout(function () { toast('读取存档：第 ' + state.day + ' 天 · ' + state.coins + ' 金', 'good'); }, 300);
     } else {
       setTimeout(function () { toast('🌾 欢迎来到我的小农场！先给空地播种吧', 'good'); }, 300);
     }
     if (unlocked.length) setTimeout(function () { achToasts(unlocked); }, 900);
+    if (codexGot.length) setTimeout(function () { codexToasts(codexGot); }, 1400);
   }
 
   boot();

@@ -87,7 +87,21 @@
     orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, free: 3, fruitMin: 1, fruitMax: 3,
                waterEnergy: 1, harvestEnergy: 1,
                grow: { seed: { days: 90, water: 30 }, sapling: { days: 30, water: 15 } },
-               slotCosts: [600, 1000, 1600, 2400, 3200] }
+               slotCosts: [600, 1000, 1600, 2400, 3200] },
+    /* 图鉴奖励：收集到 need 种鱼 / 作物时自动发一次奖励（按 id 记一次，不可重复领）。
+     * 鱼只算 6 种正经鱼（杂物和宝箱不进图鉴），作物算上架的全部 14 种。 */
+    codex: {
+      fish: [
+        { id: 'fish2', need: 2, reward: { coins: 150 } },
+        { id: 'fish4', need: 4, reward: { coins: 400, bait: { dough: 5 } } },
+        { id: 'fish6', need: 6, reward: { coins: 1000, bait: { dough: 10 } } }
+      ],
+      crops: [
+        { id: 'crop5', need: 5, reward: { coins: 200 } },
+        { id: 'crop10', need: 10, reward: { coins: 600, ferts: { normal: 3 } } },
+        { id: 'crop14', need: 14, reward: { coins: 1800, ferts: { special: 3 } } }
+      ]
+    }
   };
 
   /* ---------------- 静态数据 ---------------- */

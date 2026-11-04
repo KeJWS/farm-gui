@@ -19,6 +19,7 @@
   let soundOn = true;
   let storeFilter = 'all';
   let storeQuery = '';
+  let futureSave = false;   // 读档时发现「来自更新版本」的存档 → 备份并提示
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.prototype.slice.call(document.querySelectorAll(sel));
@@ -61,7 +62,13 @@
     try {
       const raw = localStorage.getItem(SAVE_KEY);
       if (raw) return G.deserialize(raw);
-    } catch (e) { /* 忽略 */ }
+    } catch (e) {
+      // 存档来自更新的版本：先把原文另存一份，免得被新档覆盖丢掉
+      if (e && e.code === 'FUTURE_SAVE') {
+        futureSave = true;
+        try { localStorage.setItem(SAVE_KEY + '-future', localStorage.getItem(SAVE_KEY) || ''); } catch (e2) { /* 忽略 */ }
+      }
+    }
     return null;
   }
 
@@ -949,10 +956,12 @@
 
   function commit(result) {
     const unlocked = G.checkAchievements(state);
+    const codexGot = G.checkCodexRewards(state);
     renderAll();
     save();
     if (result && !result.ok && result.msg) toast(result.msg, 'warn');
     achToasts(unlocked);
+    codexToasts(codexGot);
     return result;
   }
 
@@ -1701,6 +1710,15 @@
       '</div>' +
 
       '<div class="rule-sec">' +
+        '<h4>📖 图鉴奖励</h4>' +
+        '<p>第一次钓到 / 收到某种鱼或作物就进图鉴。收集到一定数量会<b>自动发奖</b>：' +
+        '鱼类分 ' + G.BALANCE.codex.fish.map(function (m) { return m.need; }).join(' / ') + ' 种，' +
+        '作物分 ' + G.BALANCE.codex.crops.map(function (m) { return m.need; }).join(' / ') + ' 种，' +
+        '每档只发一次（金币 / 饵料 / 肥料）。<br>' +
+        '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态；旧存档按现有进度补发。</p>' +
+      '</div>' +
+
+      '<div class="rule-sec">' +
         '<h4>⌨️ 操作</h4>' +
         '<p>· 成熟地块<b>左键直接收</b>；右键或 Shift + 点击看详情（可铲除、看产量）<br>' +
         '· 顶栏 <b>📊 状态</b> 看累计数据；<b>⚙️ 设置</b> 里有规则说明（分 4 页）/ 分享名片（导出 PNG）/ 导入导出 / 音效 / 重新开始<br>' +
@@ -1765,6 +1783,23 @@
       '<div><b>' + cropValue + '</b><span>作物总价值</span></div>' +
     '</div>';
 
+    /* 图鉴奖励：收集到 N 种鱼 / 作物自动发奖，这里显示进度和领取状态 */
+    const rw = G.codexRewards(state);
+    const rwAll = rw.fish.concat(rw.crops);
+    const rwDone = rwAll.filter(function (m) { return m.claimed; }).length;
+    const rewardHtml =
+      '<div class="store-sub">🎁 图鉴奖励 · ' + rwDone + '/' + rwAll.length + ' 已领取</div>' +
+      rwAll.map(function (m) {
+        const pct = Math.max(0, Math.min(100, Math.round(m.got / m.need * 100)));
+        const ico = m.claimed ? '✅' : (m.got >= m.need ? '🎁' : '🔒');
+        return '<div class="codex-rw' + (m.claimed ? ' got' : '') + '">' +
+          '<span class="cw-k">' + ico + ' ' + m.label + ' ' + m.need + ' 种</span>' +
+          '<span class="cw-bar"><i style="width:' + pct + '%"></i></span>' +
+          '<span class="cw-n">' + m.got + '/' + m.need + '</span>' +
+          '<span class="cw-r">' + (m.claimed ? '已领取' : m.text.replace(/^奖励\s*/, '')) + '</span>' +
+        '</div>';
+      }).join('');
+
     const bookRow = function (item, rec, emptyText) {
       const q = G.qualityById(rec.best);
       return '<div class="book-row">' +
@@ -1800,6 +1835,7 @@
     }).join('');
 
     openModal('📖 图鉴', stat +
+      rewardHtml +
       '<div class="store-sub">🐟 鱼类 · 首次 / 次数 / 累计价值</div>' + fishRows +
       '<div class="store-sub" style="margin-top:10px">🎁 宝箱 · 首次 / 数量 / 累计价值</div>' + chestRows +
       '<div class="store-sub" style="margin-top:10px">🌱 作物 · 首次 / 数量 / 累计价值</div>' + cropRows,
@@ -1876,6 +1912,17 @@
         SFX.good();
       }, 260 + i * 620);
     });
+  }
+
+  /* 图鉴奖励提示：一次可能同时解锁好几档 */
+  function codexToasts(list) {
+    if (!list || !list.length) return;
+    setTimeout(function () {
+      toast(list.length === 1
+        ? '📖 图鉴奖励：' + list[0].label + ' ' + list[0].need + ' 种 · ' + list[0].text
+        : '📖 图鉴奖励 ×' + list.length + ' 档，奖励已到账', 'good');
+      SFX.good();
+    }, 500);
   }
 
   function statsModal() {
@@ -3841,15 +3888,21 @@
     }
     bind();
     const unlocked = G.checkAchievements(state);
+    const codexGot = G.checkCodexRewards(state);
     renderAll();
     save();
 
-    if (saved) {
+    if (futureSave) {
+      setTimeout(function () {
+        toast('存档来自更新的版本，已备份为 farm-gui-save-v1-future，本次从新农场开始', 'warn');
+      }, 300);
+    } else if (saved) {
       setTimeout(function () { toast('读取存档：第 ' + state.day + ' 天 · ' + state.coins + ' 金', 'good'); }, 300);
     } else {
       setTimeout(function () { toast('🌾 欢迎来到我的小农场！先给空地播种吧', 'good'); }, 300);
     }
     if (unlocked.length) setTimeout(function () { achToasts(unlocked); }, 900);
+    if (codexGot.length) setTimeout(function () { codexToasts(codexGot); }, 1400);
   }
 
   boot();

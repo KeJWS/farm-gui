@@ -312,6 +312,15 @@
       '</div>' +
 
       '<div class="rule-sec">' +
+        '<h4>📖 图鉴奖励</h4>' +
+        '<p>第一次钓到 / 收到某种鱼或作物就进图鉴。收集到一定数量会<b>自动发奖</b>：' +
+        '鱼类分 ' + G.BALANCE.codex.fish.map(function (m) { return m.need; }).join(' / ') + ' 种，' +
+        '作物分 ' + G.BALANCE.codex.crops.map(function (m) { return m.need; }).join(' / ') + ' 种，' +
+        '每档只发一次（金币 / 饵料 / 肥料）。<br>' +
+        '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态；旧存档按现有进度补发。</p>' +
+      '</div>' +
+
+      '<div class="rule-sec">' +
         '<h4>⌨️ 操作</h4>' +
         '<p>· 成熟地块<b>左键直接收</b>；右键或 Shift + 点击看详情（可铲除、看产量）<br>' +
         '· 顶栏 <b>📊 状态</b> 看累计数据；<b>⚙️ 设置</b> 里有规则说明（分 4 页）/ 分享名片（导出 PNG）/ 导入导出 / 音效 / 重新开始<br>' +

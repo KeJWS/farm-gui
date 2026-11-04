@@ -2368,5 +2368,72 @@ ok(rep.farm && typeof rep.farm.harvested === 'number' && typeof rep.farm.missed 
 ok(Array.isArray(rep.tomorrow) && rep.orders && typeof rep.orders.fresh === 'number',
    '总结带明日提示与新委托数');
 
+/* ---------- 10. 图鉴奖励 / 存档版本门禁 ---------- */
+section('图鉴奖励');
+{
+  const c = G.createState();
+  ok(G.checkCodexRewards(c).length === 0, '新农场没有图鉴奖励可领');
+  const rw0 = G.codexRewards(c);
+  ok(rw0.fish.length === 3 && rw0.crops.length === 3, '图鉴奖励是 3 档鱼 + 3 档作物');
+
+  const addFish = function (ids) {
+    ids.forEach(function (id) {
+      c.codex.fish[id] = { n: 1, best: 'std', first: 1, perfect: 0, value: 3 };
+    });
+  };
+  addFish(['crucian', 'carp']);
+  const got1 = G.checkCodexRewards(c);
+  ok(got1.length === 1 && got1[0].id === 'fish2', '收集 2 种鱼解锁第一档', got1);
+  ok(c.coins === G.BALANCE.start.coins + 150, '第一档奖励 150 金到账', c.coins);
+  ok(G.checkCodexRewards(c).length === 0, '同一档不会重复领取');
+
+  addFish(['mandarin', 'bass', 'puffer', 'koi']);
+  const got2 = G.checkCodexRewards(c);
+  ok(got2.length === 2, '集满 6 种鱼一次补发后两档', got2.map(function (g) { return g.id; }));
+  ok(c.bait.dough === 15, '鱼档奖励的面团饵到账（5 + 10）', c.bait.dough);
+
+  G.CROP_LIST.forEach(function (crop) {
+    c.codex.crops[crop.id] = { n: 1, best: 'std', first: 1, value: 5 };
+  });
+  const got3 = G.checkCodexRewards(c);
+  ok(got3.length === 3, '作物 5 / 10 / 14 三档一次补齐', got3.map(function (g) { return g.id; }));
+  ok(c.ferts.normal === 3 && c.ferts.special === 3, '作物档奖励的肥料到账', [c.ferts.normal, c.ferts.special]);
+
+  const round = G.deserialize(G.serialize(c));
+  ok(G.checkCodexRewards(round).length === 0, '读档后已领的档位不会重发');
+  ok(G.codexRewards(round).crops.every(function (m) { return m.claimed; }), '读档保留领取状态');
+
+  const fake = JSON.parse(G.serialize(c));
+  fake.codexClaim = { hackReward: 9 };
+  const clean = G.deserialize(fake);
+  ok(!clean.codexClaim.hackReward, '存档里不认识的奖励档位会被丢掉');
+}
+
+section('存档版本门禁');
+{
+  const future = JSON.parse(G.serialize(G.createState()));
+  future.v = G.SAVE_VERSION + 1;
+  let err = null;
+  try { G.deserialize(future); } catch (e) { err = e; }
+  ok(!!err && err.code === 'FUTURE_SAVE', '来自更新版本的存档会被拒绝');
+
+  const cur = G.deserialize(JSON.parse(G.serialize(G.createState())));
+  ok(cur.v === G.SAVE_VERSION, '正常存档的版本号被归一');
+}
+
+section('全图鉴成就');
+{
+  const c = G.createState();
+  G.FISH.forEach(function (f) {
+    if (f.trash || f.chest) return;
+    c.codex.fish[f.id] = { n: 1, best: 'std', first: 1, perfect: 0, value: 1 };
+  });
+  G.CROP_LIST.forEach(function (cr) {
+    c.codex.crops[cr.id] = { n: 1, best: 'std', first: 1, value: 1 };
+  });
+  const ids = G.checkAchievements(c).map(function (a) { return a.id; });
+  ok(ids.indexOf('codexall') >= 0, '6 种鱼 + 14 种作物能解锁「全图鉴」', ids);
+}
+
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));
 process.exit(fail ? 1 : 0);

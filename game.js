@@ -774,7 +774,21 @@
     orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, free: 3, fruitMin: 1, fruitMax: 3,
                waterEnergy: 1, harvestEnergy: 1,
                grow: { seed: { days: 90, water: 30 }, sapling: { days: 30, water: 15 } },
-               slotCosts: [600, 1000, 1600, 2400, 3200] }
+               slotCosts: [600, 1000, 1600, 2400, 3200] },
+    /* 图鉴奖励：收集到 need 种鱼 / 作物时自动发一次奖励（按 id 记一次，不可重复领）。
+     * 鱼只算 6 种正经鱼（杂物和宝箱不进图鉴），作物算上架的全部 14 种。 */
+    codex: {
+      fish: [
+        { id: 'fish2', need: 2, reward: { coins: 150 } },
+        { id: 'fish4', need: 4, reward: { coins: 400, bait: { dough: 5 } } },
+        { id: 'fish6', need: 6, reward: { coins: 1000, bait: { dough: 10 } } }
+      ],
+      crops: [
+        { id: 'crop5', need: 5, reward: { coins: 200 } },
+        { id: 'crop10', need: 10, reward: { coins: 600, ferts: { normal: 3 } } },
+        { id: 'crop14', need: 14, reward: { coins: 1800, ferts: { special: 3 } } }
+      ]
+    }
   };
 
   /* ---------------- 静态数据 ---------------- */
@@ -881,6 +895,56 @@
     return Object.keys(cx).reduce(function (a, k) { return a + (cx[k].value || 0); }, 0);
   }
 
+  /* ---------------- 图鉴奖励 ---------------- */
+  /* 鱼只算 6 种正经鱼（杂物 / 宝箱不进图鉴），作物算上架的全部 14 种。
+   * 每档按 id 记一次，跨存档恢复也不会重复领。 */
+
+  const CODEX_TOTAL = {
+    fish: FISH.filter(function (f) { return !f.trash && !f.chest; }).length,
+    crops: CROP_LIST.length
+  };
+  const CODEX_LABEL = { fish: '🐟 鱼类', crops: '🌾 作物' };
+
+  function codexSpecies(s, kind) {
+    return kind === 'fish' ? fishSpeciesOwned(s) : cropSpeciesOwned(s);
+  }
+
+  /* 每档奖励 + 当前进度，给界面用 */
+  function codexRewards(s) {
+    s.codexClaim = s.codexClaim || {};
+    const out = { fish: [], crops: [] };
+    ['fish', 'crops'].forEach(function (kind) {
+      const have = codexSpecies(s, kind);
+      (BALANCE.codex[kind] || []).forEach(function (m) {
+        out[kind].push({
+          id: m.id, kind: kind, label: CODEX_LABEL[kind], need: m.need,
+          total: CODEX_TOTAL[kind], have: have, got: Math.min(have, m.need),
+          claimed: !!s.codexClaim[m.id], day: s.codexClaim[m.id] || 0,
+          text: rewardText({ reward: m.reward })
+        });
+      });
+    });
+    return out;
+  }
+
+  /* 达标就发奖，每个 id 只发一次；返回本次新领到的档位 */
+  function checkCodexRewards(s) {
+    s.codexClaim = s.codexClaim || {};
+    const out = [];
+    ['fish', 'crops'].forEach(function (kind) {
+      const have = codexSpecies(s, kind);
+      (BALANCE.codex[kind] || []).forEach(function (m) {
+        if (s.codexClaim[m.id] || have < m.need) return;
+        s.codexClaim[m.id] = s.day || 1;
+        applyReward(s, m.reward, '图鉴奖励');
+        const text = rewardText({ reward: m.reward });
+        log(s, '📖 图鉴奖励：' + CODEX_LABEL[kind] + '收集 ' + m.need + ' 种（' + text + '）', 'good');
+        out.push({ id: m.id, kind: kind, label: CODEX_LABEL[kind], need: m.need, text: text });
+      });
+    });
+    return out;
+  }
+
   /* 成就表：val(s) 是当前进度，达到 goal 就算解锁，奖励自动发放 */
   const ACH = [
     /* 种田 */
@@ -927,8 +991,8 @@
     { id: 'day100',    cat: 'biz',  emoji: '🏡', name: '百日农场',   desc: '经营满 100 天',        goal: 100,
       val: function (s) { return s.day || 1; }, reward: { coins: 400 }, pts: 4 },
 
-    /* 收集 */
-    { id: 'codexall',  cat: 'all',  emoji: '📖', name: '全图鉴',     desc: '7 种鱼 + 14 种作物都收过', goal: 21,
+    /* 收集：6 种正经鱼 + 14 种作物 = 20（杂物和宝箱不进图鉴） */
+    { id: 'codexall',  cat: 'all',  emoji: '📖', name: '全图鉴',     desc: '6 种鱼 + 14 种作物都收过', goal: 20,
       val: function (s) { return fishSpeciesOwned(s) + cropSpeciesOwned(s); },
       reward: { coins: 500, ferts: { special: 5 } }, pts: 8 },
 
@@ -1028,7 +1092,8 @@
 
   /* 成就奖励文案：成就点 + 金币 / 种子 / 肥料 / 饵料 / 茶 / 钥匙 */
   function rewardText(a) {
-    const parts = [(a.pts || 0) + ' 点'];
+    const parts = [];
+    if (a.pts) parts.push(a.pts + ' 点');
     const r = a.reward || {};
     if (r.coins) parts.push(r.coins + ' 金');
     ['seeds', 'ferts', 'bait', 'teas', 'keys'].forEach(function (k) {
@@ -1046,9 +1111,9 @@
     return '奖励 ' + parts.join(' · ');
   }
 
-  function applyReward(s, r) {
+  function applyReward(s, r, label) {
     r = r || {};
-    if (r.coins) addCoins(s, r.coins, '成就奖励');
+    if (r.coins) addCoins(s, r.coins, label || '成就奖励');
     Object.keys(r.seeds || {}).forEach(function (id) {
       s.seeds[id] = (s.seeds[id] || 0) + r.seeds[id];
     });
@@ -1382,6 +1447,7 @@
       treeStock: {},
       townDonated: 0,
       codex: { fish: {}, crops: {} },
+      codexClaim: {},
       manualRefreshUsed: false,
       workUsed: false,
       bait: { worm: 0, dough: 0 },
@@ -4137,8 +4203,15 @@
   function deserialize(json) {
     const s = typeof json === 'string' ? JSON.parse(json) : json;
     if (!s || typeof s !== 'object') throw new Error('bad save');
+    // 版本门禁：来自更新版本的存档，旧代码不该假装能读懂（否则会静默改坏数据）
+    if (s.v && s.v > SAVE_VERSION) {
+      const err = new Error('存档来自更新的版本（v' + s.v + '）');
+      err.code = 'FUTURE_SAVE';
+      throw err;
+    }
     const base = createState();
     const merged = Object.assign(base, s);
+    merged.v = SAVE_VERSION;
 
     // 数值清洗：导入的存档不能带 NaN / 负数 / 离谱的地块数
     merged.maxEnergy = Math.round(num(s.maxEnergy, 10, 5, 100) / 5) * 5;
@@ -4412,6 +4485,15 @@
       const c = merged.codex.crops[k] || {};
       merged.codex.crops[k] = { n: c.n || 0, best: c.best || null, first: c.first || null, value: c.value || 0 };
     });
+    // 图鉴奖励：只保留表里存在的档位 id（老存档没有这一项，首次检查时会补发）
+    merged.codexClaim = {};
+    const claimable = {};
+    ['fish', 'crops'].forEach(function (kind) {
+      (BALANCE.codex[kind] || []).forEach(function (m) { claimable[m.id] = 1; });
+    });
+    Object.keys(s.codexClaim || {}).forEach(function (id) {
+      if (claimable[id]) merged.codexClaim[id] = Math.round(num(s.codexClaim[id], 1, 1, 100000));
+    });
     // 老存档回填：从最近 40 条钓鱼记录里反推图鉴
     if (!Object.keys(merged.codex.fish).length) {
       ((merged.fishBook && merged.fishBook.entries) || []).forEach(function (e) {
@@ -4589,6 +4671,7 @@
     farmYieldBonus: farmYieldBonus, fishHookBonus: fishHookBonus, fishGoodBonus: fishGoodBonus,
     taxBase: taxBase, taxInDays: taxInDays, orderWeight: orderWeight, ORDER_TIERS: ORDER_TIERS,
     ACH: ACH, ACH_CATS: ACH_CATS, checkAchievements: checkAchievements, achInfo: achInfo, rewardText: rewardText,
+    CODEX_TOTAL: CODEX_TOTAL, codexRewards: codexRewards, checkCodexRewards: checkCodexRewards,
     achPts: achPts, sellBonus: sellBonus, makeLongOrder: makeLongOrder, deliverLong: deliverLong,
     fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
     fishMany: fishMany, fishAll: fishAll, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,

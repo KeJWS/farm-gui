@@ -26,6 +26,23 @@
       '<div><b>' + cropValue + '</b><span>作物总价值</span></div>' +
     '</div>';
 
+    /* 图鉴奖励：收集到 N 种鱼 / 作物自动发奖，这里显示进度和领取状态 */
+    const rw = G.codexRewards(state);
+    const rwAll = rw.fish.concat(rw.crops);
+    const rwDone = rwAll.filter(function (m) { return m.claimed; }).length;
+    const rewardHtml =
+      '<div class="store-sub">🎁 图鉴奖励 · ' + rwDone + '/' + rwAll.length + ' 已领取</div>' +
+      rwAll.map(function (m) {
+        const pct = Math.max(0, Math.min(100, Math.round(m.got / m.need * 100)));
+        const ico = m.claimed ? '✅' : (m.got >= m.need ? '🎁' : '🔒');
+        return '<div class="codex-rw' + (m.claimed ? ' got' : '') + '">' +
+          '<span class="cw-k">' + ico + ' ' + m.label + ' ' + m.need + ' 种</span>' +
+          '<span class="cw-bar"><i style="width:' + pct + '%"></i></span>' +
+          '<span class="cw-n">' + m.got + '/' + m.need + '</span>' +
+          '<span class="cw-r">' + (m.claimed ? '已领取' : m.text.replace(/^奖励\s*/, '')) + '</span>' +
+        '</div>';
+      }).join('');
+
     const bookRow = function (item, rec, emptyText) {
       const q = G.qualityById(rec.best);
       return '<div class="book-row">' +
@@ -61,6 +78,7 @@
     }).join('');
 
     openModal('📖 图鉴', stat +
+      rewardHtml +
       '<div class="store-sub">🐟 鱼类 · 首次 / 次数 / 累计价值</div>' + fishRows +
       '<div class="store-sub" style="margin-top:10px">🎁 宝箱 · 首次 / 数量 / 累计价值</div>' + chestRows +
       '<div class="store-sub" style="margin-top:10px">🌱 作物 · 首次 / 数量 / 累计价值</div>' + cropRows,
@@ -137,6 +155,17 @@
         SFX.good();
       }, 260 + i * 620);
     });
+  }
+
+  /* 图鉴奖励提示：一次可能同时解锁好几档 */
+  function codexToasts(list) {
+    if (!list || !list.length) return;
+    setTimeout(function () {
+      toast(list.length === 1
+        ? '📖 图鉴奖励：' + list[0].label + ' ' + list[0].need + ' 种 · ' + list[0].text
+        : '📖 图鉴奖励 ×' + list.length + ' 档，奖励已到账', 'good');
+      SFX.good();
+    }, 500);
   }
 
   function statsModal() {

@@ -11,6 +11,7 @@
   let soundOn = true;
   let storeFilter = 'all';
   let storeQuery = '';
+  let futureSave = false;   // 读档时发现「来自更新版本」的存档 → 备份并提示
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.prototype.slice.call(document.querySelectorAll(sel));
@@ -53,7 +54,13 @@
     try {
       const raw = localStorage.getItem(SAVE_KEY);
       if (raw) return G.deserialize(raw);
-    } catch (e) { /* 忽略 */ }
+    } catch (e) {
+      // 存档来自更新的版本：先把原文另存一份，免得被新档覆盖丢掉
+      if (e && e.code === 'FUTURE_SAVE') {
+        futureSave = true;
+        try { localStorage.setItem(SAVE_KEY + '-future', localStorage.getItem(SAVE_KEY) || ''); } catch (e2) { /* 忽略 */ }
+      }
+    }
     return null;
   }
 

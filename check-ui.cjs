@@ -37,7 +37,14 @@ console.log('== data-act 绑定 ==');
 });
 console.log('  按钮 ' + new Set(htmlActs).size + ' 个，处理函数 ' + uiActs.size + ' 个');
 
-/* 5. 关键结构存在性 */
+/* 5. ui.js 里用到的 FarmGame 成员必须都导出（API 是手抄清单，漏一个只有运行时才炸） */
+console.log('== FarmGame 导出 ==');
+const G = require('./game.js');
+const gUsed = new Set([...ui.matchAll(/\bG\.([A-Za-z_$][\w$]*)/g)].map(m => m[1]));
+[...gUsed].sort().forEach(k => { if (!(k in G)) bad('ui.js 引用了未导出的 G.' + k); });
+console.log('  引用 ' + gUsed.size + ' 个成员');
+
+/* 6. 关键结构存在性 */
 const must = [
   '#plot-grid', '#store-list', '#ledger', '#log', '#seed-box',
   '[data-act="plantAll"]', '[data-act="seedshop"]', '[data-act="sleep"]',

@@ -75,6 +75,7 @@
       treeStock: {},
       townDonated: 0,
       codex: { fish: {}, crops: {} },
+      codexClaim: {},
       manualRefreshUsed: false,
       workUsed: false,
       bait: { worm: 0, dough: 0 },

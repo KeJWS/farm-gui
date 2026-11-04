@@ -608,6 +608,14 @@ ok(shareHtml.indexOf('share-preview') >= 0 && shareHtml.indexOf('data:image/png'
    '名片用本地 canvas 生成预览图');
 ok(shareHtml.indexOf('do-share-save') >= 0, '名片可以下载成 PNG');
 
+/* ---------- 图鉴奖励（v2.28） ---------- */
+console.log('\n== 图鉴奖励 ==');
+document.getElementById('btn-codex').click();
+const codexHtml = html('#modal-root');
+ok(codexHtml.indexOf('图鉴奖励') >= 0, '图鉴弹窗列出奖励档位');
+ok(codexHtml.indexOf('codex-rw') >= 0, '每个档位带进度条');
+ok(codexHtml.indexOf('鱼类') >= 0 && codexHtml.indexOf('作物') >= 0, '鱼 / 作物两类档位都在');
+
 /* ---------- 重绘后的焦点保持（v2.27） ---------- */
 console.log('\n== 焦点保持 ==');
 document.activeElement = { dataset: { i: '2' }, closest: function () { return null; } };

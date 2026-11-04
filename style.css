@@ -1003,3 +1003,19 @@ button{ color:inherit; font:inherit; }
   padding:9px 10px; display:flex; flex-direction:column; gap:2px; }
 .share-fb-grid b{ font-size:15px; }
 .share-fb-grid span{ font-size:11px; color:var(--ink-3); font-weight:600; }
+
+/* ---------- 图鉴奖励 ---------- */
+.codex-rw{ display:flex; align-items:center; gap:8px; padding:6px 9px; margin-bottom:6px;
+  border-radius:10px; background:var(--card); border:1px solid var(--line);
+  font-size:11.5px; font-weight:700; color:var(--ink-2); }
+.codex-rw.got{ opacity:.55; }
+.codex-rw .cw-k{ flex:none; }
+.codex-rw .cw-bar{ flex:1 1 auto; min-width:36px; height:6px; border-radius:99px;
+  background:rgba(122,96,60,.14); overflow:hidden; }
+.codex-rw .cw-bar i{ display:block; height:100%; background:linear-gradient(90deg,var(--green),var(--green-d)); }
+.codex-rw .cw-n{ flex:none; color:var(--ink-3); font-variant-numeric:tabular-nums; }
+.codex-rw .cw-r{ flex:none; color:var(--gold); white-space:nowrap; }
+@media (max-width:560px){
+  .codex-rw{ flex-wrap:wrap; }
+  .codex-rw .cw-bar{ order:5; flex-basis:100%; }
+}

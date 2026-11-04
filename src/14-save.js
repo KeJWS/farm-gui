@@ -66,8 +66,15 @@
   function deserialize(json) {
     const s = typeof json === 'string' ? JSON.parse(json) : json;
     if (!s || typeof s !== 'object') throw new Error('bad save');
+    // 版本门禁：来自更新版本的存档，旧代码不该假装能读懂（否则会静默改坏数据）
+    if (s.v && s.v > SAVE_VERSION) {
+      const err = new Error('存档来自更新的版本（v' + s.v + '）');
+      err.code = 'FUTURE_SAVE';
+      throw err;
+    }
     const base = createState();
     const merged = Object.assign(base, s);
+    merged.v = SAVE_VERSION;
 
     // 数值清洗：导入的存档不能带 NaN / 负数 / 离谱的地块数
     merged.maxEnergy = Math.round(num(s.maxEnergy, 10, 5, 100) / 5) * 5;
@@ -341,6 +348,15 @@
       const c = merged.codex.crops[k] || {};
       merged.codex.crops[k] = { n: c.n || 0, best: c.best || null, first: c.first || null, value: c.value || 0 };
     });
+    // 图鉴奖励：只保留表里存在的档位 id（老存档没有这一项，首次检查时会补发）
+    merged.codexClaim = {};
+    const claimable = {};
+    ['fish', 'crops'].forEach(function (kind) {
+      (BALANCE.codex[kind] || []).forEach(function (m) { claimable[m.id] = 1; });
+    });
+    Object.keys(s.codexClaim || {}).forEach(function (id) {
+      if (claimable[id]) merged.codexClaim[id] = Math.round(num(s.codexClaim[id], 1, 1, 100000));
+    });
     // 老存档回填：从最近 40 条钓鱼记录里反推图鉴
     if (!Object.keys(merged.codex.fish).length) {
       ((merged.fishBook && merged.fishBook.entries) || []).forEach(function (e) {
@@ -518,6 +534,7 @@
     farmYieldBonus: farmYieldBonus, fishHookBonus: fishHookBonus, fishGoodBonus: fishGoodBonus,
     taxBase: taxBase, taxInDays: taxInDays, orderWeight: orderWeight, ORDER_TIERS: ORDER_TIERS,
     ACH: ACH, ACH_CATS: ACH_CATS, checkAchievements: checkAchievements, achInfo: achInfo, rewardText: rewardText,
+    CODEX_TOTAL: CODEX_TOTAL, codexRewards: codexRewards, checkCodexRewards: checkCodexRewards,
     achPts: achPts, sellBonus: sellBonus, makeLongOrder: makeLongOrder, deliverLong: deliverLong,
     fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
     fishMany: fishMany, fishAll: fishAll, digWorms: digWorms, buyBait: buyBait, tea: tea, work: work, workAuto: workAuto,

@@ -22,6 +22,56 @@
     return Object.keys(cx).reduce(function (a, k) { return a + (cx[k].value || 0); }, 0);
   }
 
+  /* ---------------- 图鉴奖励 ---------------- */
+  /* 鱼只算 6 种正经鱼（杂物 / 宝箱不进图鉴），作物算上架的全部 14 种。
+   * 每档按 id 记一次，跨存档恢复也不会重复领。 */
+
+  const CODEX_TOTAL = {
+    fish: FISH.filter(function (f) { return !f.trash && !f.chest; }).length,
+    crops: CROP_LIST.length
+  };
+  const CODEX_LABEL = { fish: '🐟 鱼类', crops: '🌾 作物' };
+
+  function codexSpecies(s, kind) {
+    return kind === 'fish' ? fishSpeciesOwned(s) : cropSpeciesOwned(s);
+  }
+
+  /* 每档奖励 + 当前进度，给界面用 */
+  function codexRewards(s) {
+    s.codexClaim = s.codexClaim || {};
+    const out = { fish: [], crops: [] };
+    ['fish', 'crops'].forEach(function (kind) {
+      const have = codexSpecies(s, kind);
+      (BALANCE.codex[kind] || []).forEach(function (m) {
+        out[kind].push({
+          id: m.id, kind: kind, label: CODEX_LABEL[kind], need: m.need,
+          total: CODEX_TOTAL[kind], have: have, got: Math.min(have, m.need),
+          claimed: !!s.codexClaim[m.id], day: s.codexClaim[m.id] || 0,
+          text: rewardText({ reward: m.reward })
+        });
+      });
+    });
+    return out;
+  }
+
+  /* 达标就发奖，每个 id 只发一次；返回本次新领到的档位 */
+  function checkCodexRewards(s) {
+    s.codexClaim = s.codexClaim || {};
+    const out = [];
+    ['fish', 'crops'].forEach(function (kind) {
+      const have = codexSpecies(s, kind);
+      (BALANCE.codex[kind] || []).forEach(function (m) {
+        if (s.codexClaim[m.id] || have < m.need) return;
+        s.codexClaim[m.id] = s.day || 1;
+        applyReward(s, m.reward, '图鉴奖励');
+        const text = rewardText({ reward: m.reward });
+        log(s, '📖 图鉴奖励：' + CODEX_LABEL[kind] + '收集 ' + m.need + ' 种（' + text + '）', 'good');
+        out.push({ id: m.id, kind: kind, label: CODEX_LABEL[kind], need: m.need, text: text });
+      });
+    });
+    return out;
+  }
+
   /* 成就表：val(s) 是当前进度，达到 goal 就算解锁，奖励自动发放 */
   const ACH = [
     /* 种田 */
@@ -68,8 +118,8 @@
     { id: 'day100',    cat: 'biz',  emoji: '🏡', name: '百日农场',   desc: '经营满 100 天',        goal: 100,
       val: function (s) { return s.day || 1; }, reward: { coins: 400 }, pts: 4 },
 
-    /* 收集 */
-    { id: 'codexall',  cat: 'all',  emoji: '📖', name: '全图鉴',     desc: '7 种鱼 + 14 种作物都收过', goal: 21,
+    /* 收集：6 种正经鱼 + 14 种作物 = 20（杂物和宝箱不进图鉴） */
+    { id: 'codexall',  cat: 'all',  emoji: '📖', name: '全图鉴',     desc: '6 种鱼 + 14 种作物都收过', goal: 20,
       val: function (s) { return fishSpeciesOwned(s) + cropSpeciesOwned(s); },
       reward: { coins: 500, ferts: { special: 5 } }, pts: 8 },
 
@@ -169,7 +219,8 @@
 
   /* 成就奖励文案：成就点 + 金币 / 种子 / 肥料 / 饵料 / 茶 / 钥匙 */
   function rewardText(a) {
-    const parts = [(a.pts || 0) + ' 点'];
+    const parts = [];
+    if (a.pts) parts.push(a.pts + ' 点');
     const r = a.reward || {};
     if (r.coins) parts.push(r.coins + ' 金');
     ['seeds', 'ferts', 'bait', 'teas', 'keys'].forEach(function (k) {
@@ -187,9 +238,9 @@
     return '奖励 ' + parts.join(' · ');
   }
 
-  function applyReward(s, r) {
+  function applyReward(s, r, label) {
     r = r || {};
-    if (r.coins) addCoins(s, r.coins, '成就奖励');
+    if (r.coins) addCoins(s, r.coins, label || '成就奖励');
     Object.keys(r.seeds || {}).forEach(function (id) {
       s.seeds[id] = (s.seeds[id] || 0) + r.seeds[id];
     });

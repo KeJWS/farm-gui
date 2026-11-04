@@ -30,6 +30,41 @@ const bundle = fs.readFileSync(path.join(root, 'game.js'), 'utf8');
 const orphans = jsonFiles.filter(function (f) { return bundle.indexOf('src/data/' + f) < 0; });
 ok(orphans.length === 0, '每个 JSON 都被拼进了 game.js', orphans);
 
+/* 顶层重复键：JSON.parse 会静默取最后一个，复制粘贴一整块忘了改 id 就会悄悄丢数据。
+ * 这里扫原始文本，数一遍深度为 1 的键（不依赖缩进格式）。 */
+function topLevelKeys(text) {
+  const keys = [];
+  let depth = 0, i = 0, inStr = false, esc = false, buf = '';
+  while (i < text.length) {
+    const ch = text[i];
+    if (inStr) {
+      if (esc) { esc = false; buf += ch; }
+      else if (ch === '\\') { esc = true; }
+      else if (ch === '"') {
+        inStr = false;
+        let k = i + 1;
+        while (k < text.length && /\s/.test(text[k])) k++;
+        if (depth === 1 && text[k] === ':') keys.push(buf);
+      } else { buf += ch; }
+      i++;
+      continue;
+    }
+    if (ch === '"') { inStr = true; buf = ''; i++; continue; }
+    if (ch === '{' || ch === '[') depth++;
+    else if (ch === '}' || ch === ']') depth--;
+    i++;
+  }
+  return keys;
+}
+
+const dupKeys = jsonFiles.map(function (f) {
+  const keys = topLevelKeys(fs.readFileSync(path.join(dataDir, f), 'utf8'));
+  const seen = {}, dups = [];
+  keys.forEach(function (k) { if (seen[k]) dups.push(k); seen[k] = 1; });
+  return dups.length ? f + ' → ' + dups.join(', ') : null;
+}).filter(Boolean);
+ok(dupKeys.length === 0, '数据表没有重复的顶层键', dupKeys);
+
 const parsed = {};
 jsonFiles.forEach(function (f) {
   try {
