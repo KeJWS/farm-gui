@@ -1078,7 +1078,7 @@ let lureS = G.createState(); lureS.coins = 100;
 G.buyBait(lureS, 'lure', 1);
 ok(lureS.lure.dur === 25 && lureS.coins === 95, '假饵 5 金 · 耐用 25 次', lureS.lure.dur);
 
-ok(G.ACH.length === 55, '成就总数 55', G.ACH.length);
+ok(G.ACH.length === 60, '成就总数 60', G.ACH.length);
 
 const retro = G.deserialize({ plots: [], coins: 100, day: 20, stats: { harvests: 100, casts: 300 } });
 ok(retro.levels.farm > 1 && retro.levels.fish > 1, '老存档按历史次数补等级',
@@ -1403,7 +1403,7 @@ ok(!G.fishAll(v23noBait, 'dough').ok, '没饵时全体力钓鱼直接失败');
 /* 新成就 */
 const v23achNew = G.checkAchievements(Object.assign(G.createState(), { stats: { teas: 10, chests: 10 } }));
 ok(v23achNew.some(x => x.id === 'tea10') && v23achNew.some(x => x.id === 'chest10'), '下午茶 / 开箱成就能解锁');
-ok(G.ACH.length === 55, '成就总数 55', G.ACH.length);
+ok(G.ACH.length === 60, '成就总数 60', G.ACH.length);
 
 /* ---------- 5f. v2.4 季节 ---------- */
 section('v2.4 季节');
@@ -2530,6 +2530,31 @@ section('v2.30 收购箱锁价（合并定价 / 入箱快照）');
   G.sleep(season);
   const gotSeason = season.coins - 100 + G.mealFee(season);
   ok(gotSeason < estOff, '换季按出箱当天的季节重算', { est: estOff, got: gotSeason });
+}
+
+/* ---------- 13. 果园图鉴 / 成就 ---------- */
+section('果园图鉴与成就');
+{
+  const s = G.createState();
+  s.day = 50; s.energy = 10; s.coins = 0;
+  s.orchard = { unlocked: true, slots: [
+    { id: 'peach', mode: 'sapling', planted: 10, water: 15, lastWater: 10, ripe: 3 }
+  ] };
+  ok(G.treeMature(s, 0), '树苗满 30 天成树');
+  const r = G.harvestTree(s, 0);
+  const cx = s.codex.crops.fruit_peach;
+  ok(r.ok && !!cx && cx.n === 3 && cx.best === 'std' && cx.value === 3 * G.CROPS.fruit_peach.price,
+    '水果收获写进图鉴（标准品质）', cx);
+  ok(s.stats.orchardFruit === 3, '累计水果计入统计', s.stats.orchardFruit);
+
+  const ids = G.checkAchievements(s).map(function (a) { return a.id; });
+  ok(ids.indexOf('orchard1') >= 0 && ids.indexOf('fruit1') >= 0,
+    '开垦果园 / 第一颗果子成就解锁', ids);
+
+  const s2 = G.createState();
+  s2.orchard = { unlocked: true, slots: new Array(8).fill(null) };
+  const ids2 = G.checkAchievements(s2).map(function (a) { return a.id; });
+  ok(ids2.indexOf('tree8') >= 0, '8 个树坑解锁「满园果树」', ids2);
 }
 
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));

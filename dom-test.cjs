@@ -486,6 +486,8 @@ console.log('\n== 农场指南分页 ==');
 ok(html('#modal-root').indexOf('rule-tabs') >= 0, '指南带分页标签');
 ok((html('#modal-root').match(/data-helppage=/g) || []).length === 4, '规则分成 4 页');
 ok(html('#modal-root').indexOf('1 / 4') >= 0, '第 1 页页码正确');
+ok(html('#modal-root').indexOf('🍑 果园') >= 0 && html('#modal-root').indexOf('树坑') >= 0,
+   '种植页含果园小节');
 (function helpNext() {
   const btn = { dataset: { helpnav: '1' }, disabled: false };
   const target = { closest: function (s) { return s === '[data-helpnav]' ? btn : null; }, classList: classList() };
@@ -519,6 +521,7 @@ const stHtml = html('#modal-root');
 ok(stHtml.indexOf('采集记录') >= 0, '状态面板新增采集记录');
 ok(stHtml.indexOf('挖蚯蚓等级') >= 0 && stHtml.indexOf('采集等级') >= 0, '状态面板列出两条新等级');
 ok(stHtml.indexOf('交易等级') >= 0, '状态面板列出交易等级');
+ok(stHtml.indexOf('果园累计') >= 0 && stHtml.indexOf('水果图鉴') >= 0, '状态面板列出果园累计');
 ok(stHtml.indexOf('其中自动播种器') < 0, '维护费不再带「其中自动播种器」');
 ok(text('#trade-lv').indexOf('Lv') >= 0, '商店面板显示交易等级', text('#trade-lv'));
 
@@ -615,6 +618,7 @@ const codexHtml = html('#modal-root');
 ok(codexHtml.indexOf('图鉴奖励') >= 0, '图鉴弹窗列出奖励档位');
 ok(codexHtml.indexOf('codex-rw') >= 0, '每个档位带进度条');
 ok(codexHtml.indexOf('鱼类') >= 0 && codexHtml.indexOf('作物') >= 0, '鱼 / 作物两类档位都在');
+ok(codexHtml.indexOf('水果') >= 0 && codexHtml.indexOf('桃') >= 0, '图鉴含果园水果');
 
 /* ---------- 重绘后的焦点保持（v2.27） ---------- */
 console.log('\n== 焦点保持 ==');

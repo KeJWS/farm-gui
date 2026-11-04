@@ -60,6 +60,33 @@
         '<tr><td>🍂 秋</td><td><b>丰收</b>：普通作物每次收获 <b>+1 个</b>（大作物不算）</td></tr>' +
         '<tr><td>❄️ 冬</td><td>会<b>下雪</b>（' + G.SEASON_WEATHER[3].snow + '%，化雪等于自动浇水）· 不能种也不能钓</td></tr>' +
         '</table>' +
+      '</div>' +
+
+      '<div class="rule-sec">' +
+        '<h4>🍑 果园</h4>' +
+        '<p><b>种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.BALANCE.orchard.unlockCost +
+        ' 金</b>开垦，先给 <b>' + G.BALANCE.orchard.free + ' 个树坑</b>，第 ' +
+        (G.BALANCE.orchard.free + 1) + '~' + G.BALANCE.orchard.slots + ' 个要花钱开（' +
+        G.BALANCE.orchard.slotCosts.join(' / ') + ' 金）。<br>' +
+        '育苗：<b>果树种子</b>浇水 ' + G.BALANCE.orchard.grow.seed.water + ' 天 + 生长 ' +
+        G.BALANCE.orchard.grow.seed.days + ' 天；<b>树苗</b>浇水 ' +
+        G.BALANCE.orchard.grow.sapling.water + ' 天 + 生长 ' + G.BALANCE.orchard.grow.sapling.days +
+        ' 天（浇够就不用再浇，两项都满足才成树）。每棵可单独浇水，浇水 ' + G.BALANCE.orchard.waterEnergy +
+        ' 体力 / 收获 ' + G.BALANCE.orchard.harvestEnergy + ' 体力。<br>' +
+        '成树<b>只在自己的季节</b>每天随机挂 <b>' + G.BALANCE.orchard.fruitMin + '~' +
+        G.BALANCE.orchard.fruitMax + ' 个</b>；水果固定<b>标准品质</b>，进仓库后和作物一样按市价卖（也能进收购箱）。</p>' +
+        '<table class="rule-table"><tr><th>果树</th><th>结果季</th><th>果实</th><th>果价</th><th>种子</th><th>树苗</th></tr>' +
+        G.TREE_LIST.map(function (t) {
+          return '<tr><td>' + t.emoji + ' ' + t.name + '</td><td>' + G.SEASONS[t.season] + '</td><td>' +
+            t.fruit + '</td><td>' + t.price + ' 金</td><td>' + t.seed + ' 金</td><td>' + t.sapling + ' 金</td></tr>';
+        }).join('') + '</table>' +
+        '<p>参考：一棵成树当季满产约 ' +
+        Math.round((G.BALANCE.orchard.fruitMin + G.BALANCE.orchard.fruitMax) / 2 * G.BALANCE.seasonDays) +
+        ' 个（按每天 ' + ((G.BALANCE.orchard.fruitMin + G.BALANCE.orchard.fruitMax) / 2) + ' 个估），' +
+        '按果价折算约 ' +
+        Math.round((G.BALANCE.orchard.fruitMin + G.BALANCE.orchard.fruitMax) / 2 * G.BALANCE.seasonDays *
+          G.TREE_LIST[0].price) + ' 金/季（桃）。<b>种子</b>要养一整季才成树，<b>树苗</b>下季就能结果，' +
+        '买哪个看现金和耐心。</p>' +
       '</div>';
 
     const P2 =
@@ -222,15 +249,6 @@
         ' 块、第 2 台管 ' + (G.SEEDER_PLOTS + 1) + '–' + (G.SEEDER_PLOTS * 2) + ' 块…），' +
         '那块地<b>收完立刻补种</b>，睡觉时再把空着的补上；用你选的种子、不耗体力，每台每周维护 ' +
         G.BALANCE.upkeep.seeder + ' 金<br>' +
-        '· 🍑 果园：种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.BALANCE.orchard.unlockCost +
-        ' 金开垦，先给 ' + G.BALANCE.orchard.free + ' 个树坑，第 ' + (G.BALANCE.orchard.free + 1) +
-        '~' + G.BALANCE.orchard.slots + ' 个树坑要花钱开（' + G.BALANCE.orchard.slotCosts.join(' / ') + ' 金）；种子要<b>浇水 ' +
-        G.BALANCE.orchard.grow.seed.water + ' 天 + 生长 ' + G.BALANCE.orchard.grow.seed.days +
-        ' 天</b>，树苗要<b>浇水 ' + G.BALANCE.orchard.grow.sapling.water + ' 天 + 生长 ' +
-        G.BALANCE.orchard.grow.sapling.days + ' 天</b>（浇够水后不必继续浇，两项都满足才成树）；每棵树可独立浇水，浇水 ' +
-        G.BALANCE.orchard.waterEnergy + ' 体力 / 收获 ' + G.BALANCE.orchard.harvestEnergy + ' 体力；' +
-        '成树只在自己的季节每天随机挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax +
-        ' 个水果，收进仓库后去农产品店卖<br>' +
         '· 💰 税：每 ' + G.BALANCE.tax.every + ' 天按（金币 + 仓库价值 + 收购箱估值）<b>累进</b>收一次——' +
         G.BALANCE.tax.bands.map(function (b, i) {
           const from = i ? G.BALANCE.tax.bands[i - 1].upTo : 0;
@@ -341,7 +359,7 @@
       '</div>';
 
     return [
-      { emoji: '🌱', name: '种植', desc: '天气 · 作物 · 季节', html: P1 },
+      { emoji: '🌱', name: '种植', desc: '天气 · 作物 · 季节 · 果园', html: P1 },
       { emoji: '🎣', name: '钓鱼', desc: '钓鱼 · 采集 · 水产店', html: P2 },
       { emoji: '🧺', name: '买卖', desc: '农产品店 · 小镇 · 收购箱 · 品质 · 肥料', html: P3 },
       { emoji: '💰', name: '经营', desc: '经济 · 委托 · 等级 · 百货店 · 成就 · 操作', html: P4 }

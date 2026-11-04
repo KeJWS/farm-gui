@@ -9,6 +9,11 @@
     const fx = (s.codex && s.codex.fish) || {};
     return FISH.filter(function (f) { return !f.trash && !f.chest && fx[f.id] && fx[f.id].n > 0; }).length;
   }
+  /* 果园水果：和作物共用 codex.crops（果实固定标准品质） */
+  function fruitSpeciesOwned(s) {
+    const cx = (s.codex && s.codex.crops) || {};
+    return FRUIT_LIST.filter(function (f) { return cx[f.id] && cx[f.id].n > 0; }).length;
+  }
   function perfectFish(s) {
     const fx = (s.codex && s.codex.fish) || {};
     return Object.keys(fx).reduce(function (a, k) { return a + (fx[k].perfect || 0); }, 0);
@@ -89,6 +94,18 @@
       val: function (s) { return s.plots.length; }, reward: { coins: 2000 }, pts: 6 },
     { id: 'crop10',    cat: 'farm', emoji: '🌽', name: '五谷丰登',   desc: '收获过全部 14 种作物', goal: 14,
       val: cropSpeciesOwned, reward: { coins: 250, seeds: { pumpkin: 1 } }, pts: 3 },
+
+    /* 果园 */
+    { id: 'orchard1',  cat: 'farm', emoji: '🍑', name: '开垦果园',   desc: '开出第一片果园',       goal: 1,
+      val: function (s) { return orchardUnlocked(s) ? 1 : 0; }, reward: { coins: 150 }, pts: 3 },
+    { id: 'fruit1',    cat: 'farm', emoji: '🌰', name: '第一颗果子', desc: '从果树上收到 1 个水果', goal: 1,
+      val: function (s) { return s.stats.orchardFruit || 0; }, reward: { coins: 60 }, pts: 1 },
+    { id: 'fruit100',  cat: 'farm', emoji: '🧺', name: '果园丰收',   desc: '累计收获 100 个水果',  goal: 100,
+      val: function (s) { return s.stats.orchardFruit || 0; }, reward: { coins: 400 }, pts: 3 },
+    { id: 'tree8',     cat: 'farm', emoji: '🌳', name: '满园果树',   desc: '把 8 个树坑全开出来',  goal: 8,
+      val: function (s) { return orchardSlotCount(s); }, reward: { coins: 600 }, pts: 4 },
+    { id: 'fruit3',    cat: 'farm', emoji: '🍎', name: '三种果子',   desc: '桃 / 芒果 / 苹果都收过', goal: 3,
+      val: fruitSpeciesOwned, reward: { coins: 500, ferts: { special: 2 } }, pts: 4 },
 
     /* 钓鱼 */
     { id: 'fish1',     cat: 'fish', emoji: '🎣', name: '开张啦',     desc: '钓上第 1 条鱼',        goal: 1,

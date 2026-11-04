@@ -212,6 +212,15 @@
     s.energy -= E;
     addStore(s, tr.fruitId, 'std', n);
     s.stats.orchardFruit = (s.stats.orchardFruit || 0) + n;
+    // 水果也进图鉴（和作物共用 codex.crops，果实固定标准品质）
+    s.codex = s.codex || { fish: {}, crops: {} };
+    s.codex.crops = s.codex.crops || {};
+    const fr = CROPS[tr.fruitId];
+    const cx = s.codex.crops[tr.fruitId] ||
+      (s.codex.crops[tr.fruitId] = { n: 0, best: null, first: s.day, value: 0 });
+    cx.n += n;
+    cx.value += n * (fr ? fr.price : 0);
+    if (!cx.best) cx.best = 'std';   // 果树果实固定标准品质
     log(s, '🧺 收获 ' + tr.emoji + ' ' + tr.fruit + ' ×' + n + '（-' + E + ' 体力）', 'good');
     return { ok: true, n: n, cost: E, msg: '收获 ' + tr.fruit + ' ×' + n + ' 进仓库（-' + E + ' 体力）' };
   }

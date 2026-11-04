@@ -152,8 +152,18 @@
           return '未开垦（种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.BALANCE.orchard.unlockCost + ' 金）';
         }
         const o = G.orchardSummary(state);
-        return '树坑 ' + o.total + '/' + o.max + ' · 成树 ' + o.mature + ' · 育苗 ' + o.growing +
-          ' · 待收 ' + o.ripe + ' 个 · 待浇水 ' + o.thirsty + ' 棵';
+        return '树坑 ' + o.total + '/' + o.max + ' · 成树 ' + o.mature + '（当季 ' + o.inSeason + '）' +
+          ' · 育苗 ' + o.growing + ' · 待收 ' + o.ripe + ' 个 · 待浇水 ' + o.thirsty + ' 棵';
+      })()],
+      ['果园累计', (function () {
+        const cx = (state.codex && state.codex.crops) || {};
+        const val = G.FRUIT_LIST.reduce(function (a, f) {
+          return a + ((cx[f.id] && cx[f.id].value) || 0);
+        }, 0);
+        const got = G.FRUIT_LIST.filter(function (f) { return cx[f.id] && cx[f.id].n > 0; }).length;
+        return '种树 ' + ((state.stats && state.stats.orchardPlanted) || 0) + ' 棵 · 收果 ' +
+          ((state.stats && state.stats.orchardFruit) || 0) + ' 个 · 水果图鉴 ' + got + '/' +
+          G.FRUIT_LIST.length + ' · 价值 ' + val + ' 金';
       })()],
       ['种田等级', 'Lv' + lv.farm + (lv.farm >= G.BALANCE.level.max ? '（满级）' :
         '（' + lv.farmXp + '/' + G.levelNeed(lv.farm) + '）') + ' · ' + G.levelEffectText('farm', lv.farm)],
