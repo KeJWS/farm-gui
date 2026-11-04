@@ -1,8 +1,15 @@
 /* ============================================================
  * 我的小农场 · 界面层
+ * 由 build-ui.cjs 从 ui-src/ 拼装生成 —— 不要直接改这个文件，改 ui-src/ 下的模块。
  * ============================================================ */
 (function () {
   'use strict';
+
+  /* ===== 01-core.js ===== */
+/* 我的小农场 · 界面层 / 01-core.js
+ * 顶层依赖 / 存档与读写 / 导入导出 / 音效 / Toast 与飘字 / 弹窗开合
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
 
   const G = window.FarmGame;
   const SAVE_KEY = 'farm-gui-save-v1';
@@ -192,6 +199,12 @@
   }
 
   const modalOpen = () => $('#modal-root').classList.contains('on');
+
+  /* ===== 02-view.js ===== */
+/* 我的小农场 · 界面层 / 02-view.js
+ * HUD / 农田地块 / 底部操作按钮 / 河边小队 / 选饵 / 最近渔获
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
 
   /* ---------------- HUD ---------------- */
 
@@ -566,6 +579,12 @@
     renderCatch();
   }
 
+  /* ===== 03-panels.js ===== */
+/* 我的小农场 · 界面层 / 03-panels.js
+ * 仓库 / 今日委托 / 账本 / 钓鱼记录本 / 日志 / 总渲染与提交
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
+
   /* ---------------- 仓库 ---------------- */
 
   function renderStore() {
@@ -865,6 +884,12 @@
     return result;
   }
 
+  /* ===== 04-plot-modals.js ===== */
+/* 我的小农场 · 界面层 / 04-plot-modals.js
+ * 地块弹窗 / 铲除确认 / 选种 / 种子店 / 全部施肥
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
+
   /* ---------------- 农田弹窗 ---------------- */
 
   function plotModal(i) {
@@ -1096,6 +1121,12 @@
       '<button class="btn" data-close>取消</button>');
   }
 
+  /* ===== 05-device-shop.js ===== */
+/* 我的小农场 · 界面层 / 05-device-shop.js
+ * 自动播种器面板 / 商店大类（种子·渔具·水产·农产品·百货）
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
+
   /* ---------------- 自动播种器 ---------------- */
 
   function seederModal() {
@@ -1281,6 +1312,13 @@
   }
 
   /* 规则说明分页：种植 / 钓鱼 / 买卖 / 经营 */
+
+  /* ===== 06-help.js ===== */
+/* 我的小农场 · 界面层 / 06-help.js
+ * 规则说明（分页正文 + 弹窗）
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
+
   let helpPage = 0;
   /* 自动播种器面板：正在给哪一台选种子 */
   let seedMach = 1;
@@ -1574,6 +1612,12 @@
     openModal('📖 规则速查', body, nav + nav2 + '<button class="btn" data-close>关闭</button>');
   }
 
+  /* ===== 07-ach-stats.js ===== */
+/* 我的小农场 · 界面层 / 07-ach-stats.js
+ * 主题切换 / 图鉴 / 成就 / 统计 / 图表
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
+
   let theme = 'light';
   function applyTheme() { document.documentElement.dataset.theme = theme; }
   function toggleTheme() {
@@ -1788,6 +1832,12 @@
     ctx.lineTo(W - pad, mid);
     ctx.stroke();
   }
+
+  /* ===== 08-crop-shop.js ===== */
+/* 我的小农场 · 界面层 / 08-crop-shop.js
+ * 农产品店 / 收购箱 / 水产店
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
 
   /* ---------------- 农产品店（作物唯一收购处） ---------------- */
 
@@ -2013,6 +2063,12 @@
   /* ---------------- 下午茶 ---------------- */
 
   /* ---------------- 市场行情 ---------------- */
+
+  /* ===== 09-town-market.js ===== */
+/* 我的小农场 · 界面层 / 09-town-market.js
+ * 小镇捐赠 / 市场行情 / 市场分析（价格历史）
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
 
   /* ---------------- 小镇（捐赠换永久加成） ---------------- */
 
@@ -2258,6 +2314,12 @@
       '<button class="btn" data-close>关闭</button>');
   }
 
+  /* ===== 10-tea-depart-status.js ===== */
+/* 我的小农场 · 界面层 / 10-tea-depart-status.js
+ * 下午茶 / 百货店 / 设置 / 当前状态
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
+
   function teaModal() {
     const canDrink = !state.teaUsed && state.energy < state.maxEnergy;
     const rows = G.TEA_LIST.map(function (t) {
@@ -2434,6 +2496,12 @@
       '<button class="btn" data-close>关闭</button>');
   }
 
+  /* ===== 11-day-summary.js ===== */
+/* 我的小农场 · 界面层 / 11-day-summary.js
+ * 每日总结（睡觉结算面板）
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
+
   /* ---------------- 每日总结（睡觉结算） ---------------- */
 
   function daySummaryModal(r) {
@@ -2504,6 +2572,12 @@
       '<button class="btn" data-close>取消</button>' +
       '<button class="btn danger" id="do-reset">确定重开</button>');
   }
+
+  /* ===== 12-actions.js ===== */
+/* 我的小农场 · 界面层 / 12-actions.js
+ * 重置确认 / ACTIONS 动作表 / 飘字定位
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
 
   /* ---------------- 动作 ---------------- */
 
@@ -2619,6 +2693,12 @@
     if (!ev || !ev.clientX) return;
     floatText(ev.clientX, ev.clientY - 10, text, cls);
   }
+
+  /* ===== 13-events.js ===== */
+/* 我的小农场 · 界面层 / 13-events.js
+ * 全部事件绑定：点击委托、输入、快捷键、文件导入
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
 
   /* ---------------- 事件绑定 ---------------- */
 
@@ -3258,6 +3338,12 @@
     });
   }
 
+  /* ===== 14-boot.js ===== */
+/* 我的小农场 · 界面层 / 14-boot.js
+ * 启动：读档、渲染、成就检查、欢迎提示
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
+
   /* ---------------- 启动 ---------------- */
 
   function boot() {
@@ -3292,4 +3378,5 @@
   }
 
   boot();
+
 })();

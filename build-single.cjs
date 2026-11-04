@@ -4,8 +4,9 @@ const path = require('path');
 
 const root = __dirname;
 
-// 先把 src/*.js 拼成 game.js，保证单文件用的是最新源码
+// 先把 src/*.js 拼成 game.js、ui-src/*.js 拼成 ui.js，保证单文件用的是最新源码
 require('./build-modules.cjs');
+require('./build-ui.cjs');
 
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8').replace(/\r\n/g, '\n');
 

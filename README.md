@@ -194,10 +194,40 @@
 原 `SKILL.md` 与 `我的小农场-存档.md` 有几处规则漂移（雨天钓鱼 +30% vs 减半、黄瓜草莓售价不同等）。
 本实现**一律以 `SKILL.md` 为准**，并补了文档没写清的细节（再生期沿用首次单价、天气/蚯蚓只作用在上钩概率与品质上）。
 
+## 代码结构
+
+```
+src/            逻辑层（13 个模块 → 拼成 game.js）
+ui-src/         界面层（14 个模块 → 拼成 ui.js）
+style.css       样式
+index.html      开发版入口
+build-modules.cjs / build-ui.cjs / build-single.cjs   三个拼装脚本
+```
+
+界面层模块（按文件名顺序拼进同一个 IIFE，共享作用域）：
+
+| 文件 | 内容 |
+|---|---|
+| `01-core.js` | 顶层依赖、存档读写、导入导出、音效、Toast / 飘字、弹窗开合 |
+| `02-view.js` | HUD、农田地块、底部操作按钮、河边小队、选饵、最近渔获 |
+| `03-panels.js` | 仓库、今日委托、账本、钓鱼记录本、日志、总渲染与提交 |
+| `04-plot-modals.js` | 地块弹窗、铲除确认、选种、种子店、全部施肥 |
+| `05-device-shop.js` | 自动播种器面板、商店大类 |
+| `06-help.js` | 规则说明（分页正文 + 弹窗） |
+| `07-ach-stats.js` | 主题、图鉴、成就、统计、图表 |
+| `08-crop-shop.js` | 农产品店、收购箱、水产店 |
+| `09-town-market.js` | 小镇捐赠、市场行情、市场分析 |
+| `10-tea-depart-status.js` | 下午茶、百货店、设置、当前状态 |
+| `11-day-summary.js` | 每日总结（睡觉结算面板） |
+| `12-actions.js` | 重置确认、ACTIONS 动作表、飘字定位 |
+| `13-events.js` | 全部事件绑定（点击委托、输入、快捷键、文件导入） |
+| `14-boot.js` | 启动：读档、渲染、成就检查、欢迎提示 |
+
 ## 开发者命令
 
 ```bash
 node build-modules.cjs # src/*.js → game.js（改了 src/ 就要跑；build-single 会自动先跑）
+node build-ui.cjs      # ui-src/*.js → ui.js（改了界面层就要跑）
 node selftest.cjs      # 538 项逻辑自测：播种/种子店/肥料/品质/收获器/钓鱼/天气/经济/委托/等级/解锁/农产品店/水产库存/成就/税金/采集/小镇/市场历史/高级假饵/自动播种器/交易等级/每日总结/存读档/3000 步压测
 node check-ui.cjs      # 校验 ui.js 用到的 id、data-act 在 index.html 里都存在
 node dom-test.cjs      # DOM 冒烟：用最小 DOM 桩把 ui.js 跑起来，测渲染与弹窗
@@ -206,7 +236,16 @@ node analysis.cjs      # 收益分析：作物 / 钓鱼（专项）/ 渔网 / �
 node build-single.cjs  # 把三件套内联成 我的小农场.html
 ```
 
+（`selftest` / `dom-test` / `check-ui` / `balance` / `analysis` 都会先检查 `src/` 与 `ui-src/` 有没有比产物新，自动补拼装。）
+
 ## 更新记录
+
+**v2.19.1（界面层拆分）**
+
+- `ui.js`（3000 多行）拆成 `ui-src/` 下 **14 个模块**，由 `build-ui.cjs` 拼回同一个 IIFE：
+  核心 / 视图 / 面板 / 地块弹窗 / 设备·商店 / 规则说明 / 成就·统计 / 农产品店·收购箱 / 小镇·行情·分析 / 下午茶·百货·状态 / 每日总结 / 动作表 / 事件绑定 / 启动
+- 纯重构：拼装前后去掉注释与空白后代码逐字一致，玩法与界面不变
+- `ensure-build.cjs` 现在同时检查 `ui-src/`；`build-single.cjs` 会先跑 `build-ui.cjs`；`dom-test` / `check-ui` 仍直接测拼装后的 `ui.js`
 
 **v2.19.0（每日总结）**
 

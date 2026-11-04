@@ -1,0 +1,180 @@
+/* 我的小农场 · 界面层 / 10-tea-depart-status.js
+ * 下午茶 / 百货店 / 设置 / 当前状态
+ * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
+ */
+
+  function teaModal() {
+    const canDrink = !state.teaUsed && state.energy < state.maxEnergy;
+    const rows = G.TEA_LIST.map(function (t) {
+      const have = (state.teas && state.teas[t.id]) || 0;
+      const open = state.day >= t.day;
+      return '<div class="store-row' + (have ? '' : ' sold-out') + (open ? '' : ' locked') + '">' +
+        '<span class="se">' + t.emoji + '</span>' +
+        '<div><div class="sn">' + t.name +
+          ' <b class="own">库存 ' + have + '</b></div>' +
+        '<div class="sv">体力 +' + t.energy + ' · ' + t.desc +
+          (open ? '' : ' · 第 ' + t.day + ' 天起供应') + '</div></div>' +
+        '<button class="btn mini" data-tea="' + t.id + '"' +
+          (!have || !canDrink ? ' disabled' : '') + '>喝</button></div>';
+    }).join('');
+
+    openModal('🍵 下午茶',
+      '<div class="shop-head">🔥 体力 <b>' + state.energy + '</b> / ' + state.maxEnergy + '</div>' +
+      '<div class="store-sub">一天只能喝一杯 · 消耗一份茶' +
+        (state.teaUsed ? '（今天已经喝过了）' : '') + '</div>' + rows +
+      '<div class="shop-tip">茶在<b>百货店</b>买；不同的茶回体力不一样，贵的更划算。<br>' +
+        '还没买的茶显示库存 0。</div>',
+      '<button class="btn" data-act="depart">🏬 去百货店买茶</button>' +
+      '<button class="btn" data-close>关闭</button>');
+  }
+
+  /* ---------------- 百货店 ---------------- */
+
+  function departModal() {
+    const teaRows = G.TEA_LIST.map(function (t) {
+      const open = state.day >= t.day;
+      const have = (state.teas && state.teas[t.id]) || 0;
+      return '<div class="store-row' + (open ? '' : ' locked') + '">' +
+        '<span class="se">' + t.emoji + '</span>' +
+        '<div><div class="sn">' + t.name +
+          (open ? ' <b class="own">库存 ' + have + '</b>' : ' <b class="lock">第 ' + t.day + ' 天起</b>') +
+          '</div><div class="sv">' + t.price + ' 金 · 体力 +' + t.energy + ' · ' + t.desc + '</div></div>' +
+        '<button class="btn mini" data-buytea="' + t.id + '"' +
+          (!open || state.coins < t.price ? ' disabled' : '') + '>买1</button>' +
+        (open ? '<button class="btn mini" data-buytea="' + t.id + '" data-n="3"' +
+          (state.coins < t.price * 3 ? ' disabled' : '') + '>买3</button>' : '') +
+        '</div>';
+    }).join('');
+
+    const keyRows = Object.keys(G.KEYS).map(function (id) {
+      const k = G.KEYS[id];
+      const open = G.keyUnlocked(state, id);
+      const have = (state.keys && state.keys[id]) || 0;
+      const tGate = G.keyTradeGate(id);
+      const fishOk = G.fishLv(state) >= k.lv;
+      const lockTxt = !fishOk ? '钓鱼 Lv' + k.lv + ' 解锁' : '交易 Lv' + tGate + ' 解锁';
+      return '<div class="store-row' + (open ? '' : ' locked') + '">' +
+        '<span class="se">' + k.emoji + '</span>' +
+        '<div><div class="sn">' + k.name +
+          (open ? ' <b class="own">持有 ' + have + '</b>' : ' <b class="lock">' + lockTxt + '</b>') +
+          '</div><div class="sv">' + (open ? Math.round(k.price * G.tradeCut(state)) + ' 金 · 开' + k.opens :
+            (!fishOk ? '钓鱼等级到 Lv' + k.lv + ' 才上架' : '交易等级到 Lv' + tGate + ' 才上架')) + '</div></div>' +
+        '<button class="btn mini" data-buykey="' + id + '"' +
+          (!open || state.coins < k.price ? ' disabled' : '') + '>买1</button></div>';
+    }).join('');
+
+    // 百货店只收宝箱，杂物一律不收（只能进收购箱）
+    const junk = G.fishGroups(state, 'junk').filter(function (g) { return g.chest; });
+    const CHECK = {
+      wood: '开箱 10–26 金',
+      iron: '开箱：肥料×6–9 / 种子×8–12 / 面团×12–18 / 蚯蚓×12–18',
+      gold: '开箱：200–320 金 + 特效肥×3–5 / 稀有种子×2–3 / 蚯蚓×14–18'
+    };
+    const junkRows = junk.length ? junk.map(function (g) {
+      const k = G.CHESTS[g.chest];
+      const needKey = k && k.key;
+      const keys = (state.keys && state.keys[needKey]) || 0;
+      const loot = CHECK[g.chest] || '';
+      return '<div class="store-row">' +
+        '<span class="se">' + g.emoji + '</span>' +
+        '<div><div class="sn">' + g.name + ' ×' + g.count + '</div>' +
+        '<div class="sv">' + (needKey ? '要' + G.KEYS[needKey].name + '（持有 ' + keys + '）· ' : '直接开 · ') +
+          loot + ' · 回收 ' + G.shopValue(g.v) + ' 金/个</div></div>' +
+        '<button class="btn mini primary" data-openchest="' + g.key + '"' +
+          (needKey && !keys ? ' disabled' : '') + '>开箱</button>' +
+        '<button class="btn mini" data-selljunk="' + g.key + '">回收</button></div>';
+    }).join('') : '<div class="store-empty">还没有宝箱，去河边捞一捞</div>';
+
+    openModal('🏬 百货店',
+      '<div class="shop-head">💰 <b>' + state.coins + '</b> 金</div>' +
+      '<div class="store-sub">🍵 茶叶 · 买回去喝下午茶</div>' + teaRows +
+      '<div class="store-sub" style="margin-top:10px">🗝️ 钥匙 · 钓鱼 Lv' + G.KEYS.iron.lv + ' / Lv' +
+        G.KEYS.gold.lv + ' + 交易 Lv' + G.BALANCE.gate.goldKeyTrade + ' 解锁</div>' + keyRows +
+      '<div class="store-sub" style="margin-top:10px">♻️ 宝箱回收 · 只收宝箱，杂物不收</div>' + junkRows +
+      '<div class="shop-tip">宝箱按钓鱼等级掉落：木制随便掉、铁制 <b>Lv' + G.BALANCE.chest.ironLv +
+        '</b> 起、黄金 <b>Lv' + G.BALANCE.chest.goldLv + '</b> 起后两者要用钥匙开。<br>' +
+        '对照：铁箱一包物资（约 80 金），钥匙 40；金箱 200–320 金 + 一件高级物品，钥匙 120 —— <b>开箱比回收划算</b>，钥匙不够就先攒着。<br>' +
+        '杂物和宝箱也能放进<b>收购箱</b>按原价结算，但通常没有开箱值。</div>',
+      '<button class="btn" data-close>关闭</button>');
+  }
+
+  function settingsModal() {
+    openModal('⚙️ 设置',
+      '<div class="action-grid">' +
+        '<button class="btn" id="set-help">📖 规则说明</button>' +
+        '<button class="btn" id="set-theme">' + (theme === 'dark' ? '🌙 黑夜模式：开' : '☀️ 黑夜模式：关') + '</button>' +
+        '<button class="btn" id="set-export">⬇️ 导出存档<small>.json</small></button>' +
+        '<button class="btn" id="set-import">⬆️ 导入存档<small>.json</small></button>' +
+        '<button class="btn" id="set-sound">' + (soundOn ? '🔊 音效：开' : '🔇 音效：关') + '</button>' +
+        '<button class="btn danger" id="set-reset">🔄 重新开始</button>' +
+      '</div>' +
+      '<div class="shop-tip">进度自动保存在本浏览器（localStorage）；换设备用导出 / 导入。</div>',
+      '<button class="btn" data-close>关闭</button>');
+  }
+
+  function statusModal() {
+    const lv = state.levels || { farm: 1, fish: 1, farmXp: 0, fishXp: 0 };
+    const nextTax = G.BALANCE.tax.every - (state.day % G.BALANCE.tax.every);
+    const rows = [
+      ['进度', '第 ' + state.day + ' 天 · ' + G.seasonOf(state.day) + '季'],
+      ['金币', state.coins + ' 金'],
+      ['体力', state.energy + ' / ' + state.maxEnergy + ' · 伙食 ' + G.mealFee(state) + ' 金/天'],
+      ['土地', state.plots.length + ' 块 · 洒水器 ' + state.sprinklers + ' 个'],
+      ['设备', (state.harvester ? '自动收获器 ✅ · ' : '自动收获器 — · ') +
+        '自动播种器 ×' + G.seederCount(state) + (G.seederCount(state) ? '（每晚 ' + G.seederPlots(state) + ' 块）' : '') +
+        ' · 渔网 ' + state.nets + ' 张（已布 ' + G.netSetCount(state) + '）' +
+        (state.fisher ? ' · 渔夫 Lv' + G.fisherLv(state) : '')],
+      ['种田等级', 'Lv' + lv.farm + (lv.farm >= G.BALANCE.level.max ? '（满级）' :
+        '（' + lv.farmXp + '/' + G.levelNeed(lv.farm) + '）') + ' · ' + G.levelEffectText('farm', lv.farm)],
+      ['钓鱼等级', 'Lv' + lv.fish + (lv.fish >= G.BALANCE.level.max ? '（满级）' :
+        '（' + lv.fishXp + '/' + G.levelNeed(lv.fish) + '）') + ' · ' + G.levelEffectText('fish', lv.fish)],
+      ['挖蚯蚓等级', 'Lv' + (lv.dig || 1) + ((lv.dig || 1) >= G.BALANCE.level.max ? '（满级）' :
+        '（' + (lv.digXp || 0) + '/' + G.levelNeed(lv.dig || 1) + '）') + ' · ' +
+        G.levelEffectText('dig', lv.dig || 1)],
+      ['采集等级', 'Lv' + (lv.forage || 1) + ((lv.forage || 1) >= G.BALANCE.level.max ? '（满级）' :
+        '（' + (lv.forageXp || 0) + '/' + G.levelNeed(lv.forage || 1) + '）') + ' · ' +
+        G.levelEffectText('forage', lv.forage || 1)],
+      ['交易等级', 'Lv' + (lv.trade || 1) + ((lv.trade || 1) >= G.BALANCE.level.max ? '（满级）' :
+        '（' + (lv.tradeXp || 0) + '/' + G.levelNeed(lv.trade || 1, 'trade') + '）') + ' · ' +
+        G.levelEffectText('trade', lv.trade || 1)],
+      ['维护费', '每周 ' + (G.plotUpkeep(state.plots.length) + G.deviceUpkeep(state)) +
+        ' 金（土地 ' + G.plotUpkeep(state.plots.length) + ' + 设备 ' + G.deviceUpkeep(state) + '）'],
+      ['税金', '还有 ' + nextTax + ' 天 · 约 ' + G.taxDue(state) + ' 金（累进 2% / 4% / 6%，最低 ' +
+        G.BALANCE.tax.min + '）'],
+      ['仓库总价', G.storeTotal(state) + ' 金'],
+      ['收购箱', G.boxCount(state) + ' 批 · ' + G.boxValue(state) + ' 金（睡觉结算）'],
+      ['茶叶', (function () {
+        const list = G.teaStock(state);
+        return list.length ? list.map(function (t) { return t.emoji + t.name + '×' + state.teas[t.id]; }).join(' · ')
+          : '没有茶了（百货店有卖）';
+      })()],
+      ['钥匙', '🗝️ 铁 ×' + ((state.keys && state.keys.iron) || 0) + ' · 🔑 金 ×' + ((state.keys && state.keys.gold) || 0)],
+      ['宝箱', '已开 ' + (state.stats.chests || 0) + ' 个 · 待开 ' +
+        G.fishGroups(state, 'junk').filter(function (g) { return g.chest; })
+          .reduce(function (n, g) { return n + g.count; }, 0) + ' 个'],
+      ['累计播种', state.stats.planted + ' 次'],
+      ['累计收获', state.stats.harvests + ' 次'],
+      ['累计钓鱼', state.stats.casts + ' 次'],
+      ['累计挖蚯蚓', state.stats.dug + ' 次'],
+      ['采集记录', (function () {
+        const n = state.stats.forages || 0;
+        if (!n) return '还没去过后山';
+        const w = state.stats.wild || {};
+        const parts = G.WILD_LIST.filter(function (x) { return (w[x.id] || 0) > 0; })
+          .map(function (x) { return x.emoji + x.name + '×' + w[x.id]; });
+        return '共 ' + n + ' 次' + (parts.length ? ' · ' + parts.join(' · ') : '') +
+          (state.stats.forageBest >= 3 ? ' · 单次最多 3 件' : '');
+      })()],
+      ['卖出作物', (state.stats.cropsSold || 0) + ' 个'],
+      ['完成委托', (state.stats.orders || 0) + ' 单'],
+      ['成就', (function () {
+        const list = G.achInfo(state);
+        return list.filter(function (a) { return a.done; }).length + ' / ' + list.length;
+      })()]
+    ];
+    openModal('📊 当前状态',
+      '<dl class="kv">' + rows.map(function (r) {
+        return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>';
+      }).join('') + '</dl>',
+      '<button class="btn" data-close>关闭</button>');
+  }
