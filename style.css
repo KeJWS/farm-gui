@@ -908,11 +908,7 @@ button{ color:inherit; font:inherit; }
 #stat-canvas{ width:100%; max-width:100%; height:auto; display:block; margin:4px 0 8px; border-radius:10px; background:var(--card); border:1px solid var(--line); }
 @media (max-width:560px){ .shop-two{ grid-template-columns:1fr !important; } }
 
-/* ---------- v1.5.1: stats categories / toast wrap ---------- */
-.stat-cats{ display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 2px; }
-.cat-chip{ display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:8px;
-  background:var(--card); border:1px solid var(--line); font-size:11px; font-weight:700; }
-.cat-chip i{ font-style:normal; }
+/* ---------- v1.5.1: stats colors / toast wrap ---------- */
 .cat-in{ color:#3d8b4f; }
 .cat-out{ color:#c9554a; }
 .toast-root .toast, .toast{ max-width:min(560px, 88vw); white-space:normal; line-height:1.5; text-align:left; }

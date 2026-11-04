@@ -190,33 +190,26 @@
       return (b.income - b.expense) - (a.income - a.expense);
     })[0];
 
-    const cat = {};
-    function put(k, inc, exp) {
-      cat[k] = cat[k] || { inc: 0, exp: 0 };
-      cat[k].inc += inc; cat[k].exp += exp;
-    }
-    function catOf(label) {
-      if (/委托/.test(label)) return '委托';
-      if (/卖鱼|水产|卖蚯蚓/.test(label)) return '渔获';
-      if (/卖仓库|卖 /.test(label)) return '作物';
-      if (/零工/.test(label)) return '打工';
-      if (/伙食/.test(label)) return '伙食';
-      if (/税/.test(label)) return '税金';
-      if (/维护/.test(label)) return '维护';
-      if (/买/.test(label)) return '采购';
-      return '其他';
-    }
-    days.forEach(function (d) {
-      d.items.forEach(function (it) { put(catOf(it.label), it.income || 0, it.expense || 0); });
-    });
-    const catHtml = '<div class="stat-cats">' + Object.keys(cat).map(function (k) {
-      const c = cat[k];
-      const net2 = c.inc - c.exp;
-      return '<span class="cat-chip"><b>' + k + '</b>' +
-        (c.inc ? '<i class="cat-in">+' + c.inc + '</i>' : '') +
-        (c.exp ? '<i class="cat-out">-' + c.exp + '</i>' : '') +
-        '</span>';
-    }).join('') + '</div>';
+    /* 收益构成：按活动 / 类别拆分（和账本共用一套分类） */
+    const byCat = G.ledgerByCategory(state, 30);
+    const catNet = byCat.income - byCat.expense;
+    const maxAbs = Math.max(1, byCat.list.reduce(function (m, c) { return Math.max(m, Math.abs(c.total)); }, 0));
+    const catBars = byCat.list.map(function (c) {
+      const v = Math.abs(c.total);
+      return '<div class="stat-bar">' +
+        '<span class="sb-n">' + c.name + '</span>' +
+        '<span class="sb-t"><i class="' + (c.total > 0 ? 'in' : 'out') + '" style="width:' +
+          Math.max(2, Math.round(v / maxAbs * 100)) + '%"></i></span>' +
+        '<b class="' + (c.total > 0 ? 'up' : 'down') + '">' + (c.total > 0 ? '+' : '−') + v + '</b>' +
+      '</div>';
+    }).join('');
+    const catHtml = '<div class="stat-sec"><h4>📊 收入 / 支出构成</h4>' +
+      '<div class="stat-sum">收入 <b class="up">+' + byCat.income + '</b> · 支出 <b class="down">−' +
+        byCat.expense + '</b> · 净 <b class="' + (catNet >= 0 ? 'up' : 'down') + '">' +
+        (catNet >= 0 ? '+' : '−') + Math.abs(catNet) + '</b></div>' +
+      (catBars || '<div class="store-empty">最近 30 天还没有账目</div>') +
+      '<div class="stat-tip">按账本标签归类：卖种子 / 卖肥料 / 回收 / 开箱并入「开箱 · 回收」。</div>' +
+    '</div>';
     openModal('📈 收益统计',
       '<div class="stat-kpis">' +
         '<div class="stat-kpi"><span>收入</span><b class="cat-in">+' + inc + '</b><small>日均 +' + avgIncome + '</small></div>' +

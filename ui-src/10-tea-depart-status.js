@@ -230,29 +230,8 @@
       })()]
     ];
 
-    /* 近 30 天收益构成：按账本类别归类，条形按最大项归一 */
-    const inc = G.ledgerByCategory(state, 30);
-    const net = inc.income - inc.expense;
-    const maxAbs = Math.max(1, inc.list.reduce(function (m, c) { return Math.max(m, Math.abs(c.total)); }, 0));
-    const bars = inc.list.map(function (c) {
-      const v = Math.abs(c.total);
-      return '<div class="stat-bar">' +
-        '<span class="sb-n">' + c.name + '</span>' +
-        '<span class="sb-t"><i class="' + (c.total > 0 ? 'in' : 'out') + '" style="width:' +
-          Math.max(2, Math.round(v / maxAbs * 100)) + '%"></i></span>' +
-        '<b class="' + (c.total > 0 ? 'up' : 'down') + '">' + (c.total > 0 ? '+' : '−') + v + '</b>' +
-      '</div>';
-    }).join('');
-    const incomeBlock = '<div class="stat-sec"><h4>📊 近 30 天收益</h4>' +
-      '<div class="stat-sum">收入 <b class="up">+' + inc.income + '</b> · 支出 <b class="down">−' +
-        inc.expense + '</b> · 净 <b class="' + (net >= 0 ? 'up' : 'down') + '">' +
-        (net >= 0 ? '+' : '−') + Math.abs(net) + '</b></div>' +
-      (bars || '<div class="store-empty">最近 30 天还没有账目</div>') +
-      '<div class="stat-tip">按账本标签归类：卖种子 / 卖肥料 / 回收 / 开箱并入「开箱 · 回收」。</div>' +
-    '</div>';
-
     openModal('📊 当前状态',
-      sec('🌱 农场与进度', progress) + sec('💰 资产与开销', assets) + incomeBlock +
+      sec('🌱 农场与进度', progress) + sec('💰 资产与开销', assets) +
       sec('📈 等级', levels) + sec('🏆 累计', totals),
       '<button class="btn" data-close>关闭</button>');
   }

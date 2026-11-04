@@ -350,6 +350,8 @@ ok(html('#modal-root').indexOf('日均') >= 0 && html('#modal-root').indexOf('�
    '统计图显示近期日均指标和收支趋势标题');
 ok(html('#modal-root').indexOf('每日收入和支出柱状图') >= 0,
    '统计趋势图带有辅助技术可读的说明');
+ok(html('#modal-root').indexOf('收入 / 支出构成') >= 0 && html('#modal-root').indexOf('stat-bar') >= 0,
+   '统计弹窗含按活动的收益构成');
 
 console.log('\n== 成就 ==');
 document.querySelector('#btn-ach').fire('click', { target: {} });
@@ -522,7 +524,7 @@ ok(stHtml.indexOf('采集记录') >= 0, '状态面板新增采集记录');
 ok(stHtml.indexOf('挖蚯蚓等级') >= 0 && stHtml.indexOf('采集等级') >= 0, '状态面板列出两条新等级');
 ok(stHtml.indexOf('交易等级') >= 0, '状态面板列出交易等级');
 ok(stHtml.indexOf('果园累计') >= 0 && stHtml.indexOf('水果图鉴') >= 0, '状态面板列出果园累计');
-ok(stHtml.indexOf('近 30 天收益') >= 0 && stHtml.indexOf('stat-sec') >= 0, '状态面板分区块 + 收益构成');
+ok(stHtml.indexOf('农场与进度') >= 0 && stHtml.indexOf('资产与开销') >= 0, '状态面板分区块展示');
 ok(stHtml.indexOf('其中自动播种器') < 0, '维护费不再带「其中自动播种器」');
 ok(text('#trade-lv').indexOf('Lv') >= 0, '商店面板显示交易等级', text('#trade-lv'));
 
