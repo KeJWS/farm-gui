@@ -340,6 +340,12 @@
     const frozen = G.isWinter(state.day);
     const FISH_E = G.BALANCE.energy.fish;
     const BATCH = G.BALANCE.fishBatch;
+    const canCast = frozen ? 0 : Math.floor(state.energy / FISH_E);
+    const meta = $('#fish-meta');
+    if (meta) {
+      meta.textContent = frozen ? '❄️ 河面结冰'
+        : (canCast ? '还能甩 ' + canCast + ' 杆' : '体力不够，先睡觉');
+    }
     const ff = $('#fish-forecast');
     if (ff) {
       if (frozen) {
@@ -370,7 +376,9 @@
     const castCost = $('#cast-cost');
     if (castCost) castCost.textContent = FISH_E + ' 体力';
     const castAllBtn = $('[data-act="castAll"]');
-    if (castAllBtn) { castAllBtn.disabled = frozen; castAllBtn.title = frozen ? '河面结冰' : ''; }
+    if (castAllBtn) { castAllBtn.disabled = frozen || canCast < 1; castAllBtn.title = frozen ? '河面结冰' : ''; }
+    const castAllN = $('#castall-n');
+    if (castAllN) castAllN.textContent = frozen ? '' : (canCast ? canCast + ' 杆' : '体力不够');
   }
 
   /* 最近渔获：单杆/连甩都按条列出来，保留最近 5 条 */

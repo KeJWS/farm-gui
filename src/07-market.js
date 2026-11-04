@@ -140,10 +140,11 @@
     return arr;
   }
 
-  /* 每天睡醒记一次市价，攒出曲线 */
+  /* 每天睡醒记一次市价，攒出曲线（水果和作物同属仓库货，一起记） */
   function snapshotMarket(s) {
     CROP_LIST.forEach(function (c) { pushMarketHist(s, c.id, marketMul(s, c.id)); });
     WILD_LIST.forEach(function (c) { pushMarketHist(s, c.id, marketMul(s, c.id)); });
+    FRUIT_LIST.forEach(function (c) { pushMarketHist(s, c.id, marketMul(s, c.id)); });
     FISH.forEach(function (f) {
       if (f.trash || f.chest) return;
       pushMarketHist(s, 'f:' + f.name, fishMarketMul(s, f.name));

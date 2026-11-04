@@ -74,7 +74,8 @@
         ' 天（浇够就不用再浇，两项都满足才成树）。每棵可单独浇水，浇水 ' + G.BALANCE.orchard.waterEnergy +
         ' 体力 / 收获 ' + G.BALANCE.orchard.harvestEnergy + ' 体力。<br>' +
         '成树<b>只在自己的季节</b>每天随机挂 <b>' + G.BALANCE.orchard.fruitMin + '~' +
-        G.BALANCE.orchard.fruitMax + ' 个</b>；水果固定<b>标准品质</b>，进仓库后和作物一样按市价卖（也能进收购箱）。</p>' +
+        G.BALANCE.orchard.fruitMax + ' 个</b>；水果固定<b>标准品质</b>，进仓库后和作物一样吃<b>市价</b>（当季 ×1、囤到反季 ×' +
+        G.BALANCE.market.offSeason + '），可以卖给农产品店、放进收购箱，市场「行情 / 分析」里也有单独一栏。</p>' +
         '<table class="rule-table"><tr><th>果树</th><th>结果季</th><th>果实</th><th>果价</th><th>种子</th><th>树苗</th></tr>' +
         G.TREE_LIST.map(function (t) {
           return '<tr><td>' + t.emoji + ' ' + t.name + '</td><td>' + G.SEASONS[t.season] + '</td><td>' +
@@ -96,7 +97,7 @@
         Math.round(G.BALANCE.hook.dough * 100) + '%、蚯蚓 ' + Math.round(G.BALANCE.hook.worm * 100) +
         '%、假饵 ' + Math.round(G.BALANCE.hook.lure * 100) + '%，晴天 ' +
         Math.round(G.BALANCE.weatherHook.sunny * 100) + '%、雨天 +' +
-        Math.round(G.BALANCE.weatherHook.rain * 100) + '%。河面上方会实时显示当前<b>咬钩率与每杆期望</b>（毛收益 − 饵成本）。<br>' +
+        Math.round(G.BALANCE.weatherHook.rain * 100) + '%。河边左边一排小胶囊会实时显示当前<b>咬钩率 / 好鱼倍率 / 双咬钩 / 每杆净收益</b>（毛收益 − 饵成本），右边「小队」栏管渔网和渔夫。<br>' +
         '🐟 <b>鱼汛</b>：每种鱼只在特定季节成群——汛期上钩权重 ×' + G.BALANCE.fishSeason.in +
         '，非汛期 ×' + G.BALANCE.fishSeason.off + '。' +
         '鲫鱼 春·秋 / 鲤鱼 春夏秋 / 鳜鱼 春·夏 / 鲈鱼 夏·秋 / 河豚 秋 / 锦鲤 春。<br>' +
@@ -174,6 +175,8 @@
         G.BALANCE.market.cropStep + '，最低 ×' + G.BALANCE.market.supplyMin + '（过剩）；隔天回落 ' +
         Math.round((1 - G.BALANCE.market.decay) * 100) + '%<br>' +
         '· <b>季节</b>：<b>反季 ×' + G.BALANCE.market.offSeason + '</b>（过季稀缺、卖得贵），<b>当季 ×1.00</b><br>' +
+        '· <b>水果</b>：桃 / 芒果 / 苹果按<b>自己那一季</b>算当季，囤到别的季节同样 ×' +
+        G.BALANCE.market.offSeason + '；它们也有独立的供需与价格历史<br>' +
         '· 两相乘就是最终系数，界面上直接显示「市价 ×' +
         (G.BALANCE.market.supplyMax * G.BALANCE.market.offSeason).toFixed(2) + ' · 反季 · 稀缺」<br>' +
         '· <b>批量按批次中点定价</b>：一次卖 30 件和分三次卖 10 件到手一样多 —— 想卖高价靠<b>换着品种卖 / 囤到反季</b>，' +

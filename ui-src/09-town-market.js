@@ -64,20 +64,22 @@
       if (hr.toGlut > 0) return '再卖 <b>' + hr.toGlut + '</b> ' + unit + '掉到「过剩」';
       return '再卖 <b>' + hr.toFloor + '</b> ' + unit + '到底价';
     };
-    const cropRow = function (c, wild) {
+    const cropRow = function (c, wild, fruit) {
       const mk = G.marketInfo(state, c.id);
       const hr = G.marketHeadroom(state, c.id);
       return '<div class="store-row">' +
         '<span class="se">' + c.emoji + '</span>' +
         '<div><div class="sn">' + c.name +
           (mk.inSeason ? ' <b class="own">当季 ×1</b>' : ' <b class="lock">反季 ×' + mk.season + '</b>') +
-          (wild ? ' <b class="own">采集</b>' : '') + '</div>' +
+          (wild ? ' <b class="own">采集</b>' : '') +
+          (fruit ? ' <b class="own">果园</b>' : '') + '</div>' +
         '<div class="sv">供需 ×' + mk.supply.toFixed(2) + ' · ' + mk.tag +
           ' · ' + headroomText(hr, '件') + '</div></div>' +
         '<span class="sp">×' + mk.total.toFixed(2) + '</span>' +
       '</div>';
     };
     const cropRows = G.CROP_LIST.map(function (c) { return cropRow(c, false); }).join('');
+    const fruitRows = G.FRUIT_LIST.map(function (c) { return cropRow(c, false, true); }).join('');
     const wildRows = G.WILD_LIST.map(function (c) { return cropRow(c, true); }).join('');
 
     const fishRows = G.FISH.filter(function (f) { return !f.trash && !f.chest; }).map(function (f) {
@@ -98,11 +100,13 @@
       '<div class="shop-head">现在是 <b>' + season + '季</b> · 售出会压低供需，睡觉后回落 ' +
         Math.round((1 - G.BALANCE.market.decay) * 100) + '%</div>' +
       '<div class="store-sub">🌱 作物 · 当季 ×1 / 反季 ×' + OFF + '</div>' + cropRows +
+      '<div class="store-sub" style="margin-top:10px">🍑 水果 · 果园当季采摘 · 当季 ×1 / 反季 ×' + OFF + '</div>' + fruitRows +
       '<div class="store-sub" style="margin-top:10px">🌿 野货 · 采集获得</div>' + wildRows +
       '<div class="store-sub" style="margin-top:10px">🐟 水产 · 汛期 ×1 / 非汛期 ×' + OFF + '</div>' + fishRows +
       '<div class="shop-tip">右侧是当前市价系数；每行显示供需状态和距离下个价格档位的销量。' +
       '一批货按<b>批次中点</b>定价 —— 一次卖 30 件和分三次卖 10 件到手一样多；' +
       '收购箱<b>按入箱时市价锁价</b>、扣 ' + Math.round(G.BALANCE.market.boxFee * 100) + '%。' +
+      '水果和作物一样吃市价：当季 ×1，囤到反季 ×' + OFF + '（每种水果只在自己那季结果）。' +
       '成本、利润、走势与下季估值见「分析」。</div>',
       '<button class="btn" data-close>关闭</button>');
   }
@@ -155,7 +159,7 @@
 
     /* 当前背包卖给商店的到手金额，与囤到下季开季的估算对比。 */
     const holdings = [];
-    G.CROP_LIST.concat(G.WILD_LIST).forEach(function (c) {
+    G.CROP_LIST.concat(G.WILD_LIST, G.FRUIT_LIST).forEach(function (c) {
       const qty = G.storeCount(state, c.id);
       if (!qty) return;
       const mk = G.marketInfo(state, c.id);
@@ -166,7 +170,7 @@
         now: G.cropNetEstimate(state, c.id),
         next: Math.max(1, Math.round(raw * G.sellBonus(state) * nextMk.total *
           (1 - G.BALANCE.market.boxFee))),
-        cost: c.wild ? null : G.cropBuyPrice(c.id, state) * qty
+        cost: (c.wild || c.fruit) ? null : G.cropBuyPrice(c.id, state) * qty
       });
     });
     G.fishGroups(state, 'fish').forEach(function (g) {
@@ -209,7 +213,8 @@
         (1 - G.BALANCE.market.boxFee)));
       const unit = isFish ? '条' : '个';
       const buyCost = isFish ? G.fishBuyPrice(item.id, state)
-        : (item.wild ? null : G.cropBuyPrice(item.id, state));
+        : ((item.wild || item.fruit) ? null : G.cropBuyPrice(item.id, state));
+      const costNote = isFish ? '水产店进价' : (item.fruit ? '果园自产 · 育苗成本未计' : '采集现金成本未计');
       const oneSale = Math.max(1, Math.round(base * G.sellBonus(state) * mk.total *
         (1 - G.BALANCE.market.boxFee)));
       const unitMargin = buyCost == null ? null : oneSale - buyCost;
@@ -231,7 +236,7 @@
           '<div class="sv">销量 ' + mk.sold.toFixed(0) + ' ' + unit + ' · 供需 ×' +
             mk.supply.toFixed(2) + ' · 季节 ×' + mk.season.toFixed(2) + ' · ' + head + '</div>' +
           '<div class="sv">' + (buyCost == null
-            ? '单件收购箱到手 ' + oneSale + ' 金 · 采集现金成本未计'
+            ? '单件收购箱到手 ' + oneSale + ' 金 · ' + costNote
             : '单件参考进价 ' + buyCost + ' 金 · 收购箱到手 ' + oneSale + ' 金 · 毛差 <b class="' +
               (unitMargin > 0 ? 'market-up' : (unitMargin < 0 ? 'market-down' : '')) + '">' +
               (unitMargin > 0 ? '+' : '') + unitMargin + ' 金</b>') + '</div>' +
@@ -244,6 +249,7 @@
     }
 
     const cropRows = G.CROP_LIST.map(function (c) { return row(c.id, c, false); }).join('');
+    const fruitRows = G.FRUIT_LIST.map(function (c) { return row(c.id, c, false); }).join('');
     const wildRows = G.WILD_LIST.map(function (c) { return row(c.id, c, false); }).join('');
     const fishRows = G.FISH.filter(function (f) { return !f.trash && !f.chest; })
       .map(function (f) { return row('f:' + f.name, f, true); }).join('');
@@ -272,11 +278,12 @@
         '</b> 天内最多 <b>' + days + '</b> 个价格点（存了 ' + tracked + ' 种货）</div>' +
       portfolio +
       '<div class="store-sub">🌱 作物</div>' + cropRows +
+      '<div class="store-sub" style="margin-top:10px">🍑 水果（果园）</div>' + fruitRows +
       '<div class="store-sub" style="margin-top:10px">🌿 野货（采集）</div>' + wildRows +
       '<div class="store-sub" style="margin-top:10px">🐟 水产</div>' + fishRows +
       '<div class="shop-tip">每行显示<b>标准品质市场基准价</b>、<b>单件商店进价 / 卖出价 / 毛差</b>、<b>销量 / 供需 / 季节</b>、<b>近期价格变化</b>和价格曲线，' +
         '右边那条线是最近 30 天的市价系数（纵轴固定 0.5~2.8，所以不同货能直接比）。<br>' +
-        '<b>成本口径：</b>单件买卖价按标准品质估算；持仓毛差使用当前商店进价作补货成本参考，不是历史实际成本；自产成本、野货采集体力未计。' +
+        '<b>成本口径：</b>单件买卖价按标准品质估算；持仓毛差使用当前商店进价作补货成本参考，不是历史实际成本；自产成本、水果育苗成本、野货采集体力未计。' +
         '<b>下季开市估算</b>按“等待期间不再卖货”计算，并逐日计入市场销量回落；未计入委托收益、税费和等待期间的经营成本。</div>',
       '<button class="btn" data-close>关闭</button>');
   }

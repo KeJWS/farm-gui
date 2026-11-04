@@ -70,18 +70,26 @@
       <div class="panel-head">
         <h2>🎣 河边</h2>
         <span class="lv-chip" id="fish-lv">🎣 Lv1</span>
+        <span class="fish-meta" id="fish-meta"></span>
       </div>
-      <div class="bait-row" id="bait-row"></div>
-      <div class="fish-forecast" id="fish-forecast"></div>
-      <div class="fish-row">
-        <button class="btn primary big" data-act="cast">🎣 甩一杆<small id="cast-cost"></small></button>
-        <button class="btn big" data-act="cast5">⚡ 连甩 <span id="cast5-n">5</span> 杆</button>
-        <button class="btn big" data-act="castAll">🌊 全部体力</button>
+      <div class="river">
+        <div class="river-main">
+          <div class="bait-row" id="bait-row"></div>
+          <div class="fish-forecast" id="fish-forecast"></div>
+          <div class="fish-row">
+            <button class="btn primary big" data-act="cast"><span class="fb">🎣 甩一杆</span><small id="cast-cost"></small></button>
+            <button class="btn big" data-act="cast5"><span class="fb">⚡ 连甩 <b id="cast5-n">5</b> 杆</span></button>
+            <button class="btn big" data-act="castAll"><span class="fb">🌊 全部体力</span><small id="castall-n"></small></button>
+          </div>
+          <div class="catch-area" id="catch-area">
+            <div class="catch-empty">今天还没开张，甩一杆试试 🌊</div>
+          </div>
+        </div>
+        <div class="river-side">
+          <div class="river-side-head">🧑‍🌾 小队<span>渔网 · 渔夫</span></div>
+          <div class="crew-row" id="crew-row"></div>
+        </div>
       </div>
-      <div class="catch-area" id="catch-area">
-        <div class="catch-empty">今天还没开张，甩一杆试试 🌊</div>
-      </div>
-      <div class="crew-row" id="crew-row"></div>
     </div>
 
     <div class="panel orchard">

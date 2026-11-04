@@ -317,16 +317,29 @@ button{ font-family:inherit; }
 
 .fish-meta{ margin-left:auto; font-size:11.5px; color:var(--ink-3); font-weight:600; }
 
-.bait-row{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+/* 河边：左边钓具（饵 / 预估 / 甩杆 / 渔获），右边小队（渔网 / 渔夫） */
+.river{ display:grid; grid-template-columns:minmax(0,1fr) 226px; gap:14px; align-items:start; }
+.river-main{ min-width:0; }
+.river-side{
+  min-width:0; display:flex; flex-direction:column; gap:7px;
+  padding-left:12px; border-left:1px dashed var(--line-2);
+}
+.river-side-head{ display:flex; align-items:baseline; gap:6px; font-size:11px; font-weight:800; color:var(--ink-2); }
+.river-side-head span{ font-size:10px; font-weight:700; color:var(--ink-3); }
+.river-side .crew-row{ grid-template-columns:1fr; margin-top:0; gap:7px; }
+.river-side .crew-card{ padding:8px 9px 7px; }
+
+/* 五种饵料：一行铺满，窄屏自动换行 */
+.bait-row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(102px, 1fr)); gap:7px; margin-bottom:9px; }
 .bait{
-  display:flex; align-items:center; gap:7px;
-  padding:6px 11px; border-radius:11px; cursor:pointer;
+  display:flex; align-items:center; gap:6px; min-width:0;
+  padding:6px 9px; border-radius:11px; cursor:pointer;
   background:var(--card); border:1px solid var(--line);
   font-size:12.5px; font-weight:700; color:var(--ink-2);
   transition:.14s;
 }
-.bait .bn{ color:var(--ink); }
-.bait .bc{ font-size:11px; color:var(--ink-3); font-weight:700; }
+.bait .bn{ color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bait .bc{ margin-left:auto; font-size:11px; color:var(--ink-3); font-weight:700; white-space:nowrap; }
 .bait:hover{ border-color:var(--line-2); transform:translateY(-1px); }
 .bait.sel{
   background:linear-gradient(180deg,#eaf7ec,#d7efdb);
@@ -335,12 +348,14 @@ button{ font-family:inherit; }
 }
 .bait.off{ opacity:.4; cursor:not-allowed; }
 
-/* 甩一杆 / 连甩 5 杆 / 全部体力：一行三个 */
-.fish-row{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:9px; }
-.fish-row .btn{ padding:11px 8px; }
-.fish-row .btn small{ font-size:9.5px; }
+/* 甩一杆 / 连甩 5 杆 / 全部体力：一行三个，主按钮略宽 */
+.fish-row{ display:grid; grid-template-columns:1.15fr 1fr 1fr; gap:9px; }
+.fish-row .btn{ padding:10px 8px; }
+.fish-row .fb{ white-space:nowrap; }
+.fish-row .fb b{ font-weight:900; }
+.fish-row .btn small{ font-size:9.5px; opacity:.85; }
 
-.catch-area{ margin-top:12px; min-height:94px; }
+.catch-area{ margin-top:10px; min-height:94px; }
 .catch-empty{
   display:grid; place-items:center; min-height:94px;
   border:1.5px dashed var(--line-2); border-radius:14px;
@@ -1047,14 +1062,30 @@ button{ color:inherit; font:inherit; }
 .profile-worth b{ font-size:20px; font-weight:900; color:var(--gold); }
 .profile-worth small{ font-size:10.5px; color:var(--ink-3); font-weight:700; }
 
-/* ---------- 河边：每杆预估 ---------- */
-.fish-forecast{ display:flex; flex-wrap:wrap; gap:3px 12px; margin:7px 0 2px;
+/* ---------- 河边：每杆预估（一排小胶囊） ---------- */
+.fish-forecast{ display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px;
   font-size:11.5px; font-weight:700; color:var(--ink-3); }
+.fish-forecast > span{
+  display:inline-flex; align-items:baseline; gap:4px; min-width:0;
+  padding:4px 9px; border-radius:9px; line-height:1.35;
+  background:var(--soft); border:1px solid var(--line);
+}
 .fish-forecast b{ color:var(--ink); font-weight:900; }
-.fish-forecast i{ font-style:normal; font-size:10.5px; margin-left:4px; color:var(--ink-3); }
+.fish-forecast i{ font-style:normal; font-size:10.5px; margin-left:2px; color:var(--ink-3); }
 .fish-forecast b.up, .fish-forecast i.up{ color:var(--green-d); }
 .fish-forecast b.down, .fish-forecast i.down{ color:var(--red); }
 .fish-forecast .ff-warn{ color:var(--blue); }
+
+/* 河边两栏的断点 */
+@media (max-width:1080px){
+  .river{ grid-template-columns:1fr; gap:10px; }
+  .river-side{ padding-left:0; border-left:0; border-top:1px dashed var(--line-2); padding-top:9px; }
+  .river-side .crew-row{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:720px){
+  .river-side .crew-row{ grid-template-columns:1fr; }
+  .bait-row{ grid-template-columns:repeat(auto-fit, minmax(96px, 1fr)); }
+}
 
 /* ---------- 行内小按钮组（仓库「全部」/ 渔具店买饵） ---------- */
 .store-row .spw{ margin-left:auto; display:flex; gap:5px; flex:none; }

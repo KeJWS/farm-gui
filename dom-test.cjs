@@ -225,6 +225,13 @@ ok(html('#crew-row').indexOf('不缴维护费') < 0, '河边不再写「不缴�
 /* 有鱼在网里时给「重新布置」按钮 */
 ok(html('#crew-row').indexOf('data-resetnets') >= 0 || html('#crew-row').indexOf('网都在水里') >= 0,
    '渔网卡有重布入口或「网都在水里」');
+/* 河边布局：左边钓具与渔获，右边小队 */
+ok(text('#fish-meta').indexOf('还能甩') >= 0 || text('#fish-meta').indexOf('体力不够') >= 0,
+   '河边标题行显示还能甩几杆', text('#fish-meta'));
+ok(/^\d+ 杆$/.test(text('#castall-n')) || text('#castall-n') === '体力不够',
+   '「全部体力」标出可甩杆数', text('#castall-n'));
+ok(/class="river-main"[\s\S]*id="catch-area"[\s\S]*class="river-side"[\s\S]*id="crew-row"/.test(indexSource),
+   '河边分成钓具 / 小队两栏');
 ok(html('#order-list').indexOf('报酬') >= 0 && html('#order-list').indexOf('交付') >= 0, '委托面板渲染出报酬与交付按钮');
 ok(html('#order-list').indexOf('含市价') >= 0, '委托面板标出市价溢价');
 ok(html('#order-list').indexOf('长期') >= 0, '委托面板显示长期订单');
@@ -295,6 +302,8 @@ ok(html('#modal-root').indexOf('再卖') >= 0 && html('#modal-root').indexOf('�
 ok(html('#modal-root').indexOf('买价') < 0, '简化行情页不重复显示商店成本');
 ok(html('#modal-root').indexOf('野货') >= 0 && html('#modal-root').indexOf('松茸') >= 0,
     '行情包含野货');
+ok(html('#modal-root').indexOf('🍑 水果') >= 0 && html('#modal-root').indexOf('果园当季采摘') >= 0,
+    '行情包含果园水果');
 ok(html('#modal-root').indexOf('最近卖出') < 0, '简化行情页不重复显示详细销量');
 
 console.log('\n== 收购箱 ==');
@@ -451,6 +460,8 @@ ok(html('#modal-root').indexOf('参考进货成本') >= 0 && html('#modal-root')
 ok(html('#modal-root').indexOf('单件参考进价') >= 0 && html('#modal-root').indexOf('单件卖出到手') >= 0 &&
    html('#modal-root').indexOf('毛差') >= 0, '分析行展示单件进价、卖价和毛差');
 ok(html('#modal-root').indexOf('不是历史实际成本') >= 0, '持仓毛差说明其补货参考成本口径');
+ok(html('#modal-root').indexOf('水果（果园）') >= 0 && html('#modal-root').indexOf('育苗成本未计') >= 0,
+   '分析页含水果，且不按补货进价算成本');
 ok((html('#modal-root').match(/<svg class="spark"/g) || []).length >= 20, '每种货都有一条价格曲线',
    (html('#modal-root').match(/<svg class="spark"/g) || []).length);
 (function multiPoint() {

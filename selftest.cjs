@@ -2681,5 +2681,46 @@ section('饵料调整与双咬钩');
   ok(rp.ok && p.bait.premium === premBefore - 1, '特级饵料钓一杆扣 1 份', p.bait.premium);
 }
 
+/* ---------- 18. v2.37 水果纳入市场 ---------- */
+section('水果纳入市场');
+{
+  const spring = G.createState();                 // 第 1 天 = 春季
+  const p1 = G.marketInfo(spring, 'fruit_peach');
+  ok(p1.inSeason && p1.season === 1, '春季桃按当季计价', p1.season);
+  ok(G.marketHeadroom(spring, 'fruit_peach').supply === G.BALANCE.market.supplyMax,
+    '水果有自己的供需档位', G.marketHeadroom(spring, 'fruit_peach').supply);
+
+  const summer = G.createState(); summer.day = 40;
+  const p2 = G.marketInfo(summer, 'fruit_peach');
+  ok(!p2.inSeason && Math.abs(p2.season - G.BALANCE.market.offSeason) < 1e-9,
+    '夏天桃转反季 ×1.7', p2.season);
+
+  function peachSell(day) {
+    const st = G.createState(); st.day = day;
+    G.addStore(st, 'fruit_peach', 'std', 1);
+    return G.shopSellValue(st, 'fruit_peach', 1);
+  }
+  ok(peachSell(40) > peachSell(1), '水果反季卖得更贵', [peachSell(1), peachSell(40)]);
+
+  const hist = G.createState(); hist.coins = 999;
+  G.sleep(hist); G.sleep(hist);
+  ok((hist.marketHist.fruit_mango || []).length === 3, '水果每天记一次价格历史',
+    (hist.marketHist.fruit_mango || []).length);
+
+  const bx = G.createState();
+  G.addStore(bx, 'fruit_apple', 'std', 4);
+  const put = G.boxPutCrop(bx, 'fruit_apple', 4);
+  ok(put.ok && put.n === 4 && put.v > 0 && G.storeCount(bx, 'fruit_apple') === 0,
+    '水果能放进收购箱并锁价', put);
+
+  const es = G.createState();
+  G.addStore(es, 'fruit_peach', 'std', 2);
+  ok(G.storeNetEstimate(es) === G.cropNetEstimate(es, 'fruit_peach', 2) &&
+    G.storeNetEstimate(es) > 0, '仓库估值把水果算进收购箱口径', G.storeNetEstimate(es));
+
+  ok(Math.abs(G.cropNextSeasonMul(spring, 'fruit_peach') - G.BALANCE.market.offSeason) < 1e-9,
+    '水果下季估值按反季算', G.cropNextSeasonMul(spring, 'fruit_peach'));
+}
+
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));
 process.exit(fail ? 1 : 0);
