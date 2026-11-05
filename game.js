@@ -702,8 +702,8 @@
     /* 伙食费：base + (上限 − from) / perEnergy，最低 min；没钱吃饭只回 pct（至少 noMoneyMin）
      * skipLunchMul：厨房解锁后，当天没吃午饭，睡觉伙食费 ×1.5 */
     meal: { base: 3, perEnergy: 5, from: 10, min: 1, noMoneyPct: 0.3, noMoneyMin: 5, skipLunchMul: 1.5 },
-    /* 厨房：种田 + 钓鱼等级双门槛；烹饪等级单独一条线 */
-    cook: { unlockFarm: 4, unlockFish: 3, energy: 1, xp: 2, xpBase: 12, xpStep: 8,
+    /* 厨房：种田 + 钓鱼等级双门槛；烹饪等级单独一条线；每道菜的体力写在食谱里 */
+    cook: { unlockFarm: 3, unlockFish: 2, xp: 2, xpBase: 12, xpStep: 8,
             failBase: 0.25, failStep: 0.025, failMin: 0.02,
             /* 达到这些等级，品质多取一次（Lv4 / Lv8） */
             qualityAt: [4, 8] },
@@ -1095,6 +1095,18 @@
       val: cropValueTotal, reward: { coins: 300 }, pts: 3 },
     { id: 'net9',      cat: 'fish', emoji: '🕸️', name: '网罗天下',   desc: '渔网放满 9 张',        goal: 9,
       val: function (s) { return s.nets || 0; }, reward: { coins: 200 }, pts: 3 },
+
+    /* v2.44 追加：厨房 / 烹饪 / 午饭 */
+    { id: 'cook1',     cat: 'biz',  emoji: '🍳', name: '开火',       desc: '做 1 道菜',            goal: 1,
+      val: function (s) { return s.stats.cooks || 0; }, reward: { coins: 40 }, pts: 1 },
+    { id: 'cook20',    cat: 'biz',  emoji: '🥘', name: '家常便饭',   desc: '累计做 20 道菜',       goal: 20,
+      val: function (s) { return s.stats.cooks || 0; }, reward: { coins: 150, ferts: { normal: 2 } }, pts: 3 },
+    { id: 'cookLv5',   cat: 'biz',  emoji: '👨‍🍳', name: '掌勺',       desc: '烹饪等级到 Lv5',       goal: 5,
+      val: function (s) { return (s.levels && s.levels.cook) || 1; }, reward: { coins: 300 }, pts: 3 },
+    { id: 'cookLv10',  cat: 'biz',  emoji: '🌟', name: '米其林',     desc: '烹饪等级满级',         goal: 10,
+      val: function (s) { return (s.levels && s.levels.cook) || 1; }, reward: { coins: 800, ferts: { special: 3 } }, pts: 5 },
+    { id: 'meal30',    cat: 'biz',  emoji: '🍽️', name: '好好吃饭',   desc: '累计吃 30 次午饭',     goal: 30,
+      val: function (s) { return s.stats.meals || 0; }, reward: { coins: 200 }, pts: 2 },
 
     /* v1.9 追加：挖蚯蚓 / 打零工 */
     { id: 'dig50',     cat: 'fish', emoji: '🪱', name: '蚯蚓猎手',   desc: '累计挖蚯蚓 50 次',     goal: 50,
@@ -1551,7 +1563,7 @@
       orchard: { unlocked: false, slots: [] },
       treeStock: {},
       townDonated: 0,
-      codex: { fish: {}, crops: {} },
+      codex: { fish: {}, crops: {}, food: {} },
       codexClaim: {},
       manualRefreshUsed: false,
       workUsed: false,
@@ -3116,7 +3128,7 @@
       } else if (e.kind === 'food') {
         for (let i = 0; i < cut; i++) {
           s.food = s.food || [];
-          s.food.push({ rid: e.rid || 'food', name: e.name, emoji: e.emoji, q: e.q || 'std',
+          s.food.push({ rid: e.rid || 'food', name: e.name, emoji: e.emoji, q: e.q || null,
                         energy: e.energy || 0, price: p.unit || 1, day: s.day,
                         expire: e.expire || (s.day + 1) });
         }
@@ -4907,14 +4919,14 @@
     }) : [];
     /* 厨房：熟食（过期的不留） + 今天有没有吃午饭 */
     merged.food = Array.isArray(s.food) ? s.food.slice(0, 200).filter(function (f) {
-      return f && (f.rid === 'fail' || recipeById(f.rid)) && Q_IDS.indexOf(f.q) >= 0;
+      return f && (f.rid === 'fail' ? true : (recipeById(f.rid) && Q_IDS.indexOf(f.q) >= 0));
     }).map(function (f) {
       const r = f.rid === 'fail' ? null : recipeById(f.rid);
       return {
         rid: f.rid,
         name: plain(f.name || (r && r.name), 20),
         emoji: plain(f.emoji || (r && r.emoji), 4),
-        q: f.q,
+        q: f.rid === 'fail' ? null : f.q,
         energy: Math.round(num(f.energy, 0, 0, 999)),
         price: Math.round(num(f.price, 1, 0, 99999)),
         day: Math.round(num(f.day, merged.day, 1, 100000)),
@@ -5046,8 +5058,14 @@
     if (merged.fisher && merged.fisher.lv >= BALANCE.fisher.max) merged.fisher.xp = 0;
     merged.codex = {
       fish: (s.codex && s.codex.fish && typeof s.codex.fish === 'object') ? s.codex.fish : {},
-      crops: (s.codex && s.codex.crops && typeof s.codex.crops === 'object') ? s.codex.crops : {}
+      crops: (s.codex && s.codex.crops && typeof s.codex.crops === 'object') ? s.codex.crops : {},
+      food: (s.codex && s.codex.food && typeof s.codex.food === 'object') ? s.codex.food : {}
     };
+    Object.keys(merged.codex.food).forEach(function (k) {
+      if (!recipeById(k)) { delete merged.codex.food[k]; return; }
+      const c = merged.codex.food[k] || {};
+      merged.codex.food[k] = { n: c.n || 0, best: c.best || null, first: c.first || null, value: c.value || 0 };
+    });
     Object.keys(merged.codex.fish).forEach(function (k) {
       const c = merged.codex.fish[k] || {};
       merged.codex.fish[k] = { n: c.n || 0, best: c.best || null, first: c.first || null,
@@ -5290,24 +5308,24 @@
  * 由 build-modules.cjs 按文件名顺序拼进 game.js（共享同一个 IIFE 作用域），不要单独加载。
  */
 
-  /* 食谱：lv = 烹饪等级门槛；days = 保质期；energy = 基础回复；price = 基础卖价
+  /* 食谱：lv = 烹饪等级门槛；energy = 做这道菜要花的体力；days = 保质期；restore = 基础回复；price = 基础卖价
    * cost.crops 里的 id 可以是作物 / 野货 / 水果（都在 CROPS 表和仓库里） */
   const RECIPES = [
-    { id: 'soup', name: '蔬菜汤', emoji: '🥣', lv: 1, energy: 8, days: 3, price: 46,
+    { id: 'soup', name: '蔬菜汤', emoji: '🥣', lv: 1, energy: 1, restore: 8, days: 3, price: 46,
       cost: { crops: { carrot: 2, cabbage: 1 } }, desc: '萝卜炖白菜，暖胃' },
-    { id: 'grill', name: '香烤鱼', emoji: '🍢', lv: 1, energy: 10, days: 2, price: 58,
+    { id: 'grill', name: '香烤鱼', emoji: '🍢', lv: 1, energy: 1, restore: 10, days: 2, price: 58,
       cost: { fish: 1 }, desc: '现钓现烤，撒点盐' },
-    { id: 'jam', name: '野莓酱', emoji: '🍯', lv: 2, energy: 9, days: 4, price: 62,
+    { id: 'jam', name: '野莓酱', emoji: '🍯', lv: 2, energy: 1, restore: 9, days: 4, price: 62,
       cost: { crops: { berry: 3 } }, desc: '抹面包能吃一星期' },
-    { id: 'stew', name: '蘑菇炖菜', emoji: '🍲', lv: 3, energy: 16, days: 3, price: 96,
+    { id: 'stew', name: '蘑菇炖菜', emoji: '🍲', lv: 3, energy: 2, restore: 16, days: 3, price: 96,
       cost: { crops: { mushroom: 1, potato: 2 } }, desc: '松茸配土豆，鲜掉眉毛' },
-    { id: 'salad', name: '水果沙拉', emoji: '🥗', lv: 4, energy: 14, days: 2, price: 108,
+    { id: 'salad', name: '水果沙拉', emoji: '🥗', lv: 4, energy: 2, restore: 14, days: 2, price: 108,
       cost: { crops: { fruit_peach: 1, berry: 2 } }, desc: '桃子野莓拌一拌' },
-    { id: 'pie', name: '南瓜派', emoji: '🥧', lv: 6, energy: 24, days: 4, price: 188,
+    { id: 'pie', name: '南瓜派', emoji: '🥧', lv: 6, energy: 2, restore: 24, days: 4, price: 188,
       cost: { crops: { pumpkin: 1, corn: 2 } }, desc: '烤得金黄，切八块' },
-    { id: 'sashimi', name: '鱼生拼盘', emoji: '🍣', lv: 7, energy: 28, days: 1, price: 232,
+    { id: 'sashimi', name: '鱼生拼盘', emoji: '🍣', lv: 7, energy: 2, restore: 28, days: 1, price: 232,
       cost: { fish: 2, crops: { carrot: 1 } }, desc: '刀工比食材更值钱' },
-    { id: 'feast', name: '农家盛宴', emoji: '🍱', lv: 9, energy: 45, days: 3, price: 520,
+    { id: 'feast', name: '农家盛宴', emoji: '🍱', lv: 9, energy: 3, restore: 45, days: 3, price: 520,
       cost: { fish: 2, crops: { watermelon: 1, pumpkin: 1, mushroom: 1 } }, desc: '一桌硬菜' }
   ];
 
@@ -5355,35 +5373,43 @@
     if (!kitchenUnlocked(s)) return { ok: false, msg: '厨房还没解锁（种田 Lv' +
       BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' + BALANCE.cook.unlockFish + '）' };
     if (cookLv(s) < r.lv) return { ok: false, msg: '烹饪 Lv' + r.lv + ' 才解锁' };
-    if (s.energy < BALANCE.cook.energy) {
-      return { ok: false, msg: '体力不够（做菜要 ' + BALANCE.cook.energy + ' 点）' };
+    const cost = r.energy;
+    if (s.energy < cost) {
+      return { ok: false, msg: '体力不够（做这道菜要 ' + cost + ' 点）' };
     }
     if (!cookHave(s, r)) return { ok: false, msg: '食材不够：' + ingredientText(r) };
 
     const crops = r.cost.crops || {};
     Object.keys(crops).forEach(function (id) { takeStore(s, id, crops[id]); });
     if (r.cost.fish) takeCookFish(s, r.cost.fish);
-    s.energy -= BALANCE.cook.energy;
+    s.energy -= cost;
     s.stats.cooks = (s.stats.cooks || 0) + 1;
     if (!Array.isArray(s.food)) s.food = [];
 
     const fail = rand() < cookFail(s);
     const up = addLevelXp(s, 'cook', BALANCE.cook.xp);
     if (fail) {
-      const f = { rid: 'fail', name: '焦糊料理', emoji: '🫕', q: 'bad', energy: 0, price: 1,
+      const f = { rid: 'fail', name: '焦糊料理', emoji: '🫕', q: null, energy: 0, price: 1,
                   day: s.day, expire: s.day + 1 };
       s.food.push(f);
-      log(s, '🔥 做菜失手：' + r.name + ' 变成了焦糊料理（-' + BALANCE.cook.energy + ' 体力）', 'warn');
-      return { ok: true, fail: true, food: f, levelUp: up, cost: BALANCE.cook.energy };
+      log(s, '🔥 做菜失手：' + r.name + ' 变成了焦糊料理（-' + cost + ' 体力）', 'warn');
+      return { ok: true, fail: true, food: f, levelUp: up, cost: cost };
     }
     const q = rollQuality(cookRolls(s));
     const f = { rid: r.id, name: r.name, emoji: r.emoji, q: q.id,
-                energy: Math.round(r.energy * q.mul), price: Math.round(r.price * q.mul),
+                energy: Math.round(r.restore * q.mul), price: Math.round(r.price * q.mul),
                 day: s.day, expire: s.day + r.days };
     s.food.push(f);
+    /* 图鉴：记录做过的菜（次数 / 最好品质 / 首次 / 累计价值） */
+    s.codex = s.codex || {};
+    s.codex.food = s.codex.food || {};
+    const ce = s.codex.food[r.id] || (s.codex.food[r.id] = { n: 0, best: null, first: s.day, value: 0 });
+    ce.n++;
+    ce.value += f.price;
+    if (!ce.best || QUALITY.indexOf(q) > QUALITY.indexOf(qualityById(ce.best))) ce.best = q.id;
     log(s, '🍳 做好 ' + f.emoji + ' ' + f.name + '（' + q.name + ' · +' + f.energy + ' 体力 · 保质 ' +
       r.days + ' 天）' + (up ? ' · 烹饪 Lv' + cookLv(s) : ''), 'good');
-    return { ok: true, fail: false, food: f, q: q.id, levelUp: up, cost: BALANCE.cook.energy };
+    return { ok: true, fail: false, food: f, q: q.id, levelUp: up, cost: cost };
   }
 
   /* 吃午饭：每天一次，回复美食体力；吃过的当天不再算「没吃午饭」 */

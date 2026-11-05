@@ -130,7 +130,7 @@
       } else if (e.kind === 'food') {
         for (let i = 0; i < cut; i++) {
           s.food = s.food || [];
-          s.food.push({ rid: e.rid || 'food', name: e.name, emoji: e.emoji, q: e.q || 'std',
+          s.food.push({ rid: e.rid || 'food', name: e.name, emoji: e.emoji, q: e.q || null,
                         energy: e.energy || 0, price: p.unit || 1, day: s.day,
                         expire: e.expire || (s.day + 1) });
         }

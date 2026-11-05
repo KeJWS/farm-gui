@@ -277,14 +277,14 @@
     }) : [];
     /* 厨房：熟食（过期的不留） + 今天有没有吃午饭 */
     merged.food = Array.isArray(s.food) ? s.food.slice(0, 200).filter(function (f) {
-      return f && (f.rid === 'fail' || recipeById(f.rid)) && Q_IDS.indexOf(f.q) >= 0;
+      return f && (f.rid === 'fail' ? true : (recipeById(f.rid) && Q_IDS.indexOf(f.q) >= 0));
     }).map(function (f) {
       const r = f.rid === 'fail' ? null : recipeById(f.rid);
       return {
         rid: f.rid,
         name: plain(f.name || (r && r.name), 20),
         emoji: plain(f.emoji || (r && r.emoji), 4),
-        q: f.q,
+        q: f.rid === 'fail' ? null : f.q,
         energy: Math.round(num(f.energy, 0, 0, 999)),
         price: Math.round(num(f.price, 1, 0, 99999)),
         day: Math.round(num(f.day, merged.day, 1, 100000)),
@@ -416,8 +416,14 @@
     if (merged.fisher && merged.fisher.lv >= BALANCE.fisher.max) merged.fisher.xp = 0;
     merged.codex = {
       fish: (s.codex && s.codex.fish && typeof s.codex.fish === 'object') ? s.codex.fish : {},
-      crops: (s.codex && s.codex.crops && typeof s.codex.crops === 'object') ? s.codex.crops : {}
+      crops: (s.codex && s.codex.crops && typeof s.codex.crops === 'object') ? s.codex.crops : {},
+      food: (s.codex && s.codex.food && typeof s.codex.food === 'object') ? s.codex.food : {}
     };
+    Object.keys(merged.codex.food).forEach(function (k) {
+      if (!recipeById(k)) { delete merged.codex.food[k]; return; }
+      const c = merged.codex.food[k] || {};
+      merged.codex.food[k] = { n: c.n || 0, best: c.best || null, first: c.first || null, value: c.value || 0 };
+    });
     Object.keys(merged.codex.fish).forEach(function (k) {
       const c = merged.codex.fish[k] || {};
       merged.codex.fish[k] = { n: c.n || 0, best: c.best || null, first: c.first || null,

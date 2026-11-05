@@ -675,6 +675,8 @@ ok(codexHtml.indexOf('图鉴奖励') >= 0, '图鉴弹窗列出奖励档位');
 ok(codexHtml.indexOf('codex-rw') >= 0, '每个档位带进度条');
 ok(codexHtml.indexOf('鱼类') >= 0 && codexHtml.indexOf('作物') >= 0, '鱼 / 作物两类档位都在');
 ok(codexHtml.indexOf('水果') >= 0 && codexHtml.indexOf('桃') >= 0, '图鉴含果园水果');
+ok(codexHtml.indexOf('菜品') >= 0 && codexHtml.indexOf('蔬菜汤') >= 0, '图鉴含菜品');
+ok(codexHtml.indexOf('codex-card') >= 0 && codexHtml.indexOf('codex-sec') >= 0, '图鉴用卡片分组布局');
 
 /* ---------- 重绘后的焦点保持（v2.27） ---------- */
 console.log('\n== 焦点保持 ==');

@@ -451,7 +451,7 @@
             G.BALANCE.codex.fish.map(function (m) { return m.need; }).join(' / ') + ' 种，作物分 ' +
             G.BALANCE.codex.crops.map(function (m) { return m.need; }).join(' / ') + ' 种，每档只发一次（金币 / 饵料 / 肥料）。',
           '图鉴还会单独记录<b>野货</b>（' + G.WILD_LIST.map(function (w) { return w.name; }).join(' / ') +
-            '）和<b>水果</b>，这两类只做收集展示，不计入上面两档奖励。',
+            '）、<b>水果</b>和<b>菜品</b>，这几类只做收集展示，不计入上面两档奖励。',
           '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态；旧存档按现有进度补发。'
         ]) +
       '</div>' +
@@ -476,19 +476,20 @@
             G.BALANCE.cook.xpStep + '×(级−1)。',
           '<b>做砸概率</b>：Lv1 ' + Math.round(G.BALANCE.cook.failBase * 100) + '%，每级 −' +
             (G.BALANCE.cook.failStep * 100).toFixed(1) + '%，最低 ' + Math.round(G.BALANCE.cook.failMin * 100) +
-            '%；做砸得到一份<b>焦糊料理</b>（不能吃，只能进收购箱）。',
+            '%；做砸得到一份<b>焦糊料理</b>（没有品质、不能吃，只能进收购箱）。',
           '<b>品质判定</b>：Lv' + G.BALANCE.cook.qualityAt[0] + ' / Lv' + G.BALANCE.cook.qualityAt[1] +
             ' 各多取一次最好，和施肥一个道理。',
-          '每道菜消耗 <b>' + G.BALANCE.cook.energy + ' 体力</b>，食材不够 / 等级不够都做不了。'
+          '<b>体力按食谱算</b>：越简单的菜越省（1 点），硬菜要 2–3 点，食材不够 / 等级不够都做不了。'
         ])) +
-        '<table class="rule-table"><tr><th>菜</th><th>需 Lv</th><th>食材</th><th>体力</th><th>保质</th><th>卖价</th></tr>' +
+        '<table class="rule-table"><tr><th>菜</th><th>需 Lv</th><th>食材</th><th>耗体力</th><th>回复</th><th>保质</th><th>卖价</th></tr>' +
         G.cookRecipes().map(function (r) {
           return '<tr><td>' + r.emoji + ' ' + r.name + '</td><td>Lv' + r.lv + '</td><td>' +
-            G.ingredientText(r) + '</td><td>+' + r.energy + '</td><td>' + r.days + ' 天</td><td>' +
-            r.price + ' 金</td></tr>';
+            G.ingredientText(r) + '</td><td>' + r.energy + '</td><td>+' + r.restore + '</td><td>' +
+            r.days + ' 天</td><td>' + r.price + ' 金</td></tr>';
         }).join('') + '</table>' +
         guideSub('🍽️ 吃午饭', guideList([
           '<b>每天一次</b>，吃一份菜回复它的体力；菜也吃品质，品质越高回的体力越多。',
+          '<b>不能直接在仓库里吃</b>：要打开「吃午饭」（或厨房）再选一份。',
           '<b>不吃午饭</b>：当天睡觉的伙食费 <b>×' + G.BALANCE.meal.skipLunchMul +
             '</b>（厨房解锁后生效）。',
           '菜有保质期，睡过保质期那天会坏掉；临期的先吃。'

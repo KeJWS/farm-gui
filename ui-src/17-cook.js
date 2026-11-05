@@ -6,17 +6,18 @@
   function cookCard(r) {
     const locked = G.cookLv(state) < r.lv;
     const have = G.cookHave(state, r);
-    const canDo = !locked && have && state.energy >= G.BALANCE.cook.energy;
+    const canDo = !locked && have && state.energy >= r.energy;
     return '<div class="cook-card' + (locked ? ' locked' : '') + '">' +
       '<div class="cc-head"><span class="cc-e">' + r.emoji + '</span>' +
         '<b>' + esc(r.name) + '</b><span class="cc-lv">Lv' + r.lv + '</span></div>' +
       '<div class="cc-desc">' + esc(r.desc || '') + '</div>' +
       '<div class="cc-row">' + G.ingredientText(r) + '</div>' +
-      '<div class="cc-row">+' + r.energy + ' 体力 · 保质 ' + r.days + ' 天 · 约 ' + r.price + ' 金</div>' +
+      '<div class="cc-row">耗 ' + r.energy + ' 体力 · 回复 +' + r.restore + ' 体力 · 保质 ' +
+        r.days + ' 天 · 约 ' + r.price + ' 金</div>' +
       (locked
         ? '<div class="cc-lock">烹饪 Lv' + r.lv + ' 解锁</div>'
         : '<button class="btn mini" data-cook="' + r.id + '"' + (canDo ? '' : ' disabled') + '>' +
-          (have ? (state.energy >= G.BALANCE.cook.energy ? '烹饪' : '体力不够') : '缺食材') + '</button>') +
+          (have ? (state.energy >= r.energy ? '烹饪' : '体力不够') : '缺食材') + '</button>') +
     '</div>';
   }
 
@@ -27,7 +28,7 @@
     const body = unlocked
       ? '<div class="cook-top">🍳 烹饪 <b>Lv' + lv + '</b> · 经验 ' + xp + '/' + G.levelNeed(lv, 'cook') +
           ' · 做砸 ' + Math.round(G.cookFail(state) * 100) + '% · 品质取 ' +
-          G.cookRolls(state) + ' 次最好 · 每道菜 ' + G.BALANCE.cook.energy + ' 体力</div>' +
+          G.cookRolls(state) + ' 次最好 · 体力消耗按食谱</div>' +
         '<div class="cook-grid">' + G.cookRecipes().map(cookCard).join('') + '</div>'
       : '<div class="shop-tip">厨房还没解锁：<b>种田 Lv' + G.BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' +
           G.BALANCE.cook.unlockFish + '</b> 后开张。<br>解锁后能拿作物 / 渔获 / 野货做菜，' +

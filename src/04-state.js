@@ -74,7 +74,7 @@
       orchard: { unlocked: false, slots: [] },
       treeStock: {},
       townDonated: 0,
-      codex: { fish: {}, crops: {} },
+      codex: { fish: {}, crops: {}, food: {} },
       codexClaim: {},
       manualRefreshUsed: false,
       workUsed: false,

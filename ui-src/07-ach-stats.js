@@ -56,50 +56,60 @@
     };
     const emptyRec = { n: 0, best: null, first: null, perfect: 0, value: 0 };
 
-    const fishRows = species.map(function (f) {
-      return bookRow(f, fx[f.id] || emptyRec, '未捕获');
-    }).join('');
+    /* v2.44：图鉴改成卡片网格，一组一块；未收集的置灰 */
+    const card = function (item, rec, emptyText) {
+      const q = G.qualityById(rec.best);
+      const got = rec.n > 0;
+      return '<div class="codex-card' + (got ? '' : ' miss') + '">' +
+        '<span class="cx-e">' + item.emoji + '</span>' +
+        '<span class="cx-n">' + item.name + '</span>' +
+        '<span class="cx-q" style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
+          (got ? (q ? q.emoji + ' ' + q.name : '—') : emptyText) + '</span>' +
+        '<span class="cx-m">' + (got ? rec.n + ' 次' + (rec.first ? ' · D' + rec.first : '') : '—') + '</span>' +
+        '<span class="cx-v">' + (got ? (rec.value || 0) + ' 金' : '') + '</span>' +
+      '</div>';
+    };
+    const sec = function (title, got, total, cards) {
+      const pct = total ? Math.round(got / total * 100) : 0;
+      return '<div class="codex-sec">' +
+        '<div class="codex-sec-head"><span>' + title + '</span>' +
+          '<span class="codex-prog"><i><b style="width:' + pct + '%"></b></i>' + got + '/' + total + '</span></div>' +
+        '<div class="codex-grid">' + cards + '</div></div>';
+    };
 
-    const chestRows = G.FISH.filter(function (f) { return f.chest; }).map(function (f) {
-      return bookRow(f, fx[f.id] || emptyRec, '未捞到');
-    }).join('');
+    const fishRows = species.map(function (f) { return card(f, fx[f.id] || emptyRec, '未捕获'); }).join('');
+    const chestRows = G.FISH.filter(function (f) { return f.chest; })
+      .map(function (f) { return card(f, fx[f.id] || emptyRec, '未捞到'); }).join('');
+    const cropRows = G.CROP_LIST.map(function (c) { return card(c, cx[c.id] || emptyRec, '未收获'); }).join('');
 
-    const cropRows = G.CROP_LIST.map(function (c) {
-      const v = cx[c.id] || { n: 0, best: null, first: null, value: 0 };
-      const q = G.qualityById(v.best);
-      return '<div class="book-row">' +
-        '<span class="be">' + c.emoji + '</span>' +
-        '<span class="bn2">' + c.name + '</span>' +
-        '<span class="bq" style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
-          (q ? q.emoji + ' ' + q.name : (v.n ? '—' : '未收获')) + '</span>' +
-        '<span class="bd">' + (v.first ? 'D' + v.first : '—') + '</span>' +
-        '<span class="bp">' + v.n + '</span>' +
-        '<span class="bv">' + (v.value || 0) + '</span></div>';
-    }).join('');
-
-    /* 果园水果：和作物共用 codex.crops，单独列一段 */
+    /* 果园水果 / 野货：和作物共用 codex.crops，单独成组 */
     const fruitList = G.FRUIT_LIST || [];
     const gotFruit = fruitList.filter(function (c) { return cx[c.id] && cx[c.id].n > 0; }).length;
-    const fruitRows = fruitList.map(function (c) {
-      return bookRow(c, cx[c.id] || emptyRec, '未收获');
-    }).join('');
+    const fruitRows = fruitList.map(function (c) { return card(c, cx[c.id] || emptyRec, '未收获'); }).join('');
 
-    /* 野货：和作物共用 codex.crops，单独列一段 */
     const wildList = G.WILD_LIST || [];
     const gotWild = wildList.filter(function (c) { return cx[c.id] && cx[c.id].n > 0; }).length;
-    const wildRows = wildList.map(function (c) {
-      return bookRow(c, cx[c.id] || emptyRec, '未采到');
+    const wildRows = wildList.map(function (c) { return card(c, cx[c.id] || emptyRec, '未采到'); }).join('');
+
+    /* 菜品图鉴：每道菜记次数 / 最好品质 / 首次 / 累计卖价 */
+    const cf = state.codex.food || {};
+    const dishes = G.cookRecipes();
+    const gotDish = dishes.filter(function (r) { return cf[r.id] && cf[r.id].n > 0; }).length;
+    const dishRows = dishes.map(function (r) {
+      return card({ emoji: r.emoji, name: r.name }, cf[r.id] || emptyRec, '未做过');
     }).join('');
 
-    openModal('📖 图鉴', stat +
+    openModal('📖 图鉴',
+      stat +
       rewardHtml +
-      '<div class="store-sub">🐟 鱼类 · 首次 / 次数 / 累计价值</div>' + fishRows +
-      '<div class="store-sub" style="margin-top:10px">🎁 宝箱 · 首次 / 数量 / 累计价值</div>' + chestRows +
-      '<div class="store-sub" style="margin-top:10px">🌱 作物 · 首次 / 数量 / 累计价值</div>' + cropRows +
-      '<div class="store-sub" style="margin-top:10px">🌿 野货 · ' + gotWild + '/' + wildList.length +
-        ' 种 · 首次 / 数量 / 累计价值</div>' + wildRows +
-      '<div class="store-sub" style="margin-top:10px">🍑 水果 · ' + gotFruit + '/' + fruitList.length +
-        ' 种 · 首次 / 数量 / 累计价值</div>' + fruitRows,
+      sec('🐟 鱼类', got, species.length, fishRows) +
+      sec('🎁 宝箱', G.FISH.filter(function (f) { return f.chest && fx[f.id] && fx[f.id].n > 0; }).length,
+        G.FISH.filter(function (f) { return f.chest; }).length, chestRows) +
+      sec('🌱 作物', G.CROP_LIST.filter(function (c) { return cx[c.id] && cx[c.id].n > 0; }).length,
+        G.CROP_LIST.length, cropRows) +
+      sec('🌿 野货', gotWild, wildList.length, wildRows) +
+      sec('🍑 水果', gotFruit, fruitList.length, fruitRows) +
+      sec('🍳 菜品', gotDish, dishes.length, dishRows),
       '<button class="btn" data-close>关闭</button>');
   }
 

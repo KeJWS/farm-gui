@@ -15,8 +15,8 @@
     /* 伙食费：base + (上限 − from) / perEnergy，最低 min；没钱吃饭只回 pct（至少 noMoneyMin）
      * skipLunchMul：厨房解锁后，当天没吃午饭，睡觉伙食费 ×1.5 */
     meal: { base: 3, perEnergy: 5, from: 10, min: 1, noMoneyPct: 0.3, noMoneyMin: 5, skipLunchMul: 1.5 },
-    /* 厨房：种田 + 钓鱼等级双门槛；烹饪等级单独一条线 */
-    cook: { unlockFarm: 4, unlockFish: 3, energy: 1, xp: 2, xpBase: 12, xpStep: 8,
+    /* 厨房：种田 + 钓鱼等级双门槛；烹饪等级单独一条线；每道菜的体力写在食谱里 */
+    cook: { unlockFarm: 3, unlockFish: 2, xp: 2, xpBase: 12, xpStep: 8,
             failBase: 0.25, failStep: 0.025, failMin: 0.02,
             /* 达到这些等级，品质多取一次（Lv4 / Lv8） */
             qualityAt: [4, 8] },

@@ -104,11 +104,9 @@
           '<div><div class="sn">' + esc(f.name) +
             (q ? ' <b class="own">' + q.emoji + q.name + '</b>' : '') + '</div>' +
           '<div class="sv">+' + (f.energy || 0) + ' 体力 · 保质到 D' + f.expire +
-            ' · 约 ' + (f.price || 0) + ' 金</div></div>' +
+            ' · 约 ' + (f.price || 0) + ' 金 · 去厨房吃</div></div>' +
           '<span class="sp">' + (f.price || 0) + ' 金</span>' +
           '<span class="spw">' +
-            '<button class="btn mini" data-eat="' + x.i + '"' +
-              (G.lunchEaten(state) || f.rid === 'fail' ? ' disabled' : '') + '>吃</button>' +
             '<button class="btn mini" data-boxfood="' + x.i + '" title="放进收购箱">📦</button>' +
           '</span></div>';
       }).join('');

@@ -1085,7 +1085,7 @@ let lureS = G.createState(); lureS.coins = 100;
 G.buyBait(lureS, 'lure', 1);
 ok(lureS.lure.dur === 25 && lureS.coins === 95, '假饵 5 金 · 耐用 25 次', lureS.lure.dur);
 
-ok(G.ACH.length === 63, '成就总数 63', G.ACH.length);
+ok(G.ACH.length === 68, '成就总数 68', G.ACH.length);
 
 const retro = G.deserialize({ plots: [], coins: 100, day: 20, stats: { harvests: 100, casts: 300 } });
 ok(retro.levels.farm > 1 && retro.levels.fish > 1, '老存档按历史次数补等级',
@@ -1410,7 +1410,7 @@ ok(!G.fishAll(v23noBait, 'dough').ok, '没饵时全体力钓鱼直接失败');
 /* 新成就 */
 const v23achNew = G.checkAchievements(Object.assign(G.createState(), { stats: { teas: 10, chests: 10 } }));
 ok(v23achNew.some(x => x.id === 'tea10') && v23achNew.some(x => x.id === 'chest10'), '下午茶 / 开箱成就能解锁');
-ok(G.ACH.length === 63, '成就总数 63', G.ACH.length);
+ok(G.ACH.length === 68, '成就总数 68', G.ACH.length);
 
 /* ---------- 5f. v2.4 季节 ---------- */
 section('v2.4 季节');
@@ -2895,19 +2895,24 @@ section('土地曲线与果树等级');
 section('厨房与烹饪');
 {
   const ck = G.createState();
-  ck.day = 10; ck.levels.farm = 4; ck.levels.fish = 5; ck.energy = 50; ck.maxEnergy = 50;
-  ok(G.kitchenUnlocked(ck), '种田 Lv4 + 钓鱼 Lv3 解锁厨房');
+  ck.day = 10; ck.levels.farm = 3; ck.levels.fish = 2; ck.energy = 50; ck.maxEnergy = 50;
+  ok(G.kitchenUnlocked(ck), '种田 Lv3 + 钓鱼 Lv2 解锁厨房');
   ok(G.cookRecipes().length === 8, '食谱 8 道', G.cookRecipes().length);
+  ok(G.cookRecipes().some(function (r) { return r.energy > 1; }), '不同食谱消耗不同体力',
+     G.cookRecipes().map(function (r) { return r.energy; }));
   ok(!G.cookMeal(ck, 'soup').ok, '没食材做不了');
 
   G.addStore(ck, 'carrot', 'std', 2);
   G.addStore(ck, 'cabbage', 'std', 1);
   G.setRng(mulberry32(3));
   const rc = G.cookMeal(ck, 'soup');
-  ok(rc.ok && !rc.fail && ck.energy === 49 && G.storeCount(ck, 'carrot') === 0 &&
+  ok(rc.ok && !rc.fail && ck.energy === 50 - G.recipeById('soup').energy &&
+     G.storeCount(ck, 'carrot') === 0 &&
      ck.levels.cookXp === G.BALANCE.cook.xp, '做菜扣食材/体力并加经验', rc);
   ok(ck.food.length === 1 && ck.food[0].energy > 0 && ck.food[0].expire === ck.day + 3,
      '菜进仓库并带保质期', ck.food[0]);
+  ok(ck.codex.food.soup && ck.codex.food.soup.n === 1 && !!ck.codex.food.soup.best,
+     '菜品写进图鉴', ck.codex.food.soup);
 
   ck.energy = 5;
   const eat = G.eatFood(ck, 0);
@@ -2924,12 +2929,12 @@ section('厨房与烹饪');
   /* 做砸：随机数固定 0，必定小于失败率 */
   G.setRng(function () { return 0; });
   const cf = G.createState();
-  cf.day = 10; cf.levels.farm = 4; cf.levels.fish = 5; cf.energy = 10;
+  cf.day = 10; cf.levels.farm = 3; cf.levels.fish = 2; cf.energy = 10;
   G.addStore(cf, 'carrot', 'std', 2);
   G.addStore(cf, 'cabbage', 'std', 1);
   const rf = G.cookMeal(cf, 'soup');
-  ok(rf.ok && rf.fail && cf.food[0].rid === 'fail' && cf.food[0].energy === 0,
-     '等级低有概率做成焦糊料理', cf.food[0]);
+  ok(rf.ok && rf.fail && cf.food[0].rid === 'fail' && cf.food[0].energy === 0 &&
+     cf.food[0].q == null, '等级低有概率做成焦糊料理（没有品质）', cf.food[0]);
   ok(G.cookRolls({ levels: { cook: 1 } }) === 1 && G.cookRolls({ levels: { cook: 4 } }) === 2 &&
      G.cookRolls({ levels: { cook: 8 } }) === 3, '烹饪 Lv4 / Lv8 各多取一次品质');
 
@@ -2952,11 +2957,21 @@ section('厨房与烹饪');
 
   /* 存档往返 */
   const sv = G.createState();
-  sv.food = [{ rid: 'soup', name: '蔬菜汤', emoji: '🥣', q: 'good', energy: 10, price: 60, day: 10, expire: 13 }];
+  sv.food = [{ rid: 'soup', name: '蔬菜汤', emoji: '🥣', q: 'good', energy: 10, price: 60, day: 10, expire: 13 },
+             { rid: 'fail', name: '焦糊料理', emoji: '🫕', q: null, energy: 0, price: 1, day: 10, expire: 11 }];
   sv.lunchDay = 10; sv.levels.cook = 3; sv.levels.cookXp = 7;
   const back = G.deserialize(G.serialize(sv));
-  ok(back.food.length === 1 && back.food[0].q === 'good' && back.lunchDay === 10 &&
-     back.levels.cook === 3 && back.levels.cookXp === 7, '熟食 / 午饭 / 烹饪等级能存档', back.food);
+  ok(back.food.length === 2 && back.food[0].q === 'good' && back.food[1].q == null &&
+     back.lunchDay === 10 && back.levels.cook === 3 && back.levels.cookXp === 7,
+     '熟食 / 焦糊料理 / 午饭 / 烹饪等级能存档', back.food);
+
+  /* 烹饪成就 */
+  const achIds = G.ACH.map(function (a) { return a.id; });
+  ok(['cook1', 'cook20', 'cookLv5', 'cookLv10', 'meal30'].every(function (id) {
+    return achIds.indexOf(id) >= 0;
+  }), '新增 5 项烹饪成就', G.ACH.length);
+  const cookAch = G.ACH.filter(function (a) { return a.id === 'cook1'; })[0];
+  ok(cookAch.val({ stats: { cooks: 1 } }) === 1, '烹饪成就能读到做菜次数');
 
   /* 厨房没解锁时整条线都不生效 */
   const lock = G.createState();

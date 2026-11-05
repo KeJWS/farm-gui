@@ -187,6 +187,18 @@
     { id: 'net9',      cat: 'fish', emoji: '🕸️', name: '网罗天下',   desc: '渔网放满 9 张',        goal: 9,
       val: function (s) { return s.nets || 0; }, reward: { coins: 200 }, pts: 3 },
 
+    /* v2.44 追加：厨房 / 烹饪 / 午饭 */
+    { id: 'cook1',     cat: 'biz',  emoji: '🍳', name: '开火',       desc: '做 1 道菜',            goal: 1,
+      val: function (s) { return s.stats.cooks || 0; }, reward: { coins: 40 }, pts: 1 },
+    { id: 'cook20',    cat: 'biz',  emoji: '🥘', name: '家常便饭',   desc: '累计做 20 道菜',       goal: 20,
+      val: function (s) { return s.stats.cooks || 0; }, reward: { coins: 150, ferts: { normal: 2 } }, pts: 3 },
+    { id: 'cookLv5',   cat: 'biz',  emoji: '👨‍🍳', name: '掌勺',       desc: '烹饪等级到 Lv5',       goal: 5,
+      val: function (s) { return (s.levels && s.levels.cook) || 1; }, reward: { coins: 300 }, pts: 3 },
+    { id: 'cookLv10',  cat: 'biz',  emoji: '🌟', name: '米其林',     desc: '烹饪等级满级',         goal: 10,
+      val: function (s) { return (s.levels && s.levels.cook) || 1; }, reward: { coins: 800, ferts: { special: 3 } }, pts: 5 },
+    { id: 'meal30',    cat: 'biz',  emoji: '🍽️', name: '好好吃饭',   desc: '累计吃 30 次午饭',     goal: 30,
+      val: function (s) { return s.stats.meals || 0; }, reward: { coins: 200 }, pts: 2 },
+
     /* v1.9 追加：挖蚯蚓 / 打零工 */
     { id: 'dig50',     cat: 'fish', emoji: '🪱', name: '蚯蚓猎手',   desc: '累计挖蚯蚓 50 次',     goal: 50,
       val: function (s) { return s.stats.dug || 0; }, reward: { coins: 60, bait: { dough: 5 } }, pts: 2 },

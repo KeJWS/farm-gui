@@ -791,11 +791,9 @@
           '<div><div class="sn">' + esc(f.name) +
             (q ? ' <b class="own">' + q.emoji + q.name + '</b>' : '') + '</div>' +
           '<div class="sv">+' + (f.energy || 0) + ' 体力 · 保质到 D' + f.expire +
-            ' · 约 ' + (f.price || 0) + ' 金</div></div>' +
+            ' · 约 ' + (f.price || 0) + ' 金 · 去厨房吃</div></div>' +
           '<span class="sp">' + (f.price || 0) + ' 金</span>' +
           '<span class="spw">' +
-            '<button class="btn mini" data-eat="' + x.i + '"' +
-              (G.lunchEaten(state) || f.rid === 'fail' ? ' disabled' : '') + '>吃</button>' +
             '<button class="btn mini" data-boxfood="' + x.i + '" title="放进收购箱">📦</button>' +
           '</span></div>';
       }).join('');
@@ -2014,7 +2012,7 @@
             G.BALANCE.codex.fish.map(function (m) { return m.need; }).join(' / ') + ' 种，作物分 ' +
             G.BALANCE.codex.crops.map(function (m) { return m.need; }).join(' / ') + ' 种，每档只发一次（金币 / 饵料 / 肥料）。',
           '图鉴还会单独记录<b>野货</b>（' + G.WILD_LIST.map(function (w) { return w.name; }).join(' / ') +
-            '）和<b>水果</b>，这两类只做收集展示，不计入上面两档奖励。',
+            '）、<b>水果</b>和<b>菜品</b>，这几类只做收集展示，不计入上面两档奖励。',
           '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态；旧存档按现有进度补发。'
         ]) +
       '</div>' +
@@ -2039,19 +2037,20 @@
             G.BALANCE.cook.xpStep + '×(级−1)。',
           '<b>做砸概率</b>：Lv1 ' + Math.round(G.BALANCE.cook.failBase * 100) + '%，每级 −' +
             (G.BALANCE.cook.failStep * 100).toFixed(1) + '%，最低 ' + Math.round(G.BALANCE.cook.failMin * 100) +
-            '%；做砸得到一份<b>焦糊料理</b>（不能吃，只能进收购箱）。',
+            '%；做砸得到一份<b>焦糊料理</b>（没有品质、不能吃，只能进收购箱）。',
           '<b>品质判定</b>：Lv' + G.BALANCE.cook.qualityAt[0] + ' / Lv' + G.BALANCE.cook.qualityAt[1] +
             ' 各多取一次最好，和施肥一个道理。',
-          '每道菜消耗 <b>' + G.BALANCE.cook.energy + ' 体力</b>，食材不够 / 等级不够都做不了。'
+          '<b>体力按食谱算</b>：越简单的菜越省（1 点），硬菜要 2–3 点，食材不够 / 等级不够都做不了。'
         ])) +
-        '<table class="rule-table"><tr><th>菜</th><th>需 Lv</th><th>食材</th><th>体力</th><th>保质</th><th>卖价</th></tr>' +
+        '<table class="rule-table"><tr><th>菜</th><th>需 Lv</th><th>食材</th><th>耗体力</th><th>回复</th><th>保质</th><th>卖价</th></tr>' +
         G.cookRecipes().map(function (r) {
           return '<tr><td>' + r.emoji + ' ' + r.name + '</td><td>Lv' + r.lv + '</td><td>' +
-            G.ingredientText(r) + '</td><td>+' + r.energy + '</td><td>' + r.days + ' 天</td><td>' +
-            r.price + ' 金</td></tr>';
+            G.ingredientText(r) + '</td><td>' + r.energy + '</td><td>+' + r.restore + '</td><td>' +
+            r.days + ' 天</td><td>' + r.price + ' 金</td></tr>';
         }).join('') + '</table>' +
         guideSub('🍽️ 吃午饭', guideList([
           '<b>每天一次</b>，吃一份菜回复它的体力；菜也吃品质，品质越高回的体力越多。',
+          '<b>不能直接在仓库里吃</b>：要打开「吃午饭」（或厨房）再选一份。',
           '<b>不吃午饭</b>：当天睡觉的伙食费 <b>×' + G.BALANCE.meal.skipLunchMul +
             '</b>（厨房解锁后生效）。',
           '菜有保质期，睡过保质期那天会坏掉；临期的先吃。'
@@ -2151,50 +2150,60 @@
     };
     const emptyRec = { n: 0, best: null, first: null, perfect: 0, value: 0 };
 
-    const fishRows = species.map(function (f) {
-      return bookRow(f, fx[f.id] || emptyRec, '未捕获');
-    }).join('');
+    /* v2.44：图鉴改成卡片网格，一组一块；未收集的置灰 */
+    const card = function (item, rec, emptyText) {
+      const q = G.qualityById(rec.best);
+      const got = rec.n > 0;
+      return '<div class="codex-card' + (got ? '' : ' miss') + '">' +
+        '<span class="cx-e">' + item.emoji + '</span>' +
+        '<span class="cx-n">' + item.name + '</span>' +
+        '<span class="cx-q" style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
+          (got ? (q ? q.emoji + ' ' + q.name : '—') : emptyText) + '</span>' +
+        '<span class="cx-m">' + (got ? rec.n + ' 次' + (rec.first ? ' · D' + rec.first : '') : '—') + '</span>' +
+        '<span class="cx-v">' + (got ? (rec.value || 0) + ' 金' : '') + '</span>' +
+      '</div>';
+    };
+    const sec = function (title, got, total, cards) {
+      const pct = total ? Math.round(got / total * 100) : 0;
+      return '<div class="codex-sec">' +
+        '<div class="codex-sec-head"><span>' + title + '</span>' +
+          '<span class="codex-prog"><i><b style="width:' + pct + '%"></b></i>' + got + '/' + total + '</span></div>' +
+        '<div class="codex-grid">' + cards + '</div></div>';
+    };
 
-    const chestRows = G.FISH.filter(function (f) { return f.chest; }).map(function (f) {
-      return bookRow(f, fx[f.id] || emptyRec, '未捞到');
-    }).join('');
+    const fishRows = species.map(function (f) { return card(f, fx[f.id] || emptyRec, '未捕获'); }).join('');
+    const chestRows = G.FISH.filter(function (f) { return f.chest; })
+      .map(function (f) { return card(f, fx[f.id] || emptyRec, '未捞到'); }).join('');
+    const cropRows = G.CROP_LIST.map(function (c) { return card(c, cx[c.id] || emptyRec, '未收获'); }).join('');
 
-    const cropRows = G.CROP_LIST.map(function (c) {
-      const v = cx[c.id] || { n: 0, best: null, first: null, value: 0 };
-      const q = G.qualityById(v.best);
-      return '<div class="book-row">' +
-        '<span class="be">' + c.emoji + '</span>' +
-        '<span class="bn2">' + c.name + '</span>' +
-        '<span class="bq" style="color:' + (q ? q.color : 'var(--ink-3)') + '">' +
-          (q ? q.emoji + ' ' + q.name : (v.n ? '—' : '未收获')) + '</span>' +
-        '<span class="bd">' + (v.first ? 'D' + v.first : '—') + '</span>' +
-        '<span class="bp">' + v.n + '</span>' +
-        '<span class="bv">' + (v.value || 0) + '</span></div>';
-    }).join('');
-
-    /* 果园水果：和作物共用 codex.crops，单独列一段 */
+    /* 果园水果 / 野货：和作物共用 codex.crops，单独成组 */
     const fruitList = G.FRUIT_LIST || [];
     const gotFruit = fruitList.filter(function (c) { return cx[c.id] && cx[c.id].n > 0; }).length;
-    const fruitRows = fruitList.map(function (c) {
-      return bookRow(c, cx[c.id] || emptyRec, '未收获');
-    }).join('');
+    const fruitRows = fruitList.map(function (c) { return card(c, cx[c.id] || emptyRec, '未收获'); }).join('');
 
-    /* 野货：和作物共用 codex.crops，单独列一段 */
     const wildList = G.WILD_LIST || [];
     const gotWild = wildList.filter(function (c) { return cx[c.id] && cx[c.id].n > 0; }).length;
-    const wildRows = wildList.map(function (c) {
-      return bookRow(c, cx[c.id] || emptyRec, '未采到');
+    const wildRows = wildList.map(function (c) { return card(c, cx[c.id] || emptyRec, '未采到'); }).join('');
+
+    /* 菜品图鉴：每道菜记次数 / 最好品质 / 首次 / 累计卖价 */
+    const cf = state.codex.food || {};
+    const dishes = G.cookRecipes();
+    const gotDish = dishes.filter(function (r) { return cf[r.id] && cf[r.id].n > 0; }).length;
+    const dishRows = dishes.map(function (r) {
+      return card({ emoji: r.emoji, name: r.name }, cf[r.id] || emptyRec, '未做过');
     }).join('');
 
-    openModal('📖 图鉴', stat +
+    openModal('📖 图鉴',
+      stat +
       rewardHtml +
-      '<div class="store-sub">🐟 鱼类 · 首次 / 次数 / 累计价值</div>' + fishRows +
-      '<div class="store-sub" style="margin-top:10px">🎁 宝箱 · 首次 / 数量 / 累计价值</div>' + chestRows +
-      '<div class="store-sub" style="margin-top:10px">🌱 作物 · 首次 / 数量 / 累计价值</div>' + cropRows +
-      '<div class="store-sub" style="margin-top:10px">🌿 野货 · ' + gotWild + '/' + wildList.length +
-        ' 种 · 首次 / 数量 / 累计价值</div>' + wildRows +
-      '<div class="store-sub" style="margin-top:10px">🍑 水果 · ' + gotFruit + '/' + fruitList.length +
-        ' 种 · 首次 / 数量 / 累计价值</div>' + fruitRows,
+      sec('🐟 鱼类', got, species.length, fishRows) +
+      sec('🎁 宝箱', G.FISH.filter(function (f) { return f.chest && fx[f.id] && fx[f.id].n > 0; }).length,
+        G.FISH.filter(function (f) { return f.chest; }).length, chestRows) +
+      sec('🌱 作物', G.CROP_LIST.filter(function (c) { return cx[c.id] && cx[c.id].n > 0; }).length,
+        G.CROP_LIST.length, cropRows) +
+      sec('🌿 野货', gotWild, wildList.length, wildRows) +
+      sec('🍑 水果', gotFruit, fruitList.length, fruitRows) +
+      sec('🍳 菜品', gotDish, dishes.length, dishRows),
       '<button class="btn" data-close>关闭</button>');
   }
 
@@ -4754,17 +4763,18 @@
   function cookCard(r) {
     const locked = G.cookLv(state) < r.lv;
     const have = G.cookHave(state, r);
-    const canDo = !locked && have && state.energy >= G.BALANCE.cook.energy;
+    const canDo = !locked && have && state.energy >= r.energy;
     return '<div class="cook-card' + (locked ? ' locked' : '') + '">' +
       '<div class="cc-head"><span class="cc-e">' + r.emoji + '</span>' +
         '<b>' + esc(r.name) + '</b><span class="cc-lv">Lv' + r.lv + '</span></div>' +
       '<div class="cc-desc">' + esc(r.desc || '') + '</div>' +
       '<div class="cc-row">' + G.ingredientText(r) + '</div>' +
-      '<div class="cc-row">+' + r.energy + ' 体力 · 保质 ' + r.days + ' 天 · 约 ' + r.price + ' 金</div>' +
+      '<div class="cc-row">耗 ' + r.energy + ' 体力 · 回复 +' + r.restore + ' 体力 · 保质 ' +
+        r.days + ' 天 · 约 ' + r.price + ' 金</div>' +
       (locked
         ? '<div class="cc-lock">烹饪 Lv' + r.lv + ' 解锁</div>'
         : '<button class="btn mini" data-cook="' + r.id + '"' + (canDo ? '' : ' disabled') + '>' +
-          (have ? (state.energy >= G.BALANCE.cook.energy ? '烹饪' : '体力不够') : '缺食材') + '</button>') +
+          (have ? (state.energy >= r.energy ? '烹饪' : '体力不够') : '缺食材') + '</button>') +
     '</div>';
   }
 
@@ -4775,7 +4785,7 @@
     const body = unlocked
       ? '<div class="cook-top">🍳 烹饪 <b>Lv' + lv + '</b> · 经验 ' + xp + '/' + G.levelNeed(lv, 'cook') +
           ' · 做砸 ' + Math.round(G.cookFail(state) * 100) + '% · 品质取 ' +
-          G.cookRolls(state) + ' 次最好 · 每道菜 ' + G.BALANCE.cook.energy + ' 体力</div>' +
+          G.cookRolls(state) + ' 次最好 · 体力消耗按食谱</div>' +
         '<div class="cook-grid">' + G.cookRecipes().map(cookCard).join('') + '</div>'
       : '<div class="shop-tip">厨房还没解锁：<b>种田 Lv' + G.BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' +
           G.BALANCE.cook.unlockFish + '</b> 后开张。<br>解锁后能拿作物 / 渔获 / 野货做菜，' +
