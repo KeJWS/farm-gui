@@ -1104,6 +1104,80 @@ button{ color:inherit; font:inherit; }
   .store-row .spw{ flex-wrap:wrap; justify-content:flex-end; }
 }
 
+/* ---------- v2.39: 日志时间线 ---------- */
+.log-timeline{ list-style:none; margin:0; padding:0 0 0 24px; border-left:2px solid var(--line-2); }
+.log-day{ position:relative; margin:0 0 8px; }
+.log-day::before{
+  content:''; position:absolute; left:-30px; top:10px;
+  width:9px; height:9px; border-radius:99px;
+  background:var(--green); box-shadow:0 0 0 2px var(--bg);
+}
+.log-date{
+  display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+  padding:2px 10px; border-radius:99px; list-style:none;
+  background:var(--card); border:1px solid var(--line);
+  font-size:11px; font-weight:800; color:var(--ink-2);
+}
+.log-date::-webkit-details-marker{ display:none; }
+.log-count{ font-size:10px; font-weight:700; color:var(--ink-3); }
+.log-entries{ list-style:none; margin:4px 0 0; padding:0; }
+.log-entry{ display:flex; align-items:flex-start; gap:6px; padding:3px 0; font-size:12px; line-height:1.55; }
+.log-entry.good .log-icon{ color:var(--green-d); }
+.log-entry.warn .log-icon{ color:#d9a02b; }
+.log-icon{ flex-shrink:0; width:18px; text-align:center; }
+
+/* ---------- v2.39: 账本 Tab + 折叠 ---------- */
+.ledger-tabs{ display:flex; gap:6px; margin-bottom:10px; }
+.ledger-tab{
+  flex:1; padding:6px 10px; border-radius:10px; cursor:pointer;
+  border:1px solid var(--line); background:var(--card);
+  font-size:12px; font-weight:700; color:var(--ink-3);
+}
+.ledger-tab.active{ background:var(--green); color:#fff; border-color:transparent; }
+.ledger-list{ list-style:none; margin:0; padding:0; }
+.ledger-day details summary{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:8px 10px; cursor:pointer; font-size:12px; font-weight:800;
+  border-radius:10px; background:var(--card); border:1px solid var(--line);
+  list-style:none;
+}
+.ledger-day details summary::-webkit-details-marker{ display:none; }
+.ledger-net{ font-variant-numeric:tabular-nums; color:var(--ink-3); font-weight:600; }
+.ledger-entries{ list-style:none; margin:0; padding:4px 0 0 16px; }
+.ledger-item{ display:flex; align-items:center; gap:6px; padding:3px 0; font-size:11.5px; }
+.ledger-item.inc .ledger-amt{ color:var(--green-d); }
+.ledger-item.exp .ledger-amt{ color:var(--red); }
+.ledger-amt{ margin-left:auto; font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ledger-icon{ flex-shrink:0; width:18px; text-align:center; }
+
+/* ---------- v2.39: 钓鱼记录卡片网格 ---------- */
+.book-stats-bar{ display:flex; gap:12px; font-size:12px; font-weight:700; color:var(--ink-3); margin-bottom:8px; flex-wrap:wrap; }
+.book-stats-bar b{ color:var(--ink); font-weight:900; }
+.bstat{ display:flex; flex-direction:column; gap:2px; }
+.bl{ font-size:10.5px; font-weight:600; color:var(--ink-3); }
+.bv{ font-size:12px; font-weight:800; }
+.book-tabs{ display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+.book-tab{
+  padding:5px 10px; border-radius:10px; cursor:pointer;
+  border:1px solid var(--line); background:var(--card);
+  font-size:11.5px; font-weight:700; color:var(--ink-3);
+}
+.book-tab.active{ background:var(--blue); color:#fff; border-color:transparent; }
+#book-list{ display:grid; grid-template-columns:repeat(auto-fill, minmax(90px, 1fr)); gap:6px; }
+.book-card{
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  padding:8px 6px; border-radius:10px; border-left:3px solid var(--line-2);
+  background:var(--card); border:1px solid var(--line);
+  font-size:10.5px; text-align:center; transition:transform .15s;
+}
+.book-card-sm{ padding:6px 5px; min-width:0; }
+.book-card:hover{ transform:translateY(-2px); }
+.book-card-emoji{ font-size:24px; line-height:1.2; }
+.book-card-name{ font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; font-size:10.5px; }
+.book-card-type{ font-size:9.5px; font-weight:700; }
+.book-card-price{ font-weight:900; color:var(--gold); font-variant-numeric:tabular-nums; font-size:10.5px; }
+
+
 </style>
 </head>
 <body>
@@ -3709,7 +3783,7 @@ button{ color:inherit; font:inherit; }
                     base: f.base, bait: kind, trash: !!f.trash, chest: f.chest || null, noOrder: noOrder };
     s.fishBook.count++;
     s.fishBook.entries.unshift(entry);
-    if (s.fishBook.entries.length > 40) s.fishBook.entries.length = 40;
+    if (s.fishBook.entries.length > 50) s.fishBook.entries.length = 50;
     if (!f.trash && !f.chest) {
       if (!s.fishBook.best || QUALITY.indexOf(q) > QUALITY.indexOf(s.fishBook.best.quality)) {
         s.fishBook.best = { fish: f.name, quality: q, price: value, day: s.day };
@@ -7228,93 +7302,157 @@ button{ color:inherit; font:inherit; }
     }).join('');
   }
 
-  /* ---------------- 账本（按天汇总，点开看明细） ---------------- */
+  /* ---------------- 账本（Tab 筛选 + 每日折叠） ---------------- */
 
-  let openLedgerDay = null;
+  let ledgerFilter = 'all'; // 'all' | 'income' | 'expense'
+  const LEDGER_ICONS = { 
+    '委托': '📋', '收购箱': '📦', '农产品店': '🧺', '水产店': '🐟',
+    '洒水器': '🚿', '伙食': '🍖', '维护': '🔧', '捐赠': '🏘️' 
+  };
 
   function renderLedger() {
+    const box = $('#ledger');
+    // 使用 G.ledgerByDay 获取按天分组的数据
     const days = G.ledgerByDay(state);
-
-    const rows = days.slice(0, 14).map(function (d) {
-      const open = openLedgerDay === d.day;
-      const inc = d.income > 0 ? '<span class="led-inc">+' + d.income + '</span>' : '';
-      const exp = d.expense > 0 ? '<span class="led-exp">-' + d.expense + '</span>' : '';
-      const sep = (inc && exp) ? ' · ' : '';
-      const head = (inc || exp) ? (inc + sep + exp) : '<span style="color:var(--ink-3)">—</span>';
-
-      let html = '<div class="led-row day' + (open ? ' open' : '') + '" data-ledday="' + d.day + '"' +
-        ' role="button" tabindex="0" aria-expanded="' + open + '"' +
-        ' title="' + d.items.length + ' 笔，点击' + (open ? '收起' : '展开') + '">' +
-        '<span class="led-day">D' + d.day + '</span>' +
-        '<span class="led-label">' + (d.items.length > 1 ? d.items.length + ' 笔' : esc(d.items[0].label)) + '</span>' +
-        '<span class="led-val">' + head + '</span>' +
-        '<span class="led-bal">' + d.balance + '</span>' +
-      '</div>';
-
-      if (open) {
-        html += '<div class="led-detail">' + d.items.map(function (it) {
-          const v = it.income > 0 ? '+' + it.income : (it.expense > 0 ? '-' + it.expense : '—');
-          const cls = it.income > 0 ? 'led-inc' : (it.expense > 0 ? 'led-exp' : '');
-          return '<div class="dline"><span>' + esc(it.label) + '</span><b class="' + cls + '">' + v + '</b></div>';
-        }).join('') + '</div>';
-      }
-      return html;
+    
+    // Tab 按钮
+    const tabs = ['全部', '收入', '支出'].map(function (t) {
+      const k = t === '全部' ? 'all' : (t === '收入' ? 'income' : 'expense');
+      return '<button class="ledger-tab' + (ledgerFilter === k ? ' active' : '') + 
+             '" data-ledger-filter="' + k + '">' + t + '</button>';
     }).join('');
+    
+    let html = '<div class="ledger-tabs">' + tabs + '</div>';
+    html += '<ol class="ledger-list">';
+    
+    days.slice(0, 14).forEach(function (d) {
+      const net = d.income - d.expense;
 
-    $('#ledger').innerHTML = rows || '<div class="store-empty">还没有账目</div>';
+      html += '<li class="ledger-day">';
+      html += '<details>';
+      html += '<summary class="ledger-summary">' +
+              '<span>D' + d.day + '</span>' +
+              '<span class="ledger-net">' + (net >= 0 ? '+' : '') + net + ' 金</span>' +
+              '</summary>';
+      html += '<ul class="ledger-entries">';
+      d.items.forEach(function (e) {
+        if (ledgerFilter === 'income' && !e.income) return;
+        if (ledgerFilter === 'expense' && !e.expense) return;
+        
+        const isInc = e.income > 0;
+        const amt = isInc ? '+' + e.income : '-' + e.expense;
+        const cls = isInc ? ' inc' : ' exp';
+        const mainLabel = e.label.split('·')[0];
+        const icon = LEDGER_ICONS[mainLabel] || '💰';
+        
+        html += '<li class="ledger-item' + cls + '">' +
+                '<span class="ledger-icon">' + icon + '</span>' +
+                '<span class="ledger-label">' + esc(e.label) + '</span>' +
+                '<span class="ledger-amt">' + amt + ' 金</span></li>';
+      });
+      html += '</ul></details></li>';
+    });
+    html += '</ol>';
+    box.innerHTML = html;
     $('#ledger-sum').textContent = '余额 ' + state.coins + ' 金';
   }
 
-  /* ---------------- 钓鱼记录 ---------------- */
+  /* ---------------- 钓鱼记录（卡片网格 + Tab） ---------------- */
+
+  let bookFilter = 'all'; // 'all' | 'fish' | 'chest'
 
   function renderBook() {
     const b = state.fishBook;
-    $('#book-stats').innerHTML =
+    const entries = b.entries || [];
+    const fishN = entries.filter(function (e) { return !e.noOrder; }).length;
+    const chestN = entries.filter(function (e) { return !!e.chest; }).length;
+
+    // 统计摘要：累计渔获 / 最高品质 / 最贵一条（沿用逻辑层维护的字段）
+    const statHtml = '<div class="book-stats-bar">' +
       '<div class="bstat"><div class="bl">累计渔获</div><div class="bv">' + b.count + ' 条</div></div>' +
       '<div class="bstat"><div class="bl">最高品质</div><div class="bv" style="color:' +
         esc(b.best && b.best.quality ? b.best.quality.color : 'var(--ink-3)') + '">' +
         (b.best && b.best.quality ? esc(b.best.quality.emoji) + ' ' + esc(b.best.quality.name) + ' · ' + esc(b.best.fish) : '—') + '</div></div>' +
       '<div class="bstat"><div class="bl">最贵一条</div><div class="bv" style="color:var(--gold)">' +
-        (b.priciest ? esc(b.priciest.fish) + ' · ' + b.priciest.price + ' 金' : '—') + '</div></div>';
+        (b.priciest ? esc(b.priciest.fish) + ' · ' + b.priciest.price + ' 金' : '—') + '</div></div>' +
+    '</div>';
 
-    $('#book-list').innerHTML = b.entries.length
-      ? b.entries.map(function (e) {
-          const col = esc(e.quality ? e.quality.color : 'var(--ink-3)');
-          const qtxt = e.quality ? (esc(e.quality.emoji) + esc(e.quality.name)) : '—';
-          return '<div class="book-row">' +
-            '<span class="be">' + esc(e.emoji) + '</span>' +
-            '<span class="bn2">' + esc(e.fish) + '</span>' +
-            '<span class="bq" style="color:' + col + '">' + qtxt + '</span>' +
-            '<span class="bp">' + e.price + '</span></div>';
-        }).join('')
-      : '<div class="store-empty">还没钓过鱼 🎣</div>';
+    // Tab（杂物并入「全部」，不单列）
+    const tabs = [
+      { k: 'all', l: '全部', n: entries.length },
+      { k: 'fish', l: '🐟 鱼', n: fishN },
+      { k: 'chest', l: '🎁 宝箱', n: chestN }
+    ].map(function (t) {
+      return '<button class="book-tab' + (bookFilter === t.k ? ' active' : '') +
+             '" data-book-filter="' + t.k + '">' + t.l + ' (' + t.n + ')</button>';
+    }).join('');
+
+    // 过滤 + 倒序（新的在前）
+    if (bookFilter === 'junk') bookFilter = 'all';
+    const filtered = entries.filter(function (e) {
+      if (bookFilter === 'chest') return !!e.chest;
+      if (bookFilter === 'fish') return !e.noOrder && !e.chest;
+      return true;
+    }).slice().reverse();
+
+    // 卡片：名字 → 品质 → 价格
+    const cards = filtered.map(function (e) {
+      const q = e.quality || null;
+      const col = q ? q.color : (e.chest ? '#c08c1f' : 'var(--ink-3)');
+      const bg = e.chest ? 'background:linear-gradient(135deg, rgba(192,140,31,.1), rgba(192,140,31,.03));' : '';
+      const qtxt = q ? (q.emoji + ' ' + q.name) : (e.chest ? '宝箱' : '杂物');
+      return '<div class="book-card book-card-sm" style="border-left-color:' + col + ';' + bg + '">' +
+        '<span class="book-card-emoji">' + esc(e.emoji) + '</span>' +
+        '<span class="book-card-name">' + esc(e.fish) + '</span>' +
+        '<span class="book-card-type" style="color:' + col + '">' + esc(qtxt) + '</span>' +
+        '<span class="book-card-price">' + e.price + ' 金</span>' +
+      '</div>';
+    }).join('');
+
+    document.getElementById('book-stats').innerHTML = statHtml + '<div class="book-tabs">' + tabs + '</div>';
+    document.getElementById('book-list').innerHTML = cards || '<div class="store-empty">暂无记录</div>';
   }
 
-  /* ---------------- 日志（按天折叠，点开看当天记录） ---------------- */
+  /* ---------------- 日志（时间线视图） ---------------- */
 
-  let openLogDay = null;
+  const LOG_ICONS = { 
+    good: '✅', warn: '⚠️', info: 'ℹ️', 
+    ach: '🏆', order: '📋', fish: '🎣', orchard: '🍑' 
+  };
 
   function renderLog() {
-    const days = G.logByDay(state);
-    const rows = days.slice(0, 10).map(function (d) {
-      const open = openLogDay === d.day;
-      const last = d.items[0] ? d.items[0].text : '';
-      let html = '<div class="log-day' + (open ? ' open' : '') + '" data-logday="' + d.day + '"' +
-        ' role="button" tabindex="0" aria-expanded="' + open + '"' +
-        ' title="' + d.items.length + ' 条记录，点击' + (open ? '收起' : '展开') + '">' +
-        '<span class="ld">D' + d.day + '</span>' +
-        '<span class="ld-count">' + d.items.length + ' 条</span>' +
-        '<span class="ld-last">' + (open ? '（点击收起）' : esc(last)) + '</span>' +
-        '<span class="ld-caret">' + (open ? '▾' : '▸') + '</span>' +
-      '</div>';
-      if (open) {
-        html += d.items.map(function (r) {
-          return '<div class="log-row ' + esc(r.kind || '') + '"><span>' + esc(r.text) + '</span></div>';
-        }).join('');
-      }
-      return html;
-    }).join('');
-    $('#log').innerHTML = rows || '<div class="store-empty">还没有记录</div>';
+    const box = $('#log');
+    if (!state.log.length) {
+      box.innerHTML = '<div class="log-empty">还没有任何记录，开始种田吧 🌱</div>';
+      return;
+    }
+    
+    // 按天分组
+    const days = {};
+    state.log.forEach(function (e) {
+      if (!days[e.day]) days[e.day] = [];
+      days[e.day].push(e);
+    });
+    
+    // 生成时间线 HTML（每天一个 details，默认收起）
+    let html = '<ol class="log-timeline">';
+    Object.keys(days).sort(function (a, b) { return b - a; }).forEach(function (day) {
+      html += '<li class="log-day" id="log-d' + day + '">';
+      html += '<details>';
+      html += '<summary class="log-date">D' + day +
+              '<span class="log-count">' + days[day].length + ' 条</span></summary>';
+      html += '<ul class="log-entries">';
+      days[day].forEach(function (e) {
+        const icon = LOG_ICONS[e.kind] || 'ℹ️';
+        const cls = e.kind === 'warn' ? ' warn' : (e.kind === 'good' ? ' good' : '');
+        html += '<li class="log-entry' + cls + '">' +
+                '<span class="log-icon">' + icon + '</span>' +
+                '<span class="log-text">' + esc(e.text) + '</span></li>';
+      });
+      html += '</ul></details></li>';
+    });
+    html += '</ol>';
+    box.innerHTML = html;
   }
 
   /* ---------------- 焦点保持 ---------------- */
@@ -7322,7 +7460,7 @@ button{ color:inherit; font:inherit; }
    * 得从头 Tab。这里在重绘前记下焦点元素的 data 标识，重绘后按同样的标识找回来。
    * 弹窗（#modal-root）里的焦点不归这里管，直接跳过。 */
 
-  const FOCUS_DATA = ['i', 'bait', 'ledday', 'logday', 'order', 'long', 'tree', 'orc',
+  const FOCUS_DATA = ['i', 'bait', 'order', 'long', 'tree', 'orc',
                       'marketPage', 'storeFilter'];
 
   function dataAttr(key) {
@@ -10479,12 +10617,19 @@ button{ color:inherit; font:inherit; }
         return;
       }
 
-      // 日志按天展开/收起
-      const logDay = t.closest('[data-logday]');
-      if (logDay) {
-        const d = Number(logDay.dataset.logday);
-        openLogDay = (openLogDay === d) ? null : d;
-        renderLog();
+      // 账本 Tab 筛选
+      const ledgerTab = t.closest('[data-ledger-filter]');
+      if (ledgerTab) {
+        ledgerFilter = ledgerTab.dataset.ledgerFilter;
+        renderLedger();
+        return;
+      }
+
+      // 钓鱼记录 Tab 筛选
+      const bookTab = t.closest('[data-book-filter]');
+      if (bookTab) {
+        bookFilter = bookTab.dataset.bookFilter;
+        renderBook();
         return;
       }
     });

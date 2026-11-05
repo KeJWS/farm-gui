@@ -724,7 +724,7 @@
                     base: f.base, bait: kind, trash: !!f.trash, chest: f.chest || null, noOrder: noOrder };
     s.fishBook.count++;
     s.fishBook.entries.unshift(entry);
-    if (s.fishBook.entries.length > 40) s.fishBook.entries.length = 40;
+    if (s.fishBook.entries.length > 50) s.fishBook.entries.length = 50;
     if (!f.trash && !f.chest) {
       if (!s.fishBook.best || QUALITY.indexOf(q) > QUALITY.indexOf(s.fishBook.best.quality)) {
         s.fishBook.best = { fish: f.name, quality: q, price: value, day: s.day };
