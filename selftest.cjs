@@ -1184,14 +1184,14 @@ section('v2.0 长期订单 / 收购箱 / 成就点');
 G.setRng(mulberry32(202));
 
 /* 委托池按等级裁剪 */
-ok(G.orderPool(18, 1).length === 6, 'Lv1 时委托池只有买得到的 6 种', G.orderPool(18, 1).length);
+ok(G.orderPool(18, 1).length === 6, 'Lv1 时委托池 6 种（含下一档 2 种）', G.orderPool(18, 1).length);
 ok(G.orderPool(18, 10).length === 13, 'Lv10 时委托池基本全开（13 种）', G.orderPool(18, 10).length);
 let os2 = G.createState(); os2.day = 18; os2.levels.farm = 3;
 G.setRng(mulberry32(5));
 const osList = G.makeOrders(os2);
 ok(osList.filter(function (o) { return o.kind === 'crop'; })
    .every(function (o) { return (G.CROPS[o.crop].lv || 1) <= 4; }),
-   '委托只会要玩家买得到的作物', osList.map(function (o) { return o.name; }));
+   '委托最多只提前一档（≤ Lv+1）', osList.map(function (o) { return o.name; }));
 
 /* 长期订单 */
 let ls = G.createState(); ls.day = 10; ls.levels.farm = 4;
@@ -1870,6 +1870,11 @@ const v31ord1 = G.makeOrders(v31o1).filter(function (o) { return o.kind === 'cro
 G.setRng(mulberry32(5));
 const v31ord2 = G.makeOrders(v31o2).filter(function (o) { return o.kind === 'crop'; })[0];
 ok(v31ord2.reward > v31ord1.reward, '村口小摊让委托更值钱', [v31ord1.reward, v31ord2.reward]);
+G.setRng(mulberry32(5));
+const v31fish1 = G.makeOrders(v31o1).filter(function (o) { return o.kind === 'fish'; })[0];
+G.setRng(mulberry32(5));
+const v31fish2 = G.makeOrders(v31o2).filter(function (o) { return o.kind === 'fish'; })[0];
+ok(v31fish2.reward > v31fish1.reward, '村口小摊让鱼单也变值钱', [v31fish1.reward, v31fish2.reward]);
 
 /* 行情「还能卖多少」 */
 const v31h = G.createState();

@@ -70,12 +70,13 @@
       pushCrop(c);
     }
 
-    // 鱼单：单价随季节上涨（11 → 15 → 19 → 23），不再后期白送
+    // 鱼单：单价随季节上涨（11 → 15 → 19 → 23），不再后期白送；小镇委托加成同样生效
     const fq = Math.max(2, Math.round(randInt(2, 3) * mult));
     const per = BALANCE.order.fishBase + BALANCE.order.fishStep * season;
     orders.push({
       id: 'd' + day + '-f', kind: 'fish', crop: null, name: '任意鱼', emoji: '🐟',
-      qty: fq, reward: Math.max(12, per * fq), done: false
+      qty: fq, reward: Math.max(12, Math.round(per * fq * (1 + townBonus(s, 'orderBonus')))),
+      done: false
     });
     return orders;
   }
@@ -89,7 +90,8 @@
     if (rand() < 0.3) {
       const qty = Math.max(6, Math.round(randInt(8, 14) * (1 + season * 0.3)));
       return { id: 'L' + day, kind: 'fish', crop: null, name: '任意鱼', emoji: '🐟',
-               qty: qty, reward: Math.round(qty * (BALANCE.order.longFishBase + BALANCE.order.fishStep * season)),
+               qty: qty, reward: Math.round(qty * (BALANCE.order.longFishBase + BALANCE.order.fishStep * season) *
+                 (1 + townBonus(s, 'orderBonus'))),
                deadline: day + 5, done: false };
     }
     const c = pool[Math.floor(rand() * pool.length)];

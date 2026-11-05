@@ -366,10 +366,11 @@
           '报酬 = 数量 × 基础价 × ' + G.BALANCE.order.mult + ' × 市价（市价封顶 ×' + G.BALANCE.market.orderCap + '）。',
           '约是商店直售（' + G.BALANCE.shop.sellRate + ' × 市价）的 ' +
             (G.BALANCE.order.mult / G.BALANCE.shop.sellRate).toFixed(1) + ' 倍；没交不罚。',
-          '季节越往后要的量越多；贵的作物一次 2–3 个，单张报酬<b>最低 40 金</b>。'
+          '季节越往后要的量越多；贵的作物一次 2–3 个（入冬可到 6–8 个），单张报酬<b>最低 40 金</b>。'
         ])) +
         guideSub('🎲 出什么单', guideList([
-          '委托池按天数逐档解锁（D1 / D3 / D5 / D7 / D9 / D12 / D15），<b>只会要你当前等级买得到的作物</b>。',
+          '委托池按天数逐档解锁（D1 / D3 / D5 / D7 / D9 / D12 / D15）；<b>最多比种田等级高一档</b>，' +
+            '刚提前的那档可能还买不到种子，交不上不罚。',
           '<b>每天第一张固定是「买得到的最贵作物」</b>，剩下随机。',
           '鱼单单价随季节上涨（' + G.BALANCE.order.fishBase + ' → ' +
             (G.BALANCE.order.fishBase + 3 * G.BALANCE.order.fishStep) + ' 金/条）；长期鱼单 ' +
