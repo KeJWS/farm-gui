@@ -460,17 +460,52 @@
         '<h4>⌨️ 操作</h4>' +
         guideList([
           '成熟地块<b>左键直接收</b>；右键或 Shift + 点击看详情（可铲除、看产量）。',
-          '顶栏 <b>📊 状态</b> 看累计数据；<b>⚙️ 设置</b> 里有<b>农场指南</b>（分 4 页）/ 分享名片（导出 PNG）/ 导入导出 / 音效 / 重新开始。',
+          '顶栏 <b>📊 状态</b> 看累计数据；<b>⚙️ 设置</b> 里有<b>农场指南</b>（分 5 页）/ 分享名片（导出 PNG）/ 导入导出 / 音效 / 重新开始。',
           '地块 / 饵料 / 账本 / 日志都可以 Tab 聚焦、Enter 或空格操作。',
           '日志和账本都能导出 .md；进度自动存在本浏览器。'
         ]) +
+      '</div>';
+
+    const P5 =
+      '<div class="rule-sec">' +
+        '<h4>🍳 厨房</h4>' +
+        '<p><b>种田 Lv' + G.BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' + G.BALANCE.cook.unlockFish +
+        '</b> 解锁。用<b>作物 / 渔获 / 野货</b>做菜，菜进仓库、有保质期，可以吃，也可以放进收购箱卖。</p>' +
+        guideSub('👨‍🍳 烹饪等级', guideList([
+          '每做一道菜 +' + G.BALANCE.cook.xp + ' 经验；升级要 ' + G.BALANCE.cook.xpBase + ' + ' +
+            G.BALANCE.cook.xpStep + '×(级−1)。',
+          '<b>做砸概率</b>：Lv1 ' + Math.round(G.BALANCE.cook.failBase * 100) + '%，每级 −' +
+            (G.BALANCE.cook.failStep * 100).toFixed(1) + '%，最低 ' + Math.round(G.BALANCE.cook.failMin * 100) +
+            '%；做砸得到一份<b>焦糊料理</b>（不能吃，只能进收购箱）。',
+          '<b>品质判定</b>：Lv' + G.BALANCE.cook.qualityAt[0] + ' / Lv' + G.BALANCE.cook.qualityAt[1] +
+            ' 各多取一次最好，和施肥一个道理。',
+          '每道菜消耗 <b>' + G.BALANCE.cook.energy + ' 体力</b>，食材不够 / 等级不够都做不了。'
+        ])) +
+        '<table class="rule-table"><tr><th>菜</th><th>需 Lv</th><th>食材</th><th>体力</th><th>保质</th><th>卖价</th></tr>' +
+        G.cookRecipes().map(function (r) {
+          return '<tr><td>' + r.emoji + ' ' + r.name + '</td><td>Lv' + r.lv + '</td><td>' +
+            G.ingredientText(r) + '</td><td>+' + r.energy + '</td><td>' + r.days + ' 天</td><td>' +
+            r.price + ' 金</td></tr>';
+        }).join('') + '</table>' +
+        guideSub('🍽️ 吃午饭', guideList([
+          '<b>每天一次</b>，吃一份菜回复它的体力；菜也吃品质，品质越高回的体力越多。',
+          '<b>不吃午饭</b>：当天睡觉的伙食费 <b>×' + G.BALANCE.meal.skipLunchMul +
+            '</b>（厨房解锁后生效）。',
+          '菜有保质期，睡过保质期那天会坏掉；临期的先吃。'
+        ])) +
+        guideSub('📦 怎么卖', guideList([
+          '熟食<b>只能进收购箱</b>（农产品店 / 水产店不收），按入箱价扣 ' +
+            Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费，<b>不吃市价</b>。',
+          '焦糊料理也能进收购箱，只值 1 金——做砸的代价。'
+        ])) +
       '</div>';
 
     return [
       { emoji: '🌱', name: '种植', desc: '天气 · 作物 · 季节 · 果园', html: P1 },
       { emoji: '🎣', name: '钓鱼', desc: '钓鱼 · 采集 · 水产店', html: P2 },
       { emoji: '🧺', name: '买卖', desc: '农产品店 · 小镇 · 收购箱 · 品质 · 肥料', html: P3 },
-      { emoji: '💰', name: '经营', desc: '经济 · 委托 · 等级 · 百货店 · 图鉴 · 成就 · 操作', html: P4 }
+      { emoji: '💰', name: '经营', desc: '经济 · 委托 · 等级 · 百货店 · 图鉴 · 成就 · 操作', html: P4 },
+      { emoji: '🍳', name: '厨房', desc: '烹饪 · 食谱 · 吃午饭 · 熟食收购', html: P5 }
     ];
   }
 

@@ -193,7 +193,8 @@ ok(indexSource.indexOf('id="btn-market"') >= 0 &&
 ok(html('#plot-grid').indexOf('class="plot') >= 0 && (html('#plot-grid').match(/class="plot /g) || []).length === 5,
    '农田渲染出 5 块地');
 ok(text('#hud-plots').indexOf('5 块') >= 0, 'HUD 显示 5 块地', text('#hud-plots'));
-ok(text('#hud-fee').indexOf(G.mealFee({ maxEnergy: 15 }) + ' 金/天') >= 0, 'HUD 伙食费来自 BALANCE', text('#hud-fee'));
+ok(text('#hud-fee').indexOf(G.mealFeeDue({ maxEnergy: 15, day: 1, lunchDay: 0,
+     levels: { farm: 4, fish: 5 } }) + ' 金/天') >= 0, 'HUD 伙食费来自 BALANCE（没吃午饭 ×1.5）', text('#hud-fee'));
 ok(text('#cast-cost') === G.BALANCE.energy.fish + ' 体力', '甩杆体力来自 BALANCE', text('#cast-cost'));
 ok(text('#cast5-n') === String(G.BALANCE.fishBatch), '连甩杆数来自 BALANCE', text('#cast5-n'));
 ok(text('#dig-txt') === G.digCost({ levels: { dig: 1 } }) + ' 体力', '挖蚯蚓体力来自 BALANCE', text('#dig-txt'));
@@ -520,8 +521,8 @@ console.log('\n== 农场指南分页 ==');
   (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
 })();
 ok(html('#modal-root').indexOf('rule-tabs') >= 0, '指南带分页标签');
-ok((html('#modal-root').match(/data-helppage=/g) || []).length === 4, '规则分成 4 页');
-ok(html('#modal-root').indexOf('1 / 4') >= 0, '第 1 页页码正确');
+ok((html('#modal-root').match(/data-helppage=/g) || []).length === 5, '规则分成 5 页');
+ok(html('#modal-root').indexOf('1 / 5') >= 0, '第 1 页页码正确');
 ok(html('#modal-root').indexOf('🍑 果园') >= 0 && html('#modal-root').indexOf('树坑') >= 0,
    '种植页含果园小节');
 (function helpNext() {
@@ -529,7 +530,7 @@ ok(html('#modal-root').indexOf('🍑 果园') >= 0 && html('#modal-root').indexO
   const target = { closest: function (s) { return s === '[data-helpnav]' ? btn : null; }, classList: classList() };
   (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
 })();
-ok(html('#modal-root').indexOf('2 / 4') >= 0, '能翻到第 2 页');
+ok(html('#modal-root').indexOf('2 / 5') >= 0, '能翻到第 2 页');
 ok(html('#modal-root').indexOf('水产店') >= 0 && html('#modal-root').indexOf('采集') >= 0,
    '第 2 页是钓鱼 / 采集 / 水产店');
 (function helpTab() {
@@ -537,8 +538,15 @@ ok(html('#modal-root').indexOf('水产店') >= 0 && html('#modal-root').indexOf(
   const target = { closest: function (s) { return s === '[data-helppage]' ? btn : null; }, classList: classList() };
   (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
 })();
-ok(html('#modal-root').indexOf('4 / 4') >= 0 && html('#modal-root').indexOf('委托') >= 0,
+ok(html('#modal-root').indexOf('4 / 5') >= 0 && html('#modal-root').indexOf('委托') >= 0,
    '点标签能直接跳到第 4 页（经营）');
+(function helpTab5() {
+  const btn = { dataset: { helppage: '4' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-helppage]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+ok(html('#modal-root').indexOf('5 / 5') >= 0 && html('#modal-root').indexOf('厨房') >= 0,
+   '第 5 页是厨房');
 
 console.log('\n== 设备区 / 新等级 / 状态 ==');
 (function devicePanel() {
@@ -631,6 +639,17 @@ setTimeout(function () {
 }, 30);
 
 /* ---------- 分享名片（v2.26） ---------- */
+console.log('\n== 厨房 ==');
+ok(document.querySelector('#kitchen-panel') !== null && document.querySelector('#cook-lv') !== null,
+   '右栏有厨房面板');
+ok(document.querySelector('[data-store-filter="food"]') !== null, '仓库有熟食分类');
+clickAct('kitchen');
+ok(html('#modal-root').indexOf('烹饪') >= 0 && html('#modal-root').indexOf('蔬菜汤') >= 0,
+   '厨房弹窗列出食谱');
+ok(html('#modal-root').indexOf('data-cook=') >= 0, '食谱带烹饪按钮');
+clickAct('lunch');
+ok(html('#modal-root').indexOf('吃午饭') >= 0, '午饭弹窗能打开');
+
 console.log('\n== 分享名片 ==');
 ok(indexSource.indexOf('id="btn-share"') < 0, '分享入口不再占用顶栏图标');
 document.getElementById('btn-settings').click();

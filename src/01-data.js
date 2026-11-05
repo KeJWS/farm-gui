@@ -12,8 +12,14 @@
     start: { coins: 50, energy: 15, maxEnergy: 15, plots: 5 },
     /* 各动作体力消耗（统一在这里改，不要在逻辑里写死数字） */
     energy: { plant: 1, water: 1, waterSummer: 2, harvest: 1, fert: 1, fish: 2 },
-    /* 伙食费：base + (上限 − from) / perEnergy，最低 min；没钱吃饭只回 pct（至少 noMoneyMin） */
-    meal: { base: 3, perEnergy: 5, from: 10, min: 1, noMoneyPct: 0.3, noMoneyMin: 5 },
+    /* 伙食费：base + (上限 − from) / perEnergy，最低 min；没钱吃饭只回 pct（至少 noMoneyMin）
+     * skipLunchMul：厨房解锁后，当天没吃午饭，睡觉伙食费 ×1.5 */
+    meal: { base: 3, perEnergy: 5, from: 10, min: 1, noMoneyPct: 0.3, noMoneyMin: 5, skipLunchMul: 1.5 },
+    /* 厨房：种田 + 钓鱼等级双门槛；烹饪等级单独一条线 */
+    cook: { unlockFarm: 4, unlockFish: 3, energy: 1, xp: 2, xpBase: 12, xpStep: 8,
+            failBase: 0.25, failStep: 0.025, failMin: 0.02,
+            /* 达到这些等级，品质多取一次（Lv4 / Lv8） */
+            qualityAt: [4, 8] },
     /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
     upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
     /* 一季 30 天（春 1–30 / 夏 31–60 / 秋 61–90 / 冬 91–120） */

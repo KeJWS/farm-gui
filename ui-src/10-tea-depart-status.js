@@ -243,7 +243,8 @@
     const progress = [
       ['进度', '第 ' + state.day + ' 天 · ' + G.seasonOf(state.day) + '季'],
       ['金币', state.coins + ' 金'],
-      ['体力', state.energy + ' / ' + state.maxEnergy + ' · 伙食 ' + G.mealFee(state) + ' 金/天'],
+      ['体力', state.energy + ' / ' + state.maxEnergy + ' · 伙食 ' + G.mealFeeDue(state) + ' 金/天' +
+        (G.mealFeeDue(state) !== G.mealFee(state) ? '（没吃午饭 ×' + G.BALANCE.meal.skipLunchMul + '）' : '')],
       ['土地', state.plots.length + ' 块 · 洒水器 ' + state.sprinklers + ' 个'],
       ['设备', (state.harvester ? '自动收获器 ✅ · ' : '自动收获器 — · ') +
         '自动播种器 ×' + G.seederCount(state) + (G.seederCount(state) ? '（每晚 ' + G.seederPlots(state) + ' 块）' : '') +

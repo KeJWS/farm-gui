@@ -84,6 +84,9 @@
       teas: { green: 0, black: 0, milk: 0, coffee: 0 },
       keys: { iron: 0, gold: 0 },
       teaUsed: false,
+      /* 厨房：做好的料理（每份带品质 / 体力 / 保质期） */
+      food: [],
+      lunchDay: 0,
       ledger: [{ day: 1, label: '开局金币', income: 50, expense: 0, balance: 50 }],
       log: [{ day: 1, text: '🌾 欢迎来到我的小农场，第 1 天开始了。', kind: 'sys' }],
       orders: makeOrders({ day: 1 }),
@@ -92,11 +95,12 @@
       shop: makeShop(1),
       cropShop: makeCropShop(1),
       levels: { farm: 1, fish: 1, farmXp: 0, fishXp: 0, dig: 1, digXp: 0, forage: 1, forageXp: 0,
-                trade: 1, tradeXp: 0 },
+                trade: 1, tradeXp: 0, cook: 1, cookXp: 0 },
       ach: {},
       fishBook: { count: 0, entries: [], best: null, priciest: null },
       stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0,
                longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0,
+               cooks: 0, meals: 0,
                incomeTotal: 0, expenseTotal: 0,
                wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }
     };

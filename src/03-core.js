@@ -63,15 +63,19 @@
 
   /* ---------------- 等级（种田 / 钓鱼 / 挖蚯蚓 / 采集 / 交易） ---------------- */
 
-  const SKILLS = ['farm', 'fish', 'dig', 'forage', 'trade'];
-  const SKILL_NAME = { farm: '种田', fish: '钓鱼', dig: '挖蚯蚓', forage: '采集', trade: '交易' };
+  const SKILLS = ['farm', 'fish', 'dig', 'forage', 'trade', 'cook'];
+  const SKILL_NAME = { farm: '种田', fish: '钓鱼', dig: '挖蚯蚓', forage: '采集', trade: '交易', cook: '烹饪' };
 
-  /* 交易等级用一条更长的曲线（经验来自交易额，来得快） */
+  /* 交易等级用一条更长的曲线（经验来自交易额，来得快）；烹饪略短一点 */
   function levelNeed(lv, kind) {
     const l = lv || 1;
     if (kind === 'trade') {
       const T = BALANCE.trade;
       return T.xpBase + T.xpStep * (l - 1);
+    }
+    if (kind === 'cook') {
+      const C = BALANCE.cook;
+      return C.xpBase + C.xpStep * (l - 1);
     }
     const L = BALANCE.level;
     return L.xpBase + L.xpStep * (l - 1);
@@ -117,6 +121,9 @@
     if (kind === 'trade') {
       return '商店进价 −' + (Math.min(BALANCE.trade.maxCut, (lv - 1) * BALANCE.trade.buyCut) * 100).toFixed(1) + '%';
     }
+    if (kind === 'cook') {
+      return '失败 ' + Math.round(cookFailByLv(lv) * 100) + '% · 品质取 ' + cookRollsByLv(lv) + ' 次最好';
+    }
     return '收获产量 +' + Math.floor(lv / 4);
   }
 
@@ -129,6 +136,30 @@
   }
   function digCost(s) { return digCostByLv(skillLv(s, 'dig')); }
   function forageCost(s) { return forageCostByLv(skillLv(s, 'forage')); }
+
+  /* 烹饪：等级越高，做砸的概率越低、品质判定次数越多 */
+  function cookFailByLv(lv) {
+    const C = BALANCE.cook;
+    return Math.max(C.failMin, C.failBase - C.failStep * (lv - 1));
+  }
+  function cookRollsByLv(lv) {
+    let n = 1;
+    (BALANCE.cook.qualityAt || []).forEach(function (at) { if (lv >= at) n++; });
+    return n;
+  }
+  function cookLv(s) { return skillLv(s, 'cook'); }
+  function cookFail(s) { return cookFailByLv(cookLv(s)); }
+  function cookRolls(s) { return cookRollsByLv(cookLv(s)); }
+  function kitchenUnlocked(s) {
+    return farmLv(s) >= BALANCE.cook.unlockFarm && fishLv(s) >= BALANCE.cook.unlockFish;
+  }
+  function lunchEaten(s) { return (s.lunchDay || 0) === (s.day || 1); }
+  /* 实际要扣的伙食费：厨房已解锁且没吃午饭 → ×1.5 */
+  function mealFeeDue(s) {
+    const base = mealFee(s);
+    if (!kitchenUnlocked(s) || lunchEaten(s)) return base;
+    return Math.round(base * BALANCE.meal.skipLunchMul);
+  }
 
   /* 加经验，返回升了几级 */
   function addLevelXp(s, kind, n) {

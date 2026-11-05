@@ -2891,5 +2891,78 @@ section('土地曲线与果树等级');
   ok(Math.abs(G.sellBonus(full) - 1.2) < 1e-9, '全成就时售价加成 +20%', G.sellBonus(full));
 }
 
+/* ---------- 21. v2.44 厨房 / 烹饪 ---------- */
+section('厨房与烹饪');
+{
+  const ck = G.createState();
+  ck.day = 10; ck.levels.farm = 4; ck.levels.fish = 5; ck.energy = 50; ck.maxEnergy = 50;
+  ok(G.kitchenUnlocked(ck), '种田 Lv4 + 钓鱼 Lv3 解锁厨房');
+  ok(G.cookRecipes().length === 8, '食谱 8 道', G.cookRecipes().length);
+  ok(!G.cookMeal(ck, 'soup').ok, '没食材做不了');
+
+  G.addStore(ck, 'carrot', 'std', 2);
+  G.addStore(ck, 'cabbage', 'std', 1);
+  G.setRng(mulberry32(3));
+  const rc = G.cookMeal(ck, 'soup');
+  ok(rc.ok && !rc.fail && ck.energy === 49 && G.storeCount(ck, 'carrot') === 0 &&
+     ck.levels.cookXp === G.BALANCE.cook.xp, '做菜扣食材/体力并加经验', rc);
+  ok(ck.food.length === 1 && ck.food[0].energy > 0 && ck.food[0].expire === ck.day + 3,
+     '菜进仓库并带保质期', ck.food[0]);
+
+  ck.energy = 5;
+  const eat = G.eatFood(ck, 0);
+  ok(eat.ok && ck.energy > 5 && ck.lunchDay === ck.day, '吃午饭回体力', eat);
+  ok(!G.eatFood(ck, 0).ok && ck.lunchDay === ck.day, '每天只能吃一次午饭');
+
+  const fs = G.createState();
+  fs.day = 10; fs.levels.farm = 4; fs.levels.fish = 5;
+  ok(G.mealFeeDue(fs) === Math.round(G.mealFee(fs) * G.BALANCE.meal.skipLunchMul),
+     '没吃午饭伙食费 ×' + G.BALANCE.meal.skipLunchMul, [G.mealFee(fs), G.mealFeeDue(fs)]);
+  fs.lunchDay = 10;
+  ok(G.mealFeeDue(fs) === G.mealFee(fs), '吃了午饭恢复原价', G.mealFeeDue(fs));
+
+  /* 做砸：随机数固定 0，必定小于失败率 */
+  G.setRng(function () { return 0; });
+  const cf = G.createState();
+  cf.day = 10; cf.levels.farm = 4; cf.levels.fish = 5; cf.energy = 10;
+  G.addStore(cf, 'carrot', 'std', 2);
+  G.addStore(cf, 'cabbage', 'std', 1);
+  const rf = G.cookMeal(cf, 'soup');
+  ok(rf.ok && rf.fail && cf.food[0].rid === 'fail' && cf.food[0].energy === 0,
+     '等级低有概率做成焦糊料理', cf.food[0]);
+  ok(G.cookRolls({ levels: { cook: 1 } }) === 1 && G.cookRolls({ levels: { cook: 4 } }) === 2 &&
+     G.cookRolls({ levels: { cook: 8 } }) === 3, '烹饪 Lv4 / Lv8 各多取一次品质');
+
+  /* 保质期：睡觉时清掉过期料理 */
+  const sf = G.createState();
+  sf.day = 10;
+  sf.food = [{ rid: 'soup', name: '蔬菜汤', emoji: '🥣', q: 'std', energy: 8, price: 46, day: 9, expire: 9 },
+             { rid: 'soup', name: '蔬菜汤', emoji: '🥣', q: 'std', energy: 8, price: 46, day: 10, expire: 13 }];
+  ok(G.foodTick(sf) === 1 && sf.food.length === 1, '过期料理会被清掉', sf.food.length);
+
+  /* 熟食进收购箱：不吃市价，扣 5% 手续费 */
+  const bx = G.createState();
+  bx.day = 10;
+  bx.food = [{ rid: 'soup', name: '蔬菜汤', emoji: '🥣', q: 'std', energy: 8, price: 46, day: 10, expire: 13 }];
+  ok(G.boxPutFood(bx, 0).ok && bx.food.length === 0 && G.boxCount(bx) === 1, '熟食能放进收购箱');
+  const bv = G.boxValue(bx);
+  ok(bv === Math.round(46 * G.sellBonus(bx) * (1 - G.BALANCE.market.boxFee)),
+     '熟食按入箱价 ×95% 结算', bv);
+  ok(G.shipBox(bx).n === 1 && G.boxCount(bx) === 0, '熟食睡觉时出货');
+
+  /* 存档往返 */
+  const sv = G.createState();
+  sv.food = [{ rid: 'soup', name: '蔬菜汤', emoji: '🥣', q: 'good', energy: 10, price: 60, day: 10, expire: 13 }];
+  sv.lunchDay = 10; sv.levels.cook = 3; sv.levels.cookXp = 7;
+  const back = G.deserialize(G.serialize(sv));
+  ok(back.food.length === 1 && back.food[0].q === 'good' && back.lunchDay === 10 &&
+     back.levels.cook === 3 && back.levels.cookXp === 7, '熟食 / 午饭 / 烹饪等级能存档', back.food);
+
+  /* 厨房没解锁时整条线都不生效 */
+  const lock = G.createState();
+  lock.energy = 50;
+  ok(!G.kitchenUnlocked(lock) && !G.cookMeal(lock, 'soup').ok, '没解锁做不了菜');
+}
+
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));
 process.exit(fail ? 1 : 0);

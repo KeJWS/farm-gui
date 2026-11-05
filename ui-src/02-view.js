@@ -19,7 +19,12 @@
     wc.dataset.w = w.id;
     wc.title = w.note;
 
-    $('#hud-fee').textContent = '🍖 ' + G.mealFee(state) + ' 金/天';
+    $('#hud-fee').textContent = '🍖 ' + G.mealFeeDue(state) + ' 金/天' +
+      (G.mealFeeDue(state) !== G.mealFee(state) ? '（没吃午饭）' : '');
+    $('#hud-fee').title = G.kitchenUnlocked(state)
+      ? '今天' + (G.lunchEaten(state) ? '已吃' : '没吃') + '午饭：' +
+        G.mealFee(state) + ' → ' + G.mealFeeDue(state) + ' 金'
+      : '每天睡觉扣一次';
     $('#hud-plots').textContent = '🏞️ ' + state.plots.length + ' 块';
     $('#season').textContent = (G.isWinter(state.day) ? '❄️ ' : '') +
       G.seasonOf(state.day) + ' · 第 ' + state.day + ' 天';
@@ -194,11 +199,32 @@
         (state.energy >= state.maxEnergy ? '体力已满'
           : teaBest.emoji + ' ' + teaBest.name + ' · +' + teaBest.energy + ' 体力'));
 
-    const digCost = G.digCost(state);
-    const digFrozen = G.isWinter(state.day);
+    const digCost = G.digCost(state);    const digFrozen = G.isWinter(state.day);
     $('[data-act="dig"]').disabled = digFrozen || state.energy < digCost;
     const digTxt = $('#dig-txt');
     if (digTxt) digTxt.textContent = digFrozen ? '封冻期 · 挖不了' : digCost + ' 体力';
+
+    /* 厨房 */
+    const cookLv = state.levels.cook || 1;
+    const cookLvEl = $('#cook-lv');
+    if (cookLvEl) {
+      cookLvEl.textContent = '🍳 Lv' + cookLv;
+      cookLvEl.title = G.levelEffectText('cook', cookLv);
+    }
+    const unlocked = G.kitchenUnlocked(state);
+    const kitchenTxt = $('#kitchen-txt');
+    if (kitchenTxt) {
+      kitchenTxt.textContent = unlocked
+        ? '食谱 ' + G.cookRecipes().filter(function (r) { return r.lv <= cookLv; }).length + ' 道'
+        : '需种田 Lv' + G.BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' + G.BALANCE.cook.unlockFish;
+    }
+    const lunchBtn = $('[data-act="lunch"]');
+    if (lunchBtn) lunchBtn.disabled = !unlocked;
+    const lunchTxt = $('#lunch-txt');
+    if (lunchTxt) {
+      lunchTxt.textContent = !unlocked ? '厨房未解锁'
+        : (G.lunchEaten(state) ? '今天吃过了' : '今天还没吃 · 伙食 ×' + G.BALANCE.meal.skipLunchMul);
+    }
     const forageBtn = $('[data-act="forage"]');
     if (forageBtn) {
       const fp = G.foragePool(state.day);

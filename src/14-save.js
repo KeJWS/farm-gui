@@ -178,7 +178,7 @@
     merged.fishBook.count = Math.round(num(merged.fishBook.count, 0, 0, 1e9));
     merged.fishBook.best = safeBookTop(merged.fishBook.best, merged.day);
     merged.fishBook.priciest = safeBookTop(merged.fishBook.priciest, merged.day);
-    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0, incomeTotal: 0, expenseTotal: 0, wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }, s.stats || {});
+    merged.stats = Object.assign({ harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0, longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0, cooks: 0, meals: 0, incomeTotal: 0, expenseTotal: 0, wild: {}, forageBest: 0, orchardFruit: 0, orchardPlanted: 0, fruitSold: 0 }, s.stats || {});
     // 老存档没有累计收支：用现有账本（最多 200 笔）估算，之后由 addCoins 继续累加
     if (s.stats == null || s.stats.incomeTotal == null) {
       merged.stats.incomeTotal = (s.ledger || []).reduce(function (n, r) { return n + (r.income || 0); }, 0);
@@ -241,7 +241,7 @@
       merged.keys[id] = Math.round(num(merged.keys[id], 0, 0, 99));
     });
     merged.box = Array.isArray(s.box) ? s.box.slice(0, 500).filter(function (e) {
-      return e && (e.kind === 'crop' || e.kind === 'fish') && e.name;
+      return e && (e.kind === 'crop' || e.kind === 'fish' || e.kind === 'food') && e.name;
     }).map(function (e) {
       // v2.29 起收购箱只记「原价 raw」，结算时才按当日市价算；老存档的 v 直接当 raw
       const raw = Math.round(num(e.raw != null ? e.raw : e.v, 0, 0, 1e9));
@@ -267,8 +267,31 @@
       if (e.kind === 'fish' && e.chest && CHESTS[e.chest]) out.chest = e.chest;
       if (e.kind === 'fish' && e.junk) out.junk = true;
       if (e.kind === 'fish' && e.trash) out.trash = true;
+      if (e.kind === 'food') {
+        if (Q_IDS.indexOf(e.q) >= 0) out.q = e.q;
+        out.energy = Math.round(num(e.energy, 0, 0, 999));
+        out.rid = e.rid === 'fail' ? 'fail' : String(e.rid || 'food');
+        out.expire = Math.round(num(e.expire, merged.day, 1, 100000));
+      }
       return out;
     }) : [];
+    /* 厨房：熟食（过期的不留） + 今天有没有吃午饭 */
+    merged.food = Array.isArray(s.food) ? s.food.slice(0, 200).filter(function (f) {
+      return f && (f.rid === 'fail' || recipeById(f.rid)) && Q_IDS.indexOf(f.q) >= 0;
+    }).map(function (f) {
+      const r = f.rid === 'fail' ? null : recipeById(f.rid);
+      return {
+        rid: f.rid,
+        name: plain(f.name || (r && r.name), 20),
+        emoji: plain(f.emoji || (r && r.emoji), 4),
+        q: f.q,
+        energy: Math.round(num(f.energy, 0, 0, 999)),
+        price: Math.round(num(f.price, 1, 0, 99999)),
+        day: Math.round(num(f.day, merged.day, 1, 100000)),
+        expire: Math.round(num(f.expire, merged.day + 1, 1, 100000))
+      };
+    }).filter(function (f) { return f.expire >= merged.day; }) : [];
+    merged.lunchDay = Math.round(num(s.lunchDay, 0, 0, 100000));
     merged.orders = normalizeOrders(s.orders, merged);
 
     // 长期订单
@@ -472,11 +495,13 @@
       dig: Math.round(num(rawLv && rawLv.dig, 1, 1, BALANCE.level.max)),
       forage: Math.round(num(rawLv && rawLv.forage, 1, 1, BALANCE.level.max)),
       trade: Math.round(num(rawLv && rawLv.trade, 1, 1, BALANCE.level.max)),
+      cook: Math.round(num(rawLv && rawLv.cook, 1, 1, BALANCE.level.max)),
       farmXp: Math.round(num(rawLv && rawLv.farmXp, 0, 0, 999999)),
       fishXp: Math.round(num(rawLv && rawLv.fishXp, 0, 0, 999999)),
       digXp: Math.round(num(rawLv && rawLv.digXp, 0, 0, 999999)),
       forageXp: Math.round(num(rawLv && rawLv.forageXp, 0, 0, 999999)),
-      tradeXp: Math.round(num(rawLv && rawLv.tradeXp, 0, 0, 999999))
+      tradeXp: Math.round(num(rawLv && rawLv.tradeXp, 0, 0, 999999)),
+      cookXp: Math.round(num(rawLv && rawLv.cookXp, 0, 0, 999999))
     };
     if (!rawLv || (merged.levels.farm === 1 && merged.levels.farmXp === 0 &&
                    merged.levels.fish === 1 && merged.levels.fishXp === 0 &&
@@ -540,6 +565,12 @@
     ledgerByDay: ledgerByDay, logByDay: logByDay, ledgerByCategory: ledgerByCategory, LEDGER_CATS: LEDGER_CATS,
     makeOrders: makeOrders, deliverOrder: deliverOrder, orderHave: orderHave, orderPool: orderPool,
     mealFee: mealFee, expandCost: expandCost, upgradeCost: upgradeCost,
+    /* 厨房 / 烹饪 */
+    cookRecipes: function () { return RECIPES; },
+    recipeById: recipeById, ingredientText: ingredientText, cookHave: cookHave,
+    cookMeal: cookMeal, eatFood: eatFood, foodTick: foodTick, boxPutFood: boxPutFood,
+    kitchenUnlocked: kitchenUnlocked, cookLv: cookLv, cookFail: cookFail, cookRolls: cookRolls,
+    mealFeeDue: mealFeeDue, lunchEaten: lunchEaten, cookFishBag: cookFishBag,
     netWorth: netWorth, profileRank: profileRank, deviceValue: deviceValue, orchardValue: orchardValue,
     addCoins: addCoins, log: log,
     WORK_RATE_FULL: WORK_RATE_FULL, WORK_RATE_HALF: WORK_RATE_HALF,

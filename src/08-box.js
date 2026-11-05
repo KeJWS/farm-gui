@@ -5,7 +5,11 @@
 
   function boxRaw(e) { return e.raw != null ? e.raw : (e.v || 0); }
   function boxSold(e) { return e.sold != null ? e.sold : 0; }
-  function boxKeyOf(e) { return e.kind === 'crop' ? 'c:' + e.id : 'f:' + e.name; }
+  function boxKeyOf(e) {
+    if (e.kind === 'crop') return 'c:' + e.id;
+    if (e.kind === 'food') return 'k:' + e.name;
+    return 'f:' + e.name;
+  }
 
   /* 同一品种的几批货合成一批：按「入箱时供需的批次中点」锁价，
    * 所以拆成几批放进去和一次全放，价格完全一样。
@@ -30,10 +34,11 @@
 
   /* 一组货的到手金额：锁定供需 × 出箱当天季节 × 成就加成 ×（1−手续费） */
   function boxGroupNet(s, g) {
-    const mkt = g.junk ? 1
-      : (g.kind === 'fish'
-        ? fishMarketMul(s, g.name, g.n, g.sold)
-        : marketMul(s, g.id, g.n, g.sold));
+    const mkt = g.kind === 'food' ? 1
+      : (g.junk ? 1
+        : (g.kind === 'fish'
+          ? fishMarketMul(s, g.name, g.n, g.sold)
+          : marketMul(s, g.id, g.n, g.sold)));
     return Math.max(1, Math.round(g.raw * sellBonus(s) * mkt * (1 - BALANCE.market.boxFee)));
   }
 
@@ -122,6 +127,13 @@
       remain -= cut;
       if (e.kind === 'crop') {
         if (e.id) addStore(s, e.id, p.q, cut);
+      } else if (e.kind === 'food') {
+        for (let i = 0; i < cut; i++) {
+          s.food = s.food || [];
+          s.food.push({ rid: e.rid || 'food', name: e.name, emoji: e.emoji, q: e.q || 'std',
+                        energy: e.energy || 0, price: p.unit || 1, day: s.day,
+                        expire: e.expire || (s.day + 1) });
+        }
       } else {
         for (let i = 0; i < cut; i++) {
           s.fishBag.push({ name: e.name, emoji: e.emoji, q: (p.q && p.q !== '-') ? p.q : null,

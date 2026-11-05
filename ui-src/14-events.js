@@ -426,6 +426,37 @@
         return;
       }
 
+      // 厨房：做菜 / 吃午饭 / 放收购箱
+      const cookBtn = t.closest('[data-cook]');
+      if (cookBtn && !cookBtn.disabled) {
+        const r = G.cookMeal(state, cookBtn.dataset.cook);
+        commit(r);
+        if (r.ok) {
+          SFX.good();
+          toast(r.fail ? '🔥 做砸了，得到一份焦糊料理' : '🍳 ' + r.food.name + ' 做好了', r.fail ? 'warn' : 'good');
+          if (modalOpen()) kitchenModal();
+        } else {
+          toast(r.msg, 'warn');
+        }
+        return;
+      }
+      const eatBtn = t.closest('[data-eat]');
+      if (eatBtn && !eatBtn.disabled) {
+        const r = G.eatFood(state, Number(eatBtn.dataset.eat));
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) { SFX.good(); closeModal(); }
+        return;
+      }
+      const boxFood = t.closest('[data-boxfood]');
+      if (boxFood && !boxFood.disabled) {
+        const r = G.boxPutFood(state, Number(boxFood.dataset.boxfood));
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) SFX.coin();
+        return;
+      }
+
       // 下午茶：喝哪一杯
       const drink = t.closest('[data-tea]');
       if (drink && !drink.disabled) {

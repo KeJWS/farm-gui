@@ -40,6 +40,8 @@
       }
     },
     tea: teaModal,
+    kitchen: kitchenModal,
+    lunch: lunchModal,
     depart: departModal,
     orchardWater: function () {
       const r = G.waterOrchard(state);

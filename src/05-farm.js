@@ -356,7 +356,8 @@
   }
 
   function sleep(s) {
-    const fee = mealFee(s);
+    const skipLunch = kitchenUnlocked(s) && !lunchEaten(s);
+    const fee = mealFeeDue(s);
     const notes = [];
     const coinsBefore = s.coins || 0;
     const cash = [];        // 当日现金收支（正负号）
@@ -365,7 +366,7 @@
     if (s.coins >= fee) {
       addCoins(s, -fee, '伙食费');
       cash.push({ label: '🍖 伙食', value: -fee });
-      notes.push({ kind: 'meal', text: '🍖 伙食 -' + fee });
+      notes.push({ kind: 'meal', text: '🍖 伙食 -' + fee + (skipLunch ? '（没吃午饭 ×1.5）' : '') });
       s.energy = s.maxEnergy;
     } else {
       // 没钱只恢复到「上限的 pct，至少 min」，但不会扣掉已有的体力
@@ -414,6 +415,8 @@
     s.day++;
     s.teaUsed = false;
     s.workUsed = false;
+    const spoiled = foodTick(s);
+    if (spoiled) notes.push({ kind: 'food', text: '🍲 坏掉 ' + spoiled + ' 份料理' });
     // 市场冷却：昨天的销量今天只算 70%（回落 30%）
     const decay = BALANCE.market.decay;
     s.market = s.market || {};

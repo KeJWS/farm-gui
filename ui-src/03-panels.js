@@ -19,10 +19,11 @@
     const wormN = state.bait.worm || 0;
     const fertRows = ['normal', 'special'].filter(function (k) { return (state.ferts[k] || 0) > 0; });
     const counts = {
-      all: crops.length + fish.length + (wormN ? 1 : 0) + fertRows.length,
+      all: crops.length + fish.length + (wormN ? 1 : 0) + fertRows.length + (state.food || []).length,
       crops: planted.length,
       wild: wild.length,
       fish: fishOnly.length,
+      food: (state.food || []).length,
       junk: junk.length,
       supplies: (wormN ? 1 : 0) + fertRows.length
     };
@@ -92,6 +93,26 @@
       const visible = junk.filter(function (g) { return matches(g.name + ' ' + G.fishDesc(g.name)); });
       const rows = fishRows(visible);
       if (rows) sections.push('<div class="store-sub">🗑️ 杂物与宝箱 · ' + visible.reduce(function (n, g) { return n + g.count; }, 0) + ' 件</div>' + rows);
+    }
+    if (storeFilter === 'all' || storeFilter === 'food') {
+      const foods = (state.food || []).map(function (f, i) { return { f: f, i: i }; })
+        .filter(function (x) { return matches(x.f.name); });
+      const rows = foods.map(function (x) {
+        const f = x.f, q = G.qualityById(f.q);
+        return '<div class="store-row">' +
+          '<span class="se">' + esc(f.emoji || '🍲') + '</span>' +
+          '<div><div class="sn">' + esc(f.name) +
+            (q ? ' <b class="own">' + q.emoji + q.name + '</b>' : '') + '</div>' +
+          '<div class="sv">+' + (f.energy || 0) + ' 体力 · 保质到 D' + f.expire +
+            ' · 约 ' + (f.price || 0) + ' 金</div></div>' +
+          '<span class="sp">' + (f.price || 0) + ' 金</span>' +
+          '<span class="spw">' +
+            '<button class="btn mini" data-eat="' + x.i + '"' +
+              (G.lunchEaten(state) || f.rid === 'fail' ? ' disabled' : '') + '>吃</button>' +
+            '<button class="btn mini" data-boxfood="' + x.i + '" title="放进收购箱">📦</button>' +
+          '</span></div>';
+      }).join('');
+      if (rows) sections.push('<div class="store-sub">🍲 熟食 · ' + foods.length + ' 份</div>' + rows);
     }
     if (storeFilter === 'all' || storeFilter === 'supplies') {
       const supplyRows = [];

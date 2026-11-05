@@ -1182,3 +1182,19 @@ button{ color:inherit; font:inherit; }
 .seed-chip .sc-n{ margin-left:auto; font-size:10.5px; color:var(--ink-3); }
 .seed-chip .sc-used{ font-size:9.5px; color:var(--green-d); }
 
+
+/* ---------- 厨房 / 烹饪 ---------- */
+.cook-top{ font-size:11.5px; line-height:1.6; color:var(--ink-2); font-weight:700; padding:8px 10px; border-radius:10px; background:var(--soft); }
+.cook-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }
+.cook-card{ display:flex; flex-direction:column; gap:4px; padding:9px 10px; border-radius:12px; background:var(--card); border:1px solid var(--line); min-width:0; }
+.cook-card.locked{ opacity:.55; }
+.cc-head{ display:flex; align-items:center; gap:6px; font-size:13px; }
+.cc-head b{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cc-e{ font-size:18px; line-height:1; }
+.cc-lv{ font-size:10px; font-weight:900; color:var(--ink-3); }
+.cc-desc{ font-size:11px; color:var(--ink-3); font-weight:600; }
+.cc-row{ font-size:11.5px; color:var(--ink-2); font-weight:700; line-height:1.5; }
+.cc-lock{ font-size:11px; font-weight:800; color:var(--ink-3); margin-top:2px; }
+.cook-card .btn{ align-self:flex-start; margin-top:2px; }
+@media (max-width:560px){ .cook-grid{ grid-template-columns:1fr; } }
+
