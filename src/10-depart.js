@@ -115,7 +115,7 @@
       }
       /* 铁箱也有小概率掉食谱 */
       if (rand() < BALANCE.cook.ironRecipeChance) {
-        const rec = grantGoldRecipe(s);
+        const rec = grantChestRecipe(s, 'iron');
         if (rec) gains.push('📜 食谱：' + rec.emoji + ' ' + rec.name);
       }
     } else {
@@ -140,7 +140,7 @@
       }
       /* 黄金宝箱还能掉食谱（只会掉还没学会的） */
       if (rand() < BALANCE.cook.goldRecipeChance) {
-        const rec = grantGoldRecipe(s);
+        const rec = grantChestRecipe(s, 'gold');
         if (rec) gains.push('📜 食谱：' + rec.emoji + ' ' + rec.name);
       }
     }

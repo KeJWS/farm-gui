@@ -452,7 +452,7 @@
             G.BALANCE.codex.crops.map(function (m) { return m.need; }).join(' / ') + ' 种，每档只发一次（金币 / 饵料 / 肥料）。',
           '图鉴还会单独记录<b>野货</b>（' + G.WILD_LIST.map(function (w) { return w.name; }).join(' / ') +
             '）、<b>水果</b>和<b>菜品</b>，这几类只做收集展示，不计入上面两档奖励。',
-          '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态；旧存档按现有进度补发。'
+          '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态（奖励区可折叠）；旧存档按现有进度补发。'
         ]) +
       '</div>' +
 
@@ -499,8 +499,10 @@
           }).join(' / ') + '，买一次永久学会。',
           '<b>黄金宝箱</b>：' + G.cookRecipes().filter(function (r) { return r.source === 'gold'; })
             .map(function (r) { return r.name; }).join(' / ') + '，金箱 ' +
-            Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '%、铁箱 ' +
-            Math.round(G.BALANCE.cook.ironRecipeChance * 100) + '% 概率掉一张。'
+            Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '%；<b>铁制宝箱</b>：' +
+            G.cookRecipes().filter(function (r) { return r.source === 'iron'; })
+              .map(function (r) { return r.name; }).join(' / ') + '，铁箱 ' +
+            Math.round(G.BALANCE.cook.ironRecipeChance * 100) + '%。'
         ])) +
         guideSub('🍽️ 吃午饭', guideList([
           '<b>每天一次</b>，吃一份菜回复它的体力；菜也吃品质，品质越高回的体力越多。',

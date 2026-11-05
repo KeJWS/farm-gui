@@ -716,7 +716,7 @@
             /* 宝箱掉食谱的概率 */
             goldRecipeChance: 0.09, ironRecipeChance: 0.06,
             /* 新鲜度：剩 0 天时卖价 / 回复打几折；刚做好是 1 */
-            freshMin: 0.5 },
+            freshMin: 0.25 },
     /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
     upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
     /* 一季 30 天（春 1–30 / 夏 31–60 / 秋 61–90 / 冬 91–120） */
@@ -3532,7 +3532,7 @@
       }
       /* 铁箱也有小概率掉食谱 */
       if (rand() < BALANCE.cook.ironRecipeChance) {
-        const rec = grantGoldRecipe(s);
+        const rec = grantChestRecipe(s, 'iron');
         if (rec) gains.push('📜 食谱：' + rec.emoji + ' ' + rec.name);
       }
     } else {
@@ -3557,7 +3557,7 @@
       }
       /* 黄金宝箱还能掉食谱（只会掉还没学会的） */
       if (rand() < BALANCE.cook.goldRecipeChance) {
-        const rec = grantGoldRecipe(s);
+        const rec = grantChestRecipe(s, 'gold');
         if (rec) gains.push('📜 食谱：' + rec.emoji + ' ' + rec.name);
       }
     }
@@ -5270,7 +5270,7 @@
     cookRecipes: function () { return RECIPES; },
     recipeById: recipeById, ingredientText: ingredientText, cookHave: cookHave,
     recipeKnown: recipeKnown, recipeReqText: recipeReqText, recipeLockText: recipeLockText,
-    shopRecipes: shopRecipes, buyRecipe: buyRecipe, grantGoldRecipe: grantGoldRecipe,
+    shopRecipes: shopRecipes, buyRecipe: buyRecipe, grantChestRecipe: grantChestRecipe, chestRecipes: chestRecipes,
     cookMeal: cookMeal, eatFood: eatFood, foodTick: foodTick, boxPutFood: boxPutFood,
     eatFoodGroup: eatFoodGroup, boxPutFoodGroup: boxPutFoodGroup, foodGroups: foodGroups,
     foodDaysLeft: foodDaysLeft, foodSoon: foodSoon, foodEnergyNow: foodEnergyNow, foodPriceNow: foodPriceNow,
@@ -5387,7 +5387,7 @@
       req: { farm: 5 }, cost: { crops: { chili: 2, eggplant: 1 } }, desc: '下饭，就是有点辣' },
     { id: 'steamedfish', name: '玉米蒸鱼', emoji: '🐟', lv: 3, energy: 2, restore: 24, days: 3, price: 210,
       source: 'shop', trade: 3, shopPrice: 1500,
-      cost: { fish: 1, crops: { corn: 1 } }, desc: '玉米垫底，清蒸河鱼' },
+      cost: { fish: 1, crops: { corn: 2 } }, desc: '玉米垫底，清蒸河鱼' },
     { id: 'salad', name: '水果沙拉', emoji: '🥗', lv: 4, energy: 2, restore: 14, days: 2, price: 108,
       cost: { crops: { fruit_peach: 1, berry: 2 } }, desc: '桃子野莓拌一拌' },
     { id: 'riversoup', name: '河鲜汤', emoji: '🐟', lv: 4, energy: 1, restore: 22, days: 2,
@@ -5398,7 +5398,10 @@
     { id: 'honeypumpkin', name: '蜂蜜烤南瓜', emoji: '🎃', lv: 5, energy: 2, restore: 30, days: 4, price: 330,
       source: 'shop', trade: 5, shopPrice: 3000,
       cost: { crops: { pumpkin: 1, berry: 2 } }, desc: '甜到心里' },
-    { id: 'pie', name: '南瓜派', emoji: '🥧', lv: 6, energy: 2, restore: 24, days: 4, price: 188,
+    { id: 'ironpot', name: '铁锅乱炖', emoji: '🍳', lv: 4, energy: 2, restore: 26, days: 2, price: 240,
+      source: 'iron',
+      cost: { fish: 1, crops: { potato: 1, carrot: 1 } }, desc: '铁制宝箱里翻出来的家常菜谱' },
+    { id: 'pie', name: '南瓜派', emoji: '🥧', lv: 6, energy: 2, restore: 25, days: 4, price: 198,
       cost: { crops: { pumpkin: 1, corn: 2 } }, desc: '烤得金黄，切八块' },
     { id: 'sashimi', name: '鱼生拼盘', emoji: '🍣', lv: 7, energy: 2, restore: 28, days: 1,
       fishPriced: true, priceMul: 4,
@@ -5415,7 +5418,10 @@
     return RECIPES.filter(function (r) { return r.id === id; })[0] || null;
   }
   function shopRecipes() { return RECIPES.filter(function (r) { return r.source === 'shop'; }); }
-  function goldRecipes() { return RECIPES.filter(function (r) { return r.source === 'gold'; }); }
+  function chestRecipes(source) {
+    return RECIPES.filter(function (r) { return r.source === source; });
+  }
+  function goldRecipes() { return chestRecipes('gold'); }
 
   /* 商店 / 宝箱食谱要先学会；等级食谱天然可用 */
   function recipeKnown(s, r) {
@@ -5467,9 +5473,9 @@
     return { ok: true, msg: '学会 ' + r.name, cost: price };
   }
 
-  /* 黄金宝箱：随机掉一张还没学会的宝箱食谱 */
-  function grantGoldRecipe(s) {
-    const cand = goldRecipes().filter(function (r) { return !recipeKnown(s, r); });
+  /* 宝箱：随机掉一张该箱子对应、还没学会的食谱 */
+  function grantChestRecipe(s, source) {
+    const cand = chestRecipes(source).filter(function (r) { return !recipeKnown(s, r); });
     if (!cand.length) return null;
     const r = cand[Math.floor(rand() * cand.length)];
     s.recipes = s.recipes || {};

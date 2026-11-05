@@ -589,7 +589,7 @@
     cookRecipes: function () { return RECIPES; },
     recipeById: recipeById, ingredientText: ingredientText, cookHave: cookHave,
     recipeKnown: recipeKnown, recipeReqText: recipeReqText, recipeLockText: recipeLockText,
-    shopRecipes: shopRecipes, buyRecipe: buyRecipe, grantGoldRecipe: grantGoldRecipe,
+    shopRecipes: shopRecipes, buyRecipe: buyRecipe, grantChestRecipe: grantChestRecipe, chestRecipes: chestRecipes,
     cookMeal: cookMeal, eatFood: eatFood, foodTick: foodTick, boxPutFood: boxPutFood,
     eatFoodGroup: eatFoodGroup, boxPutFoodGroup: boxPutFoodGroup, foodGroups: foodGroups,
     foodDaysLeft: foodDaysLeft, foodSoon: foodSoon, foodEnergyNow: foodEnergyNow, foodPriceNow: foodPriceNow,

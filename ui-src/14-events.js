@@ -426,7 +426,13 @@
         return;
       }
 
-      // 厨房：做菜 / 吃午饭 / 放收购箱
+      // 厨房：做菜 / 分页 / 吃午饭 / 放收购箱
+      const cookTabBtn = t.closest('[data-cooktab]');
+      if (cookTabBtn) {
+        cookTab = cookTabBtn.dataset.cooktab || 'all';
+        if (modalOpen()) kitchenModal();
+        return;
+      }
       const cookBtn = t.closest('[data-cook]');
       if (cookBtn && !cookBtn.disabled) {
         const r = G.cookMeal(state, cookBtn.dataset.cook);

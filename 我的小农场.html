@@ -1236,6 +1236,17 @@ button{ color:inherit; font:inherit; }
 .cc-req{ color:var(--ink-3); }
 
 
+/* ͼ�������۵� / ������ҳ */
+.codex-rw-box{ margin:8px 0 2px; padding:0 10px; border:1px solid var(--line); border-radius:10px; background:var(--card); }
+.codex-rw-box summary{ list-style:none; cursor:pointer; padding:8px 0; font-size:11.5px; font-weight:900; color:var(--ink-2); }
+.codex-rw-box summary::-webkit-details-marker{ display:none; }
+.codex-rw-box summary::before{ content:'? '; color:var(--green); }
+.codex-rw-box[open] summary::before{ content:'? '; }
+.codex-rw-box .codex-rw{ padding-bottom:6px; }
+.cook-tabs{ margin:10px 0 0; }
+.cook-tabs .rule-tab{ flex:0 1 auto; min-width:0; padding:7px 10px; }
+
+
 </style>
 </head>
 <body>
@@ -2171,7 +2182,7 @@ button{ color:inherit; font:inherit; }
             /* 宝箱掉食谱的概率 */
             goldRecipeChance: 0.09, ironRecipeChance: 0.06,
             /* 新鲜度：剩 0 天时卖价 / 回复打几折；刚做好是 1 */
-            freshMin: 0.5 },
+            freshMin: 0.25 },
     /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
     upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
     /* 一季 30 天（春 1–30 / 夏 31–60 / 秋 61–90 / 冬 91–120） */
@@ -4987,7 +4998,7 @@ button{ color:inherit; font:inherit; }
       }
       /* 铁箱也有小概率掉食谱 */
       if (rand() < BALANCE.cook.ironRecipeChance) {
-        const rec = grantGoldRecipe(s);
+        const rec = grantChestRecipe(s, 'iron');
         if (rec) gains.push('📜 食谱：' + rec.emoji + ' ' + rec.name);
       }
     } else {
@@ -5012,7 +5023,7 @@ button{ color:inherit; font:inherit; }
       }
       /* 黄金宝箱还能掉食谱（只会掉还没学会的） */
       if (rand() < BALANCE.cook.goldRecipeChance) {
-        const rec = grantGoldRecipe(s);
+        const rec = grantChestRecipe(s, 'gold');
         if (rec) gains.push('📜 食谱：' + rec.emoji + ' ' + rec.name);
       }
     }
@@ -6725,7 +6736,7 @@ button{ color:inherit; font:inherit; }
     cookRecipes: function () { return RECIPES; },
     recipeById: recipeById, ingredientText: ingredientText, cookHave: cookHave,
     recipeKnown: recipeKnown, recipeReqText: recipeReqText, recipeLockText: recipeLockText,
-    shopRecipes: shopRecipes, buyRecipe: buyRecipe, grantGoldRecipe: grantGoldRecipe,
+    shopRecipes: shopRecipes, buyRecipe: buyRecipe, grantChestRecipe: grantChestRecipe, chestRecipes: chestRecipes,
     cookMeal: cookMeal, eatFood: eatFood, foodTick: foodTick, boxPutFood: boxPutFood,
     eatFoodGroup: eatFoodGroup, boxPutFoodGroup: boxPutFoodGroup, foodGroups: foodGroups,
     foodDaysLeft: foodDaysLeft, foodSoon: foodSoon, foodEnergyNow: foodEnergyNow, foodPriceNow: foodPriceNow,
@@ -6842,7 +6853,7 @@ button{ color:inherit; font:inherit; }
       req: { farm: 5 }, cost: { crops: { chili: 2, eggplant: 1 } }, desc: '下饭，就是有点辣' },
     { id: 'steamedfish', name: '玉米蒸鱼', emoji: '🐟', lv: 3, energy: 2, restore: 24, days: 3, price: 210,
       source: 'shop', trade: 3, shopPrice: 1500,
-      cost: { fish: 1, crops: { corn: 1 } }, desc: '玉米垫底，清蒸河鱼' },
+      cost: { fish: 1, crops: { corn: 2 } }, desc: '玉米垫底，清蒸河鱼' },
     { id: 'salad', name: '水果沙拉', emoji: '🥗', lv: 4, energy: 2, restore: 14, days: 2, price: 108,
       cost: { crops: { fruit_peach: 1, berry: 2 } }, desc: '桃子野莓拌一拌' },
     { id: 'riversoup', name: '河鲜汤', emoji: '🐟', lv: 4, energy: 1, restore: 22, days: 2,
@@ -6853,7 +6864,10 @@ button{ color:inherit; font:inherit; }
     { id: 'honeypumpkin', name: '蜂蜜烤南瓜', emoji: '🎃', lv: 5, energy: 2, restore: 30, days: 4, price: 330,
       source: 'shop', trade: 5, shopPrice: 3000,
       cost: { crops: { pumpkin: 1, berry: 2 } }, desc: '甜到心里' },
-    { id: 'pie', name: '南瓜派', emoji: '🥧', lv: 6, energy: 2, restore: 24, days: 4, price: 188,
+    { id: 'ironpot', name: '铁锅乱炖', emoji: '🍳', lv: 4, energy: 2, restore: 26, days: 2, price: 240,
+      source: 'iron',
+      cost: { fish: 1, crops: { potato: 1, carrot: 1 } }, desc: '铁制宝箱里翻出来的家常菜谱' },
+    { id: 'pie', name: '南瓜派', emoji: '🥧', lv: 6, energy: 2, restore: 25, days: 4, price: 198,
       cost: { crops: { pumpkin: 1, corn: 2 } }, desc: '烤得金黄，切八块' },
     { id: 'sashimi', name: '鱼生拼盘', emoji: '🍣', lv: 7, energy: 2, restore: 28, days: 1,
       fishPriced: true, priceMul: 4,
@@ -6870,7 +6884,10 @@ button{ color:inherit; font:inherit; }
     return RECIPES.filter(function (r) { return r.id === id; })[0] || null;
   }
   function shopRecipes() { return RECIPES.filter(function (r) { return r.source === 'shop'; }); }
-  function goldRecipes() { return RECIPES.filter(function (r) { return r.source === 'gold'; }); }
+  function chestRecipes(source) {
+    return RECIPES.filter(function (r) { return r.source === source; });
+  }
+  function goldRecipes() { return chestRecipes('gold'); }
 
   /* 商店 / 宝箱食谱要先学会；等级食谱天然可用 */
   function recipeKnown(s, r) {
@@ -6922,9 +6939,9 @@ button{ color:inherit; font:inherit; }
     return { ok: true, msg: '学会 ' + r.name, cost: price };
   }
 
-  /* 黄金宝箱：随机掉一张还没学会的宝箱食谱 */
-  function grantGoldRecipe(s) {
-    const cand = goldRecipes().filter(function (r) { return !recipeKnown(s, r); });
+  /* 宝箱：随机掉一张该箱子对应、还没学会的食谱 */
+  function grantChestRecipe(s, source) {
+    const cand = chestRecipes(source).filter(function (r) { return !recipeKnown(s, r); });
     if (!cand.length) return null;
     const r = cand[Math.floor(rand() * cand.length)];
     s.recipes = s.recipes || {};
@@ -9240,7 +9257,7 @@ button{ color:inherit; font:inherit; }
             G.BALANCE.codex.crops.map(function (m) { return m.need; }).join(' / ') + ' 种，每档只发一次（金币 / 饵料 / 肥料）。',
           '图鉴还会单独记录<b>野货</b>（' + G.WILD_LIST.map(function (w) { return w.name; }).join(' / ') +
             '）、<b>水果</b>和<b>菜品</b>，这几类只做收集展示，不计入上面两档奖励。',
-          '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态；旧存档按现有进度补发。'
+          '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态（奖励区可折叠）；旧存档按现有进度补发。'
         ]) +
       '</div>' +
 
@@ -9287,8 +9304,10 @@ button{ color:inherit; font:inherit; }
           }).join(' / ') + '，买一次永久学会。',
           '<b>黄金宝箱</b>：' + G.cookRecipes().filter(function (r) { return r.source === 'gold'; })
             .map(function (r) { return r.name; }).join(' / ') + '，金箱 ' +
-            Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '%、铁箱 ' +
-            Math.round(G.BALANCE.cook.ironRecipeChance * 100) + '% 概率掉一张。'
+            Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '%；<b>铁制宝箱</b>：' +
+            G.cookRecipes().filter(function (r) { return r.source === 'iron'; })
+              .map(function (r) { return r.name; }).join(' / ') + '，铁箱 ' +
+            Math.round(G.BALANCE.cook.ironRecipeChance * 100) + '%。'
         ])) +
         guideSub('🍽️ 吃午饭', guideList([
           '<b>每天一次</b>，吃一份菜回复它的体力；菜也吃品质，品质越高回的体力越多。',
@@ -9370,7 +9389,8 @@ button{ color:inherit; font:inherit; }
     const rwAll = rw.fish.concat(rw.crops);
     const rwDone = rwAll.filter(function (m) { return m.claimed; }).length;
     const rewardHtml =
-      '<div class="store-sub">🎁 图鉴奖励 · ' + rwDone + '/' + rwAll.length + ' 已领取</div>' +
+      '<details class="codex-rw-box"><summary>🎁 图鉴奖励 · ' + rwDone + '/' + rwAll.length +
+        ' 已领取（点开看进度）</summary>' +
       rwAll.map(function (m) {
         const pct = Math.max(0, Math.min(100, Math.round(m.got / m.need * 100)));
         const ico = m.claimed ? '✅' : (m.got >= m.need ? '🎁' : '🔒');
@@ -9380,7 +9400,7 @@ button{ color:inherit; font:inherit; }
           '<span class="cw-n">' + m.got + '/' + m.need + '</span>' +
           '<span class="cw-r">' + (m.claimed ? '已领取' : m.text.replace(/^奖励\s*/, '')) + '</span>' +
         '</div>';
-      }).join('');
+      }).join('') + '</details>';
 
     const bookRow = function (item, rec, emptyText) {
       const q = G.qualityById(rec.best);
@@ -11356,7 +11376,13 @@ button{ color:inherit; font:inherit; }
         return;
       }
 
-      // 厨房：做菜 / 吃午饭 / 放收购箱
+      // 厨房：做菜 / 分页 / 吃午饭 / 放收购箱
+      const cookTabBtn = t.closest('[data-cooktab]');
+      if (cookTabBtn) {
+        cookTab = cookTabBtn.dataset.cooktab || 'all';
+        if (modalOpen()) kitchenModal();
+        return;
+      }
       const cookBtn = t.closest('[data-cook]');
       if (cookBtn && !cookBtn.disabled) {
         const r = G.cookMeal(state, cookBtn.dataset.cook);
@@ -12035,6 +12061,9 @@ button{ color:inherit; font:inherit; }
  * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
  */
 
+  /* 厨房分页：all / level / skill / shop / chest */
+  let cookTab = 'all';
+
   function foodRowsHtml(allowEat) {
     let groups = G.foodGroups(state);
     if (allowEat) groups = groups.filter(function (g) { return g.rid !== 'fail'; });
@@ -12089,17 +12118,28 @@ button{ color:inherit; font:inherit; }
     const xp = (state.levels && state.levels.cookXp) || 0;
     const all = G.cookRecipes();
     const groups = [
-      { title: '⭐ 等级食谱', list: all.filter(function (r) { return !r.source && !r.req; }) },
-      { title: '🌱 技能食谱 · 种田 / 钓鱼 / 采集', list: all.filter(function (r) { return !r.source && r.req; }) },
-      { title: '🏬 百货店配方 · 交易等级', list: G.shopRecipes() },
-      { title: '🎁 宝箱配方 · 铁箱 / 金箱', list: all.filter(function (r) { return r.source === 'gold'; }) }
+      { id: 'level', title: '⭐ 等级食谱',
+        list: all.filter(function (r) { return !r.source && !r.req; }) },
+      { id: 'skill', title: '🌱 技能食谱 · 种田 / 钓鱼 / 采集',
+        list: all.filter(function (r) { return !r.source && r.req; }) },
+      { id: 'shop', title: '🏬 百货店配方 · 交易等级', list: G.shopRecipes() },
+      { id: 'chest', title: '🎁 宝箱配方 · 铁箱 / 金箱',
+        list: all.filter(function (r) { return r.source === 'iron' || r.source === 'gold'; }) }
     ];
+    const tabs = [{ id: 'all', name: '全部' }].concat(groups.map(function (g) {
+      return { id: g.id, name: g.title.split(' ')[1] || g.title };
+    }));
+    const tabHtml = '<div class="rule-tabs cook-tabs">' + tabs.map(function (t) {
+      return '<button class="rule-tab' + (cookTab === t.id ? ' on' : '') +
+        '" data-cooktab="' + t.id + '">' + t.name + '</button>';
+    }).join('') + '</div>';
+    const shown = cookTab === 'all' ? groups : groups.filter(function (g) { return g.id === cookTab; });
     const body = unlocked
       ? '<div class="cook-top">🍳 烹饪 <b>Lv' + lv + '</b> · 经验 ' + xp + '/' + G.levelNeed(lv, 'cook') +
           ' · 今日 <b>' + G.cookLeft(state) + '/' + G.cookDailyLimit(state) + '</b> 份' +
           ' · 做砸 ' + Math.round(G.cookFail(state) * 100) + '% · 品质取 ' +
-          G.cookRolls(state) + ' 次最好</div>' +
-        groups.map(function (g) {
+          G.cookRolls(state) + ' 次最好</div>' + tabHtml +
+        shown.map(function (g) {
           return '<div class="cook-sec"><div class="cook-sec-t">' + g.title +
             ' <span>' + g.list.length + ' 道</span></div>' +
             '<div class="cook-grid">' + g.list.map(cookCard).join('') + '</div></div>';

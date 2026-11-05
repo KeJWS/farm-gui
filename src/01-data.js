@@ -29,7 +29,7 @@
             /* 宝箱掉食谱的概率 */
             goldRecipeChance: 0.09, ironRecipeChance: 0.06,
             /* 新鲜度：剩 0 天时卖价 / 回复打几折；刚做好是 1 */
-            freshMin: 0.5 },
+            freshMin: 0.25 },
     /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
     upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
     /* 一季 30 天（春 1–30 / 夏 31–60 / 秋 61–90 / 冬 91–120） */

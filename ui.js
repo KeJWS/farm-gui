@@ -2016,7 +2016,7 @@
             G.BALANCE.codex.crops.map(function (m) { return m.need; }).join(' / ') + ' 种，每档只发一次（金币 / 饵料 / 肥料）。',
           '图鉴还会单独记录<b>野货</b>（' + G.WILD_LIST.map(function (w) { return w.name; }).join(' / ') +
             '）、<b>水果</b>和<b>菜品</b>，这几类只做收集展示，不计入上面两档奖励。',
-          '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态；旧存档按现有进度补发。'
+          '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态（奖励区可折叠）；旧存档按现有进度补发。'
         ]) +
       '</div>' +
 
@@ -2063,8 +2063,10 @@
           }).join(' / ') + '，买一次永久学会。',
           '<b>黄金宝箱</b>：' + G.cookRecipes().filter(function (r) { return r.source === 'gold'; })
             .map(function (r) { return r.name; }).join(' / ') + '，金箱 ' +
-            Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '%、铁箱 ' +
-            Math.round(G.BALANCE.cook.ironRecipeChance * 100) + '% 概率掉一张。'
+            Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '%；<b>铁制宝箱</b>：' +
+            G.cookRecipes().filter(function (r) { return r.source === 'iron'; })
+              .map(function (r) { return r.name; }).join(' / ') + '，铁箱 ' +
+            Math.round(G.BALANCE.cook.ironRecipeChance * 100) + '%。'
         ])) +
         guideSub('🍽️ 吃午饭', guideList([
           '<b>每天一次</b>，吃一份菜回复它的体力；菜也吃品质，品质越高回的体力越多。',
@@ -2146,7 +2148,8 @@
     const rwAll = rw.fish.concat(rw.crops);
     const rwDone = rwAll.filter(function (m) { return m.claimed; }).length;
     const rewardHtml =
-      '<div class="store-sub">🎁 图鉴奖励 · ' + rwDone + '/' + rwAll.length + ' 已领取</div>' +
+      '<details class="codex-rw-box"><summary>🎁 图鉴奖励 · ' + rwDone + '/' + rwAll.length +
+        ' 已领取（点开看进度）</summary>' +
       rwAll.map(function (m) {
         const pct = Math.max(0, Math.min(100, Math.round(m.got / m.need * 100)));
         const ico = m.claimed ? '✅' : (m.got >= m.need ? '🎁' : '🔒');
@@ -2156,7 +2159,7 @@
           '<span class="cw-n">' + m.got + '/' + m.need + '</span>' +
           '<span class="cw-r">' + (m.claimed ? '已领取' : m.text.replace(/^奖励\s*/, '')) + '</span>' +
         '</div>';
-      }).join('');
+      }).join('') + '</details>';
 
     const bookRow = function (item, rec, emptyText) {
       const q = G.qualityById(rec.best);
@@ -4132,7 +4135,13 @@
         return;
       }
 
-      // 厨房：做菜 / 吃午饭 / 放收购箱
+      // 厨房：做菜 / 分页 / 吃午饭 / 放收购箱
+      const cookTabBtn = t.closest('[data-cooktab]');
+      if (cookTabBtn) {
+        cookTab = cookTabBtn.dataset.cooktab || 'all';
+        if (modalOpen()) kitchenModal();
+        return;
+      }
       const cookBtn = t.closest('[data-cook]');
       if (cookBtn && !cookBtn.disabled) {
         const r = G.cookMeal(state, cookBtn.dataset.cook);
@@ -4811,6 +4820,9 @@
  * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
  */
 
+  /* 厨房分页：all / level / skill / shop / chest */
+  let cookTab = 'all';
+
   function foodRowsHtml(allowEat) {
     let groups = G.foodGroups(state);
     if (allowEat) groups = groups.filter(function (g) { return g.rid !== 'fail'; });
@@ -4865,17 +4877,28 @@
     const xp = (state.levels && state.levels.cookXp) || 0;
     const all = G.cookRecipes();
     const groups = [
-      { title: '⭐ 等级食谱', list: all.filter(function (r) { return !r.source && !r.req; }) },
-      { title: '🌱 技能食谱 · 种田 / 钓鱼 / 采集', list: all.filter(function (r) { return !r.source && r.req; }) },
-      { title: '🏬 百货店配方 · 交易等级', list: G.shopRecipes() },
-      { title: '🎁 宝箱配方 · 铁箱 / 金箱', list: all.filter(function (r) { return r.source === 'gold'; }) }
+      { id: 'level', title: '⭐ 等级食谱',
+        list: all.filter(function (r) { return !r.source && !r.req; }) },
+      { id: 'skill', title: '🌱 技能食谱 · 种田 / 钓鱼 / 采集',
+        list: all.filter(function (r) { return !r.source && r.req; }) },
+      { id: 'shop', title: '🏬 百货店配方 · 交易等级', list: G.shopRecipes() },
+      { id: 'chest', title: '🎁 宝箱配方 · 铁箱 / 金箱',
+        list: all.filter(function (r) { return r.source === 'iron' || r.source === 'gold'; }) }
     ];
+    const tabs = [{ id: 'all', name: '全部' }].concat(groups.map(function (g) {
+      return { id: g.id, name: g.title.split(' ')[1] || g.title };
+    }));
+    const tabHtml = '<div class="rule-tabs cook-tabs">' + tabs.map(function (t) {
+      return '<button class="rule-tab' + (cookTab === t.id ? ' on' : '') +
+        '" data-cooktab="' + t.id + '">' + t.name + '</button>';
+    }).join('') + '</div>';
+    const shown = cookTab === 'all' ? groups : groups.filter(function (g) { return g.id === cookTab; });
     const body = unlocked
       ? '<div class="cook-top">🍳 烹饪 <b>Lv' + lv + '</b> · 经验 ' + xp + '/' + G.levelNeed(lv, 'cook') +
           ' · 今日 <b>' + G.cookLeft(state) + '/' + G.cookDailyLimit(state) + '</b> 份' +
           ' · 做砸 ' + Math.round(G.cookFail(state) * 100) + '% · 品质取 ' +
-          G.cookRolls(state) + ' 次最好</div>' +
-        groups.map(function (g) {
+          G.cookRolls(state) + ' 次最好</div>' + tabHtml +
+        shown.map(function (g) {
           return '<div class="cook-sec"><div class="cook-sec-t">' + g.title +
             ' <span>' + g.list.length + ' 道</span></div>' +
             '<div class="cook-grid">' + g.list.map(cookCard).join('') + '</div></div>';

@@ -31,7 +31,8 @@
     const rwAll = rw.fish.concat(rw.crops);
     const rwDone = rwAll.filter(function (m) { return m.claimed; }).length;
     const rewardHtml =
-      '<div class="store-sub">🎁 图鉴奖励 · ' + rwDone + '/' + rwAll.length + ' 已领取</div>' +
+      '<details class="codex-rw-box"><summary>🎁 图鉴奖励 · ' + rwDone + '/' + rwAll.length +
+        ' 已领取（点开看进度）</summary>' +
       rwAll.map(function (m) {
         const pct = Math.max(0, Math.min(100, Math.round(m.got / m.need * 100)));
         const ico = m.claimed ? '✅' : (m.got >= m.need ? '🎁' : '🔒');
@@ -41,7 +42,7 @@
           '<span class="cw-n">' + m.got + '/' + m.need + '</span>' +
           '<span class="cw-r">' + (m.claimed ? '已领取' : m.text.replace(/^奖励\s*/, '')) + '</span>' +
         '</div>';
-      }).join('');
+      }).join('') + '</details>';
 
     const bookRow = function (item, rec, emptyText) {
       const q = G.qualityById(rec.best);

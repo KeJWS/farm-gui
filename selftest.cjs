@@ -2897,7 +2897,7 @@ section('厨房与烹饪');
   const ck = G.createState();
   ck.day = 10; ck.levels.farm = 3; ck.levels.fish = 2; ck.energy = 50; ck.maxEnergy = 50;
   ok(G.kitchenUnlocked(ck), '种田 Lv3 + 钓鱼 Lv2 解锁厨房');
-  ok(G.cookRecipes().length === 16, '食谱 16 道', G.cookRecipes().length);
+  ok(G.cookRecipes().length === 17, '食谱 17 道', G.cookRecipes().length);
   ok(G.cookRecipes().some(function (r) { return r.energy > 1; }), '不同食谱消耗不同体力',
      G.cookRecipes().map(function (r) { return r.energy; }));
   ok(!G.cookMeal(ck, 'soup').ok, '没食材做不了');
@@ -2985,10 +2985,10 @@ section('厨房与烹饪');
   ok(G.foodDaysLeft(expS.food[0], 10) === 2 && !G.foodSoon(expS.food[0], 10), '熟食显示剩余天数');
   ok(G.foodSoon(expS.food[0], 12), '临期（≤1 天）会高亮');
   const freshF = expS.food[0];
-  ok(G.foodFreshMul(freshF, 10) === 1 && G.foodFreshMul(freshF, 11) === 0.75 &&
-     G.foodFreshMul(freshF, 12) === 0.5, '越接近保质期，新鲜度越低',
+  ok(G.foodFreshMul(freshF, 10) === 1 && Math.abs(G.foodFreshMul(freshF, 11) - 0.625) < 1e-9 &&
+     G.foodFreshMul(freshF, 12) === 0.25, '越接近保质期，新鲜度越低',
      [G.foodFreshMul(freshF, 10), G.foodFreshMul(freshF, 11), G.foodFreshMul(freshF, 12)]);
-  ok(G.foodEnergyNow(freshF, 12) === 4 && G.foodPriceNow(freshF, 12) === 23,
+  ok(G.foodEnergyNow(freshF, 12) === 2 && G.foodPriceNow(freshF, 12) === 12,
      '临期熟食回复和卖价同步打折', [G.foodEnergyNow(freshF, 12), G.foodPriceNow(freshF, 12)]);
   ok(G.BALANCE.cook.goldRecipeChance === 0.09 && G.BALANCE.cook.ironRecipeChance === 0.06,
      '金箱 9% / 铁箱 6% 掉食谱');
@@ -3042,7 +3042,7 @@ section('厨房与烹饪');
   bs.day = 10; bs.levels.farm = 3; bs.levels.fish = 2; bs.levels.trade = 3;
   bs.levels.cook = 3; bs.coins = 10000; bs.energy = 50;
   bs.fishBag.push({ name: '鲫鱼', emoji: '🐟', q: 'std', v: 3, d: 1 });
-  G.addStore(bs, 'corn', 'std', 1);
+  G.addStore(bs, 'corn', 'std', 2);
   ok(!G.recipeKnown(bs, G.recipeById('steamedfish')) &&
      !G.cookMeal(bs, 'steamedfish').ok, '商店食谱没买之前做不了');
   const bsCoins = bs.coins;
@@ -3056,9 +3056,12 @@ section('厨房与烹饪');
   ok(!G.buyRecipe(bs2, 'steamedfish').ok, '交易等级不够买不了食谱');
 
   const gs = G.createState();
-  const gr = G.grantGoldRecipe(gs);
+  const gr = G.grantChestRecipe(gs, 'gold');
   ok(gr && G.recipeKnown(gs, gr) && gs.recipes[gr.id], '黄金宝箱能开出食谱', gr && gr.name);
-  ok(G.grantGoldRecipe(gs) === null, '宝箱食谱不会重复掉');
+  ok(G.grantChestRecipe(gs, 'gold') === null, '宝箱食谱不会重复掉');
+  const is = G.createState();
+  const ir = G.grantChestRecipe(is, 'iron');
+  ok(ir && ir.source === 'iron' && G.recipeKnown(is, ir), '铁箱掉另一份食谱', ir && ir.name);
 
 
   const lock = G.createState();

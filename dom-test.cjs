@@ -650,6 +650,7 @@ ok(html('#modal-root').indexOf('data-cook=') >= 0, '食谱带烹饪按钮');
 ok(html('#modal-root').indexOf('玉米浓汤') >= 0 && html('#modal-root').indexOf('皇家宴席') >= 0,
    '食谱含等级 / 宝箱解锁的菜');
 ok(html('#modal-root').indexOf('现有熟食') < 0, '厨房页不再列熟食');
+ok((html('#modal-root').match(/data-cooktab=/g) || []).length === 5, '厨房分页 5 个标签');
 clickAct('depart');
 ok(html('#modal-root').indexOf('玉米蒸鱼') >= 0 && html('#modal-root').indexOf('data-buyrecipe=') >= 0,
    '百货店出售食谱');
@@ -683,6 +684,7 @@ ok(codexHtml.indexOf('鱼类') >= 0 && codexHtml.indexOf('作物') >= 0, '鱼 / 
 ok(codexHtml.indexOf('水果') >= 0 && codexHtml.indexOf('桃') >= 0, '图鉴含果园水果');
 ok(codexHtml.indexOf('菜品') >= 0 && codexHtml.indexOf('蔬菜汤') >= 0, '图鉴含菜品');
 ok(codexHtml.indexOf('codex-card') >= 0 && codexHtml.indexOf('codex-sec') >= 0, '图鉴用卡片分组布局');
+ok(codexHtml.indexOf('codex-rw-box') >= 0 && codexHtml.indexOf('details') >= 0, '图鉴奖励可以折叠');
 
 /* ---------- 重绘后的焦点保持（v2.27） ---------- */
 console.log('\n== 焦点保持 ==');

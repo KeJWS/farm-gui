@@ -3,6 +3,9 @@
  * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
  */
 
+  /* 厨房分页：all / level / skill / shop / chest */
+  let cookTab = 'all';
+
   function foodRowsHtml(allowEat) {
     let groups = G.foodGroups(state);
     if (allowEat) groups = groups.filter(function (g) { return g.rid !== 'fail'; });
@@ -57,17 +60,28 @@
     const xp = (state.levels && state.levels.cookXp) || 0;
     const all = G.cookRecipes();
     const groups = [
-      { title: '⭐ 等级食谱', list: all.filter(function (r) { return !r.source && !r.req; }) },
-      { title: '🌱 技能食谱 · 种田 / 钓鱼 / 采集', list: all.filter(function (r) { return !r.source && r.req; }) },
-      { title: '🏬 百货店配方 · 交易等级', list: G.shopRecipes() },
-      { title: '🎁 宝箱配方 · 铁箱 / 金箱', list: all.filter(function (r) { return r.source === 'gold'; }) }
+      { id: 'level', title: '⭐ 等级食谱',
+        list: all.filter(function (r) { return !r.source && !r.req; }) },
+      { id: 'skill', title: '🌱 技能食谱 · 种田 / 钓鱼 / 采集',
+        list: all.filter(function (r) { return !r.source && r.req; }) },
+      { id: 'shop', title: '🏬 百货店配方 · 交易等级', list: G.shopRecipes() },
+      { id: 'chest', title: '🎁 宝箱配方 · 铁箱 / 金箱',
+        list: all.filter(function (r) { return r.source === 'iron' || r.source === 'gold'; }) }
     ];
+    const tabs = [{ id: 'all', name: '全部' }].concat(groups.map(function (g) {
+      return { id: g.id, name: g.title.split(' ')[1] || g.title };
+    }));
+    const tabHtml = '<div class="rule-tabs cook-tabs">' + tabs.map(function (t) {
+      return '<button class="rule-tab' + (cookTab === t.id ? ' on' : '') +
+        '" data-cooktab="' + t.id + '">' + t.name + '</button>';
+    }).join('') + '</div>';
+    const shown = cookTab === 'all' ? groups : groups.filter(function (g) { return g.id === cookTab; });
     const body = unlocked
       ? '<div class="cook-top">🍳 烹饪 <b>Lv' + lv + '</b> · 经验 ' + xp + '/' + G.levelNeed(lv, 'cook') +
           ' · 今日 <b>' + G.cookLeft(state) + '/' + G.cookDailyLimit(state) + '</b> 份' +
           ' · 做砸 ' + Math.round(G.cookFail(state) * 100) + '% · 品质取 ' +
-          G.cookRolls(state) + ' 次最好</div>' +
-        groups.map(function (g) {
+          G.cookRolls(state) + ' 次最好</div>' + tabHtml +
+        shown.map(function (g) {
           return '<div class="cook-sec"><div class="cook-sec-t">' + g.title +
             ' <span>' + g.list.length + ' 道</span></div>' +
             '<div class="cook-grid">' + g.list.map(cookCard).join('') + '</div></div>';
