@@ -131,7 +131,7 @@
     merged.coins = Math.round(num(s.coins, 50, 0, 1e9));
     merged.energy = num(s.energy, merged.maxEnergy, 0, merged.maxEnergy);
 
-    const plots = Array.isArray(s.plots) ? s.plots.slice(0, 40) : [];
+    const plots = Array.isArray(s.plots) ? s.plots.slice(0, 60) : [];
     merged.plots = (plots.length ? plots : [{}]).map(function (p) {
       const plot = Object.assign(makePlot(), p || {});
       if (!CROPS[plot.crop]) plot.crop = null;
@@ -222,7 +222,9 @@
         id: t.id, mode: mode, planted: planted,
         water: t.water != null ? water : Math.min(need.water, Math.round(num(t.grown, 0, 0, need.water))),
         lastWater: Math.round(num(t.lastWater, 0, 0, 100000)),
-        ripe: Math.round(num(t.ripe, 0, 0, BALANCE.orchard.ripeCap))
+        ripe: Math.round(num(t.ripe, 0, 0, BALANCE.orchard.ripeCap)),
+        lv: Math.round(num(t.lv, 1, 1, BALANCE.orchard.treeLvMax)),
+        xp: Math.round(num(t.xp, 0, 0, 999))
       };
     });
     merged.treeStock = {};
@@ -603,6 +605,7 @@
     treeData: treeData, treeBuyPrice: treeBuyPrice, treeStockCount: treeStockCount,
     buyTreeStock: buyTreeStock, treeSlot: treeSlot, treeStage: treeStage, treeInSeason: treeInSeason,
      treeNeed: treeNeed, treeAge: treeAge, treeMature: treeMature, treeNeedsWater: treeNeedsWater, treeProgress: treeProgress,
+     treeLevel: treeLevel, treeXpNeed: treeXpNeed, treeYieldBonus: treeYieldBonus, treeLevelText: treeLevelText,
      plantTree: plantTree, waterTree: waterTree, waterOrchard: waterOrchard, orchardTick: orchardTick,
     harvestTree: harvestTree, harvestOrchard: harvestOrchard, orchardSummary: orchardSummary,
     marketHeadroom: marketHeadroom, fishMarketHeadroom: fishMarketHeadroom,

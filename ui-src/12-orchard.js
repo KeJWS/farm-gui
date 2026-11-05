@@ -33,13 +33,16 @@
         '</div></div>';
     }
     const inSeason = G.treeInSeason(state, i);
+    const lvTxt = G.treeLevelText(G.treeSlot(state, i) || {});
     return '<div class="orc-card mature' + (inSeason ? ' on' : '') + '">' +
       '<div class="orc-top"><span class="orc-emoji">' + t.emoji + '</span><span class="orc-no">' + no + ' 号坑</span>' +
+        '<b class="orc-lv">' + lvTxt + '</b>' +
         '<b class="orc-tag' + (inSeason ? '' : ' off') + '">' + (inSeason ? '当季' : '休眠') + '</b></div>' +
       '<div class="orc-mid">' + t.name + '<br>' +
         (inSeason
-          ? '每天挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax + ' 个 · 待收 ' +
-            p.ripe + '/' + G.BALANCE.orchard.ripeCap +
+          ? '每天挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax + ' 个' +
+            (p.yieldBonus > 0 ? '（+' + Math.round(p.yieldBonus * 100) + '%）' : '') +
+            ' · 待收 ' + p.ripe + '/' + G.BALANCE.orchard.ripeCap +
             (p.ripe >= G.BALANCE.orchard.ripeCap ? ' <b class="orc-full">已挂满</b>' : '')
           : G.SEASONS[t.season] + '季结果') + '</div>' +
       '<div class="orc-act">' +

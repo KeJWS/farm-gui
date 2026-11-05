@@ -14,6 +14,21 @@
     const cx = (s.codex && s.codex.crops) || {};
     return FRUIT_LIST.filter(function (f) { return cx[f.id] && cx[f.id].n > 0; }).length;
   }
+  /* 野货：和作物共用 codex.crops */
+  function wildSpeciesOwned(s) {
+    const cx = (s.codex && s.codex.crops) || {};
+    return WILD_LIST.filter(function (w) { return cx[w.id] && cx[w.id].n > 0; }).length;
+  }
+  /* 最高果树等级（成树才会升级） */
+  function maxTreeLevel(s) {
+    const slots = (s.orchard && s.orchard.slots) || [];
+    let best = 0;
+    slots.forEach(function (t) {
+      if (!t) return;
+      best = Math.max(best, (t.lv || 1));
+    });
+    return best >= BALANCE.orchard.treeLvMax ? 1 : 0;
+  }
   function perfectFish(s) {
     const fx = (s.codex && s.codex.fish) || {};
     return Object.keys(fx).reduce(function (a, k) { return a + (fx[k].perfect || 0); }, 0);
@@ -90,8 +105,10 @@
       val: function (s) { return s.plots.length; }, reward: { coins: 40 }, pts: 2 },
     { id: 'plot20',    cat: 'farm', emoji: '🌾', name: '良田成片',   desc: '土地达到 20 块',       goal: 20,
       val: function (s) { return s.plots.length; }, reward: { ferts: { normal: 5 } }, pts: 3 },
-    { id: 'plot36',    cat: 'farm', emoji: '🗺️', name: '大地主',     desc: '土地达到 36 块',       goal: 36,
+    { id: 'plot40',    cat: 'farm', emoji: '🗺️', name: '大地主',     desc: '土地达到 40 块',       goal: 40,
       val: function (s) { return s.plots.length; }, reward: { coins: 2000 }, pts: 6 },
+    { id: 'plot50',    cat: 'farm', emoji: '🏞️', name: '田连阡陌',   desc: '土地达到 50 块（40 块后地价陡涨）', goal: 50,
+      val: function (s) { return s.plots.length; }, reward: { coins: 6000 }, pts: 4 },
     { id: 'crop10',    cat: 'farm', emoji: '🌽', name: '五谷丰登',   desc: '收获过全部 14 种作物', goal: 14,
       val: cropSpeciesOwned, reward: { coins: 250, seeds: { pumpkin: 1 } }, pts: 3 },
 
@@ -106,6 +123,10 @@
       val: function (s) { return orchardSlotCount(s); }, reward: { coins: 600 }, pts: 4 },
     { id: 'fruit3',    cat: 'farm', emoji: '🍎', name: '三种果子',   desc: '桃 / 芒果 / 苹果都收过', goal: 3,
       val: fruitSpeciesOwned, reward: { coins: 500, ferts: { special: 2 } }, pts: 4 },
+    { id: 'treeLv5',   cat: 'farm', emoji: '🌳', name: '老树盘根',   desc: '把一棵果树养到满级 Lv5', goal: 1,
+      val: maxTreeLevel, reward: { coins: 800, ferts: { special: 2 } }, pts: 2 },
+    { id: 'wild4',     cat: 'farm', emoji: '🌿', name: '山野通',     desc: '四种野货都采过',       goal: 4,
+      val: wildSpeciesOwned, reward: { coins: 400 }, pts: 2 },
 
     /* 钓鱼 */
     { id: 'fish1',     cat: 'fish', emoji: '🎣', name: '开张啦',     desc: '钓上第 1 条鱼',        goal: 1,

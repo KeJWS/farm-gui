@@ -39,7 +39,8 @@
     order: { mult: 1.35, seasonStep: 0.6,
              /* 鱼单单价：每日单 11 + 4×季 / 长期单 18 + 4×季 */
              fishBase: 11, longFishBase: 18, fishStep: 4 },
-    expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
+    /* 土地：4~39 块按 25 + 15×(n−4) 线性涨；到 40 块以后每块 ×1.8 陡涨 */
+    expand: { base: 25, step: 15, from: 4, steepFrom: 40, steepMul: 1.8 },
     /* 自动播种器：一台只管 5 块地，买几台就播几块（每台每天 5 块），每台每周要交维护费 */
     device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5,
               seederMax: 9, netMax: 9, sprinklerPerDay: 1 },
@@ -92,6 +93,8 @@
      * 成树只在自己季节结果，当季每天随机 1~3 个；浇水 / 收获各 1 体力。 */
     orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, free: 3, fruitMin: 1, fruitMax: 3,
                waterEnergy: 1, harvestEnergy: 1, ripeCap: 10,
+               /* 成树等级：收获攒经验，满级 5；每级让「当天多挂 1 个」的概率 +10% */
+               treeLvMax: 5, treeXpBase: 2, treeXpStep: 2, treeLvYield: 0.10,
                grow: { seed: { days: 90, water: 30 }, sapling: { days: 30, water: 15 } },
                slotCosts: [600, 1000, 1600, 2400, 3200] },
     /* 经营档案：按净资产给的称号 */

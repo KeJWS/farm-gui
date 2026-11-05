@@ -30,6 +30,14 @@
     s.stats.wild = s.stats.wild || {};
     s.stats.wild[w.id] = (s.stats.wild[w.id] || 0) + n;
     s.stats.forageBest = Math.max(s.stats.forageBest || 0, n);
+    /* 图鉴：野货和作物共用 codex.crops（只用于图鉴展示，不算进作物收集奖励） */
+    s.codex = s.codex || { fish: {}, crops: {} };
+    s.codex.crops = s.codex.crops || {};
+    const wx = s.codex.crops[w.id] ||
+      (s.codex.crops[w.id] = { n: 0, best: null, first: s.day, value: 0 });
+    wx.n += n;
+    wx.value += n * w.price * (q.mul || 1);
+    if (!wx.best || QUALITY.indexOf(q) > QUALITY.indexOf(qualityById(wx.best))) wx.best = q.id;
     const up = addLevelXp(s, 'forage', BALANCE.forage.xp + (n >= 3 ? 1 : 0));
     let seedTxt = '';
     if (rand() < BALANCE.forage.seedChance) {

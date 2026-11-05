@@ -726,7 +726,8 @@
     order: { mult: 1.35, seasonStep: 0.6,
              /* 鱼单单价：每日单 11 + 4×季 / 长期单 18 + 4×季 */
              fishBase: 11, longFishBase: 18, fishStep: 4 },
-    expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
+    /* 土地：4~39 块按 25 + 15×(n−4) 线性涨；到 40 块以后每块 ×1.8 陡涨 */
+    expand: { base: 25, step: 15, from: 4, steepFrom: 40, steepMul: 1.8 },
     /* 自动播种器：一台只管 5 块地，买几台就播几块（每台每天 5 块），每台每周要交维护费 */
     device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5,
               seederMax: 9, netMax: 9, sprinklerPerDay: 1 },
@@ -779,6 +780,8 @@
      * 成树只在自己季节结果，当季每天随机 1~3 个；浇水 / 收获各 1 体力。 */
     orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, free: 3, fruitMin: 1, fruitMax: 3,
                waterEnergy: 1, harvestEnergy: 1, ripeCap: 10,
+               /* 成树等级：收获攒经验，满级 5；每级让「当天多挂 1 个」的概率 +10% */
+               treeLvMax: 5, treeXpBase: 2, treeXpStep: 2, treeLvYield: 0.10,
                grow: { seed: { days: 90, water: 30 }, sapling: { days: 30, water: 15 } },
                slotCosts: [600, 1000, 1600, 2400, 3200] },
     /* 经营档案：按净资产给的称号 */
@@ -910,6 +913,21 @@
     const cx = (s.codex && s.codex.crops) || {};
     return FRUIT_LIST.filter(function (f) { return cx[f.id] && cx[f.id].n > 0; }).length;
   }
+  /* 野货：和作物共用 codex.crops */
+  function wildSpeciesOwned(s) {
+    const cx = (s.codex && s.codex.crops) || {};
+    return WILD_LIST.filter(function (w) { return cx[w.id] && cx[w.id].n > 0; }).length;
+  }
+  /* 最高果树等级（成树才会升级） */
+  function maxTreeLevel(s) {
+    const slots = (s.orchard && s.orchard.slots) || [];
+    let best = 0;
+    slots.forEach(function (t) {
+      if (!t) return;
+      best = Math.max(best, (t.lv || 1));
+    });
+    return best >= BALANCE.orchard.treeLvMax ? 1 : 0;
+  }
   function perfectFish(s) {
     const fx = (s.codex && s.codex.fish) || {};
     return Object.keys(fx).reduce(function (a, k) { return a + (fx[k].perfect || 0); }, 0);
@@ -986,8 +1004,10 @@
       val: function (s) { return s.plots.length; }, reward: { coins: 40 }, pts: 2 },
     { id: 'plot20',    cat: 'farm', emoji: '🌾', name: '良田成片',   desc: '土地达到 20 块',       goal: 20,
       val: function (s) { return s.plots.length; }, reward: { ferts: { normal: 5 } }, pts: 3 },
-    { id: 'plot36',    cat: 'farm', emoji: '🗺️', name: '大地主',     desc: '土地达到 36 块',       goal: 36,
+    { id: 'plot40',    cat: 'farm', emoji: '🗺️', name: '大地主',     desc: '土地达到 40 块',       goal: 40,
       val: function (s) { return s.plots.length; }, reward: { coins: 2000 }, pts: 6 },
+    { id: 'plot50',    cat: 'farm', emoji: '🏞️', name: '田连阡陌',   desc: '土地达到 50 块（40 块后地价陡涨）', goal: 50,
+      val: function (s) { return s.plots.length; }, reward: { coins: 6000 }, pts: 4 },
     { id: 'crop10',    cat: 'farm', emoji: '🌽', name: '五谷丰登',   desc: '收获过全部 14 种作物', goal: 14,
       val: cropSpeciesOwned, reward: { coins: 250, seeds: { pumpkin: 1 } }, pts: 3 },
 
@@ -1002,6 +1022,10 @@
       val: function (s) { return orchardSlotCount(s); }, reward: { coins: 600 }, pts: 4 },
     { id: 'fruit3',    cat: 'farm', emoji: '🍎', name: '三种果子',   desc: '桃 / 芒果 / 苹果都收过', goal: 3,
       val: fruitSpeciesOwned, reward: { coins: 500, ferts: { special: 2 } }, pts: 4 },
+    { id: 'treeLv5',   cat: 'farm', emoji: '🌳', name: '老树盘根',   desc: '把一棵果树养到满级 Lv5', goal: 1,
+      val: maxTreeLevel, reward: { coins: 800, ferts: { special: 2 } }, pts: 2 },
+    { id: 'wild4',     cat: 'farm', emoji: '🌿', name: '山野通',     desc: '四种野货都采过',       goal: 4,
+      val: wildSpeciesOwned, reward: { coins: 400 }, pts: 2 },
 
     /* 钓鱼 */
     { id: 'fish1',     cat: 'fish', emoji: '🎣', name: '开张啦',     desc: '钓上第 1 条鱼',        goal: 1,
@@ -3181,6 +3205,14 @@
     s.stats.wild = s.stats.wild || {};
     s.stats.wild[w.id] = (s.stats.wild[w.id] || 0) + n;
     s.stats.forageBest = Math.max(s.stats.forageBest || 0, n);
+    /* 图鉴：野货和作物共用 codex.crops（只用于图鉴展示，不算进作物收集奖励） */
+    s.codex = s.codex || { fish: {}, crops: {} };
+    s.codex.crops = s.codex.crops || {};
+    const wx = s.codex.crops[w.id] ||
+      (s.codex.crops[w.id] = { n: 0, best: null, first: s.day, value: 0 });
+    wx.n += n;
+    wx.value += n * w.price * (q.mul || 1);
+    if (!wx.best || QUALITY.indexOf(q) > QUALITY.indexOf(qualityById(wx.best))) wx.best = q.id;
     const up = addLevelXp(s, 'forage', BALANCE.forage.xp + (n >= 3 ? 1 : 0));
     let seedTxt = '';
     if (rand() < BALANCE.forage.seedChance) {
@@ -4083,6 +4115,40 @@
     return seasonIdx(s.day || 1) === TREES[t.id].season;
   }
 
+  /* ---------------- 成树等级 ----------------
+   * 成树以后靠「收获」攒经验：每次收获 +1，升到下一级要 2 / 4 / 6 / 8 次（满级 5）。
+   * 每高一级，「当天多挂 1 个果」的概率 +10%，挂果上限不变。 */
+  function treeLevel(t) {
+    return clamp(t && t.lv ? t.lv : 1, 1, BALANCE.orchard.treeLvMax);
+  }
+  function treeXpNeed(lv) {
+    return BALANCE.orchard.treeXpBase + BALANCE.orchard.treeXpStep * (lv - 1);
+  }
+  function treeXp(t) { return (t && t.xp) || 0; }
+  function treeYieldBonus(lv) {
+    return Math.max(0, (lv - 1) * BALANCE.orchard.treeLvYield);
+  }
+  function treeLevelText(t) {
+    const lv = treeLevel(t);
+    if (lv >= BALANCE.orchard.treeLvMax) return 'Lv' + lv + '（满级 +' +
+      Math.round(treeYieldBonus(lv) * 100) + '%）';
+    return 'Lv' + lv + ' · ' + treeXp(t) + '/' + treeXpNeed(lv);
+  }
+  /* 收获后加经验，返回升了几级 */
+  function treeGainXp(t) {
+    const max = BALANCE.orchard.treeLvMax;
+    t.lv = treeLevel(t);
+    t.xp = treeXp(t) + 1;
+    let up = 0;
+    while (t.lv < max && t.xp >= treeXpNeed(t.lv)) {
+      t.xp -= treeXpNeed(t.lv);
+      t.lv++;
+      up++;
+    }
+    if (t.lv >= max) t.xp = 0;
+    return up;
+  }
+
   /* 育苗进度：给界面显示已浇水天数与自然生长天数 */
   function treeProgress(s, i) {
     const t = treeSlot(s, i);
@@ -4090,7 +4156,9 @@
     const need = treeNeed(t);
     return { age: treeAge(s, t), needDays: need.days,
              water: t.water || 0, needWater: need.water,
-             done: treeMature(s, i), ripe: t.ripe || 0, mode: t.mode || 'seed' };
+             done: treeMature(s, i), ripe: t.ripe || 0, mode: t.mode || 'seed',
+             lv: treeLevel(t), xp: treeXp(t), xpNeed: treeXpNeed(treeLevel(t)),
+             lvMax: BALANCE.orchard.treeLvMax, yieldBonus: treeYieldBonus(treeLevel(t)) };
   }
 
   /* 种树：种子要浇水 30 天 + 满 90 天；树苗浇水 15 天 + 满 30 天 */
@@ -4106,7 +4174,7 @@
       return { ok: false, msg: '没有' + t.name + (m === 'sapling' ? '树苗' : '种子') + '了，先去百货店买' };
     }
     s.treeStock[id][m]--;
-    slots[i] = { id: id, mode: m, planted: s.day || 1, water: 0, lastWater: 0, ripe: 0 };
+    slots[i] = { id: id, mode: m, planted: s.day || 1, water: 0, lastWater: 0, ripe: 0, lv: 1, xp: 0 };
     s.orchard.slots = slots;
     s.stats.orchardPlanted = (s.stats.orchardPlanted || 0) + 1;
     const need = treeNeed(slots[i]);
@@ -4171,6 +4239,7 @@
     s.energy -= E;
     addStore(s, tr.fruitId, 'std', n);
     s.stats.orchardFruit = (s.stats.orchardFruit || 0) + n;
+    const lvUp = treeGainXp(t);
     // 水果也进图鉴（和作物共用 codex.crops，果实固定标准品质）
     s.codex = s.codex || { fish: {}, crops: {} };
     s.codex.crops = s.codex.crops || {};
@@ -4180,8 +4249,11 @@
     cx.n += n;
     cx.value += n * (fr ? fr.price : 0);
     if (!cx.best) cx.best = 'std';   // 果树果实固定标准品质
-    log(s, '🧺 收获 ' + tr.emoji + ' ' + tr.fruit + ' ×' + n + '（-' + E + ' 体力）', 'good');
-    return { ok: true, n: n, cost: E, msg: '收获 ' + tr.fruit + ' ×' + n + ' 进仓库（-' + E + ' 体力）' };
+    log(s, '🧺 收获 ' + tr.emoji + ' ' + tr.fruit + ' ×' + n + '（-' + E + ' 体力）' +
+      (lvUp ? ' · 果树升到 Lv' + t.lv : ''), 'good');
+    return { ok: true, n: n, cost: E, lv: t.lv, levelUp: lvUp,
+             msg: '收获 ' + tr.fruit + ' ×' + n + ' 进仓库（-' + E + ' 体力）' +
+               (lvUp ? ' · 果树 Lv' + t.lv : '') };
   }
 
   function harvestOrchard(s) {
@@ -4214,8 +4286,10 @@
         mature++;
         if (TREES[t.id].season === season) {
           const n = randInt(BALANCE.orchard.fruitMin, BALANCE.orchard.fruitMax);
+          const bonus = treeYieldBonus(treeLevel(t));
+          const extra = (bonus > 0 && rand() < bonus) ? 1 : 0;
           const had = t.ripe || 0;
-          t.ripe = Math.min(cap, had + n);
+          t.ripe = Math.min(cap, had + n + extra);
           fruit += t.ripe - had;
           if (t.ripe >= cap) full++;
         }
@@ -4568,7 +4642,7 @@
     merged.coins = Math.round(num(s.coins, 50, 0, 1e9));
     merged.energy = num(s.energy, merged.maxEnergy, 0, merged.maxEnergy);
 
-    const plots = Array.isArray(s.plots) ? s.plots.slice(0, 40) : [];
+    const plots = Array.isArray(s.plots) ? s.plots.slice(0, 60) : [];
     merged.plots = (plots.length ? plots : [{}]).map(function (p) {
       const plot = Object.assign(makePlot(), p || {});
       if (!CROPS[plot.crop]) plot.crop = null;
@@ -4659,7 +4733,9 @@
         id: t.id, mode: mode, planted: planted,
         water: t.water != null ? water : Math.min(need.water, Math.round(num(t.grown, 0, 0, need.water))),
         lastWater: Math.round(num(t.lastWater, 0, 0, 100000)),
-        ripe: Math.round(num(t.ripe, 0, 0, BALANCE.orchard.ripeCap))
+        ripe: Math.round(num(t.ripe, 0, 0, BALANCE.orchard.ripeCap)),
+        lv: Math.round(num(t.lv, 1, 1, BALANCE.orchard.treeLvMax)),
+        xp: Math.round(num(t.xp, 0, 0, 999))
       };
     });
     merged.treeStock = {};
@@ -5040,6 +5116,7 @@
     treeData: treeData, treeBuyPrice: treeBuyPrice, treeStockCount: treeStockCount,
     buyTreeStock: buyTreeStock, treeSlot: treeSlot, treeStage: treeStage, treeInSeason: treeInSeason,
      treeNeed: treeNeed, treeAge: treeAge, treeMature: treeMature, treeNeedsWater: treeNeedsWater, treeProgress: treeProgress,
+     treeLevel: treeLevel, treeXpNeed: treeXpNeed, treeYieldBonus: treeYieldBonus, treeLevelText: treeLevelText,
      plantTree: plantTree, waterTree: waterTree, waterOrchard: waterOrchard, orchardTick: orchardTick,
     harvestTree: harvestTree, harvestOrchard: harvestOrchard, orchardSummary: orchardSummary,
     marketHeadroom: marketHeadroom, fishMarketHeadroom: fishMarketHeadroom,

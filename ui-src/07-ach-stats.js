@@ -23,7 +23,7 @@
       '<div><b>' + got + '/' + species.length + '</b><span>鱼种收集</span></div>' +
       '<div><b>' + perfect + '</b><span>完美品质</span></div>' +
       '<div><b>' + fishValue + '</b><span>鱼类总价值</span></div>' +
-      '<div><b>' + cropValue + '</b><span>作物 + 水果价值</span></div>' +
+      '<div><b>' + cropValue + '</b><span>作物 + 野货 + 水果价值</span></div>' +
     '</div>';
 
     /* 图鉴奖励：收集到 N 种鱼 / 作物自动发奖，这里显示进度和领取状态 */
@@ -84,11 +84,20 @@
       return bookRow(c, cx[c.id] || emptyRec, '未收获');
     }).join('');
 
+    /* 野货：和作物共用 codex.crops，单独列一段 */
+    const wildList = G.WILD_LIST || [];
+    const gotWild = wildList.filter(function (c) { return cx[c.id] && cx[c.id].n > 0; }).length;
+    const wildRows = wildList.map(function (c) {
+      return bookRow(c, cx[c.id] || emptyRec, '未采到');
+    }).join('');
+
     openModal('📖 图鉴', stat +
       rewardHtml +
       '<div class="store-sub">🐟 鱼类 · 首次 / 次数 / 累计价值</div>' + fishRows +
       '<div class="store-sub" style="margin-top:10px">🎁 宝箱 · 首次 / 数量 / 累计价值</div>' + chestRows +
       '<div class="store-sub" style="margin-top:10px">🌱 作物 · 首次 / 数量 / 累计价值</div>' + cropRows +
+      '<div class="store-sub" style="margin-top:10px">🌿 野货 · ' + gotWild + '/' + wildList.length +
+        ' 种 · 首次 / 数量 / 累计价值</div>' + wildRows +
       '<div class="store-sub" style="margin-top:10px">🍑 水果 · ' + gotFruit + '/' + fruitList.length +
         ' 种 · 首次 / 数量 / 累计价值</div>' + fruitRows,
       '<button class="btn" data-close>关闭</button>');

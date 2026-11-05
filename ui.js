@@ -852,58 +852,40 @@
     }).join('');
   }
 
-  /* ---------------- 账本（Tab 筛选 + 每日折叠） ---------------- */
+  /* ---------------- 账本（按天汇总，点开看明细） ---------------- */
 
-  let ledgerFilter = 'all'; // 'all' | 'income' | 'expense'
-  const LEDGER_ICONS = { 
-    '委托': '📋', '收购箱': '📦', '农产品店': '🧺', '水产店': '🐟',
-    '洒水器': '🚿', '伙食': '🍖', '维护': '🔧', '捐赠': '🏘️' 
-  };
+  let openLedgerDay = null;
 
   function renderLedger() {
-    const box = $('#ledger');
-    // 使用 G.ledgerByDay 获取按天分组的数据
     const days = G.ledgerByDay(state);
-    
-    // Tab 按钮
-    const tabs = ['全部', '收入', '支出'].map(function (t) {
-      const k = t === '全部' ? 'all' : (t === '收入' ? 'income' : 'expense');
-      return '<button class="ledger-tab' + (ledgerFilter === k ? ' active' : '') + 
-             '" data-ledger-filter="' + k + '">' + t + '</button>';
-    }).join('');
-    
-    let html = '<div class="ledger-tabs">' + tabs + '</div>';
-    html += '<ol class="ledger-list">';
-    
-    days.slice(0, 14).forEach(function (d) {
-      const net = d.income - d.expense;
 
-      html += '<li class="ledger-day">';
-      html += '<details>';
-      html += '<summary class="ledger-summary">' +
-              '<span>D' + d.day + '</span>' +
-              '<span class="ledger-net">' + (net >= 0 ? '+' : '') + net + ' 金</span>' +
-              '</summary>';
-      html += '<ul class="ledger-entries">';
-      d.items.forEach(function (e) {
-        if (ledgerFilter === 'income' && !e.income) return;
-        if (ledgerFilter === 'expense' && !e.expense) return;
-        
-        const isInc = e.income > 0;
-        const amt = isInc ? '+' + e.income : '-' + e.expense;
-        const cls = isInc ? ' inc' : ' exp';
-        const mainLabel = e.label.split('·')[0];
-        const icon = LEDGER_ICONS[mainLabel] || '💰';
-        
-        html += '<li class="ledger-item' + cls + '">' +
-                '<span class="ledger-icon">' + icon + '</span>' +
-                '<span class="ledger-label">' + esc(e.label) + '</span>' +
-                '<span class="ledger-amt">' + amt + ' 金</span></li>';
-      });
-      html += '</ul></details></li>';
-    });
-    html += '</ol>';
-    box.innerHTML = html;
+    const rows = days.slice(0, 14).map(function (d) {
+      const open = openLedgerDay === d.day;
+      const inc = d.income > 0 ? '<span class="led-inc">+' + d.income + '</span>' : '';
+      const exp = d.expense > 0 ? '<span class="led-exp">-' + d.expense + '</span>' : '';
+      const sep = (inc && exp) ? ' · ' : '';
+      const head = (inc || exp) ? (inc + sep + exp) : '<span style="color:var(--ink-3)">—</span>';
+
+      let html = '<div class="led-row day' + (open ? ' open' : '') + '" data-ledday="' + d.day + '"' +
+        ' role="button" tabindex="0" aria-expanded="' + open + '"' +
+        ' title="' + d.items.length + ' 笔，点击' + (open ? '收起' : '展开') + '">' +
+        '<span class="led-day">D' + d.day + '</span>' +
+        '<span class="led-label">' + (d.items.length > 1 ? d.items.length + ' 笔' : esc(d.items[0].label)) + '</span>' +
+        '<span class="led-val">' + head + '</span>' +
+        '<span class="led-bal">' + d.balance + '</span>' +
+      '</div>';
+
+      if (open) {
+        html += '<div class="led-detail">' + d.items.map(function (it) {
+          const v = it.income > 0 ? '+' + it.income : (it.expense > 0 ? '-' + it.expense : '—');
+          const cls = it.income > 0 ? 'led-inc' : (it.expense > 0 ? 'led-exp' : '');
+          return '<div class="dline"><span>' + esc(it.label) + '</span><b class="' + cls + '">' + v + '</b></div>';
+        }).join('') + '</div>';
+      }
+      return html;
+    }).join('');
+
+    $('#ledger').innerHTML = rows || '<div class="store-empty">还没有账目</div>';
     $('#ledger-sum').textContent = '余额 ' + state.coins + ' 金';
   }
 
@@ -963,46 +945,31 @@
     document.getElementById('book-list').innerHTML = cards || '<div class="store-empty">暂无记录</div>';
   }
 
-  /* ---------------- 日志（时间线视图） ---------------- */
+  /* ---------------- 日志（按天折叠，点开看当天记录） ---------------- */
 
-  const LOG_ICONS = { 
-    good: '✅', warn: '⚠️', info: 'ℹ️', 
-    ach: '🏆', order: '📋', fish: '🎣', orchard: '🍑' 
-  };
+  let openLogDay = null;
 
   function renderLog() {
-    const box = $('#log');
-    if (!state.log.length) {
-      box.innerHTML = '<div class="log-empty">还没有任何记录，开始种田吧 🌱</div>';
-      return;
-    }
-    
-    // 按天分组
-    const days = {};
-    state.log.forEach(function (e) {
-      if (!days[e.day]) days[e.day] = [];
-      days[e.day].push(e);
-    });
-    
-    // 生成时间线 HTML（每天一个 details，默认收起）
-    let html = '<ol class="log-timeline">';
-    Object.keys(days).sort(function (a, b) { return b - a; }).forEach(function (day) {
-      html += '<li class="log-day" id="log-d' + day + '">';
-      html += '<details>';
-      html += '<summary class="log-date">D' + day +
-              '<span class="log-count">' + days[day].length + ' 条</span></summary>';
-      html += '<ul class="log-entries">';
-      days[day].forEach(function (e) {
-        const icon = LOG_ICONS[e.kind] || 'ℹ️';
-        const cls = e.kind === 'warn' ? ' warn' : (e.kind === 'good' ? ' good' : '');
-        html += '<li class="log-entry' + cls + '">' +
-                '<span class="log-icon">' + icon + '</span>' +
-                '<span class="log-text">' + esc(e.text) + '</span></li>';
-      });
-      html += '</ul></details></li>';
-    });
-    html += '</ol>';
-    box.innerHTML = html;
+    const days = G.logByDay(state);
+    const rows = days.slice(0, 10).map(function (d) {
+      const open = openLogDay === d.day;
+      const last = d.items[0] ? d.items[0].text : '';
+      let html = '<div class="log-day' + (open ? ' open' : '') + '" data-logday="' + d.day + '"' +
+        ' role="button" tabindex="0" aria-expanded="' + open + '"' +
+        ' title="' + d.items.length + ' 条记录，点击' + (open ? '收起' : '展开') + '">' +
+        '<span class="ld">D' + d.day + '</span>' +
+        '<span class="ld-count">' + d.items.length + ' 条</span>' +
+        '<span class="ld-last">' + (open ? '（点击收起）' : esc(last)) + '</span>' +
+        '<span class="ld-caret">' + (open ? '▾' : '▸') + '</span>' +
+      '</div>';
+      if (open) {
+        html += d.items.map(function (r) {
+          return '<div class="log-row ' + esc(r.kind || '') + '"><span>' + esc(r.text) + '</span></div>';
+        }).join('');
+      }
+      return html;
+    }).join('');
+    $('#log').innerHTML = rows || '<div class="store-empty">还没有记录</div>';
   }
 
   /* ---------------- 焦点保持 ---------------- */
@@ -1010,7 +977,7 @@
    * 得从头 Tab。这里在重绘前记下焦点元素的 data 标识，重绘后按同样的标识找回来。
    * 弹窗（#modal-root）里的焦点不归这里管，直接跳过。 */
 
-  const FOCUS_DATA = ['i', 'bait', 'order', 'long', 'tree', 'orc',
+  const FOCUS_DATA = ['i', 'bait', 'ledday', 'logday', 'order', 'long', 'tree', 'orc',
                       'marketPage', 'storeFilter'];
 
   function dataAttr(key) {
@@ -1346,35 +1313,34 @@
         const users = [];
         for (let k = 1; k <= have; k++) if (G.autoSeedOf(state, k) === c.id) users.push(k);
         const on = users.indexOf(seedMach) >= 0;
-        return '<div class="store-row' + (on ? ' on' : '') + '">' +
-          '<span class="se">' + c.emoji + '</span>' +
-          '<div><div class="sn">' + c.name + ' <b class="own">种子 ×' + state.seeds[c.id] + '</b>' +
-            (users.length ? ' <b class="own">第 ' + users.join('·') + ' 台在用</b>' : '') + '</div>' +
-          '<div class="sv">' + (G.cropSeasonOk(c.id, state.day) ? '当季' : '反季') + ' · ' +
-            c.days + ' 天熟</div></div>' +
-          '<button class="btn mini" data-autoseed="' + c.id + '">' +
-            (on ? '取消' : '给第 ' + seedMach + ' 台') + '</button>' +
-        '</div>';
+        return '<button class="seed-chip' + (on ? ' on' : '') + '" data-autoseed="' + c.id + '">' +
+          '<span class="sc-emoji">' + c.emoji + '</span>' +
+          '<span class="sc-name">' + c.name + '</span>' +
+          '<span class="sc-n">×' + state.seeds[c.id] + '</span>' +
+          (users.length ? '<span class="sc-used">第' + users.join('·') + '台</span>' : '') +
+        '</button>';
       }).join('');
 
-    /* 每台机器负责的号段 + 自己选的种子 */
+    /* 每台机器负责的号段 + 自己选的种子（卡片网格） */
     const machineRows = [];
     for (let k = 1; k <= have; k++) {
       const rg = G.seederPlateRange(k);
       const real = Math.min(rg.to, state.plots.length);
       const seed = G.autoSeedOf(state, k);
-      let stTxt = seed ? (seed && (state.seeds[seed] || 0) ? '播种中' : '种子用完了') : '没选种子';
+      let stTxt = seed ? ((state.seeds[seed] || 0) ? '播种中' : '种子用完了') : '没选种子';
       if (!state.seederOn) stTxt = '已关闭';
       else if (G.isWinter(state.day)) stTxt = '冬天停工';
+      const span = real - rg.from + 1;
       const done = state.plots.slice(rg.from - 1, real)
         .filter(function (p) { return p.crop; }).length;
-      machineRows.push('<div class="store-row' + (seedMach === k ? ' on' : '') + '">' +
-        '<span class="se">🌱</span>' +
-        '<div><div class="sn">第 ' + k + ' 台 <b class="own">第 ' + rg.from + '–' + real + ' 块</b>' +
-          ' · ' + (seed ? G.CROPS[seed].emoji + ' ' + G.CROPS[seed].name : '未选种子') + '</div>' +
-        '<div class="sv">' + stTxt + ' · 已占 ' + done + '/' + (real - rg.from + 1) + ' 块 · 维护 ' +
-        upkeep + ' 金/周</div></div>' +
-        '<button class="btn mini" data-mach="' + k + '">' + (seedMach === k ? '选种子中' : '选种子') + '</button>' +
+      const c = seed ? G.CROPS[seed] : null;
+      machineRows.push('<div class="seed-card' + (seedMach === k ? ' on' : '') +
+        (seed ? '' : ' empty') + '">' +
+        '<div class="sc-head"><b>第 ' + k + ' 台</b><span>第 ' + rg.from + '–' + real + ' 块</span></div>' +
+        '<div class="sc-main">' + (c ? c.emoji + ' ' + c.name : '— 未选种子') + '</div>' +
+        '<div class="sc-foot">' + stTxt + ' · 已占 ' + done + '/' + span + '</div>' +
+        '<button class="btn mini" data-mach="' + k + '">' +
+          (seedMach === k ? '选种子中' : '选种子') + '</button>' +
         '</div>');
     }
 
@@ -1383,12 +1349,13 @@
         state.plots.length + ' 块 · ' + (state.seederOn ? '已开启' : '已关闭') +
         ' · 维护 ' + G.seederUpkeep(state) + ' 金/周</div>' +
       '<div class="store-sub">🐣 每台只管自己那 ' + per + ' 块地，各选各的种子，收完立刻补种</div>' +
-      '<div class="shop-list">' + machineRows.join('') + '</div>' +
+      '<div class="seed-grid">' + machineRows.join('') + '</div>' +
       '<div class="shop-tip">买第 ' + (have + 1) + ' 台要 ' + G.SEEDER_COST +
         ' 金（维护 +' + upkeep + ' 金/周）。台数上限 = 盖住全部地块所需（' + max + ' 台），想多买先扩地。<br>' +
         '自动播种不耗体力，只消耗种子；冬天不工作。</div>' +
-      '<div class="store-sub" style="margin-top:10px">🌰 给<b>第 ' + seedMach + ' 台</b>选种子</div>' +
-      (rows || '<div class="store-empty">背包里没有种子，先去种子店买</div>'),
+      '<div class="store-sub" style="margin-top:10px">🌰 给第 ' + seedMach + ' 台选种子</div>' +
+      (rows ? '<div class="seed-picks">' + rows + '</div>'
+            : '<div class="store-empty">背包里没有种子，先去种子店买</div>'),
       (have < max ? buyBtn : '') +
       '<button class="btn" data-toggleseeder>' + (state.seederOn ? '关掉自动播种' : '开启自动播种') + '</button>' +
       '<button class="btn" data-close>关闭</button>');
@@ -1584,6 +1551,17 @@
       '</div>' +
 
       '<div class="rule-sec">' +
+        '<h4>🏞️ 土地与扩张</h4>' +
+        '<p>从第 ' + G.BALANCE.expand.from + ' 块起，每多开一块地的价格是 <b>' + G.BALANCE.expand.base +
+        ' + ' + G.BALANCE.expand.step + '×(已有块数−' + G.BALANCE.expand.from + ')</b>，<b>一路线性涨到 ' +
+        G.BALANCE.expand.steepFrom + ' 块</b>；<b>' + G.BALANCE.expand.steepFrom +
+        ' 块以后每块 ×' + G.BALANCE.expand.steepMul + '</b> 陡涨（' + G.expandCost({ plots: new Array(40) }) +
+        ' → ' + G.expandCost({ plots: new Array(41) }) + ' → ' + G.expandCost({ plots: new Array(42) }) + ' 金）。<br>' +
+        '所以主力田块先铺到 <b>' + G.BALANCE.expand.steepFrom + ' 块</b>，再往上就是纯烧钱；' +
+        '土地维护费也按块数分档（' + G.BALANCE.upkeep.free + ' 块内免费，之后逐档变贵）。</p>' +
+      '</div>' +
+
+      '<div class="rule-sec">' +
         '<h4>🍂 季节</h4>' +
         '<p>每 <b>' + G.BALANCE.seasonDays + ' 天</b>换一季：' +
         G.SEASONS.map(function (s, i) {
@@ -1632,6 +1610,11 @@
         Math.round((G.BALANCE.orchard.fruitMin + G.BALANCE.orchard.fruitMax) / 2 * G.BALANCE.seasonDays *
           G.TREE_LIST[0].price) + ' 金/季（桃）。<b>种子</b>要养一整季才成树，<b>树苗</b>下季就能结果，' +
         '买哪个看现金和耐心。</p>' +
+        '<p>🌳 <b>成树等级</b>：成树之后每收获一次攒 1 点经验，' +
+        '升到下一级要 2 / 4 / 6 / 8 次（<b>满级 Lv' + G.BALANCE.orchard.treeLvMax + '</b>）；' +
+        '每高一级，当天「多挂 1 个果」的概率 <b>+10%</b>（满级 +' +
+        Math.round((G.BALANCE.orchard.treeLvMax - 1) * G.BALANCE.orchard.treeLvYield * 100) +
+        '%），挂果上限不变。果园卡片上直接显示等级与经验。</p>' +
       '</div>';
 
     const P2 =
@@ -1690,6 +1673,8 @@
         Math.round(G.BALANCE.forage.seedChance * 100) + '% 概率顺手摘到一颗当季作物种子（<b>和天气无关</b>）。<br>' +
         '野货直接进仓库，和作物一样按品质定价、一样吃<b>市价</b>，可以卖给农产品店或放进收购箱；' +
         '冬天也能采，是封冻期唯一的野外收入。<br>' +
+        '📖 采到的野货也会<b>记进图鉴</b>（首次 / 次数 / 最好品质 / 累计价值），' +
+        '顶栏 📖 图鉴里的「🌿 野货」一栏能看到收集进度。<br>' +
         '🌿 <b>采集等级</b>：每次采集 +' + G.BALANCE.forage.xp + ' 经验（一次采到 3 件再 +1），' +
         '<b>Lv4 / Lv8 各多取一次品质</b>（野货更容易出优良以上），' +
         '满级 Lv' + G.BALANCE.level.max + ' 后<b>采集只花 ' + (G.BALANCE.forage.energy - 1) + ' 体力</b>。</p>' +
@@ -1900,6 +1885,8 @@
         '鱼类分 ' + G.BALANCE.codex.fish.map(function (m) { return m.need; }).join(' / ') + ' 种，' +
         '作物分 ' + G.BALANCE.codex.crops.map(function (m) { return m.need; }).join(' / ') + ' 种，' +
         '每档只发一次（金币 / 饵料 / 肥料）。<br>' +
+        '图鉴还会单独记录<b>野货</b>（采集来的荠菜 / 野莓 / 松茸 / 冻梨）和<b>水果</b>，' +
+        '这两类只做收集展示，不计入上面两档奖励。<br>' +
         '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态；旧存档按现有进度补发。</p>' +
       '</div>' +
 
@@ -1965,7 +1952,7 @@
       '<div><b>' + got + '/' + species.length + '</b><span>鱼种收集</span></div>' +
       '<div><b>' + perfect + '</b><span>完美品质</span></div>' +
       '<div><b>' + fishValue + '</b><span>鱼类总价值</span></div>' +
-      '<div><b>' + cropValue + '</b><span>作物 + 水果价值</span></div>' +
+      '<div><b>' + cropValue + '</b><span>作物 + 野货 + 水果价值</span></div>' +
     '</div>';
 
     /* 图鉴奖励：收集到 N 种鱼 / 作物自动发奖，这里显示进度和领取状态 */
@@ -2026,11 +2013,20 @@
       return bookRow(c, cx[c.id] || emptyRec, '未收获');
     }).join('');
 
+    /* 野货：和作物共用 codex.crops，单独列一段 */
+    const wildList = G.WILD_LIST || [];
+    const gotWild = wildList.filter(function (c) { return cx[c.id] && cx[c.id].n > 0; }).length;
+    const wildRows = wildList.map(function (c) {
+      return bookRow(c, cx[c.id] || emptyRec, '未采到');
+    }).join('');
+
     openModal('📖 图鉴', stat +
       rewardHtml +
       '<div class="store-sub">🐟 鱼类 · 首次 / 次数 / 累计价值</div>' + fishRows +
       '<div class="store-sub" style="margin-top:10px">🎁 宝箱 · 首次 / 数量 / 累计价值</div>' + chestRows +
       '<div class="store-sub" style="margin-top:10px">🌱 作物 · 首次 / 数量 / 累计价值</div>' + cropRows +
+      '<div class="store-sub" style="margin-top:10px">🌿 野货 · ' + gotWild + '/' + wildList.length +
+        ' 种 · 首次 / 数量 / 累计价值</div>' + wildRows +
       '<div class="store-sub" style="margin-top:10px">🍑 水果 · ' + gotFruit + '/' + fruitList.length +
         ' 种 · 首次 / 数量 / 累计价值</div>' + fruitRows,
       '<button class="btn" data-close>关闭</button>');
@@ -3242,13 +3238,16 @@
         '</div></div>';
     }
     const inSeason = G.treeInSeason(state, i);
+    const lvTxt = G.treeLevelText(G.treeSlot(state, i) || {});
     return '<div class="orc-card mature' + (inSeason ? ' on' : '') + '">' +
       '<div class="orc-top"><span class="orc-emoji">' + t.emoji + '</span><span class="orc-no">' + no + ' 号坑</span>' +
+        '<b class="orc-lv">' + lvTxt + '</b>' +
         '<b class="orc-tag' + (inSeason ? '' : ' off') + '">' + (inSeason ? '当季' : '休眠') + '</b></div>' +
       '<div class="orc-mid">' + t.name + '<br>' +
         (inSeason
-          ? '每天挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax + ' 个 · 待收 ' +
-            p.ripe + '/' + G.BALANCE.orchard.ripeCap +
+          ? '每天挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax + ' 个' +
+            (p.yieldBonus > 0 ? '（+' + Math.round(p.yieldBonus * 100) + '%）' : '') +
+            ' · 待收 ' + p.ripe + '/' + G.BALANCE.orchard.ripeCap +
             (p.ripe >= G.BALANCE.orchard.ripeCap ? ' <b class="orc-full">已挂满</b>' : '')
           : G.SEASONS[t.season] + '季结果') + '</div>' +
       '<div class="orc-act">' +
@@ -4167,11 +4166,12 @@
         return;
       }
 
-      // 账本 Tab 筛选
-      const ledgerTab = t.closest('[data-ledger-filter]');
-      if (ledgerTab) {
-        ledgerFilter = ledgerTab.dataset.ledgerFilter;
-        renderLedger();
+      // 日志按天展开/收起
+      const logDay = t.closest('[data-logday]');
+      if (logDay) {
+        const d = Number(logDay.dataset.logday);
+        openLogDay = (openLogDay === d) ? null : d;
+        renderLog();
         return;
       }
 

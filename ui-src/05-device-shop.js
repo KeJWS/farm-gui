@@ -37,35 +37,34 @@
         const users = [];
         for (let k = 1; k <= have; k++) if (G.autoSeedOf(state, k) === c.id) users.push(k);
         const on = users.indexOf(seedMach) >= 0;
-        return '<div class="store-row' + (on ? ' on' : '') + '">' +
-          '<span class="se">' + c.emoji + '</span>' +
-          '<div><div class="sn">' + c.name + ' <b class="own">种子 ×' + state.seeds[c.id] + '</b>' +
-            (users.length ? ' <b class="own">第 ' + users.join('·') + ' 台在用</b>' : '') + '</div>' +
-          '<div class="sv">' + (G.cropSeasonOk(c.id, state.day) ? '当季' : '反季') + ' · ' +
-            c.days + ' 天熟</div></div>' +
-          '<button class="btn mini" data-autoseed="' + c.id + '">' +
-            (on ? '取消' : '给第 ' + seedMach + ' 台') + '</button>' +
-        '</div>';
+        return '<button class="seed-chip' + (on ? ' on' : '') + '" data-autoseed="' + c.id + '">' +
+          '<span class="sc-emoji">' + c.emoji + '</span>' +
+          '<span class="sc-name">' + c.name + '</span>' +
+          '<span class="sc-n">×' + state.seeds[c.id] + '</span>' +
+          (users.length ? '<span class="sc-used">第' + users.join('·') + '台</span>' : '') +
+        '</button>';
       }).join('');
 
-    /* 每台机器负责的号段 + 自己选的种子 */
+    /* 每台机器负责的号段 + 自己选的种子（卡片网格） */
     const machineRows = [];
     for (let k = 1; k <= have; k++) {
       const rg = G.seederPlateRange(k);
       const real = Math.min(rg.to, state.plots.length);
       const seed = G.autoSeedOf(state, k);
-      let stTxt = seed ? (seed && (state.seeds[seed] || 0) ? '播种中' : '种子用完了') : '没选种子';
+      let stTxt = seed ? ((state.seeds[seed] || 0) ? '播种中' : '种子用完了') : '没选种子';
       if (!state.seederOn) stTxt = '已关闭';
       else if (G.isWinter(state.day)) stTxt = '冬天停工';
+      const span = real - rg.from + 1;
       const done = state.plots.slice(rg.from - 1, real)
         .filter(function (p) { return p.crop; }).length;
-      machineRows.push('<div class="store-row' + (seedMach === k ? ' on' : '') + '">' +
-        '<span class="se">🌱</span>' +
-        '<div><div class="sn">第 ' + k + ' 台 <b class="own">第 ' + rg.from + '–' + real + ' 块</b>' +
-          ' · ' + (seed ? G.CROPS[seed].emoji + ' ' + G.CROPS[seed].name : '未选种子') + '</div>' +
-        '<div class="sv">' + stTxt + ' · 已占 ' + done + '/' + (real - rg.from + 1) + ' 块 · 维护 ' +
-        upkeep + ' 金/周</div></div>' +
-        '<button class="btn mini" data-mach="' + k + '">' + (seedMach === k ? '选种子中' : '选种子') + '</button>' +
+      const c = seed ? G.CROPS[seed] : null;
+      machineRows.push('<div class="seed-card' + (seedMach === k ? ' on' : '') +
+        (seed ? '' : ' empty') + '">' +
+        '<div class="sc-head"><b>第 ' + k + ' 台</b><span>第 ' + rg.from + '–' + real + ' 块</span></div>' +
+        '<div class="sc-main">' + (c ? c.emoji + ' ' + c.name : '— 未选种子') + '</div>' +
+        '<div class="sc-foot">' + stTxt + ' · 已占 ' + done + '/' + span + '</div>' +
+        '<button class="btn mini" data-mach="' + k + '">' +
+          (seedMach === k ? '选种子中' : '选种子') + '</button>' +
         '</div>');
     }
 
@@ -74,12 +73,13 @@
         state.plots.length + ' 块 · ' + (state.seederOn ? '已开启' : '已关闭') +
         ' · 维护 ' + G.seederUpkeep(state) + ' 金/周</div>' +
       '<div class="store-sub">🐣 每台只管自己那 ' + per + ' 块地，各选各的种子，收完立刻补种</div>' +
-      '<div class="shop-list">' + machineRows.join('') + '</div>' +
+      '<div class="seed-grid">' + machineRows.join('') + '</div>' +
       '<div class="shop-tip">买第 ' + (have + 1) + ' 台要 ' + G.SEEDER_COST +
         ' 金（维护 +' + upkeep + ' 金/周）。台数上限 = 盖住全部地块所需（' + max + ' 台），想多买先扩地。<br>' +
         '自动播种不耗体力，只消耗种子；冬天不工作。</div>' +
-      '<div class="store-sub" style="margin-top:10px">🌰 给<b>第 ' + seedMach + ' 台</b>选种子</div>' +
-      (rows || '<div class="store-empty">背包里没有种子，先去种子店买</div>'),
+      '<div class="store-sub" style="margin-top:10px">🌰 给第 ' + seedMach + ' 台选种子</div>' +
+      (rows ? '<div class="seed-picks">' + rows + '</div>'
+            : '<div class="store-empty">背包里没有种子，先去种子店买</div>'),
       (have < max ? buyBtn : '') +
       '<button class="btn" data-toggleseeder>' + (state.seederOn ? '关掉自动播种' : '开启自动播种') + '</button>' +
       '<button class="btn" data-close>关闭</button>');

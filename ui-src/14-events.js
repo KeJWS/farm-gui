@@ -680,11 +680,12 @@
         return;
       }
 
-      // 账本 Tab 筛选
-      const ledgerTab = t.closest('[data-ledger-filter]');
-      if (ledgerTab) {
-        ledgerFilter = ledgerTab.dataset.ledgerFilter;
-        renderLedger();
+      // 日志按天展开/收起
+      const logDay = t.closest('[data-logday]');
+      if (logDay) {
+        const d = Number(logDay.dataset.logday);
+        openLogDay = (openLogDay === d) ? null : d;
+        renderLog();
         return;
       }
 

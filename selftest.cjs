@@ -749,14 +749,15 @@ s.day = 6; s.coins = 100;
 G.sleep(s);
 ok(s.coins === 100 - 4 - 15, '10 块地周末扣 15 金维护费', s.coins);
 
-// 25 块之后扩展费暴涨
+// 40 块之前线性涨价，40 块之后每块 ×1.8
 function costAt(n) {
   const st = G.createState();
   st.plots = new Array(n).fill(0).map(function () { return G.createState().plots[0]; });
   return G.expandCost(st);
 }
-ok(costAt(5) === 40 && costAt(24) === 325 && costAt(25) === 325 && costAt(26) === 520 && costAt(27) === 832,
-   '25 块之后扩展费每块 ×1.6', [costAt(24), costAt(25), costAt(26), costAt(27)].join('/'));
+ok(costAt(5) === 40 && costAt(39) === 550 && costAt(40) === 550 &&
+   costAt(41) === 990 && costAt(42) === 1782,
+   '40 块之后扩展费每块 ×1.8', [costAt(39), costAt(40), costAt(41), costAt(42)].join('/'));
 
 // 春季过后委托需求变大
 G.setRng(mulberry32(5));
@@ -1078,7 +1079,7 @@ let lureS = G.createState(); lureS.coins = 100;
 G.buyBait(lureS, 'lure', 1);
 ok(lureS.lure.dur === 25 && lureS.coins === 95, '假饵 5 金 · 耐用 25 次', lureS.lure.dur);
 
-ok(G.ACH.length === 60, '成就总数 60', G.ACH.length);
+ok(G.ACH.length === 63, '成就总数 63', G.ACH.length);
 
 const retro = G.deserialize({ plots: [], coins: 100, day: 20, stats: { harvests: 100, casts: 300 } });
 ok(retro.levels.farm > 1 && retro.levels.fish > 1, '老存档按历史次数补等级',
@@ -1403,7 +1404,7 @@ ok(!G.fishAll(v23noBait, 'dough').ok, '没饵时全体力钓鱼直接失败');
 /* 新成就 */
 const v23achNew = G.checkAchievements(Object.assign(G.createState(), { stats: { teas: 10, chests: 10 } }));
 ok(v23achNew.some(x => x.id === 'tea10') && v23achNew.some(x => x.id === 'chest10'), '下午茶 / 开箱成就能解锁');
-ok(G.ACH.length === 60, '成就总数 60', G.ACH.length);
+ok(G.ACH.length === 63, '成就总数 63', G.ACH.length);
 
 /* ---------- 5f. v2.4 季节 ---------- */
 section('v2.4 季节');
@@ -2752,6 +2753,58 @@ section('挂果上限与连甩双咬钩');
     [ra.count, ra.doubles]);
   ok(ra.msg.indexOf('双咬钩') >= 0, '全部体力结果带双咬钩', ra.msg);
   ok(ra.entries.length === ra.count * 2, '双咬钩的第二条鱼也进了收获列表', ra.entries.length);
+}
+
+/* ---------- 20. v2.40 土地 / 果树等级 / 野货图鉴 ---------- */
+section('土地曲线与果树等级');
+{
+  /* 40 块前线性、40 块后陡涨 */
+  const B = G.BALANCE.expand;
+  ok(B.steepFrom === 40 && Math.abs(B.steepMul - 1.8) < 1e-9, '40 块之后才陡涨', B.steepFrom);
+
+  /* 果树等级：收获攒经验，满级 5，产量加成逐级 +10% */
+  const s = G.createState();
+  s.coins = 999999; s.levels.farm = 10; s.day = 30;
+  G.orchardUnlock(s);
+  s.treeStock.peach = { seed: 9, sapling: 9 };
+  G.plantTree(s, 0, 'peach', 'sapling');
+  const t = s.orchard.slots[0];
+  t.planted = s.day - 60;                 // 直接当成树
+  t.water = G.BALANCE.orchard.grow.sapling.water;
+  ok(G.treeLevel(t) === 1 && G.treeXpNeed(1) === 2, '成树初始 Lv1，升 2 级要 2 次收获',
+    [G.treeLevel(t), G.treeXpNeed(1)]);
+
+  s.energy = 999;
+  let ups = 0;
+  for (let i = 0; i < 30; i++) {
+    t.ripe = 3;
+    const r = G.harvestTree(s, 0);
+    if (r.ok && r.levelUp) ups++;
+    if (G.treeLevel(t) >= G.BALANCE.orchard.treeLvMax) break;
+  }
+  ok(G.treeLevel(t) === G.BALANCE.orchard.treeLvMax, '收获能把果树养到满级',
+    G.treeLevel(t));
+  ok(Math.abs(G.treeYieldBonus(t.lv) - 0.4) < 1e-9, '满级产量加成 +40%', G.treeYieldBonus(t.lv));
+  ok(G.treeXpNeed(4) === 8, '满级前一级要 8 次收获', G.treeXpNeed(4));
+
+  /* 野货进图鉴 */
+  const f = G.createState();
+  f.day = 60; f.energy = 100;
+  G.setRng(mulberry32(11));
+  const fw = G.forage(f);
+  ok(fw.ok && f.codex.crops[fw.wild] && f.codex.crops[fw.wild].n >= 1,
+    '采集会写进图鉴', fw.wild);
+  ok(!!f.codex.crops[fw.wild].best, '野货图鉴记录最好品质', f.codex.crops[fw.wild].best);
+
+  /* 三个新成就：40 / 50 块、果树满级、野货 4 种 */
+  const ids = G.ACH.map(function (a) { return a.id; });
+  ok(ids.indexOf('plot40') >= 0 && ids.indexOf('plot50') >= 0 &&
+     ids.indexOf('treeLv5') >= 0 && ids.indexOf('wild4') >= 0, '新增土地 / 果树 / 野货成就');
+  const pts = G.ACH.reduce(function (a, x) { return a + x.pts; }, 0);
+  ok(pts >= 200, '成就点达到 200（售价 +20% 可解锁）', pts);
+  const full = G.createState();
+  G.ACH.forEach(function (a) { full.ach[a.id] = 1; });
+  ok(Math.abs(G.sellBonus(full) - 1.2) < 1e-9, '全成就时售价加成 +20%', G.sellBonus(full));
 }
 
 console.log('\n' + (fail ? '❌' : '✅') + ' 通过 ' + pass + ' / ' + (pass + fail));

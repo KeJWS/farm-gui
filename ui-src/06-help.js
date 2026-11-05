@@ -41,6 +41,17 @@
       '</div>' +
 
       '<div class="rule-sec">' +
+        '<h4>🏞️ 土地与扩张</h4>' +
+        '<p>从第 ' + G.BALANCE.expand.from + ' 块起，每多开一块地的价格是 <b>' + G.BALANCE.expand.base +
+        ' + ' + G.BALANCE.expand.step + '×(已有块数−' + G.BALANCE.expand.from + ')</b>，<b>一路线性涨到 ' +
+        G.BALANCE.expand.steepFrom + ' 块</b>；<b>' + G.BALANCE.expand.steepFrom +
+        ' 块以后每块 ×' + G.BALANCE.expand.steepMul + '</b> 陡涨（' + G.expandCost({ plots: new Array(40) }) +
+        ' → ' + G.expandCost({ plots: new Array(41) }) + ' → ' + G.expandCost({ plots: new Array(42) }) + ' 金）。<br>' +
+        '所以主力田块先铺到 <b>' + G.BALANCE.expand.steepFrom + ' 块</b>，再往上就是纯烧钱；' +
+        '土地维护费也按块数分档（' + G.BALANCE.upkeep.free + ' 块内免费，之后逐档变贵）。</p>' +
+      '</div>' +
+
+      '<div class="rule-sec">' +
         '<h4>🍂 季节</h4>' +
         '<p>每 <b>' + G.BALANCE.seasonDays + ' 天</b>换一季：' +
         G.SEASONS.map(function (s, i) {
@@ -89,6 +100,11 @@
         Math.round((G.BALANCE.orchard.fruitMin + G.BALANCE.orchard.fruitMax) / 2 * G.BALANCE.seasonDays *
           G.TREE_LIST[0].price) + ' 金/季（桃）。<b>种子</b>要养一整季才成树，<b>树苗</b>下季就能结果，' +
         '买哪个看现金和耐心。</p>' +
+        '<p>🌳 <b>成树等级</b>：成树之后每收获一次攒 1 点经验，' +
+        '升到下一级要 2 / 4 / 6 / 8 次（<b>满级 Lv' + G.BALANCE.orchard.treeLvMax + '</b>）；' +
+        '每高一级，当天「多挂 1 个果」的概率 <b>+10%</b>（满级 +' +
+        Math.round((G.BALANCE.orchard.treeLvMax - 1) * G.BALANCE.orchard.treeLvYield * 100) +
+        '%），挂果上限不变。果园卡片上直接显示等级与经验。</p>' +
       '</div>';
 
     const P2 =
@@ -147,6 +163,8 @@
         Math.round(G.BALANCE.forage.seedChance * 100) + '% 概率顺手摘到一颗当季作物种子（<b>和天气无关</b>）。<br>' +
         '野货直接进仓库，和作物一样按品质定价、一样吃<b>市价</b>，可以卖给农产品店或放进收购箱；' +
         '冬天也能采，是封冻期唯一的野外收入。<br>' +
+        '📖 采到的野货也会<b>记进图鉴</b>（首次 / 次数 / 最好品质 / 累计价值），' +
+        '顶栏 📖 图鉴里的「🌿 野货」一栏能看到收集进度。<br>' +
         '🌿 <b>采集等级</b>：每次采集 +' + G.BALANCE.forage.xp + ' 经验（一次采到 3 件再 +1），' +
         '<b>Lv4 / Lv8 各多取一次品质</b>（野货更容易出优良以上），' +
         '满级 Lv' + G.BALANCE.level.max + ' 后<b>采集只花 ' + (G.BALANCE.forage.energy - 1) + ' 体力</b>。</p>' +
@@ -357,6 +375,8 @@
         '鱼类分 ' + G.BALANCE.codex.fish.map(function (m) { return m.need; }).join(' / ') + ' 种，' +
         '作物分 ' + G.BALANCE.codex.crops.map(function (m) { return m.need; }).join(' / ') + ' 种，' +
         '每档只发一次（金币 / 饵料 / 肥料）。<br>' +
+        '图鉴还会单独记录<b>野货</b>（采集来的荠菜 / 野莓 / 松茸 / 冻梨）和<b>水果</b>，' +
+        '这两类只做收集展示，不计入上面两档奖励。<br>' +
         '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态；旧存档按现有进度补发。</p>' +
       '</div>' +
 

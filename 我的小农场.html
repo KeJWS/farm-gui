@@ -684,6 +684,9 @@ button{ font-family:inherit; }
 .orc-tag.off{ color:var(--ink-3); }
 .orc-mid{ font-size:11.5px; line-height:1.55; font-weight:700; color:var(--ink-2); min-height:34px; }
 .orc-full{ color:var(--gold); }
+.orc-lv{ margin-left:auto; font-size:9.5px; font-weight:800; color:var(--blue); background:rgba(63,127,196,.12);
+  border-radius:6px; padding:1px 5px; white-space:nowrap; }
+.orc-lv + .orc-tag{ margin-left:4px; }
 .orc-bar{ margin:1px 0; }
 .orc-act{ display:flex; justify-content:flex-end; align-items:center; min-height:24px; }
 .orc-note{ font-size:10.5px; font-weight:700; color:var(--ink-3); }
@@ -1104,52 +1107,6 @@ button{ color:inherit; font:inherit; }
   .store-row .spw{ flex-wrap:wrap; justify-content:flex-end; }
 }
 
-/* ---------- v2.39: 日志时间线 ---------- */
-.log-timeline{ list-style:none; margin:0; padding:0 0 0 24px; border-left:2px solid var(--line-2); }
-.log-day{ position:relative; margin:0 0 8px; }
-.log-day::before{
-  content:''; position:absolute; left:-30px; top:10px;
-  width:9px; height:9px; border-radius:99px;
-  background:var(--green); box-shadow:0 0 0 2px var(--bg);
-}
-.log-date{
-  display:inline-flex; align-items:center; gap:6px; cursor:pointer;
-  padding:2px 10px; border-radius:99px; list-style:none;
-  background:var(--card); border:1px solid var(--line);
-  font-size:11px; font-weight:800; color:var(--ink-2);
-}
-.log-date::-webkit-details-marker{ display:none; }
-.log-count{ font-size:10px; font-weight:700; color:var(--ink-3); }
-.log-entries{ list-style:none; margin:4px 0 0; padding:0; }
-.log-entry{ display:flex; align-items:flex-start; gap:6px; padding:3px 0; font-size:12px; line-height:1.55; }
-.log-entry.good .log-icon{ color:var(--green-d); }
-.log-entry.warn .log-icon{ color:#d9a02b; }
-.log-icon{ flex-shrink:0; width:18px; text-align:center; }
-
-/* ---------- v2.39: 账本 Tab + 折叠 ---------- */
-.ledger-tabs{ display:flex; gap:6px; margin-bottom:10px; }
-.ledger-tab{
-  flex:1; padding:6px 10px; border-radius:10px; cursor:pointer;
-  border:1px solid var(--line); background:var(--card);
-  font-size:12px; font-weight:700; color:var(--ink-3);
-}
-.ledger-tab.active{ background:var(--green); color:#fff; border-color:transparent; }
-.ledger-list{ list-style:none; margin:0; padding:0; }
-.ledger-day details summary{
-  display:flex; justify-content:space-between; align-items:center;
-  padding:8px 10px; cursor:pointer; font-size:12px; font-weight:800;
-  border-radius:10px; background:var(--card); border:1px solid var(--line);
-  list-style:none;
-}
-.ledger-day details summary::-webkit-details-marker{ display:none; }
-.ledger-net{ font-variant-numeric:tabular-nums; color:var(--ink-3); font-weight:600; }
-.ledger-entries{ list-style:none; margin:0; padding:4px 0 0 16px; }
-.ledger-item{ display:flex; align-items:center; gap:6px; padding:3px 0; font-size:11.5px; }
-.ledger-item.inc .ledger-amt{ color:var(--green-d); }
-.ledger-item.exp .ledger-amt{ color:var(--red); }
-.ledger-amt{ margin-left:auto; font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.ledger-icon{ flex-shrink:0; width:18px; text-align:center; }
-
 /* ---------- v2.39: 钓鱼记录卡片网格 ---------- */
 .book-stats-bar{ display:flex; gap:12px; font-size:12px; font-weight:700; color:var(--ink-3); margin-bottom:8px; flex-wrap:wrap; }
 .book-stats-bar b{ color:var(--ink); font-weight:900; }
@@ -1176,6 +1133,37 @@ button{ color:inherit; font:inherit; }
 .book-card-name{ font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; font-size:10.5px; }
 .book-card-type{ font-size:9.5px; font-weight:700; }
 .book-card-price{ font-weight:900; color:var(--gold); font-variant-numeric:tabular-nums; font-size:10.5px; }
+
+
+/* ---------- v2.40: 自动播种器卡片布局 ---------- */
+.seed-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(146px,1fr)); gap:8px; margin:8px 0 4px; }
+.seed-card{
+  display:flex; flex-direction:column; gap:3px; min-width:0;
+  padding:8px 9px; border-radius:12px; background:var(--card);
+  border:1px solid var(--line); font-size:11px;
+}
+.seed-card.on{ border-color:rgba(79,156,95,.55); background:rgba(79,156,95,.08); }
+.seed-card.empty{ opacity:.75; border-style:dashed; }
+.seed-card .sc-head{ display:flex; align-items:baseline; gap:5px; }
+.seed-card .sc-head b{ font-size:11.5px; font-weight:800; }
+.seed-card .sc-head span{ font-size:10px; color:var(--ink-3); font-weight:700; margin-left:auto; }
+.seed-card .sc-main{ font-size:12px; font-weight:800; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.seed-card .sc-foot{ font-size:10px; color:var(--ink-3); font-weight:700; }
+.seed-card .btn.mini{ margin-top:3px; }
+
+.seed-picks{ display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:6px; margin-top:6px; }
+.seed-chip{
+  display:flex; align-items:center; gap:5px; min-width:0;
+  padding:6px 8px; border-radius:10px; cursor:pointer;
+  background:var(--card); border:1px solid var(--line);
+  font-family:inherit; font-size:11.5px; font-weight:700; color:var(--ink-2);
+}
+.seed-chip:hover{ border-color:var(--line-2); }
+.seed-chip.on{ border-color:rgba(79,156,95,.55); background:rgba(79,156,95,.1); color:var(--green-d); }
+.seed-chip .sc-emoji{ font-size:14px; }
+.seed-chip .sc-name{ color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.seed-chip .sc-n{ margin-left:auto; font-size:10.5px; color:var(--ink-3); }
+.seed-chip .sc-used{ font-size:9.5px; color:var(--green-d); }
 
 
 </style>
@@ -2114,7 +2102,8 @@ button{ color:inherit; font:inherit; }
     order: { mult: 1.35, seasonStep: 0.6,
              /* 鱼单单价：每日单 11 + 4×季 / 长期单 18 + 4×季 */
              fishBase: 11, longFishBase: 18, fishStep: 4 },
-    expand: { base: 25, step: 15, from: 4, steepFrom: 25, steepMul: 1.6 },
+    /* 土地：4~39 块按 25 + 15×(n−4) 线性涨；到 40 块以后每块 ×1.8 陡涨 */
+    expand: { base: 25, step: 15, from: 4, steepFrom: 40, steepMul: 1.8 },
     /* 自动播种器：一台只管 5 块地，买几台就播几块（每台每天 5 块），每台每周要交维护费 */
     device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5,
               seederMax: 9, netMax: 9, sprinklerPerDay: 1 },
@@ -2167,6 +2156,8 @@ button{ color:inherit; font:inherit; }
      * 成树只在自己季节结果，当季每天随机 1~3 个；浇水 / 收获各 1 体力。 */
     orchard: { unlockLv: 7, unlockCost: 2500, slots: 8, free: 3, fruitMin: 1, fruitMax: 3,
                waterEnergy: 1, harvestEnergy: 1, ripeCap: 10,
+               /* 成树等级：收获攒经验，满级 5；每级让「当天多挂 1 个」的概率 +10% */
+               treeLvMax: 5, treeXpBase: 2, treeXpStep: 2, treeLvYield: 0.10,
                grow: { seed: { days: 90, water: 30 }, sapling: { days: 30, water: 15 } },
                slotCosts: [600, 1000, 1600, 2400, 3200] },
     /* 经营档案：按净资产给的称号 */
@@ -2298,6 +2289,21 @@ button{ color:inherit; font:inherit; }
     const cx = (s.codex && s.codex.crops) || {};
     return FRUIT_LIST.filter(function (f) { return cx[f.id] && cx[f.id].n > 0; }).length;
   }
+  /* 野货：和作物共用 codex.crops */
+  function wildSpeciesOwned(s) {
+    const cx = (s.codex && s.codex.crops) || {};
+    return WILD_LIST.filter(function (w) { return cx[w.id] && cx[w.id].n > 0; }).length;
+  }
+  /* 最高果树等级（成树才会升级） */
+  function maxTreeLevel(s) {
+    const slots = (s.orchard && s.orchard.slots) || [];
+    let best = 0;
+    slots.forEach(function (t) {
+      if (!t) return;
+      best = Math.max(best, (t.lv || 1));
+    });
+    return best >= BALANCE.orchard.treeLvMax ? 1 : 0;
+  }
   function perfectFish(s) {
     const fx = (s.codex && s.codex.fish) || {};
     return Object.keys(fx).reduce(function (a, k) { return a + (fx[k].perfect || 0); }, 0);
@@ -2374,8 +2380,10 @@ button{ color:inherit; font:inherit; }
       val: function (s) { return s.plots.length; }, reward: { coins: 40 }, pts: 2 },
     { id: 'plot20',    cat: 'farm', emoji: '🌾', name: '良田成片',   desc: '土地达到 20 块',       goal: 20,
       val: function (s) { return s.plots.length; }, reward: { ferts: { normal: 5 } }, pts: 3 },
-    { id: 'plot36',    cat: 'farm', emoji: '🗺️', name: '大地主',     desc: '土地达到 36 块',       goal: 36,
+    { id: 'plot40',    cat: 'farm', emoji: '🗺️', name: '大地主',     desc: '土地达到 40 块',       goal: 40,
       val: function (s) { return s.plots.length; }, reward: { coins: 2000 }, pts: 6 },
+    { id: 'plot50',    cat: 'farm', emoji: '🏞️', name: '田连阡陌',   desc: '土地达到 50 块（40 块后地价陡涨）', goal: 50,
+      val: function (s) { return s.plots.length; }, reward: { coins: 6000 }, pts: 4 },
     { id: 'crop10',    cat: 'farm', emoji: '🌽', name: '五谷丰登',   desc: '收获过全部 14 种作物', goal: 14,
       val: cropSpeciesOwned, reward: { coins: 250, seeds: { pumpkin: 1 } }, pts: 3 },
 
@@ -2390,6 +2398,10 @@ button{ color:inherit; font:inherit; }
       val: function (s) { return orchardSlotCount(s); }, reward: { coins: 600 }, pts: 4 },
     { id: 'fruit3',    cat: 'farm', emoji: '🍎', name: '三种果子',   desc: '桃 / 芒果 / 苹果都收过', goal: 3,
       val: fruitSpeciesOwned, reward: { coins: 500, ferts: { special: 2 } }, pts: 4 },
+    { id: 'treeLv5',   cat: 'farm', emoji: '🌳', name: '老树盘根',   desc: '把一棵果树养到满级 Lv5', goal: 1,
+      val: maxTreeLevel, reward: { coins: 800, ferts: { special: 2 } }, pts: 2 },
+    { id: 'wild4',     cat: 'farm', emoji: '🌿', name: '山野通',     desc: '四种野货都采过',       goal: 4,
+      val: wildSpeciesOwned, reward: { coins: 400 }, pts: 2 },
 
     /* 钓鱼 */
     { id: 'fish1',     cat: 'fish', emoji: '🎣', name: '开张啦',     desc: '钓上第 1 条鱼',        goal: 1,
@@ -4569,6 +4581,14 @@ button{ color:inherit; font:inherit; }
     s.stats.wild = s.stats.wild || {};
     s.stats.wild[w.id] = (s.stats.wild[w.id] || 0) + n;
     s.stats.forageBest = Math.max(s.stats.forageBest || 0, n);
+    /* 图鉴：野货和作物共用 codex.crops（只用于图鉴展示，不算进作物收集奖励） */
+    s.codex = s.codex || { fish: {}, crops: {} };
+    s.codex.crops = s.codex.crops || {};
+    const wx = s.codex.crops[w.id] ||
+      (s.codex.crops[w.id] = { n: 0, best: null, first: s.day, value: 0 });
+    wx.n += n;
+    wx.value += n * w.price * (q.mul || 1);
+    if (!wx.best || QUALITY.indexOf(q) > QUALITY.indexOf(qualityById(wx.best))) wx.best = q.id;
     const up = addLevelXp(s, 'forage', BALANCE.forage.xp + (n >= 3 ? 1 : 0));
     let seedTxt = '';
     if (rand() < BALANCE.forage.seedChance) {
@@ -5471,6 +5491,40 @@ button{ color:inherit; font:inherit; }
     return seasonIdx(s.day || 1) === TREES[t.id].season;
   }
 
+  /* ---------------- 成树等级 ----------------
+   * 成树以后靠「收获」攒经验：每次收获 +1，升到下一级要 2 / 4 / 6 / 8 次（满级 5）。
+   * 每高一级，「当天多挂 1 个果」的概率 +10%，挂果上限不变。 */
+  function treeLevel(t) {
+    return clamp(t && t.lv ? t.lv : 1, 1, BALANCE.orchard.treeLvMax);
+  }
+  function treeXpNeed(lv) {
+    return BALANCE.orchard.treeXpBase + BALANCE.orchard.treeXpStep * (lv - 1);
+  }
+  function treeXp(t) { return (t && t.xp) || 0; }
+  function treeYieldBonus(lv) {
+    return Math.max(0, (lv - 1) * BALANCE.orchard.treeLvYield);
+  }
+  function treeLevelText(t) {
+    const lv = treeLevel(t);
+    if (lv >= BALANCE.orchard.treeLvMax) return 'Lv' + lv + '（满级 +' +
+      Math.round(treeYieldBonus(lv) * 100) + '%）';
+    return 'Lv' + lv + ' · ' + treeXp(t) + '/' + treeXpNeed(lv);
+  }
+  /* 收获后加经验，返回升了几级 */
+  function treeGainXp(t) {
+    const max = BALANCE.orchard.treeLvMax;
+    t.lv = treeLevel(t);
+    t.xp = treeXp(t) + 1;
+    let up = 0;
+    while (t.lv < max && t.xp >= treeXpNeed(t.lv)) {
+      t.xp -= treeXpNeed(t.lv);
+      t.lv++;
+      up++;
+    }
+    if (t.lv >= max) t.xp = 0;
+    return up;
+  }
+
   /* 育苗进度：给界面显示已浇水天数与自然生长天数 */
   function treeProgress(s, i) {
     const t = treeSlot(s, i);
@@ -5478,7 +5532,9 @@ button{ color:inherit; font:inherit; }
     const need = treeNeed(t);
     return { age: treeAge(s, t), needDays: need.days,
              water: t.water || 0, needWater: need.water,
-             done: treeMature(s, i), ripe: t.ripe || 0, mode: t.mode || 'seed' };
+             done: treeMature(s, i), ripe: t.ripe || 0, mode: t.mode || 'seed',
+             lv: treeLevel(t), xp: treeXp(t), xpNeed: treeXpNeed(treeLevel(t)),
+             lvMax: BALANCE.orchard.treeLvMax, yieldBonus: treeYieldBonus(treeLevel(t)) };
   }
 
   /* 种树：种子要浇水 30 天 + 满 90 天；树苗浇水 15 天 + 满 30 天 */
@@ -5494,7 +5550,7 @@ button{ color:inherit; font:inherit; }
       return { ok: false, msg: '没有' + t.name + (m === 'sapling' ? '树苗' : '种子') + '了，先去百货店买' };
     }
     s.treeStock[id][m]--;
-    slots[i] = { id: id, mode: m, planted: s.day || 1, water: 0, lastWater: 0, ripe: 0 };
+    slots[i] = { id: id, mode: m, planted: s.day || 1, water: 0, lastWater: 0, ripe: 0, lv: 1, xp: 0 };
     s.orchard.slots = slots;
     s.stats.orchardPlanted = (s.stats.orchardPlanted || 0) + 1;
     const need = treeNeed(slots[i]);
@@ -5559,6 +5615,7 @@ button{ color:inherit; font:inherit; }
     s.energy -= E;
     addStore(s, tr.fruitId, 'std', n);
     s.stats.orchardFruit = (s.stats.orchardFruit || 0) + n;
+    const lvUp = treeGainXp(t);
     // 水果也进图鉴（和作物共用 codex.crops，果实固定标准品质）
     s.codex = s.codex || { fish: {}, crops: {} };
     s.codex.crops = s.codex.crops || {};
@@ -5568,8 +5625,11 @@ button{ color:inherit; font:inherit; }
     cx.n += n;
     cx.value += n * (fr ? fr.price : 0);
     if (!cx.best) cx.best = 'std';   // 果树果实固定标准品质
-    log(s, '🧺 收获 ' + tr.emoji + ' ' + tr.fruit + ' ×' + n + '（-' + E + ' 体力）', 'good');
-    return { ok: true, n: n, cost: E, msg: '收获 ' + tr.fruit + ' ×' + n + ' 进仓库（-' + E + ' 体力）' };
+    log(s, '🧺 收获 ' + tr.emoji + ' ' + tr.fruit + ' ×' + n + '（-' + E + ' 体力）' +
+      (lvUp ? ' · 果树升到 Lv' + t.lv : ''), 'good');
+    return { ok: true, n: n, cost: E, lv: t.lv, levelUp: lvUp,
+             msg: '收获 ' + tr.fruit + ' ×' + n + ' 进仓库（-' + E + ' 体力）' +
+               (lvUp ? ' · 果树 Lv' + t.lv : '') };
   }
 
   function harvestOrchard(s) {
@@ -5602,8 +5662,10 @@ button{ color:inherit; font:inherit; }
         mature++;
         if (TREES[t.id].season === season) {
           const n = randInt(BALANCE.orchard.fruitMin, BALANCE.orchard.fruitMax);
+          const bonus = treeYieldBonus(treeLevel(t));
+          const extra = (bonus > 0 && rand() < bonus) ? 1 : 0;
           const had = t.ripe || 0;
-          t.ripe = Math.min(cap, had + n);
+          t.ripe = Math.min(cap, had + n + extra);
           fruit += t.ripe - had;
           if (t.ripe >= cap) full++;
         }
@@ -5956,7 +6018,7 @@ button{ color:inherit; font:inherit; }
     merged.coins = Math.round(num(s.coins, 50, 0, 1e9));
     merged.energy = num(s.energy, merged.maxEnergy, 0, merged.maxEnergy);
 
-    const plots = Array.isArray(s.plots) ? s.plots.slice(0, 40) : [];
+    const plots = Array.isArray(s.plots) ? s.plots.slice(0, 60) : [];
     merged.plots = (plots.length ? plots : [{}]).map(function (p) {
       const plot = Object.assign(makePlot(), p || {});
       if (!CROPS[plot.crop]) plot.crop = null;
@@ -6047,7 +6109,9 @@ button{ color:inherit; font:inherit; }
         id: t.id, mode: mode, planted: planted,
         water: t.water != null ? water : Math.min(need.water, Math.round(num(t.grown, 0, 0, need.water))),
         lastWater: Math.round(num(t.lastWater, 0, 0, 100000)),
-        ripe: Math.round(num(t.ripe, 0, 0, BALANCE.orchard.ripeCap))
+        ripe: Math.round(num(t.ripe, 0, 0, BALANCE.orchard.ripeCap)),
+        lv: Math.round(num(t.lv, 1, 1, BALANCE.orchard.treeLvMax)),
+        xp: Math.round(num(t.xp, 0, 0, 999))
       };
     });
     merged.treeStock = {};
@@ -6428,6 +6492,7 @@ button{ color:inherit; font:inherit; }
     treeData: treeData, treeBuyPrice: treeBuyPrice, treeStockCount: treeStockCount,
     buyTreeStock: buyTreeStock, treeSlot: treeSlot, treeStage: treeStage, treeInSeason: treeInSeason,
      treeNeed: treeNeed, treeAge: treeAge, treeMature: treeMature, treeNeedsWater: treeNeedsWater, treeProgress: treeProgress,
+     treeLevel: treeLevel, treeXpNeed: treeXpNeed, treeYieldBonus: treeYieldBonus, treeLevelText: treeLevelText,
      plantTree: plantTree, waterTree: waterTree, waterOrchard: waterOrchard, orchardTick: orchardTick,
     harvestTree: harvestTree, harvestOrchard: harvestOrchard, orchardSummary: orchardSummary,
     marketHeadroom: marketHeadroom, fishMarketHeadroom: fishMarketHeadroom,
@@ -7302,58 +7367,40 @@ button{ color:inherit; font:inherit; }
     }).join('');
   }
 
-  /* ---------------- 账本（Tab 筛选 + 每日折叠） ---------------- */
+  /* ---------------- 账本（按天汇总，点开看明细） ---------------- */
 
-  let ledgerFilter = 'all'; // 'all' | 'income' | 'expense'
-  const LEDGER_ICONS = { 
-    '委托': '📋', '收购箱': '📦', '农产品店': '🧺', '水产店': '🐟',
-    '洒水器': '🚿', '伙食': '🍖', '维护': '🔧', '捐赠': '🏘️' 
-  };
+  let openLedgerDay = null;
 
   function renderLedger() {
-    const box = $('#ledger');
-    // 使用 G.ledgerByDay 获取按天分组的数据
     const days = G.ledgerByDay(state);
-    
-    // Tab 按钮
-    const tabs = ['全部', '收入', '支出'].map(function (t) {
-      const k = t === '全部' ? 'all' : (t === '收入' ? 'income' : 'expense');
-      return '<button class="ledger-tab' + (ledgerFilter === k ? ' active' : '') + 
-             '" data-ledger-filter="' + k + '">' + t + '</button>';
-    }).join('');
-    
-    let html = '<div class="ledger-tabs">' + tabs + '</div>';
-    html += '<ol class="ledger-list">';
-    
-    days.slice(0, 14).forEach(function (d) {
-      const net = d.income - d.expense;
 
-      html += '<li class="ledger-day">';
-      html += '<details>';
-      html += '<summary class="ledger-summary">' +
-              '<span>D' + d.day + '</span>' +
-              '<span class="ledger-net">' + (net >= 0 ? '+' : '') + net + ' 金</span>' +
-              '</summary>';
-      html += '<ul class="ledger-entries">';
-      d.items.forEach(function (e) {
-        if (ledgerFilter === 'income' && !e.income) return;
-        if (ledgerFilter === 'expense' && !e.expense) return;
-        
-        const isInc = e.income > 0;
-        const amt = isInc ? '+' + e.income : '-' + e.expense;
-        const cls = isInc ? ' inc' : ' exp';
-        const mainLabel = e.label.split('·')[0];
-        const icon = LEDGER_ICONS[mainLabel] || '💰';
-        
-        html += '<li class="ledger-item' + cls + '">' +
-                '<span class="ledger-icon">' + icon + '</span>' +
-                '<span class="ledger-label">' + esc(e.label) + '</span>' +
-                '<span class="ledger-amt">' + amt + ' 金</span></li>';
-      });
-      html += '</ul></details></li>';
-    });
-    html += '</ol>';
-    box.innerHTML = html;
+    const rows = days.slice(0, 14).map(function (d) {
+      const open = openLedgerDay === d.day;
+      const inc = d.income > 0 ? '<span class="led-inc">+' + d.income + '</span>' : '';
+      const exp = d.expense > 0 ? '<span class="led-exp">-' + d.expense + '</span>' : '';
+      const sep = (inc && exp) ? ' · ' : '';
+      const head = (inc || exp) ? (inc + sep + exp) : '<span style="color:var(--ink-3)">—</span>';
+
+      let html = '<div class="led-row day' + (open ? ' open' : '') + '" data-ledday="' + d.day + '"' +
+        ' role="button" tabindex="0" aria-expanded="' + open + '"' +
+        ' title="' + d.items.length + ' 笔，点击' + (open ? '收起' : '展开') + '">' +
+        '<span class="led-day">D' + d.day + '</span>' +
+        '<span class="led-label">' + (d.items.length > 1 ? d.items.length + ' 笔' : esc(d.items[0].label)) + '</span>' +
+        '<span class="led-val">' + head + '</span>' +
+        '<span class="led-bal">' + d.balance + '</span>' +
+      '</div>';
+
+      if (open) {
+        html += '<div class="led-detail">' + d.items.map(function (it) {
+          const v = it.income > 0 ? '+' + it.income : (it.expense > 0 ? '-' + it.expense : '—');
+          const cls = it.income > 0 ? 'led-inc' : (it.expense > 0 ? 'led-exp' : '');
+          return '<div class="dline"><span>' + esc(it.label) + '</span><b class="' + cls + '">' + v + '</b></div>';
+        }).join('') + '</div>';
+      }
+      return html;
+    }).join('');
+
+    $('#ledger').innerHTML = rows || '<div class="store-empty">还没有账目</div>';
     $('#ledger-sum').textContent = '余额 ' + state.coins + ' 金';
   }
 
@@ -7413,46 +7460,31 @@ button{ color:inherit; font:inherit; }
     document.getElementById('book-list').innerHTML = cards || '<div class="store-empty">暂无记录</div>';
   }
 
-  /* ---------------- 日志（时间线视图） ---------------- */
+  /* ---------------- 日志（按天折叠，点开看当天记录） ---------------- */
 
-  const LOG_ICONS = { 
-    good: '✅', warn: '⚠️', info: 'ℹ️', 
-    ach: '🏆', order: '📋', fish: '🎣', orchard: '🍑' 
-  };
+  let openLogDay = null;
 
   function renderLog() {
-    const box = $('#log');
-    if (!state.log.length) {
-      box.innerHTML = '<div class="log-empty">还没有任何记录，开始种田吧 🌱</div>';
-      return;
-    }
-    
-    // 按天分组
-    const days = {};
-    state.log.forEach(function (e) {
-      if (!days[e.day]) days[e.day] = [];
-      days[e.day].push(e);
-    });
-    
-    // 生成时间线 HTML（每天一个 details，默认收起）
-    let html = '<ol class="log-timeline">';
-    Object.keys(days).sort(function (a, b) { return b - a; }).forEach(function (day) {
-      html += '<li class="log-day" id="log-d' + day + '">';
-      html += '<details>';
-      html += '<summary class="log-date">D' + day +
-              '<span class="log-count">' + days[day].length + ' 条</span></summary>';
-      html += '<ul class="log-entries">';
-      days[day].forEach(function (e) {
-        const icon = LOG_ICONS[e.kind] || 'ℹ️';
-        const cls = e.kind === 'warn' ? ' warn' : (e.kind === 'good' ? ' good' : '');
-        html += '<li class="log-entry' + cls + '">' +
-                '<span class="log-icon">' + icon + '</span>' +
-                '<span class="log-text">' + esc(e.text) + '</span></li>';
-      });
-      html += '</ul></details></li>';
-    });
-    html += '</ol>';
-    box.innerHTML = html;
+    const days = G.logByDay(state);
+    const rows = days.slice(0, 10).map(function (d) {
+      const open = openLogDay === d.day;
+      const last = d.items[0] ? d.items[0].text : '';
+      let html = '<div class="log-day' + (open ? ' open' : '') + '" data-logday="' + d.day + '"' +
+        ' role="button" tabindex="0" aria-expanded="' + open + '"' +
+        ' title="' + d.items.length + ' 条记录，点击' + (open ? '收起' : '展开') + '">' +
+        '<span class="ld">D' + d.day + '</span>' +
+        '<span class="ld-count">' + d.items.length + ' 条</span>' +
+        '<span class="ld-last">' + (open ? '（点击收起）' : esc(last)) + '</span>' +
+        '<span class="ld-caret">' + (open ? '▾' : '▸') + '</span>' +
+      '</div>';
+      if (open) {
+        html += d.items.map(function (r) {
+          return '<div class="log-row ' + esc(r.kind || '') + '"><span>' + esc(r.text) + '</span></div>';
+        }).join('');
+      }
+      return html;
+    }).join('');
+    $('#log').innerHTML = rows || '<div class="store-empty">还没有记录</div>';
   }
 
   /* ---------------- 焦点保持 ---------------- */
@@ -7460,7 +7492,7 @@ button{ color:inherit; font:inherit; }
    * 得从头 Tab。这里在重绘前记下焦点元素的 data 标识，重绘后按同样的标识找回来。
    * 弹窗（#modal-root）里的焦点不归这里管，直接跳过。 */
 
-  const FOCUS_DATA = ['i', 'bait', 'order', 'long', 'tree', 'orc',
+  const FOCUS_DATA = ['i', 'bait', 'ledday', 'logday', 'order', 'long', 'tree', 'orc',
                       'marketPage', 'storeFilter'];
 
   function dataAttr(key) {
@@ -7796,35 +7828,34 @@ button{ color:inherit; font:inherit; }
         const users = [];
         for (let k = 1; k <= have; k++) if (G.autoSeedOf(state, k) === c.id) users.push(k);
         const on = users.indexOf(seedMach) >= 0;
-        return '<div class="store-row' + (on ? ' on' : '') + '">' +
-          '<span class="se">' + c.emoji + '</span>' +
-          '<div><div class="sn">' + c.name + ' <b class="own">种子 ×' + state.seeds[c.id] + '</b>' +
-            (users.length ? ' <b class="own">第 ' + users.join('·') + ' 台在用</b>' : '') + '</div>' +
-          '<div class="sv">' + (G.cropSeasonOk(c.id, state.day) ? '当季' : '反季') + ' · ' +
-            c.days + ' 天熟</div></div>' +
-          '<button class="btn mini" data-autoseed="' + c.id + '">' +
-            (on ? '取消' : '给第 ' + seedMach + ' 台') + '</button>' +
-        '</div>';
+        return '<button class="seed-chip' + (on ? ' on' : '') + '" data-autoseed="' + c.id + '">' +
+          '<span class="sc-emoji">' + c.emoji + '</span>' +
+          '<span class="sc-name">' + c.name + '</span>' +
+          '<span class="sc-n">×' + state.seeds[c.id] + '</span>' +
+          (users.length ? '<span class="sc-used">第' + users.join('·') + '台</span>' : '') +
+        '</button>';
       }).join('');
 
-    /* 每台机器负责的号段 + 自己选的种子 */
+    /* 每台机器负责的号段 + 自己选的种子（卡片网格） */
     const machineRows = [];
     for (let k = 1; k <= have; k++) {
       const rg = G.seederPlateRange(k);
       const real = Math.min(rg.to, state.plots.length);
       const seed = G.autoSeedOf(state, k);
-      let stTxt = seed ? (seed && (state.seeds[seed] || 0) ? '播种中' : '种子用完了') : '没选种子';
+      let stTxt = seed ? ((state.seeds[seed] || 0) ? '播种中' : '种子用完了') : '没选种子';
       if (!state.seederOn) stTxt = '已关闭';
       else if (G.isWinter(state.day)) stTxt = '冬天停工';
+      const span = real - rg.from + 1;
       const done = state.plots.slice(rg.from - 1, real)
         .filter(function (p) { return p.crop; }).length;
-      machineRows.push('<div class="store-row' + (seedMach === k ? ' on' : '') + '">' +
-        '<span class="se">🌱</span>' +
-        '<div><div class="sn">第 ' + k + ' 台 <b class="own">第 ' + rg.from + '–' + real + ' 块</b>' +
-          ' · ' + (seed ? G.CROPS[seed].emoji + ' ' + G.CROPS[seed].name : '未选种子') + '</div>' +
-        '<div class="sv">' + stTxt + ' · 已占 ' + done + '/' + (real - rg.from + 1) + ' 块 · 维护 ' +
-        upkeep + ' 金/周</div></div>' +
-        '<button class="btn mini" data-mach="' + k + '">' + (seedMach === k ? '选种子中' : '选种子') + '</button>' +
+      const c = seed ? G.CROPS[seed] : null;
+      machineRows.push('<div class="seed-card' + (seedMach === k ? ' on' : '') +
+        (seed ? '' : ' empty') + '">' +
+        '<div class="sc-head"><b>第 ' + k + ' 台</b><span>第 ' + rg.from + '–' + real + ' 块</span></div>' +
+        '<div class="sc-main">' + (c ? c.emoji + ' ' + c.name : '— 未选种子') + '</div>' +
+        '<div class="sc-foot">' + stTxt + ' · 已占 ' + done + '/' + span + '</div>' +
+        '<button class="btn mini" data-mach="' + k + '">' +
+          (seedMach === k ? '选种子中' : '选种子') + '</button>' +
         '</div>');
     }
 
@@ -7833,12 +7864,13 @@ button{ color:inherit; font:inherit; }
         state.plots.length + ' 块 · ' + (state.seederOn ? '已开启' : '已关闭') +
         ' · 维护 ' + G.seederUpkeep(state) + ' 金/周</div>' +
       '<div class="store-sub">🐣 每台只管自己那 ' + per + ' 块地，各选各的种子，收完立刻补种</div>' +
-      '<div class="shop-list">' + machineRows.join('') + '</div>' +
+      '<div class="seed-grid">' + machineRows.join('') + '</div>' +
       '<div class="shop-tip">买第 ' + (have + 1) + ' 台要 ' + G.SEEDER_COST +
         ' 金（维护 +' + upkeep + ' 金/周）。台数上限 = 盖住全部地块所需（' + max + ' 台），想多买先扩地。<br>' +
         '自动播种不耗体力，只消耗种子；冬天不工作。</div>' +
-      '<div class="store-sub" style="margin-top:10px">🌰 给<b>第 ' + seedMach + ' 台</b>选种子</div>' +
-      (rows || '<div class="store-empty">背包里没有种子，先去种子店买</div>'),
+      '<div class="store-sub" style="margin-top:10px">🌰 给第 ' + seedMach + ' 台选种子</div>' +
+      (rows ? '<div class="seed-picks">' + rows + '</div>'
+            : '<div class="store-empty">背包里没有种子，先去种子店买</div>'),
       (have < max ? buyBtn : '') +
       '<button class="btn" data-toggleseeder>' + (state.seederOn ? '关掉自动播种' : '开启自动播种') + '</button>' +
       '<button class="btn" data-close>关闭</button>');
@@ -8034,6 +8066,17 @@ button{ color:inherit; font:inherit; }
       '</div>' +
 
       '<div class="rule-sec">' +
+        '<h4>🏞️ 土地与扩张</h4>' +
+        '<p>从第 ' + G.BALANCE.expand.from + ' 块起，每多开一块地的价格是 <b>' + G.BALANCE.expand.base +
+        ' + ' + G.BALANCE.expand.step + '×(已有块数−' + G.BALANCE.expand.from + ')</b>，<b>一路线性涨到 ' +
+        G.BALANCE.expand.steepFrom + ' 块</b>；<b>' + G.BALANCE.expand.steepFrom +
+        ' 块以后每块 ×' + G.BALANCE.expand.steepMul + '</b> 陡涨（' + G.expandCost({ plots: new Array(40) }) +
+        ' → ' + G.expandCost({ plots: new Array(41) }) + ' → ' + G.expandCost({ plots: new Array(42) }) + ' 金）。<br>' +
+        '所以主力田块先铺到 <b>' + G.BALANCE.expand.steepFrom + ' 块</b>，再往上就是纯烧钱；' +
+        '土地维护费也按块数分档（' + G.BALANCE.upkeep.free + ' 块内免费，之后逐档变贵）。</p>' +
+      '</div>' +
+
+      '<div class="rule-sec">' +
         '<h4>🍂 季节</h4>' +
         '<p>每 <b>' + G.BALANCE.seasonDays + ' 天</b>换一季：' +
         G.SEASONS.map(function (s, i) {
@@ -8082,6 +8125,11 @@ button{ color:inherit; font:inherit; }
         Math.round((G.BALANCE.orchard.fruitMin + G.BALANCE.orchard.fruitMax) / 2 * G.BALANCE.seasonDays *
           G.TREE_LIST[0].price) + ' 金/季（桃）。<b>种子</b>要养一整季才成树，<b>树苗</b>下季就能结果，' +
         '买哪个看现金和耐心。</p>' +
+        '<p>🌳 <b>成树等级</b>：成树之后每收获一次攒 1 点经验，' +
+        '升到下一级要 2 / 4 / 6 / 8 次（<b>满级 Lv' + G.BALANCE.orchard.treeLvMax + '</b>）；' +
+        '每高一级，当天「多挂 1 个果」的概率 <b>+10%</b>（满级 +' +
+        Math.round((G.BALANCE.orchard.treeLvMax - 1) * G.BALANCE.orchard.treeLvYield * 100) +
+        '%），挂果上限不变。果园卡片上直接显示等级与经验。</p>' +
       '</div>';
 
     const P2 =
@@ -8140,6 +8188,8 @@ button{ color:inherit; font:inherit; }
         Math.round(G.BALANCE.forage.seedChance * 100) + '% 概率顺手摘到一颗当季作物种子（<b>和天气无关</b>）。<br>' +
         '野货直接进仓库，和作物一样按品质定价、一样吃<b>市价</b>，可以卖给农产品店或放进收购箱；' +
         '冬天也能采，是封冻期唯一的野外收入。<br>' +
+        '📖 采到的野货也会<b>记进图鉴</b>（首次 / 次数 / 最好品质 / 累计价值），' +
+        '顶栏 📖 图鉴里的「🌿 野货」一栏能看到收集进度。<br>' +
         '🌿 <b>采集等级</b>：每次采集 +' + G.BALANCE.forage.xp + ' 经验（一次采到 3 件再 +1），' +
         '<b>Lv4 / Lv8 各多取一次品质</b>（野货更容易出优良以上），' +
         '满级 Lv' + G.BALANCE.level.max + ' 后<b>采集只花 ' + (G.BALANCE.forage.energy - 1) + ' 体力</b>。</p>' +
@@ -8350,6 +8400,8 @@ button{ color:inherit; font:inherit; }
         '鱼类分 ' + G.BALANCE.codex.fish.map(function (m) { return m.need; }).join(' / ') + ' 种，' +
         '作物分 ' + G.BALANCE.codex.crops.map(function (m) { return m.need; }).join(' / ') + ' 种，' +
         '每档只发一次（金币 / 饵料 / 肥料）。<br>' +
+        '图鉴还会单独记录<b>野货</b>（采集来的荠菜 / 野莓 / 松茸 / 冻梨）和<b>水果</b>，' +
+        '这两类只做收集展示，不计入上面两档奖励。<br>' +
         '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态；旧存档按现有进度补发。</p>' +
       '</div>' +
 
@@ -8415,7 +8467,7 @@ button{ color:inherit; font:inherit; }
       '<div><b>' + got + '/' + species.length + '</b><span>鱼种收集</span></div>' +
       '<div><b>' + perfect + '</b><span>完美品质</span></div>' +
       '<div><b>' + fishValue + '</b><span>鱼类总价值</span></div>' +
-      '<div><b>' + cropValue + '</b><span>作物 + 水果价值</span></div>' +
+      '<div><b>' + cropValue + '</b><span>作物 + 野货 + 水果价值</span></div>' +
     '</div>';
 
     /* 图鉴奖励：收集到 N 种鱼 / 作物自动发奖，这里显示进度和领取状态 */
@@ -8476,11 +8528,20 @@ button{ color:inherit; font:inherit; }
       return bookRow(c, cx[c.id] || emptyRec, '未收获');
     }).join('');
 
+    /* 野货：和作物共用 codex.crops，单独列一段 */
+    const wildList = G.WILD_LIST || [];
+    const gotWild = wildList.filter(function (c) { return cx[c.id] && cx[c.id].n > 0; }).length;
+    const wildRows = wildList.map(function (c) {
+      return bookRow(c, cx[c.id] || emptyRec, '未采到');
+    }).join('');
+
     openModal('📖 图鉴', stat +
       rewardHtml +
       '<div class="store-sub">🐟 鱼类 · 首次 / 次数 / 累计价值</div>' + fishRows +
       '<div class="store-sub" style="margin-top:10px">🎁 宝箱 · 首次 / 数量 / 累计价值</div>' + chestRows +
       '<div class="store-sub" style="margin-top:10px">🌱 作物 · 首次 / 数量 / 累计价值</div>' + cropRows +
+      '<div class="store-sub" style="margin-top:10px">🌿 野货 · ' + gotWild + '/' + wildList.length +
+        ' 种 · 首次 / 数量 / 累计价值</div>' + wildRows +
       '<div class="store-sub" style="margin-top:10px">🍑 水果 · ' + gotFruit + '/' + fruitList.length +
         ' 种 · 首次 / 数量 / 累计价值</div>' + fruitRows,
       '<button class="btn" data-close>关闭</button>');
@@ -9692,13 +9753,16 @@ button{ color:inherit; font:inherit; }
         '</div></div>';
     }
     const inSeason = G.treeInSeason(state, i);
+    const lvTxt = G.treeLevelText(G.treeSlot(state, i) || {});
     return '<div class="orc-card mature' + (inSeason ? ' on' : '') + '">' +
       '<div class="orc-top"><span class="orc-emoji">' + t.emoji + '</span><span class="orc-no">' + no + ' 号坑</span>' +
+        '<b class="orc-lv">' + lvTxt + '</b>' +
         '<b class="orc-tag' + (inSeason ? '' : ' off') + '">' + (inSeason ? '当季' : '休眠') + '</b></div>' +
       '<div class="orc-mid">' + t.name + '<br>' +
         (inSeason
-          ? '每天挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax + ' 个 · 待收 ' +
-            p.ripe + '/' + G.BALANCE.orchard.ripeCap +
+          ? '每天挂 ' + G.BALANCE.orchard.fruitMin + '–' + G.BALANCE.orchard.fruitMax + ' 个' +
+            (p.yieldBonus > 0 ? '（+' + Math.round(p.yieldBonus * 100) + '%）' : '') +
+            ' · 待收 ' + p.ripe + '/' + G.BALANCE.orchard.ripeCap +
             (p.ripe >= G.BALANCE.orchard.ripeCap ? ' <b class="orc-full">已挂满</b>' : '')
           : G.SEASONS[t.season] + '季结果') + '</div>' +
       '<div class="orc-act">' +
@@ -10617,11 +10681,12 @@ button{ color:inherit; font:inherit; }
         return;
       }
 
-      // 账本 Tab 筛选
-      const ledgerTab = t.closest('[data-ledger-filter]');
-      if (ledgerTab) {
-        ledgerFilter = ledgerTab.dataset.ledgerFilter;
-        renderLedger();
+      // 日志按天展开/收起
+      const logDay = t.closest('[data-logday]');
+      if (logDay) {
+        const d = Number(logDay.dataset.logday);
+        openLogDay = (openLogDay === d) ? null : d;
+        renderLog();
         return;
       }
 

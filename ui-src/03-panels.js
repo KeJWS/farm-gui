@@ -195,58 +195,40 @@
     }).join('');
   }
 
-  /* ---------------- 账本（Tab 筛选 + 每日折叠） ---------------- */
+  /* ---------------- 账本（按天汇总，点开看明细） ---------------- */
 
-  let ledgerFilter = 'all'; // 'all' | 'income' | 'expense'
-  const LEDGER_ICONS = { 
-    '委托': '📋', '收购箱': '📦', '农产品店': '🧺', '水产店': '🐟',
-    '洒水器': '🚿', '伙食': '🍖', '维护': '🔧', '捐赠': '🏘️' 
-  };
+  let openLedgerDay = null;
 
   function renderLedger() {
-    const box = $('#ledger');
-    // 使用 G.ledgerByDay 获取按天分组的数据
     const days = G.ledgerByDay(state);
-    
-    // Tab 按钮
-    const tabs = ['全部', '收入', '支出'].map(function (t) {
-      const k = t === '全部' ? 'all' : (t === '收入' ? 'income' : 'expense');
-      return '<button class="ledger-tab' + (ledgerFilter === k ? ' active' : '') + 
-             '" data-ledger-filter="' + k + '">' + t + '</button>';
-    }).join('');
-    
-    let html = '<div class="ledger-tabs">' + tabs + '</div>';
-    html += '<ol class="ledger-list">';
-    
-    days.slice(0, 14).forEach(function (d) {
-      const net = d.income - d.expense;
 
-      html += '<li class="ledger-day">';
-      html += '<details>';
-      html += '<summary class="ledger-summary">' +
-              '<span>D' + d.day + '</span>' +
-              '<span class="ledger-net">' + (net >= 0 ? '+' : '') + net + ' 金</span>' +
-              '</summary>';
-      html += '<ul class="ledger-entries">';
-      d.items.forEach(function (e) {
-        if (ledgerFilter === 'income' && !e.income) return;
-        if (ledgerFilter === 'expense' && !e.expense) return;
-        
-        const isInc = e.income > 0;
-        const amt = isInc ? '+' + e.income : '-' + e.expense;
-        const cls = isInc ? ' inc' : ' exp';
-        const mainLabel = e.label.split('·')[0];
-        const icon = LEDGER_ICONS[mainLabel] || '💰';
-        
-        html += '<li class="ledger-item' + cls + '">' +
-                '<span class="ledger-icon">' + icon + '</span>' +
-                '<span class="ledger-label">' + esc(e.label) + '</span>' +
-                '<span class="ledger-amt">' + amt + ' 金</span></li>';
-      });
-      html += '</ul></details></li>';
-    });
-    html += '</ol>';
-    box.innerHTML = html;
+    const rows = days.slice(0, 14).map(function (d) {
+      const open = openLedgerDay === d.day;
+      const inc = d.income > 0 ? '<span class="led-inc">+' + d.income + '</span>' : '';
+      const exp = d.expense > 0 ? '<span class="led-exp">-' + d.expense + '</span>' : '';
+      const sep = (inc && exp) ? ' · ' : '';
+      const head = (inc || exp) ? (inc + sep + exp) : '<span style="color:var(--ink-3)">—</span>';
+
+      let html = '<div class="led-row day' + (open ? ' open' : '') + '" data-ledday="' + d.day + '"' +
+        ' role="button" tabindex="0" aria-expanded="' + open + '"' +
+        ' title="' + d.items.length + ' 笔，点击' + (open ? '收起' : '展开') + '">' +
+        '<span class="led-day">D' + d.day + '</span>' +
+        '<span class="led-label">' + (d.items.length > 1 ? d.items.length + ' 笔' : esc(d.items[0].label)) + '</span>' +
+        '<span class="led-val">' + head + '</span>' +
+        '<span class="led-bal">' + d.balance + '</span>' +
+      '</div>';
+
+      if (open) {
+        html += '<div class="led-detail">' + d.items.map(function (it) {
+          const v = it.income > 0 ? '+' + it.income : (it.expense > 0 ? '-' + it.expense : '—');
+          const cls = it.income > 0 ? 'led-inc' : (it.expense > 0 ? 'led-exp' : '');
+          return '<div class="dline"><span>' + esc(it.label) + '</span><b class="' + cls + '">' + v + '</b></div>';
+        }).join('') + '</div>';
+      }
+      return html;
+    }).join('');
+
+    $('#ledger').innerHTML = rows || '<div class="store-empty">还没有账目</div>';
     $('#ledger-sum').textContent = '余额 ' + state.coins + ' 金';
   }
 
@@ -306,46 +288,31 @@
     document.getElementById('book-list').innerHTML = cards || '<div class="store-empty">暂无记录</div>';
   }
 
-  /* ---------------- 日志（时间线视图） ---------------- */
+  /* ---------------- 日志（按天折叠，点开看当天记录） ---------------- */
 
-  const LOG_ICONS = { 
-    good: '✅', warn: '⚠️', info: 'ℹ️', 
-    ach: '🏆', order: '📋', fish: '🎣', orchard: '🍑' 
-  };
+  let openLogDay = null;
 
   function renderLog() {
-    const box = $('#log');
-    if (!state.log.length) {
-      box.innerHTML = '<div class="log-empty">还没有任何记录，开始种田吧 🌱</div>';
-      return;
-    }
-    
-    // 按天分组
-    const days = {};
-    state.log.forEach(function (e) {
-      if (!days[e.day]) days[e.day] = [];
-      days[e.day].push(e);
-    });
-    
-    // 生成时间线 HTML（每天一个 details，默认收起）
-    let html = '<ol class="log-timeline">';
-    Object.keys(days).sort(function (a, b) { return b - a; }).forEach(function (day) {
-      html += '<li class="log-day" id="log-d' + day + '">';
-      html += '<details>';
-      html += '<summary class="log-date">D' + day +
-              '<span class="log-count">' + days[day].length + ' 条</span></summary>';
-      html += '<ul class="log-entries">';
-      days[day].forEach(function (e) {
-        const icon = LOG_ICONS[e.kind] || 'ℹ️';
-        const cls = e.kind === 'warn' ? ' warn' : (e.kind === 'good' ? ' good' : '');
-        html += '<li class="log-entry' + cls + '">' +
-                '<span class="log-icon">' + icon + '</span>' +
-                '<span class="log-text">' + esc(e.text) + '</span></li>';
-      });
-      html += '</ul></details></li>';
-    });
-    html += '</ol>';
-    box.innerHTML = html;
+    const days = G.logByDay(state);
+    const rows = days.slice(0, 10).map(function (d) {
+      const open = openLogDay === d.day;
+      const last = d.items[0] ? d.items[0].text : '';
+      let html = '<div class="log-day' + (open ? ' open' : '') + '" data-logday="' + d.day + '"' +
+        ' role="button" tabindex="0" aria-expanded="' + open + '"' +
+        ' title="' + d.items.length + ' 条记录，点击' + (open ? '收起' : '展开') + '">' +
+        '<span class="ld">D' + d.day + '</span>' +
+        '<span class="ld-count">' + d.items.length + ' 条</span>' +
+        '<span class="ld-last">' + (open ? '（点击收起）' : esc(last)) + '</span>' +
+        '<span class="ld-caret">' + (open ? '▾' : '▸') + '</span>' +
+      '</div>';
+      if (open) {
+        html += d.items.map(function (r) {
+          return '<div class="log-row ' + esc(r.kind || '') + '"><span>' + esc(r.text) + '</span></div>';
+        }).join('');
+      }
+      return html;
+    }).join('');
+    $('#log').innerHTML = rows || '<div class="store-empty">还没有记录</div>';
   }
 
   /* ---------------- 焦点保持 ---------------- */
@@ -353,7 +320,7 @@
    * 得从头 Tab。这里在重绘前记下焦点元素的 data 标识，重绘后按同样的标识找回来。
    * 弹窗（#modal-root）里的焦点不归这里管，直接跳过。 */
 
-  const FOCUS_DATA = ['i', 'bait', 'order', 'long', 'tree', 'orc',
+  const FOCUS_DATA = ['i', 'bait', 'ledday', 'logday', 'order', 'long', 'tree', 'orc',
                       'marketPage', 'storeFilter'];
 
   function dataAttr(key) {
