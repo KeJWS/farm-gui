@@ -288,10 +288,13 @@
         energy: Math.round(num(f.energy, 0, 0, 999)),
         price: Math.round(num(f.price, 1, 0, 99999)),
         day: Math.round(num(f.day, merged.day, 1, 100000)),
-        expire: Math.round(num(f.expire, merged.day + 1, 1, 100000))
+        expire: Math.round(num(f.expire, merged.day + 1, 1, 100000)),
+        n: Math.round(num(f.n, 1, 1, 999))
       };
     }).filter(function (f) { return f.expire >= merged.day; }) : [];
     merged.lunchDay = Math.round(num(s.lunchDay, 0, 0, 100000));
+    merged.cookedDay = Math.round(num(s.cookedDay, 0, 0, 100000));
+    merged.cookedToday = Math.round(num(s.cookedToday, 0, 0, 999));
     merged.orders = normalizeOrders(s.orders, merged);
 
     // 长期订单
@@ -575,6 +578,8 @@
     cookRecipes: function () { return RECIPES; },
     recipeById: recipeById, ingredientText: ingredientText, cookHave: cookHave,
     cookMeal: cookMeal, eatFood: eatFood, foodTick: foodTick, boxPutFood: boxPutFood,
+    eatFoodGroup: eatFoodGroup, boxPutFoodGroup: boxPutFoodGroup, foodGroups: foodGroups,
+    foodDaysLeft: foodDaysLeft, foodSoon: foodSoon, cookDailyLimit: cookDailyLimit, cookLeft: cookLeft,
     kitchenUnlocked: kitchenUnlocked, cookLv: cookLv, cookFail: cookFail, cookRolls: cookRolls,
     mealFeeDue: mealFeeDue, lunchEaten: lunchEaten, cookFishBag: cookFishBag,
     netWorth: netWorth, profileRank: profileRank, deviceValue: deviceValue, orchardValue: orchardValue,

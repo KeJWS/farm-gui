@@ -39,7 +39,8 @@
         : (g.kind === 'fish'
           ? fishMarketMul(s, g.name, g.n, g.sold)
           : marketMul(s, g.id, g.n, g.sold)));
-    return Math.max(1, Math.round(g.raw * sellBonus(s) * mkt * (1 - BALANCE.market.boxFee)));
+    const fee = BALANCE.market.boxFee + (g.kind === 'food' ? (BALANCE.market.boxFoodExtra || 0) : 0);
+    return Math.max(1, Math.round(g.raw * sellBonus(s) * mkt * (1 - fee)));
   }
 
   /* 单个批次的展示金额：按它在同品种里的原价占比分摊 */

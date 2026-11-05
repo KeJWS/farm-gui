@@ -19,11 +19,11 @@
     const wormN = state.bait.worm || 0;
     const fertRows = ['normal', 'special'].filter(function (k) { return (state.ferts[k] || 0) > 0; });
     const counts = {
-      all: crops.length + fish.length + (wormN ? 1 : 0) + fertRows.length + (state.food || []).length,
+      all: crops.length + fish.length + (wormN ? 1 : 0) + fertRows.length + G.foodGroups(state).length,
       crops: planted.length,
       wild: wild.length,
       fish: fishOnly.length,
-      food: (state.food || []).length,
+      food: G.foodGroups(state).length,
       junk: junk.length,
       supplies: (wormN ? 1 : 0) + fertRows.length
     };
@@ -95,22 +95,24 @@
       if (rows) sections.push('<div class="store-sub">🗑️ 杂物与宝箱 · ' + visible.reduce(function (n, g) { return n + g.count; }, 0) + ' 件</div>' + rows);
     }
     if (storeFilter === 'all' || storeFilter === 'food') {
-      const foods = (state.food || []).map(function (f, i) { return { f: f, i: i }; })
-        .filter(function (x) { return matches(x.f.name); });
-      const rows = foods.map(function (x) {
-        const f = x.f, q = G.qualityById(f.q);
+      const groups = G.foodGroups(state).filter(function (g) { return matches(g.name); });
+      const rows = groups.map(function (g) {
+        const q = G.qualityById(g.q);
+        const left = G.foodDaysLeft(g, state.day);
         return '<div class="store-row">' +
-          '<span class="se">' + esc(f.emoji || '🍲') + '</span>' +
-          '<div><div class="sn">' + esc(f.name) +
+          '<span class="se">' + esc(g.emoji || '🍲') + '</span>' +
+          '<div><div class="sn">' + esc(g.name) + (g.n > 1 ? ' ×' + g.n : '') +
             (q ? ' <b class="own">' + q.emoji + q.name + '</b>' : '') + '</div>' +
-          '<div class="sv">+' + (f.energy || 0) + ' 体力 · 保质到 D' + f.expire +
-            ' · 约 ' + (f.price || 0) + ' 金 · 去厨房吃</div></div>' +
-          '<span class="sp">' + (f.price || 0) + ' 金</span>' +
+          '<div class="sv">+' + (g.energy || 0) + ' 体力 · <span class="' +
+            (left <= 1 ? 'exp-soon' : '') + '">' +
+            (left <= 0 ? '今天到期' : '还剩 ' + left + ' 天') + '</span>' +
+            ' · 约 ' + (g.price || 0) + ' 金/份 · 去厨房吃</div></div>' +
+          '<span class="sp">' + ((g.price || 0) * g.n) + ' 金</span>' +
           '<span class="spw">' +
-            '<button class="btn mini" data-boxfood="' + x.i + '" title="放进收购箱">📦</button>' +
+            '<button class="btn mini" data-boxfood="' + g.key + '" title="整组放进收购箱">📦</button>' +
           '</span></div>';
       }).join('');
-      if (rows) sections.push('<div class="store-sub">🍲 熟食 · ' + foods.length + ' 份</div>' + rows);
+      if (rows) sections.push('<div class="store-sub">🍲 熟食 · ' + groups.length + ' 种</div>' + rows);
     }
     if (storeFilter === 'all' || storeFilter === 'supplies') {
       const supplyRows = [];

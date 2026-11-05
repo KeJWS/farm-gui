@@ -440,9 +440,9 @@
         }
         return;
       }
-      const eatBtn = t.closest('[data-eat]');
+      const eatBtn = t.closest('[data-eatfood]');
       if (eatBtn && !eatBtn.disabled) {
-        const r = G.eatFood(state, Number(eatBtn.dataset.eat));
+        const r = G.eatFoodGroup(state, eatBtn.dataset.eatfood);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) { SFX.good(); closeModal(); }
@@ -450,10 +450,11 @@
       }
       const boxFood = t.closest('[data-boxfood]');
       if (boxFood && !boxFood.disabled) {
-        const r = G.boxPutFood(state, Number(boxFood.dataset.boxfood));
+        const r = G.boxPutFoodGroup(state, boxFood.dataset.boxfood);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();
+        if (modalOpen()) kitchenModal();
         return;
       }
 

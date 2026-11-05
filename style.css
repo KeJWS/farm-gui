@@ -1215,3 +1215,7 @@ button{ color:inherit; font:inherit; }
 .cx-v{ font-size:10px; color:var(--ink-2); font-weight:800; }
 @media (max-width:520px){ .codex-grid{ grid-template-columns:repeat(2,1fr); } }
 
+
+/* 熟食临期提示 */
+.exp-soon{ color:#c0392b; font-weight:900; }
+

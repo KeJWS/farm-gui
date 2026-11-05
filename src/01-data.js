@@ -19,7 +19,13 @@
     cook: { unlockFarm: 3, unlockFish: 2, xp: 2, xpBase: 12, xpStep: 8,
             failBase: 0.25, failStep: 0.025, failMin: 0.02,
             /* 达到这些等级，品质多取一次（Lv4 / Lv8） */
-            qualityAt: [4, 8] },
+            qualityAt: [4, 8],
+            /* 每天最多做几份：基础 3，Lv4 +1，Lv8 再 +1 */
+            dailyBase: 3, dailyAt: [4, 8],
+            /* 高级菜（Lv≥advLv）额外经验 */
+            advLv: 4, advXp: 2,
+            /* 食材只收标准及以上；成品品质下限 = 食材最好品质 − 1 档 */
+            minQuality: 'std', qualityFloorDrop: 1 },
     /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
     upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
     /* 一季 30 天（春 1–30 / 夏 31–60 / 秋 61–90 / 冬 91–120） */
@@ -64,6 +70,8 @@
     market: { supplyMax: 1.3, supplyMin: 0.7, cropStep: 0.015, fishStep: 0.01,
               offSeason: 1.7, decay: 0.75, scarce: 1.15, glut: 0.9,
               boxFee: 0.05,
+              /* 熟食进收购箱的额外手续费（在 boxFee 之上再加 10%） */
+              boxFoodExtra: 0.10,
               /* 委托的市价溢价封顶，避免一张单顶掉整个农场 */
               orderCap: 1.6 },
     /* 采集：5 体力一次（采集满级 4），100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子

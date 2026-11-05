@@ -472,11 +472,16 @@
         '<p><b>种田 Lv' + G.BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' + G.BALANCE.cook.unlockFish +
         '</b> 解锁。用<b>作物 / 渔获 / 野货</b>做菜，菜进仓库、有保质期，可以吃，也可以放进收购箱卖。</p>' +
         guideSub('👨‍🍳 烹饪等级', guideList([
-          '每做一道菜 +' + G.BALANCE.cook.xp + ' 经验；升级要 ' + G.BALANCE.cook.xpBase + ' + ' +
+          '每做一道菜 +' + G.BALANCE.cook.xp + ' 经验（Lv' + G.BALANCE.cook.advLv + '+ 的菜再 +' +
+            G.BALANCE.cook.advXp + '）；升级要 ' + G.BALANCE.cook.xpBase + ' + ' +
             G.BALANCE.cook.xpStep + '×(级−1)。',
+          '<b>每天最多做 ' + G.BALANCE.cook.dailyBase + ' 份</b>，Lv' + G.BALANCE.cook.dailyAt[0] +
+            ' +1、Lv' + G.BALANCE.cook.dailyAt[1] + ' 再 +1。',
           '<b>做砸概率</b>：Lv1 ' + Math.round(G.BALANCE.cook.failBase * 100) + '%，每级 −' +
             (G.BALANCE.cook.failStep * 100).toFixed(1) + '%，最低 ' + Math.round(G.BALANCE.cook.failMin * 100) +
             '%；做砸得到一份<b>焦糊料理</b>（没有品质、不能吃，只能进收购箱）。',
+          '<b>食材只收标准及以上</b>：劣质食材做不了菜；成品品质至少比食材最好品质低 ' +
+            G.BALANCE.cook.qualityFloorDrop + ' 档。',
           '<b>品质判定</b>：Lv' + G.BALANCE.cook.qualityAt[0] + ' / Lv' + G.BALANCE.cook.qualityAt[1] +
             ' 各多取一次最好，和施肥一个道理。',
           '<b>体力按食谱算</b>：越简单的菜越省（1 点），硬菜要 2–3 点，食材不够 / 等级不够都做不了。'
@@ -485,18 +490,20 @@
         G.cookRecipes().map(function (r) {
           return '<tr><td>' + r.emoji + ' ' + r.name + '</td><td>Lv' + r.lv + '</td><td>' +
             G.ingredientText(r) + '</td><td>' + r.energy + '</td><td>+' + r.restore + '</td><td>' +
-            r.days + ' 天</td><td>' + r.price + ' 金</td></tr>';
+            r.days + ' 天</td><td>' + (r.fishPriced ? '按鱼价 ×' + r.priceMul : r.price + ' 金') + '</td></tr>';
         }).join('') + '</table>' +
         guideSub('🍽️ 吃午饭', guideList([
           '<b>每天一次</b>，吃一份菜回复它的体力；菜也吃品质，品质越高回的体力越多。',
           '<b>不能直接在仓库里吃</b>：要打开「吃午饭」（或厨房）再选一份。',
           '<b>不吃午饭</b>：当天睡觉的伙食费 <b>×' + G.BALANCE.meal.skipLunchMul +
             '</b>（厨房解锁后生效）。',
-          '菜有保质期，睡过保质期那天会坏掉；临期的先吃。'
+          '菜有保质期，仓库 / 厨房会显示「还剩 N 天」，≤1 天标红；临期的先吃。'
         ])) +
         guideSub('📦 怎么卖', guideList([
-          '熟食<b>只能进收购箱</b>（农产品店 / 水产店不收），按入箱价扣 ' +
-            Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费，<b>不吃市价</b>。',
+          '熟食<b>只能进收购箱</b>（农产品店 / 水产店不收），扣 <b>' +
+            Math.round((G.BALANCE.market.boxFee + G.BALANCE.market.boxFoodExtra) * 100) +
+            '%</b> 手续费（普通货 5% + 熟食额外 10%），<b>不吃市价</b>。',
+          '相同的菜和品质会在仓库里合并成一份，显示总份数与最近到期日。',
           '焦糊料理也能进收购箱，只值 1 金——做砸的代价。'
         ])) +
       '</div>';

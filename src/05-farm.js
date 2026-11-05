@@ -415,6 +415,8 @@
     s.day++;
     s.teaUsed = false;
     s.workUsed = false;
+    s.cookedToday = 0;
+    s.cookedDay = s.day;
     const spoiled = foodTick(s);
     if (spoiled) notes.push({ kind: 'food', text: '🍲 坏掉 ' + spoiled + ' 份料理' });
     // 市场冷却：昨天的销量今天只算 70%（回落 30%）

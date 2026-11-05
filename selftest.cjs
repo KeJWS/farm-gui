@@ -2938,6 +2938,53 @@ section('厨房与烹饪');
   ok(G.cookRolls({ levels: { cook: 1 } }) === 1 && G.cookRolls({ levels: { cook: 4 } }) === 2 &&
      G.cookRolls({ levels: { cook: 8 } }) === 3, '烹饪 Lv4 / Lv8 各多取一次品质');
 
+  /* v2.44.2：食材品质门槛 / 成品托底 / 每日份数 / 鱼价折算 / 同菜合并 */
+  const qm = G.createState();
+  qm.day = 10; qm.levels.farm = 3; qm.levels.fish = 2; qm.energy = 50; qm.maxEnergy = 50;
+  G.addStore(qm, 'carrot', 'bad', 5);
+  G.addStore(qm, 'cabbage', 'bad', 5);
+  ok(!G.cookHave(qm, G.recipeById('soup')), '只收标准及以上食材');
+
+  const qf2 = G.createState();
+  qf2.day = 10; qf2.levels.farm = 3; qf2.levels.fish = 2; qf2.energy = 50;
+  G.addStore(qf2, 'carrot', 'std', 2);
+  G.addStore(qf2, 'cabbage', 'std', 1);
+  const seq = [1, 0, 0, 0];                      // 第一次 rand 判失败（不失败），后面判品质（最差）
+  G.setRng(function () { return seq.length ? seq.shift() : 0; });
+  const qfR = G.cookMeal(qf2, 'soup');
+  ok(qfR.ok && !qfR.fail && qfR.q === 'common', '成品品质至少比食材最好品质低一档', qfR.q);
+
+  ok(G.cookDailyLimit({ levels: { cook: 1 } }) === 3 && G.cookDailyLimit({ levels: { cook: 4 } }) === 4 &&
+     G.cookDailyLimit({ levels: { cook: 8 } }) === 5, '每日份数 3 / Lv4 4 / Lv8 5');
+
+  const dl = G.createState();
+  dl.day = 10; dl.levels.farm = 3; dl.levels.fish = 2; dl.energy = 200; dl.maxEnergy = 200;
+  G.addStore(dl, 'carrot', 'std', 20);
+  G.addStore(dl, 'cabbage', 'std', 20);
+  G.setRng(function () { return 0.99; });        // 不失败、品质最好，方便连做
+  let made = 0;
+  for (let i = 0; i < 4; i++) if (G.cookMeal(dl, 'soup').ok) made++;
+  ok(made === 3 && G.cookLeft(dl) === 0, '每天最多做 3 份（Lv1）', made);
+  ok(G.foodGroups(dl).length === 1 && G.foodGroups(dl)[0].n === 3, '相同熟食合并成一组', G.foodGroups(dl));
+
+  /* 鱼价折算：鲫鱼 3 金 → 15，锦鲤 25 金 → 125 */
+  function grillPrice(v, q) {
+    const st = G.createState();
+    st.day = 10; st.levels.farm = 3; st.levels.fish = 2; st.energy = 50;
+    st.fishBag.push({ name: '鱼', emoji: '🐟', q: q || 'std', v: v, d: 1 });
+    const rng = [0.99, 0.5];                    // 不失败 + 标准品质（×1）
+    G.setRng(function () { return rng.length ? rng.shift() : 0.5; });
+    return G.cookMeal(st, 'grill');
+  }
+  const cheapFish = grillPrice(3), priceyFish = grillPrice(25);
+  ok(cheapFish.ok && priceyFish.ok && cheapFish.food.price === 15 && priceyFish.food.price === 125,
+     '鱼类食谱按实际鱼价折算', [cheapFish.food && cheapFish.food.price, priceyFish.food && priceyFish.food.price]);
+
+  const expS = G.createState();
+  expS.food = [{ rid: 'soup', name: '蔬菜汤', emoji: '🥣', q: 'std', energy: 8, price: 46, day: 10, expire: 12, n: 1 }];
+  ok(G.foodDaysLeft(expS.food[0], 10) === 2 && !G.foodSoon(expS.food[0], 10), '熟食显示剩余天数');
+  ok(G.foodSoon(expS.food[0], 12), '临期（≤1 天）会高亮');
+
   /* 保质期：睡觉时清掉过期料理 */
   const sf = G.createState();
   sf.day = 10;
@@ -2951,8 +2998,8 @@ section('厨房与烹饪');
   bx.food = [{ rid: 'soup', name: '蔬菜汤', emoji: '🥣', q: 'std', energy: 8, price: 46, day: 10, expire: 13 }];
   ok(G.boxPutFood(bx, 0).ok && bx.food.length === 0 && G.boxCount(bx) === 1, '熟食能放进收购箱');
   const bv = G.boxValue(bx);
-  ok(bv === Math.round(46 * G.sellBonus(bx) * (1 - G.BALANCE.market.boxFee)),
-     '熟食按入箱价 ×95% 结算', bv);
+  ok(bv === Math.round(46 * G.sellBonus(bx) * (1 - G.BALANCE.market.boxFee - G.BALANCE.market.boxFoodExtra)),
+     '熟食按入箱价 ×85% 结算（5% + 10%）', bv);
   ok(G.shipBox(bx).n === 1 && G.boxCount(bx) === 0, '熟食睡觉时出货');
 
   /* 存档往返 */

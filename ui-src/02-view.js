@@ -215,7 +215,8 @@
     const kitchenTxt = $('#kitchen-txt');
     if (kitchenTxt) {
       kitchenTxt.textContent = unlocked
-        ? '食谱 ' + G.cookRecipes().filter(function (r) { return r.lv <= cookLv; }).length + ' 道'
+        ? '今日 ' + G.cookLeft(state) + '/' + G.cookDailyLimit(state) + ' 份 · 食谱 ' +
+          G.cookRecipes().filter(function (r) { return r.lv <= cookLv; }).length + ' 道'
         : '需种田 Lv' + G.BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' + G.BALANCE.cook.unlockFish;
     }
     const lunchBtn = $('[data-act="lunch"]');

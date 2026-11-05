@@ -1225,6 +1225,10 @@ button{ color:inherit; font:inherit; }
 @media (max-width:520px){ .codex-grid{ grid-template-columns:repeat(2,1fr); } }
 
 
+/* ��ʳ������ʾ */
+.exp-soon{ color:#c0392b; font-weight:900; }
+
+
 </style>
 </head>
 <body>
@@ -2150,7 +2154,13 @@ button{ color:inherit; font:inherit; }
     cook: { unlockFarm: 3, unlockFish: 2, xp: 2, xpBase: 12, xpStep: 8,
             failBase: 0.25, failStep: 0.025, failMin: 0.02,
             /* 达到这些等级，品质多取一次（Lv4 / Lv8） */
-            qualityAt: [4, 8] },
+            qualityAt: [4, 8],
+            /* 每天最多做几份：基础 3，Lv4 +1，Lv8 再 +1 */
+            dailyBase: 3, dailyAt: [4, 8],
+            /* 高级菜（Lv≥advLv）额外经验 */
+            advLv: 4, advXp: 2,
+            /* 食材只收标准及以上；成品品质下限 = 食材最好品质 − 1 档 */
+            minQuality: 'std', qualityFloorDrop: 1 },
     /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
     upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
     /* 一季 30 天（春 1–30 / 夏 31–60 / 秋 61–90 / 冬 91–120） */
@@ -2195,6 +2205,8 @@ button{ color:inherit; font:inherit; }
     market: { supplyMax: 1.3, supplyMin: 0.7, cropStep: 0.015, fishStep: 0.01,
               offSeason: 1.7, decay: 0.75, scarce: 1.15, glut: 0.9,
               boxFee: 0.05,
+              /* 熟食进收购箱的额外手续费（在 boxFee 之上再加 10%） */
+              boxFoodExtra: 0.10,
               /* 委托的市价溢价封顶，避免一张单顶掉整个农场 */
               orderCap: 1.6 },
     /* 采集：5 体力一次（采集满级 4），100% 1 件 → 75% 再来 1 件 → 35% 再来 1 件，25% 掉一颗当季种子
@@ -2853,6 +2865,16 @@ button{ color:inherit; font:inherit; }
   function cookLv(s) { return skillLv(s, 'cook'); }
   function cookFail(s) { return cookFailByLv(cookLv(s)); }
   function cookRolls(s) { return cookRollsByLv(cookLv(s)); }
+  /* 每天能做的份数：基础 3，Lv4 +1，Lv8 再 +1 */
+  function cookDailyLimit(s) {
+    let n = BALANCE.cook.dailyBase;
+    (BALANCE.cook.dailyAt || []).forEach(function (at) { if (cookLv(s) >= at) n++; });
+    return n;
+  }
+  function cookLeft(s) {
+    const used = (s.cookedDay === (s.day || 1)) ? (s.cookedToday || 0) : 0;
+    return Math.max(0, cookDailyLimit(s) - used);
+  }
   function kitchenUnlocked(s) {
     return farmLv(s) >= BALANCE.cook.unlockFarm && fishLv(s) >= BALANCE.cook.unlockFish;
   }
@@ -3020,6 +3042,8 @@ button{ color:inherit; font:inherit; }
       /* 厨房：做好的料理（每份带品质 / 体力 / 保质期） */
       food: [],
       lunchDay: 0,
+      cookedDay: 0,
+      cookedToday: 0,
       ledger: [{ day: 1, label: '开局金币', income: 50, expense: 0, balance: 50 }],
       log: [{ day: 1, text: '🌾 欢迎来到我的小农场，第 1 天开始了。', kind: 'sys' }],
       orders: makeOrders({ day: 1 }),
@@ -3611,6 +3635,8 @@ button{ color:inherit; font:inherit; }
     s.day++;
     s.teaUsed = false;
     s.workUsed = false;
+    s.cookedToday = 0;
+    s.cookedDay = s.day;
     const spoiled = foodTick(s);
     if (spoiled) notes.push({ kind: 'food', text: '🍲 坏掉 ' + spoiled + ' 份料理' });
     // 市场冷却：昨天的销量今天只算 70%（回落 30%）
@@ -4481,7 +4507,8 @@ button{ color:inherit; font:inherit; }
         : (g.kind === 'fish'
           ? fishMarketMul(s, g.name, g.n, g.sold)
           : marketMul(s, g.id, g.n, g.sold)));
-    return Math.max(1, Math.round(g.raw * sellBonus(s) * mkt * (1 - BALANCE.market.boxFee)));
+    const fee = BALANCE.market.boxFee + (g.kind === 'food' ? (BALANCE.market.boxFoodExtra || 0) : 0);
+    return Math.max(1, Math.round(g.raw * sellBonus(s) * mkt * (1 - fee)));
   }
 
   /* 单个批次的展示金额：按它在同品种里的原价占比分摊 */
@@ -6374,10 +6401,13 @@ button{ color:inherit; font:inherit; }
         energy: Math.round(num(f.energy, 0, 0, 999)),
         price: Math.round(num(f.price, 1, 0, 99999)),
         day: Math.round(num(f.day, merged.day, 1, 100000)),
-        expire: Math.round(num(f.expire, merged.day + 1, 1, 100000))
+        expire: Math.round(num(f.expire, merged.day + 1, 1, 100000)),
+        n: Math.round(num(f.n, 1, 1, 999))
       };
     }).filter(function (f) { return f.expire >= merged.day; }) : [];
     merged.lunchDay = Math.round(num(s.lunchDay, 0, 0, 100000));
+    merged.cookedDay = Math.round(num(s.cookedDay, 0, 0, 100000));
+    merged.cookedToday = Math.round(num(s.cookedToday, 0, 0, 999));
     merged.orders = normalizeOrders(s.orders, merged);
 
     // 长期订单
@@ -6661,6 +6691,8 @@ button{ color:inherit; font:inherit; }
     cookRecipes: function () { return RECIPES; },
     recipeById: recipeById, ingredientText: ingredientText, cookHave: cookHave,
     cookMeal: cookMeal, eatFood: eatFood, foodTick: foodTick, boxPutFood: boxPutFood,
+    eatFoodGroup: eatFoodGroup, boxPutFoodGroup: boxPutFoodGroup, foodGroups: foodGroups,
+    foodDaysLeft: foodDaysLeft, foodSoon: foodSoon, cookDailyLimit: cookDailyLimit, cookLeft: cookLeft,
     kitchenUnlocked: kitchenUnlocked, cookLv: cookLv, cookFail: cookFail, cookRolls: cookRolls,
     mealFeeDue: mealFeeDue, lunchEaten: lunchEaten, cookFishBag: cookFishBag,
     netWorth: netWorth, profileRank: profileRank, deviceValue: deviceValue, orchardValue: orchardValue,
@@ -6752,22 +6784,25 @@ button{ color:inherit; font:inherit; }
  * 由 build-modules.cjs 按文件名顺序拼进 game.js（共享同一个 IIFE 作用域），不要单独加载。
  */
 
-  /* 食谱：lv = 烹饪等级门槛；energy = 做这道菜要花的体力；days = 保质期；restore = 基础回复；price = 基础卖价
+  /* 食谱：lv = 烹饪等级门槛；energy = 做这道菜要花的体力；days = 保质期；restore = 基础回复
+   * price = 固定卖价；fishPriced + priceMul = 按实际食材价折算（鱼类食谱）
    * cost.crops 里的 id 可以是作物 / 野货 / 水果（都在 CROPS 表和仓库里） */
   const RECIPES = [
     { id: 'soup', name: '蔬菜汤', emoji: '🥣', lv: 1, energy: 1, restore: 8, days: 3, price: 46,
       cost: { crops: { carrot: 2, cabbage: 1 } }, desc: '萝卜炖白菜，暖胃' },
-    { id: 'grill', name: '香烤鱼', emoji: '🍢', lv: 1, energy: 1, restore: 10, days: 2, price: 58,
-      cost: { fish: 1 }, desc: '现钓现烤，撒点盐' },
-    { id: 'jam', name: '野莓酱', emoji: '🍯', lv: 2, energy: 1, restore: 9, days: 4, price: 62,
-      cost: { crops: { berry: 3 } }, desc: '抹面包能吃一星期' },
+    { id: 'grill', name: '香烤鱼', emoji: '🍢', lv: 1, energy: 1, restore: 10, days: 2,
+      fishPriced: true, priceMul: 5,
+      cost: { fish: 1 }, desc: '现钓现烤，鱼越贵菜越值钱' },
+    { id: 'jam', name: '野莓酱', emoji: '🍯', lv: 2, energy: 1, restore: 9, days: 4, price: 66,
+      cost: { crops: { berry: 2 } }, desc: '抹面包能吃一星期' },
     { id: 'stew', name: '蘑菇炖菜', emoji: '🍲', lv: 3, energy: 2, restore: 16, days: 3, price: 96,
       cost: { crops: { mushroom: 1, potato: 2 } }, desc: '松茸配土豆，鲜掉眉毛' },
     { id: 'salad', name: '水果沙拉', emoji: '🥗', lv: 4, energy: 2, restore: 14, days: 2, price: 108,
       cost: { crops: { fruit_peach: 1, berry: 2 } }, desc: '桃子野莓拌一拌' },
     { id: 'pie', name: '南瓜派', emoji: '🥧', lv: 6, energy: 2, restore: 24, days: 4, price: 188,
       cost: { crops: { pumpkin: 1, corn: 2 } }, desc: '烤得金黄，切八块' },
-    { id: 'sashimi', name: '鱼生拼盘', emoji: '🍣', lv: 7, energy: 2, restore: 28, days: 1, price: 232,
+    { id: 'sashimi', name: '鱼生拼盘', emoji: '🍣', lv: 7, energy: 2, restore: 28, days: 1,
+      fishPriced: true, priceMul: 5,
       cost: { fish: 2, crops: { carrot: 1 } }, desc: '刀工比食材更值钱' },
     { id: 'feast', name: '农家盛宴', emoji: '🍱', lv: 9, energy: 3, restore: 45, days: 3, price: 520,
       cost: { fish: 2, crops: { watermelon: 1, pumpkin: 1, mushroom: 1 } }, desc: '一桌硬菜' }
@@ -6777,16 +6812,26 @@ button{ color:inherit; font:inherit; }
     return RECIPES.filter(function (r) { return r.id === id; })[0] || null;
   }
 
-  /* 能下锅的鱼：有品质、不是杂物/宝箱（买来的也行） */
+  /* 食材只收「标准」及以上；成品品质下限 = 食材最好品质 − 1 档 */
+  const COOK_MIN_RANK = Math.max(0, Q_IDS.indexOf(BALANCE.cook.minQuality));
+  function cookQRank(q) { return Q_IDS.indexOf(q); }
+  function cookQOk(q) { return cookQRank(q) >= COOK_MIN_RANK; }
+
+  /* 能下锅的鱼：标准及以上、不是杂物/宝箱（买来的也行） */
   function cookFishBag(s) {
-    return (s.fishBag || []).filter(function (e) { return e && e.q && !e.no && !e.chest; });
+    return (s.fishBag || []).filter(function (e) {
+      return e && e.q && !e.no && !e.chest && cookQOk(e.q);
+    });
   }
 
   function cookHave(s, r) {
     if (!r) return false;
     const crops = r.cost.crops || {};
     for (const id in crops) {
-      if (storeCount(s, id) < crops[id]) return false;
+      const b = s.store[id] || {};
+      let n = 0;
+      for (let i = COOK_MIN_RANK; i < Q_IDS.length; i++) n += b[Q_IDS[i]] || 0;
+      if (n < crops[id]) return false;
     }
     if (r.cost.fish && cookFishBag(s).length < r.cost.fish) return false;
     return true;
@@ -6803,11 +6848,45 @@ button{ color:inherit; font:inherit; }
     return parts.join(' · ');
   }
 
-  /* 从渔获袋按最便宜的先扣（和交鱼单一致） */
+  /* 从仓库按「标准→更好」取作物，返回用掉的品质（含最好一档） */
+  function takeCookCrops(s, crops) {
+    let best = -1;
+    Object.keys(crops).forEach(function (id) {
+      let left = crops[id];
+      const b = s.store[id];
+      if (!b) return;
+      for (let i = COOK_MIN_RANK; i < Q_IDS.length && left > 0; i++) {
+        const q = Q_IDS[i], have = b[q] || 0, take = Math.min(have, left);
+        if (!take) continue;
+        b[q] = have - take; left -= take;
+        best = Math.max(best, i);
+      }
+      if (storeCount(s, id) <= 0) delete s.store[id];
+    });
+    return best;
+  }
+
+  /* 从渔获袋取最便宜的合规鱼，返回 { best, fish } */
   function takeCookFish(s, n) {
-    const drop = cookFishBag(s).sort(function (a, b) { return a.v - b.v; }).slice(0, n);
-    s.fishBag = (s.fishBag || []).filter(function (e) { return drop.indexOf(e) < 0; });
-    return drop.length;
+    const picked = cookFishBag(s).sort(function (a, b) { return a.v - b.v; }).slice(0, n);
+    s.fishBag = (s.fishBag || []).filter(function (e) { return picked.indexOf(e) < 0; });
+    let best = -1;
+    picked.forEach(function (e) { best = Math.max(best, cookQRank(e.q)); });
+    return { best: best, fish: picked };
+  }
+
+  /* 鱼类食谱按实际食材价折算基础卖价（鱼用 base 价，不含品质） */
+  function cookFishBase(e) {
+    const f = FISH.filter(function (x) { return x.name === e.name; })[0];
+    return f ? f.base : (e.v || 1);
+  }
+  function cookBasePrice(s, r, fish) {
+    if (!r.fishPriced) return r.price;
+    let v = 0;
+    const crops = r.cost.crops || {};
+    Object.keys(crops).forEach(function (id) { v += (CROPS[id] ? CROPS[id].price : 0) * crops[id]; });
+    fish.forEach(function (e) { v += cookFishBase(e); });
+    return Math.max(6, Math.round(v * r.priceMul));
   }
 
   /* 做一道菜 */
@@ -6817,66 +6896,132 @@ button{ color:inherit; font:inherit; }
     if (!kitchenUnlocked(s)) return { ok: false, msg: '厨房还没解锁（种田 Lv' +
       BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' + BALANCE.cook.unlockFish + '）' };
     if (cookLv(s) < r.lv) return { ok: false, msg: '烹饪 Lv' + r.lv + ' 才解锁' };
+    if (cookLeft(s) <= 0) {
+      return { ok: false, msg: '今天的烹饪次数用完了（' + cookDailyLimit(s) + ' 份/天）' };
+    }
     const cost = r.energy;
     if (s.energy < cost) {
       return { ok: false, msg: '体力不够（做这道菜要 ' + cost + ' 点）' };
     }
-    if (!cookHave(s, r)) return { ok: false, msg: '食材不够：' + ingredientText(r) };
+    if (!cookHave(s, r)) {
+      return { ok: false, msg: '食材不够（要' + qualityById(BALANCE.cook.minQuality).name + '及以上品质）：' +
+        ingredientText(r) };
+    }
 
     const crops = r.cost.crops || {};
-    Object.keys(crops).forEach(function (id) { takeStore(s, id, crops[id]); });
-    if (r.cost.fish) takeCookFish(s, r.cost.fish);
+    const cropBest = takeCookCrops(s, crops);
+    const fishRes = r.cost.fish ? takeCookFish(s, r.cost.fish) : { best: -1, fish: [] };
+    const ingBest = Math.max(cropBest, fishRes.best);
+    const basePrice = cookBasePrice(s, r, fishRes.fish);
+
     s.energy -= cost;
     s.stats.cooks = (s.stats.cooks || 0) + 1;
+    const usedToday = (s.cookedDay === s.day ? (s.cookedToday || 0) : 0);
+    s.cookedToday = usedToday + 1;
+    s.cookedDay = s.day;
     if (!Array.isArray(s.food)) s.food = [];
 
     const fail = rand() < cookFail(s);
-    const up = addLevelXp(s, 'cook', BALANCE.cook.xp);
+    const xp = BALANCE.cook.xp + (r.lv >= BALANCE.cook.advLv ? BALANCE.cook.advXp : 0);
+    const up = addLevelXp(s, 'cook', xp);
     if (fail) {
       const f = { rid: 'fail', name: '焦糊料理', emoji: '🫕', q: null, energy: 0, price: 1,
-                  day: s.day, expire: s.day + 1 };
-      s.food.push(f);
+                  day: s.day, expire: s.day + 1, n: 1 };
+      addFoodEntry(s, f);
       log(s, '🔥 做菜失手：' + r.name + ' 变成了焦糊料理（-' + cost + ' 体力）', 'warn');
       return { ok: true, fail: true, food: f, levelUp: up, cost: cost };
     }
-    const q = rollQuality(cookRolls(s));
+    let q = rollQuality(cookRolls(s));
+    /* 食材品质托底：成品至少比食材最好品质低 1 档 */
+    const floorRank = ingBest >= 0 ? Math.max(0, ingBest - BALANCE.cook.qualityFloorDrop) : 0;
+    if (cookQRank(q.id) < floorRank) q = QUALITY[floorRank];
     const f = { rid: r.id, name: r.name, emoji: r.emoji, q: q.id,
-                energy: Math.round(r.restore * q.mul), price: Math.round(r.price * q.mul),
-                day: s.day, expire: s.day + r.days };
-    s.food.push(f);
+                energy: Math.round(r.restore * q.mul), price: Math.round(basePrice * q.mul),
+                day: s.day, expire: s.day + r.days, n: 1 };
+    addFoodEntry(s, f);
     /* 图鉴：记录做过的菜（次数 / 最好品质 / 首次 / 累计价值） */
     s.codex = s.codex || {};
     s.codex.food = s.codex.food || {};
     const ce = s.codex.food[r.id] || (s.codex.food[r.id] = { n: 0, best: null, first: s.day, value: 0 });
     ce.n++;
     ce.value += f.price;
-    if (!ce.best || QUALITY.indexOf(q) > QUALITY.indexOf(qualityById(ce.best))) ce.best = q.id;
+    if (!ce.best || cookQRank(q.id) > cookQRank(ce.best)) ce.best = q.id;
     log(s, '🍳 做好 ' + f.emoji + ' ' + f.name + '（' + q.name + ' · +' + f.energy + ' 体力 · 保质 ' +
       r.days + ' 天）' + (up ? ' · 烹饪 Lv' + cookLv(s) : ''), 'good');
-    return { ok: true, fail: false, food: f, q: q.id, levelUp: up, cost: cost };
+    return { ok: true, fail: false, food: f, q: q.id, levelUp: up, cost: cost, xp: xp };
   }
 
-  /* 吃午饭：每天一次，回复美食体力；吃过的当天不再算「没吃午饭」 */
+  /* 同菜同品质、且同一天到期 → 叠在同一份里 */
+  function addFoodEntry(s, f) {
+    const same = s.food.filter(function (x) {
+      return x.rid === f.rid && x.q === f.q && x.expire === f.expire && x.name === f.name;
+    })[0];
+    if (same && f.rid !== 'fail') {
+      same.n = (same.n || 1) + 1;
+      same.price = f.price;
+      same.energy = f.energy;
+    } else {
+      s.food.push(f);
+    }
+  }
+
+  function foodDaysLeft(f, day) { return Math.max(0, (f.expire || 0) - (day || 1)); }
+  function foodSoon(f, day) { return foodDaysLeft(f, day) <= 1; }
+
+  /* 仓库里的熟食按「菜 + 品质」合并显示 */
+  function foodGroups(s) {
+    const map = {}, out = [];
+    (s.food || []).forEach(function (f, i) {
+      const key = (f.rid || 'food') + '|' + (f.q || '-');
+      if (!map[key]) {
+        map[key] = { key: key, rid: f.rid, name: f.name, emoji: f.emoji, q: f.q,
+                     n: 0, energy: f.energy, price: f.price, expire: f.expire, idx: [] };
+        out.push(map[key]);
+      }
+      const g = map[key];
+      g.n += f.n || 1;
+      g.expire = Math.min(g.expire, f.expire);
+      g.idx.push(i);
+    });
+    return out;
+  }
+
+  /* 吃午饭：吃一份（优先吃掉最快过期的那份） */
   function eatFood(s, idx) {
     if (!kitchenUnlocked(s)) return { ok: false, msg: '厨房还没解锁' };
     if (lunchEaten(s)) return { ok: false, msg: '今天已经吃过午饭了' };
     const list = s.food || [];
     const f = list[idx];
     if (!f) return { ok: false, msg: '没有这份料理' };
+    return eatFoodEntry(s, f);
+  }
+
+  function eatFoodEntry(s, f) {
     if (f.rid === 'fail') return { ok: false, msg: '焦糊料理不能吃，扔收购箱吧' };
-    if ((f.expire || 0) < (s.day || 1)) {
-      list.splice(idx, 1);
-      return { ok: false, msg: '这份已经过期了（保质期到 D' + f.expire + '）' };
-    }
-    list.splice(idx, 1);
+    if ((f.expire || 0) < (s.day || 1)) return { ok: false, msg: '这份已经过期了' };
     const room = Math.max(0, s.maxEnergy - s.energy);
     const gain = Math.min(room, f.energy || 0);
     s.energy += gain;
     s.lunchDay = s.day;
     s.stats.meals = (s.stats.meals || 0) + 1;
+    if ((f.n || 1) > 1) f.n--;
+    else (s.food || []).splice((s.food || []).indexOf(f), 1);
     log(s, '🍽️ 吃午饭：' + f.emoji + ' ' + f.name + '，+ ' + gain + ' 体力' +
       (f.energy > gain ? '（体力已接近上限）' : ''), 'good');
     return { ok: true, gain: gain, energy: f.energy, name: f.name, emoji: f.emoji };
+  }
+
+  /* 按合并后的组吃一份 */
+  function eatFoodGroup(s, key) {
+    if (!kitchenUnlocked(s)) return { ok: false, msg: '厨房还没解锁' };
+    if (lunchEaten(s)) return { ok: false, msg: '今天已经吃过午饭了' };
+    const g = foodGroups(s).filter(function (x) { return x.key === key; })[0];
+    if (!g) return { ok: false, msg: '没有这种熟食' };
+    const list = s.food || [];
+    const f = g.idx.map(function (i) { return list[i]; })
+      .filter(Boolean)
+      .sort(function (a, b) { return (a.expire || 0) - (b.expire || 0); })[0];
+    return eatFoodEntry(s, f);
   }
 
   /* 睡觉时清掉过期料理，返回坏掉的份数 */
@@ -6892,12 +7037,33 @@ button{ color:inherit; font:inherit; }
     const list = s.food || [];
     const f = list[idx];
     if (!f) return { ok: false, msg: '没有这份料理' };
+    const n = f.n || 1;
     list.splice(idx, 1);
     s.box = s.box || [];
-    s.box.push({ kind: 'food', name: f.name, emoji: f.emoji, n: 1, raw: f.price || 1,
+    s.box.push({ kind: 'food', name: f.name, emoji: f.emoji, n: n, raw: (f.price || 1) * n,
                  q: f.q, energy: f.energy, rid: f.rid, expire: f.expire });
-    log(s, '📦 ' + f.emoji + ' ' + f.name + ' 放进收购箱（' + (f.price || 1) + ' 金，睡觉结算）', 'info');
-    return { ok: true, name: f.name, v: f.price || 1 };
+    log(s, '📦 ' + f.emoji + ' ' + f.name + '×' + n + ' 放进收购箱（' + ((f.price || 1) * n) + ' 金，睡觉结算）', 'info');
+    return { ok: true, name: f.name, v: (f.price || 1) * n, n: n };
+  }
+
+  /* 按合并后的组整组放进收购箱 */
+  function boxPutFoodGroup(s, key) {
+    const g = foodGroups(s).filter(function (x) { return x.key === key; })[0];
+    if (!g) return { ok: false, msg: '没有这种熟食' };
+    const list = s.food || [];
+    let n = 0, raw = 0;
+    g.idx.slice().sort(function (a, b) { return b - a; }).forEach(function (i) {
+      const f = list[i];
+      if (!f) return;
+      n += f.n || 1;
+      raw += (f.price || 1) * (f.n || 1);
+      list.splice(i, 1);
+    });
+    s.box = s.box || [];
+    s.box.push({ kind: 'food', name: g.name, emoji: g.emoji, n: n, raw: raw,
+                 q: g.q, energy: g.energy, rid: g.rid, expire: g.expire });
+    log(s, '📦 ' + g.emoji + ' ' + g.name + '×' + n + ' 放进收购箱（' + raw + ' 金，睡觉结算）', 'info');
+    return { ok: true, name: g.name, v: raw, n: n };
   }
 
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -7359,7 +7525,8 @@ button{ color:inherit; font:inherit; }
     const kitchenTxt = $('#kitchen-txt');
     if (kitchenTxt) {
       kitchenTxt.textContent = unlocked
-        ? '食谱 ' + G.cookRecipes().filter(function (r) { return r.lv <= cookLv; }).length + ' 道'
+        ? '今日 ' + G.cookLeft(state) + '/' + G.cookDailyLimit(state) + ' 份 · 食谱 ' +
+          G.cookRecipes().filter(function (r) { return r.lv <= cookLv; }).length + ' 道'
         : '需种田 Lv' + G.BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' + G.BALANCE.cook.unlockFish;
     }
     const lunchBtn = $('[data-act="lunch"]');
@@ -7612,11 +7779,11 @@ button{ color:inherit; font:inherit; }
     const wormN = state.bait.worm || 0;
     const fertRows = ['normal', 'special'].filter(function (k) { return (state.ferts[k] || 0) > 0; });
     const counts = {
-      all: crops.length + fish.length + (wormN ? 1 : 0) + fertRows.length + (state.food || []).length,
+      all: crops.length + fish.length + (wormN ? 1 : 0) + fertRows.length + G.foodGroups(state).length,
       crops: planted.length,
       wild: wild.length,
       fish: fishOnly.length,
-      food: (state.food || []).length,
+      food: G.foodGroups(state).length,
       junk: junk.length,
       supplies: (wormN ? 1 : 0) + fertRows.length
     };
@@ -7688,22 +7855,24 @@ button{ color:inherit; font:inherit; }
       if (rows) sections.push('<div class="store-sub">🗑️ 杂物与宝箱 · ' + visible.reduce(function (n, g) { return n + g.count; }, 0) + ' 件</div>' + rows);
     }
     if (storeFilter === 'all' || storeFilter === 'food') {
-      const foods = (state.food || []).map(function (f, i) { return { f: f, i: i }; })
-        .filter(function (x) { return matches(x.f.name); });
-      const rows = foods.map(function (x) {
-        const f = x.f, q = G.qualityById(f.q);
+      const groups = G.foodGroups(state).filter(function (g) { return matches(g.name); });
+      const rows = groups.map(function (g) {
+        const q = G.qualityById(g.q);
+        const left = G.foodDaysLeft(g, state.day);
         return '<div class="store-row">' +
-          '<span class="se">' + esc(f.emoji || '🍲') + '</span>' +
-          '<div><div class="sn">' + esc(f.name) +
+          '<span class="se">' + esc(g.emoji || '🍲') + '</span>' +
+          '<div><div class="sn">' + esc(g.name) + (g.n > 1 ? ' ×' + g.n : '') +
             (q ? ' <b class="own">' + q.emoji + q.name + '</b>' : '') + '</div>' +
-          '<div class="sv">+' + (f.energy || 0) + ' 体力 · 保质到 D' + f.expire +
-            ' · 约 ' + (f.price || 0) + ' 金 · 去厨房吃</div></div>' +
-          '<span class="sp">' + (f.price || 0) + ' 金</span>' +
+          '<div class="sv">+' + (g.energy || 0) + ' 体力 · <span class="' +
+            (left <= 1 ? 'exp-soon' : '') + '">' +
+            (left <= 0 ? '今天到期' : '还剩 ' + left + ' 天') + '</span>' +
+            ' · 约 ' + (g.price || 0) + ' 金/份 · 去厨房吃</div></div>' +
+          '<span class="sp">' + ((g.price || 0) * g.n) + ' 金</span>' +
           '<span class="spw">' +
-            '<button class="btn mini" data-boxfood="' + x.i + '" title="放进收购箱">📦</button>' +
+            '<button class="btn mini" data-boxfood="' + g.key + '" title="整组放进收购箱">📦</button>' +
           '</span></div>';
       }).join('');
-      if (rows) sections.push('<div class="store-sub">🍲 熟食 · ' + foods.length + ' 份</div>' + rows);
+      if (rows) sections.push('<div class="store-sub">🍲 熟食 · ' + groups.length + ' 种</div>' + rows);
     }
     if (storeFilter === 'all' || storeFilter === 'supplies') {
       const supplyRows = [];
@@ -8939,11 +9108,16 @@ button{ color:inherit; font:inherit; }
         '<p><b>种田 Lv' + G.BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' + G.BALANCE.cook.unlockFish +
         '</b> 解锁。用<b>作物 / 渔获 / 野货</b>做菜，菜进仓库、有保质期，可以吃，也可以放进收购箱卖。</p>' +
         guideSub('👨‍🍳 烹饪等级', guideList([
-          '每做一道菜 +' + G.BALANCE.cook.xp + ' 经验；升级要 ' + G.BALANCE.cook.xpBase + ' + ' +
+          '每做一道菜 +' + G.BALANCE.cook.xp + ' 经验（Lv' + G.BALANCE.cook.advLv + '+ 的菜再 +' +
+            G.BALANCE.cook.advXp + '）；升级要 ' + G.BALANCE.cook.xpBase + ' + ' +
             G.BALANCE.cook.xpStep + '×(级−1)。',
+          '<b>每天最多做 ' + G.BALANCE.cook.dailyBase + ' 份</b>，Lv' + G.BALANCE.cook.dailyAt[0] +
+            ' +1、Lv' + G.BALANCE.cook.dailyAt[1] + ' 再 +1。',
           '<b>做砸概率</b>：Lv1 ' + Math.round(G.BALANCE.cook.failBase * 100) + '%，每级 −' +
             (G.BALANCE.cook.failStep * 100).toFixed(1) + '%，最低 ' + Math.round(G.BALANCE.cook.failMin * 100) +
             '%；做砸得到一份<b>焦糊料理</b>（没有品质、不能吃，只能进收购箱）。',
+          '<b>食材只收标准及以上</b>：劣质食材做不了菜；成品品质至少比食材最好品质低 ' +
+            G.BALANCE.cook.qualityFloorDrop + ' 档。',
           '<b>品质判定</b>：Lv' + G.BALANCE.cook.qualityAt[0] + ' / Lv' + G.BALANCE.cook.qualityAt[1] +
             ' 各多取一次最好，和施肥一个道理。',
           '<b>体力按食谱算</b>：越简单的菜越省（1 点），硬菜要 2–3 点，食材不够 / 等级不够都做不了。'
@@ -8952,18 +9126,20 @@ button{ color:inherit; font:inherit; }
         G.cookRecipes().map(function (r) {
           return '<tr><td>' + r.emoji + ' ' + r.name + '</td><td>Lv' + r.lv + '</td><td>' +
             G.ingredientText(r) + '</td><td>' + r.energy + '</td><td>+' + r.restore + '</td><td>' +
-            r.days + ' 天</td><td>' + r.price + ' 金</td></tr>';
+            r.days + ' 天</td><td>' + (r.fishPriced ? '按鱼价 ×' + r.priceMul : r.price + ' 金') + '</td></tr>';
         }).join('') + '</table>' +
         guideSub('🍽️ 吃午饭', guideList([
           '<b>每天一次</b>，吃一份菜回复它的体力；菜也吃品质，品质越高回的体力越多。',
           '<b>不能直接在仓库里吃</b>：要打开「吃午饭」（或厨房）再选一份。',
           '<b>不吃午饭</b>：当天睡觉的伙食费 <b>×' + G.BALANCE.meal.skipLunchMul +
             '</b>（厨房解锁后生效）。',
-          '菜有保质期，睡过保质期那天会坏掉；临期的先吃。'
+          '菜有保质期，仓库 / 厨房会显示「还剩 N 天」，≤1 天标红；临期的先吃。'
         ])) +
         guideSub('📦 怎么卖', guideList([
-          '熟食<b>只能进收购箱</b>（农产品店 / 水产店不收），按入箱价扣 ' +
-            Math.round(G.BALANCE.market.boxFee * 100) + '% 手续费，<b>不吃市价</b>。',
+          '熟食<b>只能进收购箱</b>（农产品店 / 水产店不收），扣 <b>' +
+            Math.round((G.BALANCE.market.boxFee + G.BALANCE.market.boxFoodExtra) * 100) +
+            '%</b> 手续费（普通货 5% + 熟食额外 10%），<b>不吃市价</b>。',
+          '相同的菜和品质会在仓库里合并成一份，显示总份数与最近到期日。',
           '焦糊料理也能进收购箱，只值 1 金——做砸的代价。'
         ])) +
       '</div>';
@@ -11010,9 +11186,9 @@ button{ color:inherit; font:inherit; }
         }
         return;
       }
-      const eatBtn = t.closest('[data-eat]');
+      const eatBtn = t.closest('[data-eatfood]');
       if (eatBtn && !eatBtn.disabled) {
-        const r = G.eatFood(state, Number(eatBtn.dataset.eat));
+        const r = G.eatFoodGroup(state, eatBtn.dataset.eatfood);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) { SFX.good(); closeModal(); }
@@ -11020,10 +11196,11 @@ button{ color:inherit; font:inherit; }
       }
       const boxFood = t.closest('[data-boxfood]');
       if (boxFood && !boxFood.disabled) {
-        const r = G.boxPutFood(state, Number(boxFood.dataset.boxfood));
+        const r = G.boxPutFoodGroup(state, boxFood.dataset.boxfood);
         commit(r);
         toast(r.msg, r.ok ? 'good' : 'warn');
         if (r.ok) SFX.coin();
+        if (modalOpen()) kitchenModal();
         return;
       }
 
@@ -11666,21 +11843,49 @@ button{ color:inherit; font:inherit; }
  * 由 build-ui.cjs 按文件名顺序拼进 ui.js（共享同一个 IIFE 作用域），不要单独加载。
  */
 
+  function foodRowsHtml(allowEat) {
+    const groups = G.foodGroups(state);
+    if (!groups.length) return '<div class="store-empty">仓库里没有做好的菜，先去做两道 🍳</div>';
+    const eaten = G.lunchEaten(state);
+    return groups.map(function (g) {
+      const q = G.qualityById(g.q);
+      const left = G.foodDaysLeft(g, state.day);
+      const bad = g.rid === 'fail';
+      return '<div class="store-row">' +
+        '<span class="se">' + esc(g.emoji || '🍲') + '</span>' +
+        '<div><div class="sn">' + esc(g.name) + (g.n > 1 ? ' ×' + g.n : '') +
+          (q ? ' <b class="own">' + q.emoji + q.name + '</b>' : '') + '</div>' +
+        '<div class="sv">+' + (g.energy || 0) + ' 体力 · <span class="' +
+          (left <= 1 ? 'exp-soon' : '') + '">' +
+          (left <= 0 ? '今天到期' : '还剩 ' + left + ' 天') + '</span>' +
+          (bad ? ' · 焦糊了不能吃' : '') + '</div></div>' +
+        (allowEat
+          ? '<span class="spw"><button class="btn mini" data-eatfood="' + g.key + '"' +
+            (eaten || bad ? ' disabled' : '') + '>吃</button></span>'
+          : '') +
+      '</div>';
+    }).join('');
+  }
+
   function cookCard(r) {
     const locked = G.cookLv(state) < r.lv;
     const have = G.cookHave(state, r);
-    const canDo = !locked && have && state.energy >= r.energy;
+    const canDo = !locked && have && state.energy >= r.energy && G.cookLeft(state) > 0;
     return '<div class="cook-card' + (locked ? ' locked' : '') + '">' +
       '<div class="cc-head"><span class="cc-e">' + r.emoji + '</span>' +
         '<b>' + esc(r.name) + '</b><span class="cc-lv">Lv' + r.lv + '</span></div>' +
       '<div class="cc-desc">' + esc(r.desc || '') + '</div>' +
       '<div class="cc-row">' + G.ingredientText(r) + '</div>' +
       '<div class="cc-row">耗 ' + r.energy + ' 体力 · 回复 +' + r.restore + ' 体力 · 保质 ' +
-        r.days + ' 天 · 约 ' + r.price + ' 金</div>' +
+        r.days + ' 天 · ' + (r.fishPriced
+          ? '按鱼价 ×' + r.priceMul + ' 折算'
+          : '约 ' + r.price + ' 金') + '</div>' +
       (locked
         ? '<div class="cc-lock">烹饪 Lv' + r.lv + ' 解锁</div>'
         : '<button class="btn mini" data-cook="' + r.id + '"' + (canDo ? '' : ' disabled') + '>' +
-          (have ? (state.energy >= r.energy ? '烹饪' : '体力不够') : '缺食材') + '</button>') +
+          (!have ? '缺食材（标准+）'
+            : state.energy < r.energy ? '体力不够'
+              : G.cookLeft(state) <= 0 ? '今日份数用完' : '烹饪') + '</button>') +
     '</div>';
   }
 
@@ -11690,9 +11895,12 @@ button{ color:inherit; font:inherit; }
     const xp = (state.levels && state.levels.cookXp) || 0;
     const body = unlocked
       ? '<div class="cook-top">🍳 烹饪 <b>Lv' + lv + '</b> · 经验 ' + xp + '/' + G.levelNeed(lv, 'cook') +
+          ' · 今日 <b>' + G.cookLeft(state) + '/' + G.cookDailyLimit(state) + '</b> 份' +
           ' · 做砸 ' + Math.round(G.cookFail(state) * 100) + '% · 品质取 ' +
-          G.cookRolls(state) + ' 次最好 · 体力消耗按食谱</div>' +
-        '<div class="cook-grid">' + G.cookRecipes().map(cookCard).join('') + '</div>'
+          G.cookRolls(state) + ' 次最好</div>' +
+        '<div class="cook-grid">' + G.cookRecipes().map(cookCard).join('') + '</div>' +
+        '<div class="store-sub" style="margin-top:12px">🍲 现有熟食 · 吃午饭每天一次</div>' +
+        foodRowsHtml(true)
       : '<div class="shop-tip">厨房还没解锁：<b>种田 Lv' + G.BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' +
           G.BALANCE.cook.unlockFish + '</b> 后开张。<br>解锁后能拿作物 / 渔获 / 野货做菜，' +
           '菜有保质期，吃了回体力，也能进收购箱卖。</div>';
@@ -11700,28 +11908,12 @@ button{ color:inherit; font:inherit; }
   }
 
   function lunchModal() {
-    const list = state.food || [];
-    const eaten = G.lunchEaten(state);
-    const rows = list.length
-      ? list.map(function (f, i) {
-          const q = G.qualityById(f.q);
-          const bad = f.rid === 'fail';
-          return '<div class="store-row">' +
-            '<span class="se">' + esc(f.emoji || '🍲') + '</span>' +
-            '<div><div class="sn">' + esc(f.name) +
-              (q ? ' <b class="own">' + q.emoji + q.name + '</b>' : '') + '</div>' +
-            '<div class="sv">+' + (f.energy || 0) + ' 体力 · 保质到 D' + f.expire +
-              (bad ? ' · 焦糊了不能吃' : '') + '</div></div>' +
-            '<span class="spw"><button class="btn mini" data-eat="' + i + '"' +
-              (eaten || bad ? ' disabled' : '') + '>吃</button></span></div>';
-        }).join('')
-      : '<div class="store-empty">仓库里没有做好的菜，先去厨房做两道 🍳</div>';
-    openModal('🍽️ 吃午饭',
-      '<div class="shop-tip">每天只能吃一次，回复菜品的体力。' +
-        (G.kitchenUnlocked(state)
-          ? (eaten ? '今天已经吃过了 ✅' : '今天还没吃，不吃的话今晚伙食费 <b>×' + G.BALANCE.meal.skipLunchMul + '</b>。')
-          : '厨房解锁后才生效。') + '</div>' + rows,
-      '<button class="btn" data-close>关闭</button>');
+    const body = '<div class="shop-tip">每天只能吃一次，回复菜品的体力。' +
+      (G.kitchenUnlocked(state)
+        ? (G.lunchEaten(state) ? '今天已经吃过了 ✅' : '今天还没吃，不吃的话今晚伙食费 <b>×' +
+            G.BALANCE.meal.skipLunchMul + '</b>。')
+        : '厨房解锁后才生效。') + '</div>' + foodRowsHtml(true);
+    openModal('🍽️ 吃午饭', body, '<button class="btn" data-close>关闭</button>');
   }
 
 })();

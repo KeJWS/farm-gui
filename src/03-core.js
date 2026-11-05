@@ -150,6 +150,16 @@
   function cookLv(s) { return skillLv(s, 'cook'); }
   function cookFail(s) { return cookFailByLv(cookLv(s)); }
   function cookRolls(s) { return cookRollsByLv(cookLv(s)); }
+  /* 每天能做的份数：基础 3，Lv4 +1，Lv8 再 +1 */
+  function cookDailyLimit(s) {
+    let n = BALANCE.cook.dailyBase;
+    (BALANCE.cook.dailyAt || []).forEach(function (at) { if (cookLv(s) >= at) n++; });
+    return n;
+  }
+  function cookLeft(s) {
+    const used = (s.cookedDay === (s.day || 1)) ? (s.cookedToday || 0) : 0;
+    return Math.max(0, cookDailyLimit(s) - used);
+  }
   function kitchenUnlocked(s) {
     return farmLv(s) >= BALANCE.cook.unlockFarm && fishLv(s) >= BALANCE.cook.unlockFish;
   }

@@ -87,6 +87,8 @@
       /* 厨房：做好的料理（每份带品质 / 体力 / 保质期） */
       food: [],
       lunchDay: 0,
+      cookedDay: 0,
+      cookedToday: 0,
       ledger: [{ day: 1, label: '开局金币', income: 50, expense: 0, balance: 50 }],
       log: [{ day: 1, text: '🌾 欢迎来到我的小农场，第 1 天开始了。', kind: 'sys' }],
       orders: makeOrders({ day: 1 }),
