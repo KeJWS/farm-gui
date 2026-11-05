@@ -2044,18 +2044,27 @@
           '<b>做砸概率</b>：Lv1 ' + Math.round(G.BALANCE.cook.failBase * 100) + '%，每级 −' +
             (G.BALANCE.cook.failStep * 100).toFixed(1) + '%，最低 ' + Math.round(G.BALANCE.cook.failMin * 100) +
             '%；做砸得到一份<b>焦糊料理</b>（没有品质、不能吃，只能进收购箱）。',
-          '<b>食材只收标准及以上</b>：劣质食材做不了菜；成品品质至少比食材最好品质低 ' +
-            G.BALANCE.cook.qualityFloorDrop + ' 档。',
+          '<b>食材只收' + G.qualityById(G.BALANCE.cook.minQuality).name + '及以上</b>：更低品质的做不了菜；' +
+            '成品品质至少比食材最好品质低 ' + G.BALANCE.cook.qualityFloorDrop + ' 档。',
           '<b>品质判定</b>：Lv' + G.BALANCE.cook.qualityAt[0] + ' / Lv' + G.BALANCE.cook.qualityAt[1] +
             ' 各多取一次最好，和施肥一个道理。',
           '<b>体力按食谱算</b>：越简单的菜越省（1 点），硬菜要 2–3 点，食材不够 / 等级不够都做不了。'
         ])) +
-        '<table class="rule-table"><tr><th>菜</th><th>需 Lv</th><th>食材</th><th>耗体力</th><th>回复</th><th>保质</th><th>卖价</th></tr>' +
+        '<table class="rule-table"><tr><th>菜</th><th>条件</th><th>食材</th><th>耗体力</th><th>回复</th><th>保质</th><th>卖价</th></tr>' +
         G.cookRecipes().map(function (r) {
-          return '<tr><td>' + r.emoji + ' ' + r.name + '</td><td>Lv' + r.lv + '</td><td>' +
+          return '<tr><td>' + r.emoji + ' ' + r.name + '</td><td>' + G.recipeReqText(r) + '</td><td>' +
             G.ingredientText(r) + '</td><td>' + r.energy + '</td><td>+' + r.restore + '</td><td>' +
             r.days + ' 天</td><td>' + (r.fishPriced ? '按鱼价 ×' + r.priceMul : r.price + ' 金') + '</td></tr>';
         }).join('') + '</table>' +
+        guideSub('📜 食谱从哪来', guideList([
+          '<b>等级解锁</b>：烹饪等级 + 种田 / 钓鱼 / 采集等级，够了自动会做。',
+          '<b>百货店买</b>：' + G.shopRecipes().map(function (r) {
+            return r.name + '（交易 Lv' + r.trade + '，' + r.shopPrice + ' 金）';
+          }).join(' / ') + '，买一次永久学会。',
+          '<b>黄金宝箱</b>：' + G.cookRecipes().filter(function (r) { return r.source === 'gold'; })
+            .map(function (r) { return r.name; }).join(' / ') + '，开金箱有 ' +
+            Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '% 概率掉一张。'
+        ])) +
         guideSub('🍽️ 吃午饭', guideList([
           '<b>每天一次</b>，吃一份菜回复它的体力；菜也吃品质，品质越高回的体力越多。',
           '<b>不能直接在仓库里吃</b>：要打开「吃午饭」（或厨房）再选一份。',
@@ -3042,11 +3051,28 @@
           (!open || state.coins < k.price ? ' disabled' : '') + '>买1</button></div>';
     }).join('');
 
+    const recipeRows = G.shopRecipes().map(function (r) {
+      const known = G.recipeKnown(state, r);
+      const open = G.tradeLv(state) >= r.trade;
+      const price = Math.round(r.shopPrice * G.tradeCut(state));
+      return '<div class="store-row' + (!known && !open ? ' locked' : '') + '">' +
+        '<span class="se">📜</span>' +
+        '<div><div class="sn">' + r.emoji + ' ' + r.name +
+          (known ? ' <b class="own">已学会</b>' : '') + '</div>' +
+        '<div class="sv">' + G.ingredientText(r) + ' · +' + r.restore + ' 体力 · ' +
+          (known ? '可在厨房做' : (open ? price + ' 金' : '交易 Lv' + r.trade + ' 才出售')) +
+        '</div></div>' +
+        (known ? '<span class="sp">✅</span>' :
+          '<button class="btn mini" data-buyrecipe="' + r.id + '"' +
+            (!open || state.coins < price ? ' disabled' : '') + '>买配方</button>') +
+      '</div>';
+    }).join('');
+
     // 百货店只收宝箱，杂物一律不收（只能进收购箱）
     const junk = G.fishGroups(state, 'junk').filter(function (g) { return g.chest; });    const CHECK = {
       wood: '开箱 10–26 金',
       iron: '开箱：肥料×6–9 / 种子×8–12 / 面团×12–18 / 蚯蚓×12–18',
-      gold: '开箱：200–320 金 + 特效肥×3–5 / 稀有种子×2–3 / 蚯蚓×14–18'
+      gold: '开箱：200–320 金 + 特效肥×3–5 / 稀有种子×2–3 / 蚯蚓×14–18 + 18% 掉食谱'
     };
     const junkRows = junk.length ? junk.map(function (g) {
       const k = G.CHESTS[g.chest];
@@ -3071,6 +3097,7 @@
         '</div>' + treeRows +
       '<div class="store-sub" style="margin-top:10px">🗝️ 钥匙 · 钓鱼 Lv' + G.KEYS.iron.lv + ' / Lv' +
         G.KEYS.gold.lv + ' + 交易 Lv' + G.BALANCE.gate.goldKeyTrade + ' 解锁</div>' + keyRows +
+      '<div class="store-sub" style="margin-top:10px">📜 食谱 · 交易等级解锁，买一次永久学会</div>' + recipeRows +
       '<div class="store-sub" style="margin-top:10px">♻️ 宝箱回收 · 只收宝箱，杂物不收</div>' + junkRows +
       '<div class="shop-tip">宝箱按钓鱼等级掉落：木制随便掉、铁制 <b>Lv' + G.BALANCE.chest.ironLv +
         '</b> 起、黄金 <b>Lv' + G.BALANCE.chest.goldLv + '</b> 起后两者要用钥匙开。<br>' +
@@ -4161,6 +4188,14 @@
         if (modalOpen()) departModal();
         return;
       }
+      const buyRecipe = t.closest('[data-buyrecipe]');
+      if (buyRecipe && !buyRecipe.disabled) {
+        const r = G.buyRecipe(state, buyRecipe.dataset.buyrecipe);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) { SFX.coin(); if (modalOpen()) departModal(); }
+        return;
+      }
       const sellJunk = t.closest('[data-selljunk]');
       if (sellJunk && !sellJunk.disabled) {
         const r = G.sellJunk(state, sellJunk.dataset.selljunk);
@@ -4772,31 +4807,32 @@
  */
 
   function foodRowsHtml(allowEat) {
-    const groups = G.foodGroups(state);
-    if (!groups.length) return '<div class="store-empty">仓库里没有做好的菜，先去做两道 🍳</div>';
+    let groups = G.foodGroups(state);
+    if (allowEat) groups = groups.filter(function (g) { return g.rid !== 'fail'; });
+    if (!groups.length) return '<div class="store-empty">仓库里没有能吃的菜，先去做两道 🍳</div>';
     const eaten = G.lunchEaten(state);
     return groups.map(function (g) {
       const q = G.qualityById(g.q);
       const left = G.foodDaysLeft(g, state.day);
-      const bad = g.rid === 'fail';
       return '<div class="store-row">' +
         '<span class="se">' + esc(g.emoji || '🍲') + '</span>' +
         '<div><div class="sn">' + esc(g.name) + (g.n > 1 ? ' ×' + g.n : '') +
           (q ? ' <b class="own">' + q.emoji + q.name + '</b>' : '') + '</div>' +
         '<div class="sv">+' + (g.energy || 0) + ' 体力 · <span class="' +
           (left <= 1 ? 'exp-soon' : '') + '">' +
-          (left <= 0 ? '今天到期' : '还剩 ' + left + ' 天') + '</span>' +
-          (bad ? ' · 焦糊了不能吃' : '') + '</div></div>' +
+          (left <= 0 ? '今天到期' : '还剩 ' + left + ' 天') + '</span></div></div>' +
         (allowEat
           ? '<span class="spw"><button class="btn mini" data-eatfood="' + g.key + '"' +
-            (eaten || bad ? ' disabled' : '') + '>吃</button></span>'
+            (eaten ? ' disabled' : '') + '>吃</button></span>'
           : '') +
       '</div>';
     }).join('');
   }
 
   function cookCard(r) {
-    const locked = G.cookLv(state) < r.lv;
+    const known = G.recipeKnown(state, r);
+    const lockText = G.recipeLockText(state, r);
+    const locked = !known || !!lockText;
     const have = G.cookHave(state, r);
     const canDo = !locked && have && state.energy >= r.energy && G.cookLeft(state) > 0;
     return '<div class="cook-card' + (locked ? ' locked' : '') + '">' +
@@ -4808,10 +4844,11 @@
         r.days + ' 天 · ' + (r.fishPriced
           ? '按鱼价 ×' + r.priceMul + ' 折算'
           : '约 ' + r.price + ' 金') + '</div>' +
+      '<div class="cc-row cc-req">' + G.recipeReqText(r) + '</div>' +
       (locked
-        ? '<div class="cc-lock">烹饪 Lv' + r.lv + ' 解锁</div>'
+        ? '<div class="cc-lock">' + (known ? '还需 ' + lockText : lockText) + '</div>'
         : '<button class="btn mini" data-cook="' + r.id + '"' + (canDo ? '' : ' disabled') + '>' +
-          (!have ? '缺食材（标准+）'
+          (!have ? '缺食材（' + G.qualityById(G.BALANCE.cook.minQuality).name + '+）'
             : state.energy < r.energy ? '体力不够'
               : G.cookLeft(state) <= 0 ? '今日份数用完' : '烹饪') + '</button>') +
     '</div>';

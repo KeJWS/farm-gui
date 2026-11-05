@@ -487,6 +487,14 @@
         if (modalOpen()) departModal();
         return;
       }
+      const buyRecipe = t.closest('[data-buyrecipe]');
+      if (buyRecipe && !buyRecipe.disabled) {
+        const r = G.buyRecipe(state, buyRecipe.dataset.buyrecipe);
+        commit(r);
+        toast(r.msg, r.ok ? 'good' : 'warn');
+        if (r.ok) { SFX.coin(); if (modalOpen()) departModal(); }
+        return;
+      }
       const sellJunk = t.closest('[data-selljunk]');
       if (sellJunk && !sellJunk.disabled) {
         const r = G.sellJunk(state, sellJunk.dataset.selljunk);

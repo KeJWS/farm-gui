@@ -711,8 +711,10 @@
             dailyBase: 3, dailyAt: [4, 8],
             /* 高级菜（Lv≥advLv）额外经验 */
             advLv: 4, advXp: 2,
-            /* 食材只收标准及以上；成品品质下限 = 食材最好品质 − 1 档 */
-            minQuality: 'std', qualityFloorDrop: 1 },
+            /* 食材只收普通及以上；成品品质下限 = 食材最好品质 − 1 档 */
+            minQuality: 'common', qualityFloorDrop: 1,
+            /* 黄金宝箱掉食谱的概率 */
+            goldRecipeChance: 0.18 },
     /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
     upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
     /* 一季 30 天（春 1–30 / 夏 31–60 / 秋 61–90 / 冬 91–120） */
@@ -1596,6 +1598,8 @@
       lunchDay: 0,
       cookedDay: 0,
       cookedToday: 0,
+      /* 学会的商店 / 宝箱食谱 */
+      recipes: {},
       ledger: [{ day: 1, label: '开局金币', income: 50, expense: 0, balance: 50 }],
       log: [{ day: 1, text: '🌾 欢迎来到我的小农场，第 1 天开始了。', kind: 'sys' }],
       orders: makeOrders({ day: 1 }),
@@ -3544,6 +3548,11 @@
         s.bait.worm = (s.bait.worm || 0) + n;
         gains.push('🪱 蚯蚓×' + n);
       }
+      /* 黄金宝箱还能掉食谱（只会掉还没学会的） */
+      if (rand() < BALANCE.cook.goldRecipeChance) {
+        const rec = grantGoldRecipe(s);
+        if (rec) gains.push('📜 食谱：' + rec.emoji + ' ' + rec.name);
+      }
     }
 
     log(s, C.emoji + ' 打开' + C.name + '：' + gains.join(' · '), 'good');
@@ -4960,6 +4969,12 @@
     merged.lunchDay = Math.round(num(s.lunchDay, 0, 0, 100000));
     merged.cookedDay = Math.round(num(s.cookedDay, 0, 0, 100000));
     merged.cookedToday = Math.round(num(s.cookedToday, 0, 0, 999));
+    /* 学会的食谱：只保留认识、且确实需要解锁的那些 */
+    merged.recipes = {};
+    Object.keys(s.recipes && typeof s.recipes === 'object' ? s.recipes : {}).forEach(function (id) {
+      const r = recipeById(id);
+      if (r && r.source) merged.recipes[id] = true;
+    });
     merged.orders = normalizeOrders(s.orders, merged);
 
     // 长期订单
@@ -5242,6 +5257,8 @@
     /* 厨房 / 烹饪 */
     cookRecipes: function () { return RECIPES; },
     recipeById: recipeById, ingredientText: ingredientText, cookHave: cookHave,
+    recipeKnown: recipeKnown, recipeReqText: recipeReqText, recipeLockText: recipeLockText,
+    shopRecipes: shopRecipes, buyRecipe: buyRecipe, grantGoldRecipe: grantGoldRecipe,
     cookMeal: cookMeal, eatFood: eatFood, foodTick: foodTick, boxPutFood: boxPutFood,
     eatFoodGroup: eatFoodGroup, boxPutFoodGroup: boxPutFoodGroup, foodGroups: foodGroups,
     foodDaysLeft: foodDaysLeft, foodSoon: foodSoon, cookDailyLimit: cookDailyLimit, cookLeft: cookLeft,
@@ -5347,21 +5364,104 @@
       cost: { fish: 1 }, desc: '现钓现烤，鱼越贵菜越值钱' },
     { id: 'jam', name: '野莓酱', emoji: '🍯', lv: 2, energy: 1, restore: 9, days: 4, price: 66,
       cost: { crops: { berry: 2 } }, desc: '抹面包能吃一星期' },
-    { id: 'stew', name: '蘑菇炖菜', emoji: '🍲', lv: 3, energy: 2, restore: 16, days: 3, price: 96,
+    { id: 'cornsoup', name: '玉米浓汤', emoji: '🌽', lv: 2, energy: 1, restore: 15, days: 3, price: 100,
+      req: { farm: 3 }, cost: { crops: { corn: 3 } }, desc: '奶油和玉米一起煮' },
+    { id: 'mushroomsoup', name: '菌菇汤', emoji: '🍲', lv: 2, energy: 1, restore: 18, days: 3, price: 112,
+      req: { forage: 3 }, cost: { crops: { mushroom: 1, shepherd: 2 } }, desc: '山里的鲜味' },
+    { id: 'stew', name: '蘑菇炖菜', emoji: '🥘', lv: 3, energy: 2, restore: 16, days: 3, price: 96,
       cost: { crops: { mushroom: 1, potato: 2 } }, desc: '松茸配土豆，鲜掉眉毛' },
+    { id: 'stirfry', name: '辣味小炒', emoji: '🌶️', lv: 3, energy: 2, restore: 20, days: 2, price: 130,
+      req: { farm: 5 }, cost: { crops: { chili: 2, eggplant: 1 } }, desc: '下饭，就是有点辣' },
+    { id: 'smokedfish', name: '茶香熏鱼', emoji: '🍵', lv: 3, energy: 2, restore: 24, days: 3, price: 210,
+      source: 'shop', trade: 3, shopPrice: 1500,
+      cost: { fish: 1, crops: { corn: 1 } }, desc: '茶叶熏出来的河鲜' },
     { id: 'salad', name: '水果沙拉', emoji: '🥗', lv: 4, energy: 2, restore: 14, days: 2, price: 108,
       cost: { crops: { fruit_peach: 1, berry: 2 } }, desc: '桃子野莓拌一拌' },
+    { id: 'riversoup', name: '河鲜汤', emoji: '🐟', lv: 4, energy: 1, restore: 22, days: 2,
+      req: { fish: 4 }, fishPriced: true, priceMul: 4,
+      cost: { fish: 2, crops: { potato: 1 } }, desc: '两条河鱼一锅炖' },
+    { id: 'gameplatter', name: '野味拼盘', emoji: '🍖', lv: 5, energy: 2, restore: 30, days: 2, price: 300,
+      req: { forage: 6 }, cost: { fish: 1, crops: { mushroom: 2, berry: 2 } }, desc: '山里水里凑一桌' },
+    { id: 'honeypumpkin', name: '蜂蜜烤南瓜', emoji: '🎃', lv: 5, energy: 2, restore: 30, days: 4, price: 330,
+      source: 'shop', trade: 5, shopPrice: 3000,
+      cost: { crops: { pumpkin: 1, berry: 2 } }, desc: '甜到心里' },
     { id: 'pie', name: '南瓜派', emoji: '🥧', lv: 6, energy: 2, restore: 24, days: 4, price: 188,
       cost: { crops: { pumpkin: 1, corn: 2 } }, desc: '烤得金黄，切八块' },
     { id: 'sashimi', name: '鱼生拼盘', emoji: '🍣', lv: 7, energy: 2, restore: 28, days: 1,
-      fishPriced: true, priceMul: 5,
+      fishPriced: true, priceMul: 4,
       cost: { fish: 2, crops: { carrot: 1 } }, desc: '刀工比食材更值钱' },
+    { id: 'royal', name: '皇家宴席', emoji: '👑', lv: 8, energy: 3, restore: 55, days: 3, price: 760,
+      source: 'gold',
+      cost: { fish: 2, crops: { watermelon: 1, pumpkin: 1, mushroom: 1, fruit_peach: 1 } },
+      desc: '黄金宝箱里掉出来的宫廷菜谱' },
     { id: 'feast', name: '农家盛宴', emoji: '🍱', lv: 9, energy: 3, restore: 45, days: 3, price: 520,
       cost: { fish: 2, crops: { watermelon: 1, pumpkin: 1, mushroom: 1 } }, desc: '一桌硬菜' }
   ];
 
   function recipeById(id) {
     return RECIPES.filter(function (r) { return r.id === id; })[0] || null;
+  }
+  function shopRecipes() { return RECIPES.filter(function (r) { return r.source === 'shop'; }); }
+  function goldRecipes() { return RECIPES.filter(function (r) { return r.source === 'gold'; }); }
+
+  /* 商店 / 宝箱食谱要先学会；等级食谱天然可用 */
+  function recipeKnown(s, r) {
+    return !r.source || !!(s && s.recipes && s.recipes[r.id]);
+  }
+  function recipeSkillOk(s, r) {
+    if (cookLv(s) < r.lv) return false;
+    const req = r.req || {};
+    if (req.farm && farmLv(s) < req.farm) return false;
+    if (req.fish && fishLv(s) < req.fish) return false;
+    if (req.forage && forageLv(s) < req.forage) return false;
+    return true;
+  }
+  function recipeReqText(r) {
+    const parts = ['烹饪 Lv' + r.lv];
+    const req = r.req || {};
+    if (req.farm) parts.push('种田 Lv' + req.farm);
+    if (req.fish) parts.push('钓鱼 Lv' + req.fish);
+    if (req.forage) parts.push('采集 Lv' + req.forage);
+    if (r.source === 'shop') parts.push('百货店配方（交易 Lv' + r.trade + '）');
+    if (r.source === 'gold') parts.push('黄金宝箱掉落');
+    return parts.join(' · ');
+  }
+  function recipeLockText(s, r) {
+    if (!recipeKnown(s, r)) {
+      return r.source === 'shop' ? '百货店买配方（交易 Lv' + r.trade + '）' : '黄金宝箱掉落';
+    }
+    if (cookLv(s) < r.lv) return '烹饪 Lv' + r.lv;
+    const req = r.req || {};
+    if (req.farm && farmLv(s) < req.farm) return '种田 Lv' + req.farm;
+    if (req.fish && fishLv(s) < req.fish) return '钓鱼 Lv' + req.fish;
+    if (req.forage && forageLv(s) < req.forage) return '采集 Lv' + req.forage;
+    return '';
+  }
+
+  /* 百货店买食谱 */
+  function buyRecipe(s, id) {
+    const r = recipeById(id);
+    if (!r || r.source !== 'shop') return { ok: false, msg: '没有这个配方' };
+    if (recipeKnown(s, r)) return { ok: false, msg: '这个配方已经学会了' };
+    if (tradeLv(s) < r.trade) return { ok: false, msg: '交易 Lv' + r.trade + ' 才卖这个配方' };
+    const price = Math.round(r.shopPrice * tradeCut(s));
+    if (s.coins < price) return { ok: false, msg: '金币不够（' + price + ' 金）' };
+    s.coins -= price;
+    ledger(s, '买食谱 · ' + r.name, 0, price);
+    s.recipes = s.recipes || {};
+    s.recipes[r.id] = true;
+    log(s, '📜 学会了食谱：' + r.emoji + ' ' + r.name + '（-' + price + ' 金）', 'good');
+    return { ok: true, msg: '学会 ' + r.name, cost: price };
+  }
+
+  /* 黄金宝箱：随机掉一张还没学会的宝箱食谱 */
+  function grantGoldRecipe(s) {
+    const cand = goldRecipes().filter(function (r) { return !recipeKnown(s, r); });
+    if (!cand.length) return null;
+    const r = cand[Math.floor(rand() * cand.length)];
+    s.recipes = s.recipes || {};
+    s.recipes[r.id] = true;
+    return r;
   }
 
   /* 食材只收「标准」及以上；成品品质下限 = 食材最好品质 − 1 档 */
@@ -5447,7 +5547,13 @@
     if (!r) return { ok: false, msg: '没有这个食谱' };
     if (!kitchenUnlocked(s)) return { ok: false, msg: '厨房还没解锁（种田 Lv' +
       BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' + BALANCE.cook.unlockFish + '）' };
-    if (cookLv(s) < r.lv) return { ok: false, msg: '烹饪 Lv' + r.lv + ' 才解锁' };
+    if (!recipeKnown(s, r)) {
+      return { ok: false, msg: r.source === 'shop'
+        ? '还没学会：去百货店买这张配方'
+        : '还没学会：黄金宝箱里有几率开出' };
+    }
+    const lock = recipeLockText(s, r);
+    if (lock) return { ok: false, msg: '还差：' + lock };
     if (cookLeft(s) <= 0) {
       return { ok: false, msg: '今天的烹饪次数用完了（' + cookDailyLimit(s) + ' 份/天）' };
     }

@@ -480,18 +480,27 @@
           '<b>做砸概率</b>：Lv1 ' + Math.round(G.BALANCE.cook.failBase * 100) + '%，每级 −' +
             (G.BALANCE.cook.failStep * 100).toFixed(1) + '%，最低 ' + Math.round(G.BALANCE.cook.failMin * 100) +
             '%；做砸得到一份<b>焦糊料理</b>（没有品质、不能吃，只能进收购箱）。',
-          '<b>食材只收标准及以上</b>：劣质食材做不了菜；成品品质至少比食材最好品质低 ' +
-            G.BALANCE.cook.qualityFloorDrop + ' 档。',
+          '<b>食材只收' + G.qualityById(G.BALANCE.cook.minQuality).name + '及以上</b>：更低品质的做不了菜；' +
+            '成品品质至少比食材最好品质低 ' + G.BALANCE.cook.qualityFloorDrop + ' 档。',
           '<b>品质判定</b>：Lv' + G.BALANCE.cook.qualityAt[0] + ' / Lv' + G.BALANCE.cook.qualityAt[1] +
             ' 各多取一次最好，和施肥一个道理。',
           '<b>体力按食谱算</b>：越简单的菜越省（1 点），硬菜要 2–3 点，食材不够 / 等级不够都做不了。'
         ])) +
-        '<table class="rule-table"><tr><th>菜</th><th>需 Lv</th><th>食材</th><th>耗体力</th><th>回复</th><th>保质</th><th>卖价</th></tr>' +
+        '<table class="rule-table"><tr><th>菜</th><th>条件</th><th>食材</th><th>耗体力</th><th>回复</th><th>保质</th><th>卖价</th></tr>' +
         G.cookRecipes().map(function (r) {
-          return '<tr><td>' + r.emoji + ' ' + r.name + '</td><td>Lv' + r.lv + '</td><td>' +
+          return '<tr><td>' + r.emoji + ' ' + r.name + '</td><td>' + G.recipeReqText(r) + '</td><td>' +
             G.ingredientText(r) + '</td><td>' + r.energy + '</td><td>+' + r.restore + '</td><td>' +
             r.days + ' 天</td><td>' + (r.fishPriced ? '按鱼价 ×' + r.priceMul : r.price + ' 金') + '</td></tr>';
         }).join('') + '</table>' +
+        guideSub('📜 食谱从哪来', guideList([
+          '<b>等级解锁</b>：烹饪等级 + 种田 / 钓鱼 / 采集等级，够了自动会做。',
+          '<b>百货店买</b>：' + G.shopRecipes().map(function (r) {
+            return r.name + '（交易 Lv' + r.trade + '，' + r.shopPrice + ' 金）';
+          }).join(' / ') + '，买一次永久学会。',
+          '<b>黄金宝箱</b>：' + G.cookRecipes().filter(function (r) { return r.source === 'gold'; })
+            .map(function (r) { return r.name; }).join(' / ') + '，开金箱有 ' +
+            Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '% 概率掉一张。'
+        ])) +
         guideSub('🍽️ 吃午饭', guideList([
           '<b>每天一次</b>，吃一份菜回复它的体力；菜也吃品质，品质越高回的体力越多。',
           '<b>不能直接在仓库里吃</b>：要打开「吃午饭」（或厨房）再选一份。',

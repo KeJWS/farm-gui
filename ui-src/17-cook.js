@@ -4,31 +4,32 @@
  */
 
   function foodRowsHtml(allowEat) {
-    const groups = G.foodGroups(state);
-    if (!groups.length) return '<div class="store-empty">仓库里没有做好的菜，先去做两道 🍳</div>';
+    let groups = G.foodGroups(state);
+    if (allowEat) groups = groups.filter(function (g) { return g.rid !== 'fail'; });
+    if (!groups.length) return '<div class="store-empty">仓库里没有能吃的菜，先去做两道 🍳</div>';
     const eaten = G.lunchEaten(state);
     return groups.map(function (g) {
       const q = G.qualityById(g.q);
       const left = G.foodDaysLeft(g, state.day);
-      const bad = g.rid === 'fail';
       return '<div class="store-row">' +
         '<span class="se">' + esc(g.emoji || '🍲') + '</span>' +
         '<div><div class="sn">' + esc(g.name) + (g.n > 1 ? ' ×' + g.n : '') +
           (q ? ' <b class="own">' + q.emoji + q.name + '</b>' : '') + '</div>' +
         '<div class="sv">+' + (g.energy || 0) + ' 体力 · <span class="' +
           (left <= 1 ? 'exp-soon' : '') + '">' +
-          (left <= 0 ? '今天到期' : '还剩 ' + left + ' 天') + '</span>' +
-          (bad ? ' · 焦糊了不能吃' : '') + '</div></div>' +
+          (left <= 0 ? '今天到期' : '还剩 ' + left + ' 天') + '</span></div></div>' +
         (allowEat
           ? '<span class="spw"><button class="btn mini" data-eatfood="' + g.key + '"' +
-            (eaten || bad ? ' disabled' : '') + '>吃</button></span>'
+            (eaten ? ' disabled' : '') + '>吃</button></span>'
           : '') +
       '</div>';
     }).join('');
   }
 
   function cookCard(r) {
-    const locked = G.cookLv(state) < r.lv;
+    const known = G.recipeKnown(state, r);
+    const lockText = G.recipeLockText(state, r);
+    const locked = !known || !!lockText;
     const have = G.cookHave(state, r);
     const canDo = !locked && have && state.energy >= r.energy && G.cookLeft(state) > 0;
     return '<div class="cook-card' + (locked ? ' locked' : '') + '">' +
@@ -40,10 +41,11 @@
         r.days + ' 天 · ' + (r.fishPriced
           ? '按鱼价 ×' + r.priceMul + ' 折算'
           : '约 ' + r.price + ' 金') + '</div>' +
+      '<div class="cc-row cc-req">' + G.recipeReqText(r) + '</div>' +
       (locked
-        ? '<div class="cc-lock">烹饪 Lv' + r.lv + ' 解锁</div>'
+        ? '<div class="cc-lock">' + (known ? '还需 ' + lockText : lockText) + '</div>'
         : '<button class="btn mini" data-cook="' + r.id + '"' + (canDo ? '' : ' disabled') + '>' +
-          (!have ? '缺食材（标准+）'
+          (!have ? '缺食材（' + G.qualityById(G.BALANCE.cook.minQuality).name + '+）'
             : state.energy < r.energy ? '体力不够'
               : G.cookLeft(state) <= 0 ? '今日份数用完' : '烹饪') + '</button>') +
     '</div>';

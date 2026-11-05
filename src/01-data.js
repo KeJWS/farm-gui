@@ -24,8 +24,10 @@
             dailyBase: 3, dailyAt: [4, 8],
             /* 高级菜（Lv≥advLv）额外经验 */
             advLv: 4, advXp: 2,
-            /* 食材只收标准及以上；成品品质下限 = 食材最好品质 − 1 档 */
-            minQuality: 'std', qualityFloorDrop: 1 },
+            /* 食材只收普通及以上；成品品质下限 = 食材最好品质 − 1 档 */
+            minQuality: 'common', qualityFloorDrop: 1,
+            /* 黄金宝箱掉食谱的概率 */
+            goldRecipeChance: 0.18 },
     /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
     upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
     /* 一季 30 天（春 1–30 / 夏 31–60 / 秋 61–90 / 冬 91–120） */

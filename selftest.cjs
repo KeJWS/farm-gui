@@ -2897,7 +2897,7 @@ section('厨房与烹饪');
   const ck = G.createState();
   ck.day = 10; ck.levels.farm = 3; ck.levels.fish = 2; ck.energy = 50; ck.maxEnergy = 50;
   ok(G.kitchenUnlocked(ck), '种田 Lv3 + 钓鱼 Lv2 解锁厨房');
-  ok(G.cookRecipes().length === 8, '食谱 8 道', G.cookRecipes().length);
+  ok(G.cookRecipes().length === 16, '食谱 16 道', G.cookRecipes().length);
   ok(G.cookRecipes().some(function (r) { return r.energy > 1; }), '不同食谱消耗不同体力',
      G.cookRecipes().map(function (r) { return r.energy; }));
   ok(!G.cookMeal(ck, 'soup').ok, '没食材做不了');
@@ -2943,7 +2943,7 @@ section('厨房与烹饪');
   qm.day = 10; qm.levels.farm = 3; qm.levels.fish = 2; qm.energy = 50; qm.maxEnergy = 50;
   G.addStore(qm, 'carrot', 'bad', 5);
   G.addStore(qm, 'cabbage', 'bad', 5);
-  ok(!G.cookHave(qm, G.recipeById('soup')), '只收标准及以上食材');
+  ok(!G.cookHave(qm, G.recipeById('soup')), '只收普通及以上食材');
 
   const qf2 = G.createState();
   qf2.day = 10; qf2.levels.farm = 3; qf2.levels.fish = 2; qf2.energy = 50;
@@ -3020,7 +3020,39 @@ section('厨房与烹饪');
   const cookAch = G.ACH.filter(function (a) { return a.id === 'cook1'; })[0];
   ok(cookAch.val({ stats: { cooks: 1 } }) === 1, '烹饪成就能读到做菜次数');
 
-  /* 厨房没解锁时整条线都不生效 */
+  /* 技能门槛 / 商店食谱 / 黄金宝箱食谱 */
+  const sk = G.createState();
+  sk.day = 10; sk.levels.farm = 2; sk.levels.fish = 2; sk.levels.cook = 2; sk.energy = 50;
+  G.addStore(sk, 'corn', 'std', 3);
+  ok(!G.cookMeal(sk, 'cornsoup').ok, '玉米浓汤要种田 Lv3');
+  sk.levels.farm = 3;
+  G.setRng(function () { return 0.99; });
+  ok(G.cookMeal(sk, 'cornsoup').ok, '种田等级够了就能做');
+
+  ok(G.shopRecipes().length === 2, '百货店有 2 张食谱', G.shopRecipes().map(function (r) { return r.name; }));
+  const bs = G.createState();
+  bs.day = 10; bs.levels.farm = 3; bs.levels.fish = 2; bs.levels.trade = 3;
+  bs.levels.cook = 3; bs.coins = 10000; bs.energy = 50;
+  bs.fishBag.push({ name: '鲫鱼', emoji: '🐟', q: 'std', v: 3, d: 1 });
+  G.addStore(bs, 'corn', 'std', 1);
+  ok(!G.recipeKnown(bs, G.recipeById('smokedfish')) &&
+     !G.cookMeal(bs, 'smokedfish').ok, '商店食谱没买之前做不了');
+  const bsCoins = bs.coins;
+  const br = G.buyRecipe(bs, 'smokedfish');
+  ok(br.ok && bs.coins < bsCoins && G.recipeKnown(bs, G.recipeById('smokedfish')),
+     '百货店能买食谱并永久学会', br);
+  G.setRng(function () { return 0.99; });
+  ok(G.cookMeal(bs, 'smokedfish').ok, '学会后能烹饪');
+  const bs2 = G.createState();
+  bs2.levels.trade = 2; bs2.coins = 10000;
+  ok(!G.buyRecipe(bs2, 'smokedfish').ok, '交易等级不够买不了食谱');
+
+  const gs = G.createState();
+  const gr = G.grantGoldRecipe(gs);
+  ok(gr && G.recipeKnown(gs, gr) && gs.recipes[gr.id], '黄金宝箱能开出食谱', gr && gr.name);
+  ok(G.grantGoldRecipe(gs) === null, '宝箱食谱不会重复掉');
+
+
   const lock = G.createState();
   lock.energy = 50;
   ok(!G.kitchenUnlocked(lock) && !G.cookMeal(lock, 'soup').ok, '没解锁做不了菜');

@@ -295,6 +295,12 @@
     merged.lunchDay = Math.round(num(s.lunchDay, 0, 0, 100000));
     merged.cookedDay = Math.round(num(s.cookedDay, 0, 0, 100000));
     merged.cookedToday = Math.round(num(s.cookedToday, 0, 0, 999));
+    /* 学会的食谱：只保留认识、且确实需要解锁的那些 */
+    merged.recipes = {};
+    Object.keys(s.recipes && typeof s.recipes === 'object' ? s.recipes : {}).forEach(function (id) {
+      const r = recipeById(id);
+      if (r && r.source) merged.recipes[id] = true;
+    });
     merged.orders = normalizeOrders(s.orders, merged);
 
     // 长期订单
@@ -577,6 +583,8 @@
     /* 厨房 / 烹饪 */
     cookRecipes: function () { return RECIPES; },
     recipeById: recipeById, ingredientText: ingredientText, cookHave: cookHave,
+    recipeKnown: recipeKnown, recipeReqText: recipeReqText, recipeLockText: recipeLockText,
+    shopRecipes: shopRecipes, buyRecipe: buyRecipe, grantGoldRecipe: grantGoldRecipe,
     cookMeal: cookMeal, eatFood: eatFood, foodTick: foodTick, boxPutFood: boxPutFood,
     eatFoodGroup: eatFoodGroup, boxPutFoodGroup: boxPutFoodGroup, foodGroups: foodGroups,
     foodDaysLeft: foodDaysLeft, foodSoon: foodSoon, cookDailyLimit: cookDailyLimit, cookLeft: cookLeft,

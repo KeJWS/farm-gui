@@ -83,11 +83,28 @@
           (!open || state.coins < k.price ? ' disabled' : '') + '>买1</button></div>';
     }).join('');
 
+    const recipeRows = G.shopRecipes().map(function (r) {
+      const known = G.recipeKnown(state, r);
+      const open = G.tradeLv(state) >= r.trade;
+      const price = Math.round(r.shopPrice * G.tradeCut(state));
+      return '<div class="store-row' + (!known && !open ? ' locked' : '') + '">' +
+        '<span class="se">📜</span>' +
+        '<div><div class="sn">' + r.emoji + ' ' + r.name +
+          (known ? ' <b class="own">已学会</b>' : '') + '</div>' +
+        '<div class="sv">' + G.ingredientText(r) + ' · +' + r.restore + ' 体力 · ' +
+          (known ? '可在厨房做' : (open ? price + ' 金' : '交易 Lv' + r.trade + ' 才出售')) +
+        '</div></div>' +
+        (known ? '<span class="sp">✅</span>' :
+          '<button class="btn mini" data-buyrecipe="' + r.id + '"' +
+            (!open || state.coins < price ? ' disabled' : '') + '>买配方</button>') +
+      '</div>';
+    }).join('');
+
     // 百货店只收宝箱，杂物一律不收（只能进收购箱）
     const junk = G.fishGroups(state, 'junk').filter(function (g) { return g.chest; });    const CHECK = {
       wood: '开箱 10–26 金',
       iron: '开箱：肥料×6–9 / 种子×8–12 / 面团×12–18 / 蚯蚓×12–18',
-      gold: '开箱：200–320 金 + 特效肥×3–5 / 稀有种子×2–3 / 蚯蚓×14–18'
+      gold: '开箱：200–320 金 + 特效肥×3–5 / 稀有种子×2–3 / 蚯蚓×14–18 + 18% 掉食谱'
     };
     const junkRows = junk.length ? junk.map(function (g) {
       const k = G.CHESTS[g.chest];
@@ -112,6 +129,7 @@
         '</div>' + treeRows +
       '<div class="store-sub" style="margin-top:10px">🗝️ 钥匙 · 钓鱼 Lv' + G.KEYS.iron.lv + ' / Lv' +
         G.KEYS.gold.lv + ' + 交易 Lv' + G.BALANCE.gate.goldKeyTrade + ' 解锁</div>' + keyRows +
+      '<div class="store-sub" style="margin-top:10px">📜 食谱 · 交易等级解锁，买一次永久学会</div>' + recipeRows +
       '<div class="store-sub" style="margin-top:10px">♻️ 宝箱回收 · 只收宝箱，杂物不收</div>' + junkRows +
       '<div class="shop-tip">宝箱按钓鱼等级掉落：木制随便掉、铁制 <b>Lv' + G.BALANCE.chest.ironLv +
         '</b> 起、黄金 <b>Lv' + G.BALANCE.chest.goldLv + '</b> 起后两者要用钥匙开。<br>' +

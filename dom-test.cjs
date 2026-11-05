@@ -647,6 +647,11 @@ clickAct('kitchen');
 ok(html('#modal-root').indexOf('烹饪') >= 0 && html('#modal-root').indexOf('蔬菜汤') >= 0,
    '厨房弹窗列出食谱');
 ok(html('#modal-root').indexOf('data-cook=') >= 0, '食谱带烹饪按钮');
+ok(html('#modal-root').indexOf('玉米浓汤') >= 0 && html('#modal-root').indexOf('皇家宴席') >= 0,
+   '食谱含等级 / 宝箱解锁的菜');
+clickAct('depart');
+ok(html('#modal-root').indexOf('茶香熏鱼') >= 0 && html('#modal-root').indexOf('data-buyrecipe=') >= 0,
+   '百货店出售食谱');
 clickAct('lunch');
 ok(html('#modal-root').indexOf('吃午饭') >= 0, '午饭弹窗能打开');
 

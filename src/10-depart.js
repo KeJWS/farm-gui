@@ -133,6 +133,11 @@
         s.bait.worm = (s.bait.worm || 0) + n;
         gains.push('🪱 蚯蚓×' + n);
       }
+      /* 黄金宝箱还能掉食谱（只会掉还没学会的） */
+      if (rand() < BALANCE.cook.goldRecipeChance) {
+        const rec = grantGoldRecipe(s);
+        if (rec) gains.push('📜 食谱：' + rec.emoji + ' ' + rec.name);
+      }
     }
 
     log(s, C.emoji + ' 打开' + C.name + '：' + gains.join(' · '), 'good');
