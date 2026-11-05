@@ -166,9 +166,10 @@
         '<span class="oe">📜</span>' +
         '<div class="oi">' +
           '<div class="on">长期 · ' + lo.emoji + ' ' + lo.name + ' ×' + lo.qty +
-            ' · 报酬 ' + lo.reward + ' 金</div>' +
+            ' · 报酬 ' + lo.reward + ' 金' + (lo.offSeason ? ' · 🌗 反季' : '') + '</div>' +
           '<div class="os">' + (lo.kind === 'fish' ? '渔获' : '仓库') + ' ' +
-            Math.min(have, lo.qty) + '/' + lo.qty + ' · ' + (left === 0 ? '今天截止' : '还剩 ' + left + ' 天') + ' · 2 倍价' +
+            Math.min(have, lo.qty) + '/' + lo.qty + ' · 只收普通及以上 · ' +
+            (left === 0 ? '今天截止' : '还剩 ' + left + ' 天') + (lo.kind === 'fish' ? '' : ' · 2 倍价') +
             (lo.mul && Math.abs(lo.mul - 1) > 0.01 ? '（含市价 ×' + lo.mul.toFixed(2) + '）' : '') +
             (lo.kind === 'fish' ? ' · 交付时优先扣低价的自钓鱼' : '') +
             (bonus ? ' · <b style="color:var(--green-d)">今天交 +' + bonus + ' 金</b>' : '') + '</div>' +
@@ -183,9 +184,10 @@
       return '<div class="order-row' + (o.done ? ' done' : '') + '">' +
         '<span class="oe">' + o.emoji + '</span>' +
         '<div class="oi">' +
-          '<div class="on">' + o.name + ' ×' + o.qty + ' · 报酬 ' + o.reward + ' 金</div>' +
+          '<div class="on">' + o.name + ' ×' + o.qty + ' · 报酬 ' + o.reward + ' 金' +
+            (o.offSeason ? ' · 🌗 反季' : '') + '</div>' +
           '<div class="os">' + (o.done ? '✅ 已完成' : thing + ' ' + Math.min(have, o.qty) + '/' + o.qty +
-            ' · 约 ' + Math.round(o.reward / o.qty) + ' 金/个' +
+            ' · 只收普通及以上 · 约 ' + Math.round(o.reward / o.qty) + (o.kind === 'fish' ? ' 金/条' : ' 金/个') +
             (o.mul && Math.abs(o.mul - 1) > 0.01 ? ' · 含市价 ×' + o.mul.toFixed(2) : '') +
             (o.kind === 'fish' ? '（交最便宜的）' : '')) + '</div>' +
         '</div>' +

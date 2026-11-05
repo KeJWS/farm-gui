@@ -749,15 +749,15 @@ s.day = 6; s.coins = 100;
 G.sleep(s);
 ok(s.coins === 100 - 4 - 15, '10 块地周末扣 15 金维护费', s.coins);
 
-// 40 块之前线性涨价，40 块之后每块 ×1.8
+// 35 块之前线性涨价，35 块之后每块 ×1.8
 function costAt(n) {
   const st = G.createState();
   st.plots = new Array(n).fill(0).map(function () { return G.createState().plots[0]; });
   return G.expandCost(st);
 }
-ok(costAt(5) === 40 && costAt(39) === 550 && costAt(40) === 550 &&
-   costAt(41) === 990 && costAt(42) === 1782,
-   '40 块之后扩展费每块 ×1.8', [costAt(39), costAt(40), costAt(41), costAt(42)].join('/'));
+ok(costAt(5) === 40 && costAt(34) === 475 && costAt(35) === 475 &&
+   costAt(36) === 855 && costAt(37) === 1539,
+   '35 块之后扩展费每块 ×1.8', [costAt(34), costAt(35), costAt(36), costAt(37)].join('/'));
 
 // 春季过后委托需求变大
 G.setRng(mulberry32(5));
@@ -1876,6 +1876,38 @@ G.setRng(mulberry32(5));
 const v31fish2 = G.makeOrders(v31o2).filter(function (o) { return o.kind === 'fish'; })[0];
 ok(v31fish2.reward > v31fish1.reward, '村口小摊让鱼单也变值钱', [v31fish1.reward, v31fish2.reward]);
 
+/* v2.43：委托只收普通及以上 / 反季单 / 长期单按价值加权 */
+const v243s = G.createState(); v243s.day = 30; v243s.levels.farm = 10;
+G.setRng(mulberry32(5));
+const v243list = G.makeOrders(v243s);
+v243s.orders = v243list;
+const v243o = v243list.filter(function (o) { return o.kind === 'crop'; })[0];
+G.addStore(v243s, v243o.crop, 'bad', 5);
+G.addStore(v243s, v243o.crop, 'std', v243o.qty);
+ok(G.orderHave(v243s, v243o) === v243o.qty, '劣质不算委托进度', G.orderHave(v243s, v243o));
+ok(G.deliverOrder(v243s, v243o.id).ok && G.storeCount(v243s, v243o.crop) === 5,
+   '交委托只扣普通及以上', G.storeCount(v243s, v243o.crop));
+
+let v243off = 0, v243win = 0;
+for (let i = 0; i < 200; i++) {
+  G.setRng(mulberry32(500 + i));
+  const st = G.createState(); st.day = 45; st.levels.farm = 10;
+  G.makeOrders(st).forEach(function (o) { if (o.offSeason) v243off++; });
+}
+G.setRng(mulberry32(7));
+const v243w = G.createState(); v243w.day = 95; v243w.levels.farm = 10;
+G.makeOrders(v243w).forEach(function (o) { if (o.offSeason) v243win++; });
+ok(v243off > 0 && v243win === 0, '非冬季偶尔出反季单，冬季不标反季', [v243off, v243win]);
+
+let v243hi = 0, v243crop = 0;
+for (let i = 0; i < 200; i++) {
+  G.setRng(mulberry32(900 + i));
+  const st = G.createState(); st.day = 45; st.levels.farm = 10;
+  const lo = G.makeLongOrder(st);
+  if (lo.kind === 'crop') { v243crop++; if (G.CROPS[lo.crop].price >= 20) v243hi++; }
+}
+ok(v243crop > 0 && v243hi / v243crop > 0.4, '长期单偏向贵作物', (v243hi / v243crop).toFixed(2));
+
 /* 行情「还能卖多少」 */
 const v31h = G.createState();
 const v31h0 = G.marketHeadroom(v31h, 'carrot');
@@ -2763,9 +2795,9 @@ section('挂果上限与连甩双咬钩');
 /* ---------- 20. v2.40 土地 / 果树等级 / 野货图鉴 ---------- */
 section('土地曲线与果树等级');
 {
-  /* 40 块前线性、40 块后陡涨 */
+  /* 35 块前线性、35 块后陡涨 */
   const B = G.BALANCE.expand;
-  ok(B.steepFrom === 40 && Math.abs(B.steepMul - 1.8) < 1e-9, '40 块之后才陡涨', B.steepFrom);
+  ok(B.steepFrom === 35 && Math.abs(B.steepMul - 1.8) < 1e-9, '35 块之后才陡涨', B.steepFrom);
 
   /* 果树等级：收获攒经验，满级 5，产量加成逐级 +10% */
   const s = G.createState();

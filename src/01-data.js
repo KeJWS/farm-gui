@@ -38,9 +38,13 @@
               sprinkle: 3, net: 0, harvester: 5, seeder: 6 },
     order: { mult: 1.35, seasonStep: 0.6,
              /* 鱼单单价：每日单 11 + 4×季 / 长期单 18 + 4×季 */
-             fishBase: 11, longFishBase: 18, fishStep: 4 },
-    /* 土地：4~39 块按 25 + 15×(n−4) 线性涨；到 40 块以后每块 ×1.8 陡涨 */
-    expand: { base: 25, step: 15, from: 4, steepFrom: 40, steepMul: 1.8 },
+             fishBase: 11, longFishBase: 18, fishStep: 4,
+             /* 委托默认只收普通及以上品质（劣质只能自己卖） */
+             minQuality: 'common',
+             /* 非冬季每张作物单有多大概率点名反季作物（卖价按反季市价算） */
+             offSeasonChance: 0.12 },
+    /* 土地：4~34 块按 25 + 15×(n−4) 线性涨；到 35 块以后每块 ×1.8 陡涨 */
+    expand: { base: 25, step: 15, from: 4, steepFrom: 35, steepMul: 1.8 },
     /* 自动播种器：一台只管 5 块地，买几台就播几块（每台每天 5 块），每台每周要交维护费 */
     device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5,
               seederMax: 9, netMax: 9, sprinklerPerDay: 1 },

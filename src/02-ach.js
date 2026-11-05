@@ -107,7 +107,7 @@
       val: function (s) { return s.plots.length; }, reward: { ferts: { normal: 5 } }, pts: 3 },
     { id: 'plot40',    cat: 'farm', emoji: '🗺️', name: '大地主',     desc: '土地达到 40 块',       goal: 40,
       val: function (s) { return s.plots.length; }, reward: { coins: 2000 }, pts: 6 },
-    { id: 'plot50',    cat: 'farm', emoji: '🏞️', name: '田连阡陌',   desc: '土地达到 50 块（40 块后地价陡涨）', goal: 50,
+    { id: 'plot50',    cat: 'farm', emoji: '🏞️', name: '田连阡陌',   desc: '土地达到 50 块（35 块后地价陡涨）', goal: 50,
       val: function (s) { return s.plots.length; }, reward: { coins: 6000 }, pts: 4 },
     { id: 'crop10',    cat: 'farm', emoji: '🌽', name: '五谷丰登',   desc: '收获过全部 14 种作物', goal: 14,
       val: cropSpeciesOwned, reward: { coins: 250, seeds: { pumpkin: 1 } }, pts: 3 },

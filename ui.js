@@ -823,9 +823,10 @@
         '<span class="oe">📜</span>' +
         '<div class="oi">' +
           '<div class="on">长期 · ' + lo.emoji + ' ' + lo.name + ' ×' + lo.qty +
-            ' · 报酬 ' + lo.reward + ' 金</div>' +
+            ' · 报酬 ' + lo.reward + ' 金' + (lo.offSeason ? ' · 🌗 反季' : '') + '</div>' +
           '<div class="os">' + (lo.kind === 'fish' ? '渔获' : '仓库') + ' ' +
-            Math.min(have, lo.qty) + '/' + lo.qty + ' · ' + (left === 0 ? '今天截止' : '还剩 ' + left + ' 天') + ' · 2 倍价' +
+            Math.min(have, lo.qty) + '/' + lo.qty + ' · 只收普通及以上 · ' +
+            (left === 0 ? '今天截止' : '还剩 ' + left + ' 天') + (lo.kind === 'fish' ? '' : ' · 2 倍价') +
             (lo.mul && Math.abs(lo.mul - 1) > 0.01 ? '（含市价 ×' + lo.mul.toFixed(2) + '）' : '') +
             (lo.kind === 'fish' ? ' · 交付时优先扣低价的自钓鱼' : '') +
             (bonus ? ' · <b style="color:var(--green-d)">今天交 +' + bonus + ' 金</b>' : '') + '</div>' +
@@ -840,9 +841,10 @@
       return '<div class="order-row' + (o.done ? ' done' : '') + '">' +
         '<span class="oe">' + o.emoji + '</span>' +
         '<div class="oi">' +
-          '<div class="on">' + o.name + ' ×' + o.qty + ' · 报酬 ' + o.reward + ' 金</div>' +
+          '<div class="on">' + o.name + ' ×' + o.qty + ' · 报酬 ' + o.reward + ' 金' +
+            (o.offSeason ? ' · 🌗 反季' : '') + '</div>' +
           '<div class="os">' + (o.done ? '✅ 已完成' : thing + ' ' + Math.min(have, o.qty) + '/' + o.qty +
-            ' · 约 ' + Math.round(o.reward / o.qty) + ' 金/个' +
+            ' · 只收普通及以上 · 约 ' + Math.round(o.reward / o.qty) + (o.kind === 'fish' ? ' 金/条' : ' 金/个') +
             (o.mul && Math.abs(o.mul - 1) > 0.01 ? ' · 含市价 ×' + o.mul.toFixed(2) : '') +
             (o.kind === 'fish' ? '（交最便宜的）' : '')) + '</div>' +
         '</div>' +
@@ -1568,8 +1570,10 @@
         '<p>从第 ' + G.BALANCE.expand.from + ' 块起，每多开一块地的价格是 <b>' + G.BALANCE.expand.base +
         ' + ' + G.BALANCE.expand.step + '×(已有块数−' + G.BALANCE.expand.from + ')</b>，<b>一路线性涨到 ' +
         G.BALANCE.expand.steepFrom + ' 块</b>；<b>' + G.BALANCE.expand.steepFrom +
-        ' 块以后每块 ×' + G.BALANCE.expand.steepMul + '</b> 陡涨（' + G.expandCost({ plots: new Array(40) }) +
-        ' → ' + G.expandCost({ plots: new Array(41) }) + ' → ' + G.expandCost({ plots: new Array(42) }) + ' 金）。<br>' +
+        ' 块以后每块 ×' + G.BALANCE.expand.steepMul + '</b> 陡涨（' +
+        G.expandCost({ plots: new Array(G.BALANCE.expand.steepFrom - 1) }) + ' → ' +
+        G.expandCost({ plots: new Array(G.BALANCE.expand.steepFrom) }) + ' → ' +
+        G.expandCost({ plots: new Array(G.BALANCE.expand.steepFrom + 1) }) + ' 金）。<br>' +
         '所以主力田块先铺到 <b>' + G.BALANCE.expand.steepFrom + ' 块</b>，再往上就是纯烧钱；' +
         '土地维护费也按块数分档（' + G.BALANCE.upkeep.free + ' 块内免费，之后逐档变贵）。</p>' +
       '</div>' +
@@ -1881,19 +1885,23 @@
         guideSub('🎲 出什么单', guideList([
           '委托池按天数逐档解锁（D1 / D3 / D5 / D7 / D9 / D12 / D15）；<b>最多比种田等级高一档</b>，' +
             '刚提前的那档可能还买不到种子，交不上不罚。',
-          '<b>每天第一张固定是「买得到的最贵作物」</b>，剩下随机。',
+          '<b>平时点当季作物</b>；非冬季有 <b>' + Math.round(G.BALANCE.order.offSeasonChance * 100) +
+            '%</b> 概率点名一批<b>反季作物</b>（价更高，但得囤着或有温室命）。',
+          '<b>每天第一张固定是「当季买得到的最贵作物」</b>，剩下随机。',
           '鱼单单价随季节上涨（' + G.BALANCE.order.fishBase + ' → ' +
             (G.BALANCE.order.fishBase + 3 * G.BALANCE.order.fishStep) + ' 金/条）；长期鱼单 ' +
             G.BALANCE.order.longFishBase + ' → ' + (G.BALANCE.order.longFishBase + 3 * G.BALANCE.order.fishStep) + ' 金/条。'
         ])) +
         guideSub('📜 长期订单', guideList([
           '5 天期限、数量大、<b>2 倍报酬</b>（同样吃市价溢价）；交付或过期后隔天睡醒换下一张。',
+          '点单<b>按价值加权</b>：贵的作物更容易被点中，不会总是一单萝卜。',
           '<b>提前交货有额外奖励</b>：每提前 1 天 +10%，最多 +50%。'
         ])) +
         guideList([
           '<b>市价溢价</b>：指定作物的单子按<b>该作物当前市价</b>结算（反季 / 稀缺时合同价更高），面板会写「含市价 ×1.30」；' +
             '「任意鱼」不指定品种，价格固定。',
-          '交委托先扣<b>品质差的</b>，交鱼先交最便宜的；杂物、宝箱不算数。'
+          '<b>只收普通及以上品质</b>：劣质不收、也不计数，只能自己卖；同档里先交普通的，好的留着。',
+          '交鱼先交最便宜的（同样要求普通及以上）；杂物、宝箱不算数。'
         ]) +
       '</div>' +
 

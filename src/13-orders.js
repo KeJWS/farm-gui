@@ -35,6 +35,28 @@
     return cand[cand.length - 1];
   }
 
+  /* 委托只收「普通」及以上：劣质不计数、也扣不走，只能自己卖 */
+  const ORDER_MIN_RANK = Math.max(0, Q_IDS.indexOf(BALANCE.order.minQuality));
+  function orderQOk(q) { return Q_IDS.indexOf(q) >= ORDER_MIN_RANK; }
+  function orderStoreCount(s, id) {
+    const b = s.store[id];
+    if (!b) return 0;
+    let n = 0;
+    for (let i = ORDER_MIN_RANK; i < Q_IDS.length; i++) n += b[Q_IDS[i]] || 0;
+    return n;
+  }
+  function takeStoreOrder(s, id, n) {
+    const b = s.store[id];
+    if (!b) return 0;
+    let left = n;
+    for (let i = ORDER_MIN_RANK; i < Q_IDS.length && left > 0; i++) {
+      const q = Q_IDS[i], have = b[q] || 0, take = Math.min(have, left);
+      if (take) { b[q] = have - take; left -= take; }
+    }
+    if (storeCount(s, id) <= 0) delete s.store[id];
+    return n - left;
+  }
+
   function makeOrders(s) {
     const day = (s && s.day) || 1;
     const farmLv = (s && s.levels && s.levels.farm) || 1;
@@ -43,8 +65,12 @@
     const orders = [];
     const season = Math.floor((day - 1) / 30);                                  // 0 春 / 1 夏 / 2 秋 / 3 冬
     const mult = 1 + season * BALANCE.order.seasonStep;                        // 1 / 1.6 / 2.2 / 2.8
+    /* 平时点当季作物，偶尔点一批反季的（冬天全是反季，不特殊处理） */
+    const inSeason = pool.filter(function (c) { return (c.seasons || []).indexOf(season) >= 0; });
+    const offSeason = pool.filter(function (c) { return (c.seasons || []).indexOf(season) < 0; });
+    const basePool = (season < 3 && inSeason.length >= 3) ? inSeason : pool;
 
-    function pushCrop(c) {
+    function pushCrop(c, isOff) {
       used.push(c.id);
       const qty = Math.max(1, Math.round((c.price >= 20 ? randInt(2, 3) : randInt(3, 6)) * mult));
       // 市价溢价：合同价跟着该作物当前市价走（反季 / 稀缺时更值钱），但有封顶
@@ -53,21 +79,32 @@
         (1 + townBonus(s, 'orderBonus'))));
       orders.push({
         id: 'd' + day + '-c' + orders.length, kind: 'crop', crop: c.id, name: c.name, emoji: c.emoji,
-        qty: qty, reward: reward, mul: mk, done: false, flagship: orders.length === 0
+        qty: qty, reward: reward, mul: mk, offSeason: !!isOff, done: false, flagship: orders.length === 0
       });
     }
 
-    // 保底：第一张单固定是「能买到的种子里最贵的那个」，避免一天全是白菜单
-    if (pool.length) {
-      const buyable = pool.filter(function (c) { return (c.lv || 1) <= farmLv; });
-      const src = buyable.length ? buyable : pool;
+    // 保底：第一张单固定是「当季能买到的最贵作物」，避免一天全是白菜单
+    if (basePool.length) {
+      const buyable = basePool.filter(function (c) { return (c.lv || 1) <= farmLv; });
+      const src = buyable.length ? buyable : basePool;
       const top = src.slice().sort(function (a, b) { return b.price - a.price; })[0];
-      pushCrop(top);
+      pushCrop(top, season < 3 && (top.seasons || []).indexOf(season) < 0);
     }
-    for (let i = orders.length; i < 2 && pool.length; i++) {
-      let c = pickOrderCrop(pool, used);
-      if (!c) c = pool[i % pool.length];
-      pushCrop(c);
+    for (let i = orders.length; i < 2 && basePool.length; i++) {
+      let c = pickOrderCrop(basePool, used);
+      if (!c) c = basePool[i % basePool.length];
+      pushCrop(c, false);
+    }
+    // 非冬季：小概率把第二张作物单换成反季作物（市价溢价更高，凑不齐就不换）
+    if (season < 3 && orders.length > 1 && offSeason.length &&
+        rand() < BALANCE.order.offSeasonChance) {
+      const cand = offSeason.filter(function (c) { return used.indexOf(c.id) < 0; });
+      const off = cand.length ? pickOrderCrop(cand, used) : null;
+      if (off) {
+        orders.length = 1;      // 只留保底那单，第二单重抽
+        used.length = 1;
+        pushCrop(off, true);
+      }
     }
 
     // 鱼单：单价随季节上涨（11 → 15 → 19 → 23），不再后期白送；小镇委托加成同样生效
@@ -94,12 +131,21 @@
                  (1 + townBonus(s, 'orderBonus'))),
                deadline: day + 5, done: false };
     }
-    const c = pool[Math.floor(rand() * pool.length)];
+    const inSeason = pool.filter(function (c) { return (c.seasons || []).indexOf(season) >= 0; });
+    const basePool = (season < 3 && inSeason.length >= 3) ? inSeason : pool;
+    /* 按价值加权：贵作物更容易被长期单点中，避免一单萝卜白干 5 天 */
+    let c = pickOrderCrop(basePool, []);
+    let isOff = (c.seasons || []).indexOf(season) < 0;
+    if (season < 3 && rand() < BALANCE.order.offSeasonChance) {
+      const cand = pool.filter(function (x) { return (x.seasons || []).indexOf(season) < 0; });
+      const off = cand.length ? pickOrderCrop(cand, []) : null;
+      if (off) { c = off; isOff = true; }
+    }
     const qty = Math.max(6, Math.round((c.price >= 40 ? randInt(6, 10) : randInt(12, 20)) * (1 + season * 0.3)));
     const mk = Math.min(BALANCE.market.orderCap, marketMul(s, c.id));
     return { id: 'L' + day, kind: 'crop', crop: c.id, name: c.name, emoji: c.emoji,
              qty: qty, reward: Math.round(qty * c.price * 2 * mk *
-               (1 + townBonus(s, 'orderBonus'))), mul: mk,
+               (1 + townBonus(s, 'orderBonus'))), mul: mk, offSeason: isOff,
              deadline: day + 5, done: false };
   }
 
@@ -112,7 +158,7 @@
       const drop = orderFish(s).sort(function (a, b) { return a.v - b.v; }).slice(0, o.qty);
       s.fishBag = s.fishBag.filter(function (e) { return drop.indexOf(e) < 0; });
     } else {
-      takeStoreN(s, o.crop, o.qty);
+      takeStoreOrder(s, o.crop, o.qty);
     }
     // 提前交货：每提前一天 +10%，最多 +50%
     const early = Math.max(0, (o.deadline || 0) - s.day);
@@ -130,17 +176,19 @@
              reward: o.reward, bonus: bonus, early: early };
   }
 
-  /* 委托进度：作物看仓库，鱼看渔获袋 */
+  /* 委托进度：作物看仓库（普通及以上），鱼看渔获袋 */
   /* 杂物、宝箱不算委托的鱼 */
   function orderFish(s) {
-    // 买来的水产（bought）不能拿去交委托，避免套利
-    return (s.fishBag || []).filter(function (e) { return e && e.q && !e.no && !e.bought; });
+    // 买来的水产（bought）不能拿去交委托，避免套利；劣质也不收
+    return (s.fishBag || []).filter(function (e) {
+      return e && e.q && !e.no && !e.bought && orderQOk(e.q);
+    });
   }
 
   function orderHave(s, o) {
     if (!o) return 0;
     if (o.kind === 'fish') return orderFish(s).length;
-    return storeCount(s, o.crop);
+    return orderStoreCount(s, o.crop);
   }
 
   function deliverOrder(s, id) {
@@ -155,7 +203,7 @@
       const drop = orderFish(s).sort(function (a, b) { return a.v - b.v; }).slice(0, o.qty);
       s.fishBag = s.fishBag.filter(function (e) { return drop.indexOf(e) < 0; });
     } else {
-      takeStore(s, o.crop, o.qty);
+      takeStoreOrder(s, o.crop, o.qty);
     }
     o.done = true;
     s.stats.orders = (s.stats.orders || 0) + 1;
@@ -180,6 +228,7 @@
         qty: Math.round(num(o.qty, 1, 1, 99)),
         reward: Math.round(num(o.reward, 10, 1, 9999)),
         mul: (o.kind === 'crop' && o.mul != null) ? num(o.mul, 1, 0.5, 3) : 0,
+        offSeason: !!o.offSeason,
         done: !!o.done
       });
     });
