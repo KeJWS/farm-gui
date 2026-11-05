@@ -195,9 +195,10 @@
           : teaBest.emoji + ' ' + teaBest.name + ' · +' + teaBest.energy + ' 体力'));
 
     const digCost = G.digCost(state);
-    $('[data-act="dig"]').disabled = state.energy < digCost;
+    const digFrozen = G.isWinter(state.day);
+    $('[data-act="dig"]').disabled = digFrozen || state.energy < digCost;
     const digTxt = $('#dig-txt');
-    if (digTxt) digTxt.textContent = digCost + ' 体力';
+    if (digTxt) digTxt.textContent = digFrozen ? '封冻期 · 挖不了' : digCost + ' 体力';
     const forageBtn = $('[data-act="forage"]');
     if (forageBtn) {
       const fp = G.foragePool(state.day);

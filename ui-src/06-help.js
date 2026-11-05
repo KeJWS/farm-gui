@@ -82,8 +82,8 @@
           '好处是反季收成的卖价 <b>×' + G.BALANCE.market.offSeason + '</b>，所以囤到反季卖更划算。',
           '已经种下的作物不受换季影响，该熟还会熟。'
         ])) +
-        '<div class="guide-warn">❄️ <b>冬天土地封冻、河面结冰</b>：不能播种、不能钓鱼（渔网也收不了），' +
-          '种子店歇业，只能打工、卖库存、交委托。</div>' +
+        '<div class="guide-warn">❄️ <b>冬天土地封冻、河面结冰</b>：不能播种、不能钓鱼、不能挖蚯蚓（渔网也收不了），' +
+          '种子店歇业，只能打工、采集、卖库存、交委托。</div>' +
         '<table class="rule-table"><tr><th>季节</th><th>特点</th></tr>' +
         '<tr><td>🌱 春</td><td><b>多雨</b>（雨天 ' + G.SEASON_WEATHER[0].rain + '%，自动浇水）</td></tr>' +
         '<tr><td>☀️ 夏</td><td><b>多晴</b>（晴天 ' + G.SEASON_WEATHER[1].sunny + '%）· <b>浇水要 ' + G.BALANCE.energy.waterSummer +
@@ -166,7 +166,7 @@
         guideSub('🎣 五种饵怎么选', guideList([
           '🍞 <b>面团饵</b>：' + G.BAIT.dough.price + ' 金/份、' + Math.round(G.BALANCE.hook.dough * 100) +
             '% 咬钩、品质正常 —— 便宜大碗的默认选择，渔网和渔夫也只吃它。',
-          '🪱 <b>蚯蚓</b>：好鱼 ×' + G.BALANCE.bait.wormGood + '，品质取两次较好；靠挖蚯蚓获得。',
+          '🪱 <b>蚯蚓</b>：好鱼 ×' + G.BALANCE.bait.wormGood + '，品质取两次较好；靠挖蚯蚓获得（冬天封冻，挖不了）。',
           '🎣 <b>假饵</b>：杂物 ×' + G.BALANCE.bait.lureTrash + '、好鱼 ×' + G.BALANCE.bait.lureGood +
             '、品质取两次较好，但咬钩只有 ' + Math.round(G.BALANCE.hook.lure * 100) + '%，耐用 ' + G.BALANCE.lure.dur + ' 次。',
           '🪝 <b>高级假饵</b>（钓鱼 Lv' + G.BALANCE.gate.lure2 + ' + 交易 Lv' + G.BALANCE.gate.lure2Trade + '）：' +
@@ -329,7 +329,7 @@
           '挖蚯蚓 ' + G.BALANCE.dig.energy + ' 体力一次（满级 ' + (G.BALANCE.dig.energy - 1) + ' 体力）：基础 ' +
             G.BALANCE.dig.min + '–' + G.BALANCE.dig.max + ' 条，Lv' + G.BALANCE.dig.yieldAt + ' / Lv' +
             (G.BALANCE.dig.yieldAt * 2) + ' 各 +1 条，晴天 −1、阴雨 +1，最多 ' +
-            (G.BALANCE.dig.cap + Math.floor(G.BALANCE.level.max / G.BALANCE.dig.yieldAt)) + ' 条。'
+            (G.BALANCE.dig.cap + Math.floor(G.BALANCE.level.max / G.BALANCE.dig.yieldAt)) + ' 条；<b>冬天封冻，挖不了</b>。'
         ])) +
         guideSub('🔧 设备（都在右栏「设备」面板）', guideList([
           '🚿 洒水器 ' + G.SPRINKLER_COST + ' 金/个（种田 Lv' + G.BALANCE.gate.sprinkler + '）：每个每天自动浇 <b>' +

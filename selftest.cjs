@@ -2149,6 +2149,9 @@ G.digWorms(v35d2);
 ok(v35d2.energy === 28, '挖蚯蚓满级只花 2 体力', v35d2.energy);
 ok(G.levelEffectText('dig', 10).indexOf('2 体力') >= 0, '满级效果文案写 2 体力',
   G.levelEffectText('dig', 10));
+const v43w = G.createState(); v43w.day = 91; v43w.energy = 50;
+const v43wd = G.digWorms(v43w);
+ok(!v43wd.ok && v43w.energy === 50 && v43w.bait.worm === 0, '冬天土地封冻，挖不了蚯蚓', v43wd.msg);
 
 /* 采集等级 + 采集记录 + 成就 */
 const v35f = G.createState();

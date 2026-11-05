@@ -220,6 +220,7 @@
   }
 
   function digWorms(s) {
+    if (isWinter(s.day)) return { ok: false, msg: '冬天土地封冻，挖不了蚯蚓' };
     const cost = digCost(s);
     if (s.energy < cost) return { ok: false, msg: '体力不够（挖蚯蚓要 ' + cost + ' 点）' };
     const w = WEATHER[s.weather];
