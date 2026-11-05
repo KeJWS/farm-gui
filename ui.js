@@ -1517,6 +1517,17 @@
   /* 自动播种器面板：正在给哪一台选种子 */
   let seedMach = 1;
 
+  /* 指南排版小工具：一组要点 → 无序列表（每条一行，比 <br> 连串好扫读） */
+  function guideList(items) {
+    return '<ul class="guide-list">' + items.map(function (x) {
+      return '<li>' + x + '</li>';
+    }).join('') + '</ul>';
+  }
+  /* 带小标题的一小节（页内二级标题，比整段粗体更醒目） */
+  function guideSub(title, body) {
+    return '<div class="guide-sub"><div class="guide-sub-t">' + title + '</div>' + body + '</div>';
+  }
+
   function helpPages() {
     const cropRows = G.CROP_LIST.map(function (c) {
       return '<tr><td>' + c.emoji + ' ' + c.name + '</td><td>' + c.seed + ' 金</td><td>' + c.days + ' 天</td>' +
@@ -1541,13 +1552,15 @@
         '<h4>🌱 作物</h4>' +
         '<table class="rule-table"><tr><th>作物</th><th>种子</th><th>生长</th><th>产量/块</th><th>单果</th><th>季节</th><th>解锁</th></tr>' +
         cropRows + '</table>' +
-        '<p>生长按浇水天数推进，成熟当天不能收、<b>次日</b>才能收。<br>' +
-        '普通作物产量 = 基础 ±1 − 漏浇 + 施肥 + 等级加成（每 ' +
-        G.BALANCE.level.yieldEvery + ' 级 +1，最低 1）；' +
-        '<b>南瓜 / 西瓜固定 1 个</b>，不吃等级和产量肥料，只有<b>肥料品质加成</b>（见「肥料」）。<br>' +
-        '高级种子要<b>种田等级</b>解锁：' +
-        G.CROP_LIST.filter(function (c) { return (c.lv || 1) > 1; })
-          .map(function (c) { return c.name + ' Lv' + c.lv; }).join('、') + '。</p>' +
+        guideList([
+          '生长按<b>浇水天数</b>推进；成熟当天不能收，<b>次日</b>才能收。',
+          '普通作物产量 = 基础 ±1 − 漏浇 + 施肥 + 等级加成（每 ' + G.BALANCE.level.yieldEvery +
+            ' 级 +1，最低 1）。',
+          '<b>南瓜 / 西瓜固定 1 个</b>，不吃等级和产量肥料，只有<b>肥料品质加成</b>（见「肥料」）。',
+          '高级种子要<b>种田等级</b>解锁：' +
+            G.CROP_LIST.filter(function (c) { return (c.lv || 1) > 1; })
+              .map(function (c) { return c.name + ' Lv' + c.lv; }).join('、') + '。'
+        ]) +
       '</div>' +
 
       '<div class="rule-sec">' +
@@ -1563,17 +1576,21 @@
 
       '<div class="rule-sec">' +
         '<h4>🍂 季节</h4>' +
-        '<p>每 <b>' + G.BALANCE.seasonDays + ' 天</b>换一季：' +
+        '<p>每 <b>' + G.BALANCE.seasonDays + ' 天</b>换一季，四季循环：' +
         G.SEASONS.map(function (s, i) {
           return '<b>' + s + '（' + (i * G.BALANCE.seasonDays + 1) + '–' +
             ((i + 1) * G.BALANCE.seasonDays) + '）</b>';
-        }).join('/') + '，然后循环。<br>' +
-        '当季的种子按<b>原价</b>卖；<b>反季的种子也卖，但贵 ×' + G.BALANCE.seed.offSeasonMul + '</b>，' +
-        '种下去第一茬多花 ' + G.BALANCE.seed.offSeasonDays + ' 天（南瓜 / 西瓜直接翻倍）、每茬少结 ' +
-        G.BALANCE.seed.offSeasonYield + ' 个 —— 换来的好处是反季的收成卖价 <b>×' +
-        G.BALANCE.market.offSeason + '</b>（多收作物每茬都少 1 个）。<br>' +
-        '<b>冬天土地封冻、河面结冰</b>——不能播种、不能钓鱼（渔网也收不了），种子店歇业，只能打工、卖库存、交委托。<br>' +
-        '已经种下的作物不受换季影响，该熟还会熟。</p>' +
+        }).join(' · ') + '。</p>' +
+        guideSub('🌾 种子怎么买', guideList([
+          '当季的种子按<b>原价</b>卖。',
+          '<b>反季的种子也卖，但贵 ×' + G.BALANCE.seed.offSeasonMul + '</b>：第一茬多花 ' +
+            G.BALANCE.seed.offSeasonDays + ' 天（南瓜 / 西瓜直接翻倍），每茬少结 ' +
+            G.BALANCE.seed.offSeasonYield + ' 个。',
+          '好处是反季收成的卖价 <b>×' + G.BALANCE.market.offSeason + '</b>，所以囤到反季卖更划算。',
+          '已经种下的作物不受换季影响，该熟还会熟。'
+        ])) +
+        '<div class="guide-warn">❄️ <b>冬天土地封冻、河面结冰</b>：不能播种、不能钓鱼（渔网也收不了），' +
+          '种子店歇业，只能打工、卖库存、交委托。</div>' +
         '<table class="rule-table"><tr><th>季节</th><th>特点</th></tr>' +
         '<tr><td>🌱 春</td><td><b>多雨</b>（雨天 ' + G.SEASON_WEATHER[0].rain + '%，自动浇水）</td></tr>' +
         '<tr><td>☀️ 夏</td><td><b>多晴</b>（晴天 ' + G.SEASON_WEATHER[1].sunny + '%）· <b>浇水要 ' + G.BALANCE.energy.waterSummer +
@@ -1588,33 +1605,44 @@
         '<p><b>种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.BALANCE.orchard.unlockCost +
         ' 金</b>开垦，先给 <b>' + G.BALANCE.orchard.free + ' 个树坑</b>，第 ' +
         (G.BALANCE.orchard.free + 1) + '~' + G.BALANCE.orchard.slots + ' 个要花钱开（' +
-        G.BALANCE.orchard.slotCosts.join(' / ') + ' 金）。<br>' +
-        '育苗：<b>果树种子</b>浇水 ' + G.BALANCE.orchard.grow.seed.water + ' 天 + 生长 ' +
-        G.BALANCE.orchard.grow.seed.days + ' 天；<b>树苗</b>浇水 ' +
-        G.BALANCE.orchard.grow.sapling.water + ' 天 + 生长 ' + G.BALANCE.orchard.grow.sapling.days +
-        ' 天（浇够就不用再浇，两项都满足才成树）。每棵可单独浇水，浇水 ' + G.BALANCE.orchard.waterEnergy +
-        ' 体力 / 收获 ' + G.BALANCE.orchard.harvestEnergy + ' 体力。<br>' +
-        '成树<b>只在自己的季节</b>每天随机挂 <b>' + G.BALANCE.orchard.fruitMin + '~' +
-        G.BALANCE.orchard.fruitMax + ' 个</b>，每棵最多挂 <b>' + G.BALANCE.orchard.ripeCap +
-        ' 个</b>（挂满就不再长了，记得去收）；水果固定<b>标准品质</b>，进仓库后和作物一样吃<b>市价</b>（当季 ×1、囤到反季 ×' +
-        G.BALANCE.market.offSeason + '），可以卖给农产品店、放进收购箱，市场「行情 / 分析」里也有单独一栏。</p>' +
+        G.BALANCE.orchard.slotCosts.join(' / ') + ' 金）。</p>' +
+        guideSub('🌱 育苗', guideList([
+          '<b>果树种子</b>：浇水 ' + G.BALANCE.orchard.grow.seed.water + ' 天 + 生长 ' +
+            G.BALANCE.orchard.grow.seed.days + ' 天才成树。',
+          '<b>树苗</b>：浇水 ' + G.BALANCE.orchard.grow.sapling.water + ' 天 + 生长 ' +
+            G.BALANCE.orchard.grow.sapling.days + ' 天才成树。',
+          '两项都满足才成树；浇够就不用再浇。每棵可单独浇水（' + G.BALANCE.orchard.waterEnergy + ' 体力 / 棵）。'
+        ])) +
+        guideSub('🍎 结果', guideList([
+          '成树<b>只在自己的季节</b>每天随机挂 <b>' + G.BALANCE.orchard.fruitMin + '~' +
+            G.BALANCE.orchard.fruitMax + ' 个</b>；每棵最多挂 <b>' + G.BALANCE.orchard.ripeCap +
+            ' 个</b>，挂满就不再长，记得去收（收获 ' + G.BALANCE.orchard.harvestEnergy + ' 体力 / 棵）。',
+          '水果固定<b>标准品质</b>，进仓库后和作物一样吃<b>市价</b>（当季 ×1、囤到反季 ×' +
+            G.BALANCE.market.offSeason + '）。',
+          '可以卖给农产品店、放进收购箱；市场「行情 / 分析」里有单独的「🍑 水果」一栏。'
+        ])) +
         '<table class="rule-table"><tr><th>果树</th><th>结果季</th><th>果实</th><th>果价</th><th>种子</th><th>树苗</th></tr>' +
         G.TREE_LIST.map(function (t) {
           return '<tr><td>' + t.emoji + ' ' + t.name + '</td><td>' + G.SEASONS[t.season] + '</td><td>' +
             t.fruit + '</td><td>' + t.price + ' 金</td><td>' + t.seed + ' 金</td><td>' + t.sapling + ' 金</td></tr>';
         }).join('') + '</table>' +
-        '<p>参考：一棵成树当季满产约 ' +
-        Math.round((G.BALANCE.orchard.fruitMin + G.BALANCE.orchard.fruitMax) / 2 * G.BALANCE.seasonDays) +
-        ' 个（按每天 ' + ((G.BALANCE.orchard.fruitMin + G.BALANCE.orchard.fruitMax) / 2) + ' 个估），' +
-        '按果价折算约 ' +
-        Math.round((G.BALANCE.orchard.fruitMin + G.BALANCE.orchard.fruitMax) / 2 * G.BALANCE.seasonDays *
-          G.TREE_LIST[0].price) + ' 金/季（桃）。<b>种子</b>要养一整季才成树，<b>树苗</b>下季就能结果，' +
-        '买哪个看现金和耐心。</p>' +
-        '<p>🌳 <b>成树等级</b>：成树之后每收获一次攒 1 点经验，' +
-        '升到下一级要 2 / 4 / 6 / 8 次（<b>满级 Lv' + G.BALANCE.orchard.treeLvMax + '</b>）；' +
-        '每高一级，当天「多挂 1 个果」的概率 <b>+10%</b>（满级 +' +
-        Math.round((G.BALANCE.orchard.treeLvMax - 1) * G.BALANCE.orchard.treeLvYield * 100) +
-        '%），挂果上限不变。果园卡片上直接显示等级与经验。</p>' +
+        guideSub('💡 怎么算', guideList([
+          '一棵成树当季满产约 ' +
+            Math.round((G.BALANCE.orchard.fruitMin + G.BALANCE.orchard.fruitMax) / 2 * G.BALANCE.seasonDays) +
+            ' 个（按每天 ' + ((G.BALANCE.orchard.fruitMin + G.BALANCE.orchard.fruitMax) / 2) + ' 个估），' +
+            '按果价折算约 ' +
+            Math.round((G.BALANCE.orchard.fruitMin + G.BALANCE.orchard.fruitMax) / 2 * G.BALANCE.seasonDays *
+              G.TREE_LIST[0].price) + ' 金/季（桃）。',
+          '<b>种子</b>要养一整季才成树，<b>树苗</b>下季就能结果；买哪个看现金和耐心。'
+        ])) +
+        guideSub('🌳 成树等级', guideList([
+          '成树之后，每收获一次攒 1 点经验；升到下一级要 2 / 4 / 6 / 8 次（<b>满级 Lv' +
+            G.BALANCE.orchard.treeLvMax + '</b>）。',
+          '每高一级，当天「多挂 1 个果」的概率 <b>+10%</b>（满级 +' +
+            Math.round((G.BALANCE.orchard.treeLvMax - 1) * G.BALANCE.orchard.treeLvYield * 100) +
+            '%），挂果上限不变。',
+          '果园卡片上直接显示等级与经验。'
+        ])) +
       '</div>';
 
     const P2 =
