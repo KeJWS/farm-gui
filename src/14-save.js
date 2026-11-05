@@ -283,6 +283,7 @@
         qty: Math.round(num(lo.qty, 10, 1, 999)),
         reward: Math.round(num(lo.reward, 20, 1, 999999)),
         mul: lo.kind === 'crop' && lo.mul != null ? num(lo.mul, 1, 0.5, 3) : 0,
+        offSeason: !!lo.offSeason,
         deadline: Math.round(num(lo.deadline, merged.day + 5, 1, 100000)),
         done: false
       };

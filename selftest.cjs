@@ -1876,17 +1876,33 @@ G.setRng(mulberry32(5));
 const v31fish2 = G.makeOrders(v31o2).filter(function (o) { return o.kind === 'fish'; })[0];
 ok(v31fish2.reward > v31fish1.reward, '村口小摊让鱼单也变值钱', [v31fish1.reward, v31fish2.reward]);
 
-/* v2.43：委托只收普通及以上 / 反季单 / 长期单按价值加权 */
+/* v2.43：普通单先扣劣质 / 长期单挑品质 / 反季单 / 长期单按价值加权 */
 const v243s = G.createState(); v243s.day = 30; v243s.levels.farm = 10;
 G.setRng(mulberry32(5));
 const v243list = G.makeOrders(v243s);
 v243s.orders = v243list;
 const v243o = v243list.filter(function (o) { return o.kind === 'crop'; })[0];
-G.addStore(v243s, v243o.crop, 'bad', 5);
-G.addStore(v243s, v243o.crop, 'std', v243o.qty);
-ok(G.orderHave(v243s, v243o) === v243o.qty, '劣质不算委托进度', G.orderHave(v243s, v243o));
-ok(G.deliverOrder(v243s, v243o.id).ok && G.storeCount(v243s, v243o.crop) === 5,
-   '交委托只扣普通及以上', G.storeCount(v243s, v243o.crop));
+G.addStore(v243s, v243o.crop, 'bad', v243o.qty);
+G.addStore(v243s, v243o.crop, 'std', 3);
+ok(G.orderHave(v243s, v243o) === v243o.qty + 3, '普通单劣质也计数', G.orderHave(v243s, v243o));
+ok(G.deliverOrder(v243s, v243o.id).ok && G.storeCount(v243s, v243o.crop) === 3 &&
+   (v243s.store[v243o.crop].bad || 0) === 0,
+   '普通单交付先扣劣质', v243s.store[v243o.crop]);
+
+const v243l = G.createState(); v243l.day = 30; v243l.levels.farm = 10;
+G.setRng(mulberry32(31));
+const v243lo = G.makeLongOrder(v243l);
+v243l.longOrder = v243lo;
+if (v243lo.kind === 'crop') {
+  G.addStore(v243l, v243lo.crop, 'bad', 4);
+  G.addStore(v243l, v243lo.crop, 'std', v243lo.qty);
+  ok(G.orderHave(v243l, v243lo) === v243lo.qty, '长期单不算劣质', G.orderHave(v243l, v243lo));
+  ok(G.deliverLong(v243l).ok && G.storeCount(v243l, v243lo.crop) === 4,
+     '长期单只扣普通及以上', G.storeCount(v243l, v243lo.crop));
+} else {
+  ok(true, '长期单不算劣质（本单是鱼，跳过）');
+  ok(true, '长期单只扣普通及以上（本单是鱼，跳过）');
+}
 
 let v243off = 0, v243win = 0;
 for (let i = 0; i < 200; i++) {

@@ -187,7 +187,7 @@
           '<div class="on">' + o.name + ' ×' + o.qty + ' · 报酬 ' + o.reward + ' 金' +
             (o.offSeason ? ' · 🌗 反季' : '') + '</div>' +
           '<div class="os">' + (o.done ? '✅ 已完成' : thing + ' ' + Math.min(have, o.qty) + '/' + o.qty +
-            ' · 只收普通及以上 · 约 ' + Math.round(o.reward / o.qty) + (o.kind === 'fish' ? ' 金/条' : ' 金/个') +
+            ' · 先扣劣质 · 约 ' + Math.round(o.reward / o.qty) + (o.kind === 'fish' ? ' 金/条' : ' 金/个') +
             (o.mul && Math.abs(o.mul - 1) > 0.01 ? ' · 含市价 ×' + o.mul.toFixed(2) : '') +
             (o.kind === 'fish' ? '（交最便宜的）' : '')) + '</div>' +
         '</div>' +

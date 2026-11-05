@@ -729,7 +729,7 @@
              /* 委托默认只收普通及以上品质（劣质只能自己卖） */
              minQuality: 'common',
              /* 非冬季每张作物单有多大概率点名反季作物（卖价按反季市价算） */
-             offSeasonChance: 0.12 },
+             offSeasonChance: 0.15 },
     /* 土地：4~34 块按 25 + 15×(n−4) 线性涨；到 35 块以后每块 ×1.8 陡涨 */
     expand: { base: 25, step: 15, from: 4, steepFrom: 35, steepMul: 1.8 },
     /* 自动播种器：一台只管 5 块地，买几台就播几块（每台每天 5 块），每台每周要交维护费 */
@@ -4504,19 +4504,22 @@
              reward: o.reward, bonus: bonus, early: early };
   }
 
-  /* 委托进度：作物看仓库（普通及以上），鱼看渔获袋 */
+  /* 委托进度：普通单什么品质都收；长期单只收普通及以上 */
   /* 杂物、宝箱不算委托的鱼 */
-  function orderFish(s) {
-    // 买来的水产（bought）不能拿去交委托，避免套利；劣质也不收
-    return (s.fishBag || []).filter(function (e) {
-      return e && e.q && !e.no && !e.bought && orderQOk(e.q);
-    });
+  function orderFishAll(s) {
+    return (s.fishBag || []).filter(function (e) { return e && e.q && !e.no && !e.bought; });
   }
+  function orderFish(s) {
+    // 长期单：买来的水产不算，劣质也不收
+    return orderFishAll(s).filter(function (e) { return orderQOk(e.q); });
+  }
+  /* 长期单带 deadline，普通单没有；据此决定品质门槛 */
+  function isLongOrder(o) { return !!o && o.deadline != null; }
 
   function orderHave(s, o) {
     if (!o) return 0;
-    if (o.kind === 'fish') return orderFish(s).length;
-    return orderStoreCount(s, o.crop);
+    if (o.kind === 'fish') return (isLongOrder(o) ? orderFish(s) : orderFishAll(s)).length;
+    return isLongOrder(o) ? orderStoreCount(s, o.crop) : storeCount(s, o.crop);
   }
 
   function deliverOrder(s, id) {
@@ -4528,10 +4531,11 @@
 
     if (o.kind === 'fish') {
       // 交最便宜的可交鱼，好鱼和杂物都留着
-      const drop = orderFish(s).sort(function (a, b) { return a.v - b.v; }).slice(0, o.qty);
+      const drop = orderFishAll(s).sort(function (a, b) { return a.v - b.v; }).slice(0, o.qty);
       s.fishBag = s.fishBag.filter(function (e) { return drop.indexOf(e) < 0; });
     } else {
-      takeStoreOrder(s, o.crop, o.qty);
+      // 普通单不挑品质：劣质先被收走
+      takeStore(s, o.crop, o.qty);
     }
     o.done = true;
     s.stats.orders = (s.stats.orders || 0) + 1;
@@ -4849,6 +4853,7 @@
         qty: Math.round(num(lo.qty, 10, 1, 999)),
         reward: Math.round(num(lo.reward, 20, 1, 999999)),
         mul: lo.kind === 'crop' && lo.mul != null ? num(lo.mul, 1, 0.5, 3) : 0,
+        offSeason: !!lo.offSeason,
         deadline: Math.round(num(lo.deadline, merged.day + 5, 1, 100000)),
         done: false
       };
