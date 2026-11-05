@@ -731,7 +731,7 @@
              /* 非冬季每张作物单有多大概率点名反季作物（卖价按反季市价算） */
              offSeasonChance: 0.15 },
     /* 土地：4~34 块按 25 + 15×(n−4) 线性涨；到 35 块以后每块 ×1.8 陡涨 */
-    expand: { base: 25, step: 15, from: 4, steepFrom: 35, steepMul: 1.8 },
+    expand: { base: 25, step: 15, from: 4, steepFrom: 35, steepMul: 1.8, max: 60 },
     /* 自动播种器：一台只管 5 块地，买几台就播几块（每台每天 5 块），每台每周要交维护费 */
     device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5,
               seederMax: 9, netMax: 9, sprinklerPerDay: 1 },
@@ -3975,6 +3975,9 @@
   }
 
   function expand(s) {
+    if (s.plots.length >= BALANCE.expand.max) {
+      return { ok: false, msg: '土地已经到上限（' + BALANCE.expand.max + ' 块）' };
+    }
     const cost = expandCost(s);
     if (s.coins < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
     s.coins -= cost; ledger(s, '开垦第 ' + (s.plots.length + 1) + ' 块地', 0, cost);
@@ -4391,7 +4394,7 @@
     const pool = orderPool(day, farmLv);
     const used = [];
     const orders = [];
-    const season = Math.floor((day - 1) / 30);                                  // 0 春 / 1 夏 / 2 秋 / 3 冬
+    const season = seasonIdx(day);                                              // 0 春 / 1 夏 / 2 秋 / 3 冬（跨年循环）
     const mult = 1 + season * BALANCE.order.seasonStep;                        // 1 / 1.6 / 2.2 / 2.8
     /* 平时点当季作物，偶尔点一批反季的（冬天全是反季，不特殊处理） */
     const inSeason = pool.filter(function (c) { return (c.seasons || []).indexOf(season) >= 0; });
@@ -4450,7 +4453,7 @@
 
   function makeLongOrder(s) {
     const day = (s && s.day) || 1;
-    const season = Math.floor((day - 1) / 30);
+    const season = seasonIdx(day);
     const pool = orderPool(day, (s && s.levels && s.levels.farm) || 1);
     if (rand() < 0.3) {
       const qty = Math.max(6, Math.round(randInt(8, 14) * (1 + season * 0.3)));
@@ -4701,7 +4704,7 @@
     merged.coins = Math.round(num(s.coins, 50, 0, 1e9));
     merged.energy = num(s.energy, merged.maxEnergy, 0, merged.maxEnergy);
 
-    const plots = Array.isArray(s.plots) ? s.plots.slice(0, 60) : [];
+    const plots = Array.isArray(s.plots) ? s.plots.slice(0, BALANCE.expand.max) : [];
     merged.plots = (plots.length ? plots : [{}]).map(function (p) {
       const plot = Object.assign(makePlot(), p || {});
       if (!CROPS[plot.crop]) plot.crop = null;

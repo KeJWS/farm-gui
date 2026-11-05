@@ -416,6 +416,9 @@
   }
 
   function expand(s) {
+    if (s.plots.length >= BALANCE.expand.max) {
+      return { ok: false, msg: '土地已经到上限（' + BALANCE.expand.max + ' 块）' };
+    }
     const cost = expandCost(s);
     if (s.coins < cost) return { ok: false, msg: '金币不够（' + cost + ' 金）' };
     s.coins -= cost; ledger(s, '开垦第 ' + (s.plots.length + 1) + ' 块地', 0, cost);

@@ -387,7 +387,9 @@
     } else {
       $('#work-txt').textContent = '体力不足 · 先睡觉';
     }
-    $('#expand-txt').textContent = '第 ' + (state.plots.length + 1) + ' 块 · ' + G.expandCost(state) + ' 金';
+    $('#expand-txt').textContent = state.plots.length >= G.BALANCE.expand.max
+      ? '已到上限 · ' + G.BALANCE.expand.max + ' 块'
+      : '第 ' + (state.plots.length + 1) + ' 块 · ' + G.expandCost(state) + ' 金';
     $('#upgrade-txt').textContent = '上限 ' + state.maxEnergy + '→' + (state.maxEnergy + G.BALANCE.upgrade.step) + ' · ' + G.upgradeCost(state) + ' 金';
     const sprLock = !G.sprinklerUnlocked(state);
     $('#sprinkler-txt').textContent = sprLock
@@ -447,7 +449,8 @@
       }
     }
     $('[data-act="work"]').disabled = state.workUsed || state.energy <= 0;
-    $('[data-act="expand"]').disabled = state.coins < G.expandCost(state);
+    $('[data-act="expand"]').disabled = state.plots.length >= G.BALANCE.expand.max ||
+      state.coins < G.expandCost(state);
     $('[data-act="upgrade"]').disabled = state.coins < G.upgradeCost(state);
     $('[data-act="sprinkler"]').disabled = sprLock ||
       state.coins < G.SPRINKLER_COST || state.sprinklers >= state.plots.length;
@@ -1575,6 +1578,7 @@
         G.expandCost({ plots: new Array(G.BALANCE.expand.steepFrom) }) + ' → ' +
         G.expandCost({ plots: new Array(G.BALANCE.expand.steepFrom + 1) }) + ' 金）。<br>' +
         '所以主力田块先铺到 <b>' + G.BALANCE.expand.steepFrom + ' 块</b>，再往上就是纯烧钱；' +
+        '土地最多 <b>' + G.BALANCE.expand.max + ' 块</b>。' +
         '土地维护费也按块数分档（' + G.BALANCE.upkeep.free + ' 块内免费，之后逐档变贵）。</p>' +
       '</div>' +
 

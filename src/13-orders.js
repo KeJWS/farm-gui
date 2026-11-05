@@ -63,7 +63,7 @@
     const pool = orderPool(day, farmLv);
     const used = [];
     const orders = [];
-    const season = Math.floor((day - 1) / 30);                                  // 0 春 / 1 夏 / 2 秋 / 3 冬
+    const season = seasonIdx(day);                                              // 0 春 / 1 夏 / 2 秋 / 3 冬（跨年循环）
     const mult = 1 + season * BALANCE.order.seasonStep;                        // 1 / 1.6 / 2.2 / 2.8
     /* 平时点当季作物，偶尔点一批反季的（冬天全是反季，不特殊处理） */
     const inSeason = pool.filter(function (c) { return (c.seasons || []).indexOf(season) >= 0; });
@@ -122,7 +122,7 @@
 
   function makeLongOrder(s) {
     const day = (s && s.day) || 1;
-    const season = Math.floor((day - 1) / 30);
+    const season = seasonIdx(day);
     const pool = orderPool(day, (s && s.levels && s.levels.farm) || 1);
     if (rand() < 0.3) {
       const qty = Math.max(6, Math.round(randInt(8, 14) * (1 + season * 0.3)));

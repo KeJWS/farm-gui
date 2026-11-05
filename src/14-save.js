@@ -131,7 +131,7 @@
     merged.coins = Math.round(num(s.coins, 50, 0, 1e9));
     merged.energy = num(s.energy, merged.maxEnergy, 0, merged.maxEnergy);
 
-    const plots = Array.isArray(s.plots) ? s.plots.slice(0, 60) : [];
+    const plots = Array.isArray(s.plots) ? s.plots.slice(0, BALANCE.expand.max) : [];
     merged.plots = (plots.length ? plots : [{}]).map(function (p) {
       const plot = Object.assign(makePlot(), p || {});
       if (!CROPS[plot.crop]) plot.crop = null;

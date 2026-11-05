@@ -759,6 +759,12 @@ ok(costAt(5) === 40 && costAt(34) === 475 && costAt(35) === 475 &&
    costAt(36) === 855 && costAt(37) === 1539,
    '35 块之后扩展费每块 ×1.8', [costAt(34), costAt(35), costAt(36), costAt(37)].join('/'));
 
+const capS = G.createState();
+capS.plots = new Array(G.BALANCE.expand.max).fill(0).map(function () { return G.createState().plots[0]; });
+capS.coins = 1e12;
+ok(!G.expand(capS).ok && capS.plots.length === G.BALANCE.expand.max,
+   '土地到 ' + G.BALANCE.expand.max + ' 块就不能再开', capS.plots.length);
+
 // 春季过后委托需求变大
 G.setRng(mulberry32(5));
 const sumQ = function (os) {
@@ -1923,6 +1929,28 @@ for (let i = 0; i < 200; i++) {
   if (lo.kind === 'crop') { v243crop++; if (G.CROPS[lo.crop].price >= 20) v243hi++; }
 }
 ok(v243crop > 0 && v243hi / v243crop > 0.4, '长期单偏向贵作物', (v243hi / v243crop).toFixed(2));
+
+/* v2.43.2：跨年后季节必须循环（第二年春季 = 第一年春季） */
+ok(G.seasonIdx(121) === 0 && G.seasonIdx(151) === 1 && G.seasonIdx(211) === 3,
+   '第二年季节从春重新循环', [G.seasonIdx(121), G.seasonIdx(151), G.seasonIdx(211)]);
+function v243yOrders(day) {
+  G.setRng(mulberry32(11));
+  const st = G.createState(); st.day = day; st.levels.farm = 10;
+  return G.makeOrders(st);
+}
+const v243y1 = v243yOrders(5), v243y2 = v243yOrders(125);
+ok(v243y1.map(function (o) { return o.kind + ':' + o.name + 'x' + o.qty + ':' + o.reward; }).join('|') ===
+   v243y2.map(function (o) { return o.kind + ':' + o.name + 'x' + o.qty + ':' + o.reward; }).join('|'),
+   '第二年春季三单与第一年一致', v243y2.map(function (o) { return o.reward; }));
+const v243fish2 = v243y2.filter(function (o) { return o.kind === 'fish'; })[0];
+ok(v243fish2.reward / v243fish2.qty === G.BALANCE.order.fishBase, '第二年鱼单单价仍是春季价',
+   v243fish2.reward / v243fish2.qty);
+G.setRng(mulberry32(31));
+const v243lo1 = G.makeLongOrder({ day: 5, levels: { farm: 10 } });
+G.setRng(mulberry32(31));
+const v243lo2 = G.makeLongOrder({ day: 125, levels: { farm: 10 } });
+ok(v243lo1.qty === v243lo2.qty && v243lo1.reward === v243lo2.reward,
+   '第二年长期单与第一年一致', [v243lo1.reward, v243lo2.reward]);
 
 /* 行情「还能卖多少」 */
 const v31h = G.createState();

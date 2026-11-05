@@ -63,6 +63,7 @@
         G.expandCost({ plots: new Array(G.BALANCE.expand.steepFrom) }) + ' → ' +
         G.expandCost({ plots: new Array(G.BALANCE.expand.steepFrom + 1) }) + ' 金）。<br>' +
         '所以主力田块先铺到 <b>' + G.BALANCE.expand.steepFrom + ' 块</b>，再往上就是纯烧钱；' +
+        '土地最多 <b>' + G.BALANCE.expand.max + ' 块</b>。' +
         '土地维护费也按块数分档（' + G.BALANCE.upkeep.free + ' 块内免费，之后逐档变贵）。</p>' +
       '</div>' +
 

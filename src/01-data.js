@@ -44,7 +44,7 @@
              /* 非冬季每张作物单有多大概率点名反季作物（卖价按反季市价算） */
              offSeasonChance: 0.15 },
     /* 土地：4~34 块按 25 + 15×(n−4) 线性涨；到 35 块以后每块 ×1.8 陡涨 */
-    expand: { base: 25, step: 15, from: 4, steepFrom: 35, steepMul: 1.8 },
+    expand: { base: 25, step: 15, from: 4, steepFrom: 35, steepMul: 1.8, max: 60 },
     /* 自动播种器：一台只管 5 块地，买几台就播几块（每台每天 5 块），每台每周要交维护费 */
     device: { sprinkler: 80, harvester: 300, net: 50, seeder: 400, seederPlots: 5,
               seederMax: 9, netMax: 9, sprinklerPerDay: 1 },
