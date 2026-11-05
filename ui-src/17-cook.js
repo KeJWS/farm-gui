@@ -55,14 +55,23 @@
     const unlocked = G.kitchenUnlocked(state);
     const lv = G.cookLv(state);
     const xp = (state.levels && state.levels.cookXp) || 0;
+    const all = G.cookRecipes();
+    const groups = [
+      { title: '⭐ 等级食谱', list: all.filter(function (r) { return !r.source && !r.req; }) },
+      { title: '🌱 技能食谱 · 种田 / 钓鱼 / 采集', list: all.filter(function (r) { return !r.source && r.req; }) },
+      { title: '🏬 百货店配方 · 交易等级', list: G.shopRecipes() },
+      { title: '🎁 宝箱配方 · 铁箱 / 金箱', list: all.filter(function (r) { return r.source === 'gold'; }) }
+    ];
     const body = unlocked
       ? '<div class="cook-top">🍳 烹饪 <b>Lv' + lv + '</b> · 经验 ' + xp + '/' + G.levelNeed(lv, 'cook') +
           ' · 今日 <b>' + G.cookLeft(state) + '/' + G.cookDailyLimit(state) + '</b> 份' +
           ' · 做砸 ' + Math.round(G.cookFail(state) * 100) + '% · 品质取 ' +
           G.cookRolls(state) + ' 次最好</div>' +
-        '<div class="cook-grid">' + G.cookRecipes().map(cookCard).join('') + '</div>' +
-        '<div class="store-sub" style="margin-top:12px">🍲 现有熟食 · 吃午饭每天一次</div>' +
-        foodRowsHtml(true)
+        groups.map(function (g) {
+          return '<div class="cook-sec"><div class="cook-sec-t">' + g.title +
+            ' <span>' + g.list.length + ' 道</span></div>' +
+            '<div class="cook-grid">' + g.list.map(cookCard).join('') + '</div></div>';
+        }).join('')
       : '<div class="shop-tip">厨房还没解锁：<b>种田 Lv' + G.BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' +
           G.BALANCE.cook.unlockFish + '</b> 后开张。<br>解锁后能拿作物 / 渔获 / 野货做菜，' +
           '菜有保质期，吃了回体力，也能进收购箱卖。</div>';
@@ -70,7 +79,8 @@
   }
 
   function lunchModal() {
-    const body = '<div class="shop-tip">每天只能吃一次，回复菜品的体力。' +
+    const body = '<div class="shop-tip">每天只能吃一次，回复菜品的体力；' +
+      '<b>放得越久，回复和卖价越低</b>。' +
       (G.kitchenUnlocked(state)
         ? (G.lunchEaten(state) ? '今天已经吃过了 ✅' : '今天还没吃，不吃的话今晚伙食费 <b>×' +
             G.BALANCE.meal.skipLunchMul + '</b>。')

@@ -277,11 +277,13 @@
     }) : [];
     /* 厨房：熟食（过期的不留） + 今天有没有吃午饭 */
     merged.food = Array.isArray(s.food) ? s.food.slice(0, 200).filter(function (f) {
-      return f && (f.rid === 'fail' ? true : (recipeById(f.rid) && Q_IDS.indexOf(f.q) >= 0));
+      return f && (f.rid === 'fail' ? true : (recipeById(f.rid === 'smokedfish' ? 'steamedfish' : f.rid) &&
+        Q_IDS.indexOf(f.q) >= 0));
     }).map(function (f) {
-      const r = f.rid === 'fail' ? null : recipeById(f.rid);
+      const rid = f.rid === 'smokedfish' ? 'steamedfish' : f.rid;
+      const r = f.rid === 'fail' ? null : recipeById(rid);
       return {
-        rid: f.rid,
+        rid: rid,
         name: plain(f.name || (r && r.name), 20),
         emoji: plain(f.emoji || (r && r.emoji), 4),
         q: f.rid === 'fail' ? null : f.q,
@@ -298,8 +300,9 @@
     /* 学会的食谱：只保留认识、且确实需要解锁的那些 */
     merged.recipes = {};
     Object.keys(s.recipes && typeof s.recipes === 'object' ? s.recipes : {}).forEach(function (id) {
-      const r = recipeById(id);
-      if (r && r.source) merged.recipes[id] = true;
+      const rid = id === 'smokedfish' ? 'steamedfish' : id;
+      const r = recipeById(rid);
+      if (r && r.source) merged.recipes[rid] = true;
     });
     merged.orders = normalizeOrders(s.orders, merged);
 
@@ -429,9 +432,11 @@
       food: (s.codex && s.codex.food && typeof s.codex.food === 'object') ? s.codex.food : {}
     };
     Object.keys(merged.codex.food).forEach(function (k) {
-      if (!recipeById(k)) { delete merged.codex.food[k]; return; }
+      const id = k === 'smokedfish' ? 'steamedfish' : k;
+      if (!recipeById(id)) { delete merged.codex.food[k]; return; }
       const c = merged.codex.food[k] || {};
-      merged.codex.food[k] = { n: c.n || 0, best: c.best || null, first: c.first || null, value: c.value || 0 };
+      if (id !== k) delete merged.codex.food[k];
+      merged.codex.food[id] = { n: c.n || 0, best: c.best || null, first: c.first || null, value: c.value || 0 };
     });
     Object.keys(merged.codex.fish).forEach(function (k) {
       const c = merged.codex.fish[k] || {};
@@ -587,7 +592,8 @@
     shopRecipes: shopRecipes, buyRecipe: buyRecipe, grantGoldRecipe: grantGoldRecipe,
     cookMeal: cookMeal, eatFood: eatFood, foodTick: foodTick, boxPutFood: boxPutFood,
     eatFoodGroup: eatFoodGroup, boxPutFoodGroup: boxPutFoodGroup, foodGroups: foodGroups,
-    foodDaysLeft: foodDaysLeft, foodSoon: foodSoon, cookDailyLimit: cookDailyLimit, cookLeft: cookLeft,
+    foodDaysLeft: foodDaysLeft, foodSoon: foodSoon, foodEnergyNow: foodEnergyNow, foodPriceNow: foodPriceNow,
+    foodFreshMul: foodFreshMul, cookDailyLimit: cookDailyLimit, cookLeft: cookLeft,
     kitchenUnlocked: kitchenUnlocked, cookLv: cookLv, cookFail: cookFail, cookRolls: cookRolls,
     mealFeeDue: mealFeeDue, lunchEaten: lunchEaten, cookFishBag: cookFishBag,
     netWorth: netWorth, profileRank: profileRank, deviceValue: deviceValue, orchardValue: orchardValue,

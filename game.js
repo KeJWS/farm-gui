@@ -713,8 +713,10 @@
             advLv: 4, advXp: 2,
             /* 食材只收普通及以上；成品品质下限 = 食材最好品质 − 1 档 */
             minQuality: 'common', qualityFloorDrop: 1,
-            /* 黄金宝箱掉食谱的概率 */
-            goldRecipeChance: 0.18 },
+            /* 宝箱掉食谱的概率 */
+            goldRecipeChance: 0.09, ironRecipeChance: 0.06,
+            /* 新鲜度：剩 0 天时卖价 / 回复打几折；刚做好是 1 */
+            freshMin: 0.5 },
     /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
     upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
     /* 一季 30 天（春 1–30 / 夏 31–60 / 秋 61–90 / 冬 91–120） */
@@ -3528,6 +3530,11 @@
         s.bait.worm = (s.bait.worm || 0) + n;
         gains.push('🪱 蚯蚓×' + n);
       }
+      /* 铁箱也有小概率掉食谱 */
+      if (rand() < BALANCE.cook.ironRecipeChance) {
+        const rec = grantGoldRecipe(s);
+        if (rec) gains.push('📜 食谱：' + rec.emoji + ' ' + rec.name);
+      }
     } else {
       // 金箱：一大笔金币 + 一件高级物品
       const c = randInt(200, 320);
@@ -4951,11 +4958,13 @@
     }) : [];
     /* 厨房：熟食（过期的不留） + 今天有没有吃午饭 */
     merged.food = Array.isArray(s.food) ? s.food.slice(0, 200).filter(function (f) {
-      return f && (f.rid === 'fail' ? true : (recipeById(f.rid) && Q_IDS.indexOf(f.q) >= 0));
+      return f && (f.rid === 'fail' ? true : (recipeById(f.rid === 'smokedfish' ? 'steamedfish' : f.rid) &&
+        Q_IDS.indexOf(f.q) >= 0));
     }).map(function (f) {
-      const r = f.rid === 'fail' ? null : recipeById(f.rid);
+      const rid = f.rid === 'smokedfish' ? 'steamedfish' : f.rid;
+      const r = f.rid === 'fail' ? null : recipeById(rid);
       return {
-        rid: f.rid,
+        rid: rid,
         name: plain(f.name || (r && r.name), 20),
         emoji: plain(f.emoji || (r && r.emoji), 4),
         q: f.rid === 'fail' ? null : f.q,
@@ -4972,8 +4981,9 @@
     /* 学会的食谱：只保留认识、且确实需要解锁的那些 */
     merged.recipes = {};
     Object.keys(s.recipes && typeof s.recipes === 'object' ? s.recipes : {}).forEach(function (id) {
-      const r = recipeById(id);
-      if (r && r.source) merged.recipes[id] = true;
+      const rid = id === 'smokedfish' ? 'steamedfish' : id;
+      const r = recipeById(rid);
+      if (r && r.source) merged.recipes[rid] = true;
     });
     merged.orders = normalizeOrders(s.orders, merged);
 
@@ -5103,9 +5113,11 @@
       food: (s.codex && s.codex.food && typeof s.codex.food === 'object') ? s.codex.food : {}
     };
     Object.keys(merged.codex.food).forEach(function (k) {
-      if (!recipeById(k)) { delete merged.codex.food[k]; return; }
+      const id = k === 'smokedfish' ? 'steamedfish' : k;
+      if (!recipeById(id)) { delete merged.codex.food[k]; return; }
       const c = merged.codex.food[k] || {};
-      merged.codex.food[k] = { n: c.n || 0, best: c.best || null, first: c.first || null, value: c.value || 0 };
+      if (id !== k) delete merged.codex.food[k];
+      merged.codex.food[id] = { n: c.n || 0, best: c.best || null, first: c.first || null, value: c.value || 0 };
     });
     Object.keys(merged.codex.fish).forEach(function (k) {
       const c = merged.codex.fish[k] || {};
@@ -5261,7 +5273,8 @@
     shopRecipes: shopRecipes, buyRecipe: buyRecipe, grantGoldRecipe: grantGoldRecipe,
     cookMeal: cookMeal, eatFood: eatFood, foodTick: foodTick, boxPutFood: boxPutFood,
     eatFoodGroup: eatFoodGroup, boxPutFoodGroup: boxPutFoodGroup, foodGroups: foodGroups,
-    foodDaysLeft: foodDaysLeft, foodSoon: foodSoon, cookDailyLimit: cookDailyLimit, cookLeft: cookLeft,
+    foodDaysLeft: foodDaysLeft, foodSoon: foodSoon, foodEnergyNow: foodEnergyNow, foodPriceNow: foodPriceNow,
+    foodFreshMul: foodFreshMul, cookDailyLimit: cookDailyLimit, cookLeft: cookLeft,
     kitchenUnlocked: kitchenUnlocked, cookLv: cookLv, cookFail: cookFail, cookRolls: cookRolls,
     mealFeeDue: mealFeeDue, lunchEaten: lunchEaten, cookFishBag: cookFishBag,
     netWorth: netWorth, profileRank: profileRank, deviceValue: deviceValue, orchardValue: orchardValue,
@@ -5372,9 +5385,9 @@
       cost: { crops: { mushroom: 1, potato: 2 } }, desc: '松茸配土豆，鲜掉眉毛' },
     { id: 'stirfry', name: '辣味小炒', emoji: '🌶️', lv: 3, energy: 2, restore: 20, days: 2, price: 130,
       req: { farm: 5 }, cost: { crops: { chili: 2, eggplant: 1 } }, desc: '下饭，就是有点辣' },
-    { id: 'smokedfish', name: '茶香熏鱼', emoji: '🍵', lv: 3, energy: 2, restore: 24, days: 3, price: 210,
+    { id: 'steamedfish', name: '玉米蒸鱼', emoji: '🐟', lv: 3, energy: 2, restore: 24, days: 3, price: 210,
       source: 'shop', trade: 3, shopPrice: 1500,
-      cost: { fish: 1, crops: { corn: 1 } }, desc: '茶叶熏出来的河鲜' },
+      cost: { fish: 1, crops: { corn: 1 } }, desc: '玉米垫底，清蒸河鱼' },
     { id: 'salad', name: '水果沙拉', emoji: '🥗', lv: 4, energy: 2, restore: 14, days: 2, price: 108,
       cost: { crops: { fruit_peach: 1, berry: 2 } }, desc: '桃子野莓拌一拌' },
     { id: 'riversoup', name: '河鲜汤', emoji: '🐟', lv: 4, energy: 1, restore: 22, days: 2,
@@ -5625,22 +5638,44 @@
 
   function foodDaysLeft(f, day) { return Math.max(0, (f.expire || 0) - (day || 1)); }
   function foodSoon(f, day) { return foodDaysLeft(f, day) <= 1; }
+  /* 越接近保质期，卖价和回复越差：刚做好 100%，最后一天只有 freshMin */
+  function foodFreshMul(f, day) {
+    const d = day || 1;
+    const total = Math.max(1, (f.expire || d) - (f.day || d));
+    const left = Math.max(0, (f.expire || d) - d);
+    const ratio = Math.max(0, Math.min(1, left / total));
+    const min = BALANCE.cook.freshMin;
+    return min + (1 - min) * ratio;
+  }
+  function foodEnergyNow(f, day) {
+    return Math.max(0, Math.round((f.energy || 0) * foodFreshMul(f, day)));
+  }
+  function foodPriceNow(f, day) {
+    return Math.max(1, Math.round((f.price || 1) * foodFreshMul(f, day)));
+  }
 
   /* 仓库里的熟食按「菜 + 品质」合并显示 */
   function foodGroups(s) {
     const map = {}, out = [];
+    const day = s.day || 1;
     (s.food || []).forEach(function (f, i) {
       const key = (f.rid || 'food') + '|' + (f.q || '-');
       if (!map[key]) {
         map[key] = { key: key, rid: f.rid, name: f.name, emoji: f.emoji, q: f.q,
-                     n: 0, energy: f.energy, price: f.price, expire: f.expire, idx: [] };
+                     n: 0, energy: 0, price: 0, priceTotal: 0, expire: f.expire, idx: [] };
         out.push(map[key]);
       }
       const g = map[key];
-      g.n += f.n || 1;
-      g.expire = Math.min(g.expire, f.expire);
+      const n = f.n || 1;
+      g.n += n;
+      g.priceTotal += foodPriceNow(f, day) * n;
+      if ((f.expire || 0) < (g.expire || 0) || g.energy === 0) {
+        g.expire = f.expire;
+        g.energy = foodEnergyNow(f, day);
+      }
       g.idx.push(i);
     });
+    out.forEach(function (g) { g.price = g.n ? Math.round(g.priceTotal / g.n) : 0; });
     return out;
   }
 
@@ -5657,16 +5692,18 @@
   function eatFoodEntry(s, f) {
     if (f.rid === 'fail') return { ok: false, msg: '焦糊料理不能吃，扔收购箱吧' };
     if ((f.expire || 0) < (s.day || 1)) return { ok: false, msg: '这份已经过期了' };
+    const energy = foodEnergyNow(f, s.day);
     const room = Math.max(0, s.maxEnergy - s.energy);
-    const gain = Math.min(room, f.energy || 0);
+    const gain = Math.min(room, energy);
     s.energy += gain;
     s.lunchDay = s.day;
     s.stats.meals = (s.stats.meals || 0) + 1;
     if ((f.n || 1) > 1) f.n--;
     else (s.food || []).splice((s.food || []).indexOf(f), 1);
     log(s, '🍽️ 吃午饭：' + f.emoji + ' ' + f.name + '，+ ' + gain + ' 体力' +
-      (f.energy > gain ? '（体力已接近上限）' : ''), 'good');
-    return { ok: true, gain: gain, energy: f.energy, name: f.name, emoji: f.emoji };
+      (energy < (f.energy || 0) ? '（放久了，回复打折）' : '') +
+      (energy > gain ? '（体力已接近上限）' : ''), 'good');
+    return { ok: true, gain: gain, energy: energy, name: f.name, emoji: f.emoji };
   }
 
   /* 按合并后的组吃一份 */
@@ -5696,12 +5733,13 @@
     const f = list[idx];
     if (!f) return { ok: false, msg: '没有这份料理' };
     const n = f.n || 1;
+    const raw = foodPriceNow(f, s.day) * n;
     list.splice(idx, 1);
     s.box = s.box || [];
-    s.box.push({ kind: 'food', name: f.name, emoji: f.emoji, n: n, raw: (f.price || 1) * n,
-                 q: f.q, energy: f.energy, rid: f.rid, expire: f.expire });
-    log(s, '📦 ' + f.emoji + ' ' + f.name + '×' + n + ' 放进收购箱（' + ((f.price || 1) * n) + ' 金，睡觉结算）', 'info');
-    return { ok: true, name: f.name, v: (f.price || 1) * n, n: n };
+    s.box.push({ kind: 'food', name: f.name, emoji: f.emoji, n: n, raw: raw,
+                 q: f.q, energy: foodEnergyNow(f, s.day), rid: f.rid, expire: f.expire });
+    log(s, '📦 ' + f.emoji + ' ' + f.name + '×' + n + ' 放进收购箱（' + raw + ' 金，睡觉结算）', 'info');
+    return { ok: true, name: f.name, v: raw, n: n };
   }
 
   /* 按合并后的组整组放进收购箱 */
@@ -5713,8 +5751,9 @@
     g.idx.slice().sort(function (a, b) { return b - a; }).forEach(function (i) {
       const f = list[i];
       if (!f) return;
-      n += f.n || 1;
-      raw += (f.price || 1) * (f.n || 1);
+      const cnt = f.n || 1;
+      n += cnt;
+      raw += foodPriceNow(f, s.day) * cnt;
       list.splice(i, 1);
     });
     s.box = s.box || [];

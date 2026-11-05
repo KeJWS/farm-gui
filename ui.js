@@ -795,7 +795,7 @@
             (left <= 1 ? 'exp-soon' : '') + '">' +
             (left <= 0 ? '今天到期' : '还剩 ' + left + ' 天') + '</span>' +
             ' · 约 ' + (g.price || 0) + ' 金/份 · 去厨房吃</div></div>' +
-          '<span class="sp">' + ((g.price || 0) * g.n) + ' 金</span>' +
+          '<span class="sp">' + (g.priceTotal || 0) + ' 金</span>' +
           '<span class="spw">' +
             '<button class="btn mini" data-boxfood="' + g.key + '" title="整组放进收购箱">📦</button>' +
           '</span></div>';
@@ -2062,15 +2062,17 @@
             return r.name + '（交易 Lv' + r.trade + '，' + r.shopPrice + ' 金）';
           }).join(' / ') + '，买一次永久学会。',
           '<b>黄金宝箱</b>：' + G.cookRecipes().filter(function (r) { return r.source === 'gold'; })
-            .map(function (r) { return r.name; }).join(' / ') + '，开金箱有 ' +
-            Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '% 概率掉一张。'
+            .map(function (r) { return r.name; }).join(' / ') + '，金箱 ' +
+            Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '%、铁箱 ' +
+            Math.round(G.BALANCE.cook.ironRecipeChance * 100) + '% 概率掉一张。'
         ])) +
         guideSub('🍽️ 吃午饭', guideList([
           '<b>每天一次</b>，吃一份菜回复它的体力；菜也吃品质，品质越高回的体力越多。',
-          '<b>不能直接在仓库里吃</b>：要打开「吃午饭」（或厨房）再选一份。',
+          '<b>不能直接在仓库里吃</b>：要打开「吃午饭」再选一份（厨房页不列熟食）。',
           '<b>不吃午饭</b>：当天睡觉的伙食费 <b>×' + G.BALANCE.meal.skipLunchMul +
             '</b>（厨房解锁后生效）。',
-          '菜有保质期，仓库 / 厨房会显示「还剩 N 天」，≤1 天标红；临期的先吃。'
+          '菜有保质期，越接近到期<b>回复和卖价越低</b>（最低打 ' +
+            Math.round(G.BALANCE.cook.freshMin * 100) + '%）；仓库 / 午饭里会显示「还剩 N 天」，≤1 天标红。'
         ])) +
         guideSub('📦 怎么卖', guideList([
           '熟食<b>只能进收购箱</b>（农产品店 / 水产店不收），扣 <b>' +
@@ -3071,8 +3073,11 @@
     // 百货店只收宝箱，杂物一律不收（只能进收购箱）
     const junk = G.fishGroups(state, 'junk').filter(function (g) { return g.chest; });    const CHECK = {
       wood: '开箱 10–26 金',
-      iron: '开箱：肥料×6–9 / 种子×8–12 / 面团×12–18 / 蚯蚓×12–18',
-      gold: '开箱：200–320 金 + 特效肥×3–5 / 稀有种子×2–3 / 蚯蚓×14–18 + 18% 掉食谱'
+      iron: '开箱：肥料×6–9 / 种子×8–12 / 面团×12–18 / 蚯蚓×12–18 + ' +
+        Math.round(G.BALANCE.cook.ironRecipeChance * 100) + '% 掉食谱',
+      gold: '开箱：200–320 金 + 特效肥×3–5 / 稀有种子×2–3 / 蚯蚓×14–18 + ' +
+        Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '% 掉食谱',
+      ironNote: Math.round(G.BALANCE.cook.ironRecipeChance * 100) + '% 掉食谱'
     };
     const junkRows = junk.length ? junk.map(function (g) {
       const k = G.CHESTS[g.chest];
@@ -4858,14 +4863,23 @@
     const unlocked = G.kitchenUnlocked(state);
     const lv = G.cookLv(state);
     const xp = (state.levels && state.levels.cookXp) || 0;
+    const all = G.cookRecipes();
+    const groups = [
+      { title: '⭐ 等级食谱', list: all.filter(function (r) { return !r.source && !r.req; }) },
+      { title: '🌱 技能食谱 · 种田 / 钓鱼 / 采集', list: all.filter(function (r) { return !r.source && r.req; }) },
+      { title: '🏬 百货店配方 · 交易等级', list: G.shopRecipes() },
+      { title: '🎁 宝箱配方 · 铁箱 / 金箱', list: all.filter(function (r) { return r.source === 'gold'; }) }
+    ];
     const body = unlocked
       ? '<div class="cook-top">🍳 烹饪 <b>Lv' + lv + '</b> · 经验 ' + xp + '/' + G.levelNeed(lv, 'cook') +
           ' · 今日 <b>' + G.cookLeft(state) + '/' + G.cookDailyLimit(state) + '</b> 份' +
           ' · 做砸 ' + Math.round(G.cookFail(state) * 100) + '% · 品质取 ' +
           G.cookRolls(state) + ' 次最好</div>' +
-        '<div class="cook-grid">' + G.cookRecipes().map(cookCard).join('') + '</div>' +
-        '<div class="store-sub" style="margin-top:12px">🍲 现有熟食 · 吃午饭每天一次</div>' +
-        foodRowsHtml(true)
+        groups.map(function (g) {
+          return '<div class="cook-sec"><div class="cook-sec-t">' + g.title +
+            ' <span>' + g.list.length + ' 道</span></div>' +
+            '<div class="cook-grid">' + g.list.map(cookCard).join('') + '</div></div>';
+        }).join('')
       : '<div class="shop-tip">厨房还没解锁：<b>种田 Lv' + G.BALANCE.cook.unlockFarm + ' + 钓鱼 Lv' +
           G.BALANCE.cook.unlockFish + '</b> 后开张。<br>解锁后能拿作物 / 渔获 / 野货做菜，' +
           '菜有保质期，吃了回体力，也能进收购箱卖。</div>';
@@ -4873,7 +4887,8 @@
   }
 
   function lunchModal() {
-    const body = '<div class="shop-tip">每天只能吃一次，回复菜品的体力。' +
+    const body = '<div class="shop-tip">每天只能吃一次，回复菜品的体力；' +
+      '<b>放得越久，回复和卖价越低</b>。' +
       (G.kitchenUnlocked(state)
         ? (G.lunchEaten(state) ? '今天已经吃过了 ✅' : '今天还没吃，不吃的话今晚伙食费 <b>×' +
             G.BALANCE.meal.skipLunchMul + '</b>。')

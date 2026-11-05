@@ -498,15 +498,17 @@
             return r.name + '（交易 Lv' + r.trade + '，' + r.shopPrice + ' 金）';
           }).join(' / ') + '，买一次永久学会。',
           '<b>黄金宝箱</b>：' + G.cookRecipes().filter(function (r) { return r.source === 'gold'; })
-            .map(function (r) { return r.name; }).join(' / ') + '，开金箱有 ' +
-            Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '% 概率掉一张。'
+            .map(function (r) { return r.name; }).join(' / ') + '，金箱 ' +
+            Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '%、铁箱 ' +
+            Math.round(G.BALANCE.cook.ironRecipeChance * 100) + '% 概率掉一张。'
         ])) +
         guideSub('🍽️ 吃午饭', guideList([
           '<b>每天一次</b>，吃一份菜回复它的体力；菜也吃品质，品质越高回的体力越多。',
-          '<b>不能直接在仓库里吃</b>：要打开「吃午饭」（或厨房）再选一份。',
+          '<b>不能直接在仓库里吃</b>：要打开「吃午饭」再选一份（厨房页不列熟食）。',
           '<b>不吃午饭</b>：当天睡觉的伙食费 <b>×' + G.BALANCE.meal.skipLunchMul +
             '</b>（厨房解锁后生效）。',
-          '菜有保质期，仓库 / 厨房会显示「还剩 N 天」，≤1 天标红；临期的先吃。'
+          '菜有保质期，越接近到期<b>回复和卖价越低</b>（最低打 ' +
+            Math.round(G.BALANCE.cook.freshMin * 100) + '%）；仓库 / 午饭里会显示「还剩 N 天」，≤1 天标红。'
         ])) +
         guideSub('📦 怎么卖', guideList([
           '熟食<b>只能进收购箱</b>（农产品店 / 水产店不收），扣 <b>' +

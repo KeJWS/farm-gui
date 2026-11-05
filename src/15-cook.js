@@ -22,9 +22,9 @@
       cost: { crops: { mushroom: 1, potato: 2 } }, desc: '松茸配土豆，鲜掉眉毛' },
     { id: 'stirfry', name: '辣味小炒', emoji: '🌶️', lv: 3, energy: 2, restore: 20, days: 2, price: 130,
       req: { farm: 5 }, cost: { crops: { chili: 2, eggplant: 1 } }, desc: '下饭，就是有点辣' },
-    { id: 'smokedfish', name: '茶香熏鱼', emoji: '🍵', lv: 3, energy: 2, restore: 24, days: 3, price: 210,
+    { id: 'steamedfish', name: '玉米蒸鱼', emoji: '🐟', lv: 3, energy: 2, restore: 24, days: 3, price: 210,
       source: 'shop', trade: 3, shopPrice: 1500,
-      cost: { fish: 1, crops: { corn: 1 } }, desc: '茶叶熏出来的河鲜' },
+      cost: { fish: 1, crops: { corn: 1 } }, desc: '玉米垫底，清蒸河鱼' },
     { id: 'salad', name: '水果沙拉', emoji: '🥗', lv: 4, energy: 2, restore: 14, days: 2, price: 108,
       cost: { crops: { fruit_peach: 1, berry: 2 } }, desc: '桃子野莓拌一拌' },
     { id: 'riversoup', name: '河鲜汤', emoji: '🐟', lv: 4, energy: 1, restore: 22, days: 2,
@@ -275,22 +275,44 @@
 
   function foodDaysLeft(f, day) { return Math.max(0, (f.expire || 0) - (day || 1)); }
   function foodSoon(f, day) { return foodDaysLeft(f, day) <= 1; }
+  /* 越接近保质期，卖价和回复越差：刚做好 100%，最后一天只有 freshMin */
+  function foodFreshMul(f, day) {
+    const d = day || 1;
+    const total = Math.max(1, (f.expire || d) - (f.day || d));
+    const left = Math.max(0, (f.expire || d) - d);
+    const ratio = Math.max(0, Math.min(1, left / total));
+    const min = BALANCE.cook.freshMin;
+    return min + (1 - min) * ratio;
+  }
+  function foodEnergyNow(f, day) {
+    return Math.max(0, Math.round((f.energy || 0) * foodFreshMul(f, day)));
+  }
+  function foodPriceNow(f, day) {
+    return Math.max(1, Math.round((f.price || 1) * foodFreshMul(f, day)));
+  }
 
   /* 仓库里的熟食按「菜 + 品质」合并显示 */
   function foodGroups(s) {
     const map = {}, out = [];
+    const day = s.day || 1;
     (s.food || []).forEach(function (f, i) {
       const key = (f.rid || 'food') + '|' + (f.q || '-');
       if (!map[key]) {
         map[key] = { key: key, rid: f.rid, name: f.name, emoji: f.emoji, q: f.q,
-                     n: 0, energy: f.energy, price: f.price, expire: f.expire, idx: [] };
+                     n: 0, energy: 0, price: 0, priceTotal: 0, expire: f.expire, idx: [] };
         out.push(map[key]);
       }
       const g = map[key];
-      g.n += f.n || 1;
-      g.expire = Math.min(g.expire, f.expire);
+      const n = f.n || 1;
+      g.n += n;
+      g.priceTotal += foodPriceNow(f, day) * n;
+      if ((f.expire || 0) < (g.expire || 0) || g.energy === 0) {
+        g.expire = f.expire;
+        g.energy = foodEnergyNow(f, day);
+      }
       g.idx.push(i);
     });
+    out.forEach(function (g) { g.price = g.n ? Math.round(g.priceTotal / g.n) : 0; });
     return out;
   }
 
@@ -307,16 +329,18 @@
   function eatFoodEntry(s, f) {
     if (f.rid === 'fail') return { ok: false, msg: '焦糊料理不能吃，扔收购箱吧' };
     if ((f.expire || 0) < (s.day || 1)) return { ok: false, msg: '这份已经过期了' };
+    const energy = foodEnergyNow(f, s.day);
     const room = Math.max(0, s.maxEnergy - s.energy);
-    const gain = Math.min(room, f.energy || 0);
+    const gain = Math.min(room, energy);
     s.energy += gain;
     s.lunchDay = s.day;
     s.stats.meals = (s.stats.meals || 0) + 1;
     if ((f.n || 1) > 1) f.n--;
     else (s.food || []).splice((s.food || []).indexOf(f), 1);
     log(s, '🍽️ 吃午饭：' + f.emoji + ' ' + f.name + '，+ ' + gain + ' 体力' +
-      (f.energy > gain ? '（体力已接近上限）' : ''), 'good');
-    return { ok: true, gain: gain, energy: f.energy, name: f.name, emoji: f.emoji };
+      (energy < (f.energy || 0) ? '（放久了，回复打折）' : '') +
+      (energy > gain ? '（体力已接近上限）' : ''), 'good');
+    return { ok: true, gain: gain, energy: energy, name: f.name, emoji: f.emoji };
   }
 
   /* 按合并后的组吃一份 */
@@ -346,12 +370,13 @@
     const f = list[idx];
     if (!f) return { ok: false, msg: '没有这份料理' };
     const n = f.n || 1;
+    const raw = foodPriceNow(f, s.day) * n;
     list.splice(idx, 1);
     s.box = s.box || [];
-    s.box.push({ kind: 'food', name: f.name, emoji: f.emoji, n: n, raw: (f.price || 1) * n,
-                 q: f.q, energy: f.energy, rid: f.rid, expire: f.expire });
-    log(s, '📦 ' + f.emoji + ' ' + f.name + '×' + n + ' 放进收购箱（' + ((f.price || 1) * n) + ' 金，睡觉结算）', 'info');
-    return { ok: true, name: f.name, v: (f.price || 1) * n, n: n };
+    s.box.push({ kind: 'food', name: f.name, emoji: f.emoji, n: n, raw: raw,
+                 q: f.q, energy: foodEnergyNow(f, s.day), rid: f.rid, expire: f.expire });
+    log(s, '📦 ' + f.emoji + ' ' + f.name + '×' + n + ' 放进收购箱（' + raw + ' 金，睡觉结算）', 'info');
+    return { ok: true, name: f.name, v: raw, n: n };
   }
 
   /* 按合并后的组整组放进收购箱 */
@@ -363,8 +388,9 @@
     g.idx.slice().sort(function (a, b) { return b - a; }).forEach(function (i) {
       const f = list[i];
       if (!f) return;
-      n += f.n || 1;
-      raw += (f.price || 1) * (f.n || 1);
+      const cnt = f.n || 1;
+      n += cnt;
+      raw += foodPriceNow(f, s.day) * cnt;
       list.splice(i, 1);
     });
     s.box = s.box || [];

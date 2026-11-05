@@ -649,8 +649,9 @@ ok(html('#modal-root').indexOf('烹饪') >= 0 && html('#modal-root').indexOf('�
 ok(html('#modal-root').indexOf('data-cook=') >= 0, '食谱带烹饪按钮');
 ok(html('#modal-root').indexOf('玉米浓汤') >= 0 && html('#modal-root').indexOf('皇家宴席') >= 0,
    '食谱含等级 / 宝箱解锁的菜');
+ok(html('#modal-root').indexOf('现有熟食') < 0, '厨房页不再列熟食');
 clickAct('depart');
-ok(html('#modal-root').indexOf('茶香熏鱼') >= 0 && html('#modal-root').indexOf('data-buyrecipe=') >= 0,
+ok(html('#modal-root').indexOf('玉米蒸鱼') >= 0 && html('#modal-root').indexOf('data-buyrecipe=') >= 0,
    '百货店出售食谱');
 clickAct('lunch');
 ok(html('#modal-root').indexOf('吃午饭') >= 0, '午饭弹窗能打开');

@@ -107,7 +107,7 @@
             (left <= 1 ? 'exp-soon' : '') + '">' +
             (left <= 0 ? '今天到期' : '还剩 ' + left + ' 天') + '</span>' +
             ' · 约 ' + (g.price || 0) + ' 金/份 · 去厨房吃</div></div>' +
-          '<span class="sp">' + ((g.price || 0) * g.n) + ' 金</span>' +
+          '<span class="sp">' + (g.priceTotal || 0) + ' 金</span>' +
           '<span class="spw">' +
             '<button class="btn mini" data-boxfood="' + g.key + '" title="整组放进收购箱">📦</button>' +
           '</span></div>';

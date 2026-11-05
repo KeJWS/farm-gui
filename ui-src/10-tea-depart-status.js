@@ -103,8 +103,11 @@
     // 百货店只收宝箱，杂物一律不收（只能进收购箱）
     const junk = G.fishGroups(state, 'junk').filter(function (g) { return g.chest; });    const CHECK = {
       wood: '开箱 10–26 金',
-      iron: '开箱：肥料×6–9 / 种子×8–12 / 面团×12–18 / 蚯蚓×12–18',
-      gold: '开箱：200–320 金 + 特效肥×3–5 / 稀有种子×2–3 / 蚯蚓×14–18 + 18% 掉食谱'
+      iron: '开箱：肥料×6–9 / 种子×8–12 / 面团×12–18 / 蚯蚓×12–18 + ' +
+        Math.round(G.BALANCE.cook.ironRecipeChance * 100) + '% 掉食谱',
+      gold: '开箱：200–320 金 + 特效肥×3–5 / 稀有种子×2–3 / 蚯蚓×14–18 + ' +
+        Math.round(G.BALANCE.cook.goldRecipeChance * 100) + '% 掉食谱',
+      ironNote: Math.round(G.BALANCE.cook.ironRecipeChance * 100) + '% 掉食谱'
     };
     const junkRows = junk.length ? junk.map(function (g) {
       const k = G.CHESTS[g.chest];

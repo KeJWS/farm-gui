@@ -2984,6 +2984,14 @@ section('厨房与烹饪');
   expS.food = [{ rid: 'soup', name: '蔬菜汤', emoji: '🥣', q: 'std', energy: 8, price: 46, day: 10, expire: 12, n: 1 }];
   ok(G.foodDaysLeft(expS.food[0], 10) === 2 && !G.foodSoon(expS.food[0], 10), '熟食显示剩余天数');
   ok(G.foodSoon(expS.food[0], 12), '临期（≤1 天）会高亮');
+  const freshF = expS.food[0];
+  ok(G.foodFreshMul(freshF, 10) === 1 && G.foodFreshMul(freshF, 11) === 0.75 &&
+     G.foodFreshMul(freshF, 12) === 0.5, '越接近保质期，新鲜度越低',
+     [G.foodFreshMul(freshF, 10), G.foodFreshMul(freshF, 11), G.foodFreshMul(freshF, 12)]);
+  ok(G.foodEnergyNow(freshF, 12) === 4 && G.foodPriceNow(freshF, 12) === 23,
+     '临期熟食回复和卖价同步打折', [G.foodEnergyNow(freshF, 12), G.foodPriceNow(freshF, 12)]);
+  ok(G.BALANCE.cook.goldRecipeChance === 0.09 && G.BALANCE.cook.ironRecipeChance === 0.06,
+     '金箱 9% / 铁箱 6% 掉食谱');
 
   /* 保质期：睡觉时清掉过期料理 */
   const sf = G.createState();
@@ -3035,17 +3043,17 @@ section('厨房与烹饪');
   bs.levels.cook = 3; bs.coins = 10000; bs.energy = 50;
   bs.fishBag.push({ name: '鲫鱼', emoji: '🐟', q: 'std', v: 3, d: 1 });
   G.addStore(bs, 'corn', 'std', 1);
-  ok(!G.recipeKnown(bs, G.recipeById('smokedfish')) &&
-     !G.cookMeal(bs, 'smokedfish').ok, '商店食谱没买之前做不了');
+  ok(!G.recipeKnown(bs, G.recipeById('steamedfish')) &&
+     !G.cookMeal(bs, 'steamedfish').ok, '商店食谱没买之前做不了');
   const bsCoins = bs.coins;
-  const br = G.buyRecipe(bs, 'smokedfish');
-  ok(br.ok && bs.coins < bsCoins && G.recipeKnown(bs, G.recipeById('smokedfish')),
+  const br = G.buyRecipe(bs, 'steamedfish');
+  ok(br.ok && bs.coins < bsCoins && G.recipeKnown(bs, G.recipeById('steamedfish')),
      '百货店能买食谱并永久学会', br);
   G.setRng(function () { return 0.99; });
-  ok(G.cookMeal(bs, 'smokedfish').ok, '学会后能烹饪');
+  ok(G.cookMeal(bs, 'steamedfish').ok, '学会后能烹饪');
   const bs2 = G.createState();
   bs2.levels.trade = 2; bs2.coins = 10000;
-  ok(!G.buyRecipe(bs2, 'smokedfish').ok, '交易等级不够买不了食谱');
+  ok(!G.buyRecipe(bs2, 'steamedfish').ok, '交易等级不够买不了食谱');
 
   const gs = G.createState();
   const gr = G.grantGoldRecipe(gs);

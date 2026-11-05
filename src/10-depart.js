@@ -113,6 +113,11 @@
         s.bait.worm = (s.bait.worm || 0) + n;
         gains.push('🪱 蚯蚓×' + n);
       }
+      /* 铁箱也有小概率掉食谱 */
+      if (rand() < BALANCE.cook.ironRecipeChance) {
+        const rec = grantGoldRecipe(s);
+        if (rec) gains.push('📜 食谱：' + rec.emoji + ' ' + rec.name);
+      }
     } else {
       // 金箱：一大笔金币 + 一件高级物品
       const c = randInt(200, 320);
