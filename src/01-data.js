@@ -9,7 +9,7 @@
     /* ---------------- 全局入口：所有可调数值都在这里，界面 / 分析脚本只读这里 ---------------- */
 
     /* 开局 */
-    start: { coins: 50, energy: 15, maxEnergy: 15, plots: 5 },
+    start: { coins: 50, energy: 20, maxEnergy: 20, plots: 5 },
     /* 各动作体力消耗（统一在这里改，不要在逻辑里写死数字） */
     energy: { plant: 1, water: 1, waterSummer: 2, harvest: 1, fert: 1, fish: 2 },
     /* 伙食费：base + (上限 − from) / perEnergy，最低 min；没钱吃饭只回 pct（至少 noMoneyMin）
@@ -30,8 +30,8 @@
             goldRecipeChance: 0.09, ironRecipeChance: 0.06,
             /* 新鲜度：剩 0 天时卖价 / 回复打几折；刚做好是 1 */
             freshMin: 0.25 },
-    /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
-    upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
+    /* 体力上限强化：每次 +step，成本 baseCost × costMul^档；上限过 steepFrom 后每档再 ×steepMul */
+    upgrade: { step: 10, baseCost: 30, costMul: 1.25, from: 20, steepFrom: 100, steepMul: 4 },
     /* 一季 30 天（春 1–30 / 夏 31–60 / 秋 61–90 / 冬 91–120） */
     seasonDays: 30,
     /* 鱼汛：汛期权重 ×in、非汛期 ×off */

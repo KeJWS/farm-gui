@@ -212,11 +212,15 @@
     for (let k = B.steepFrom; k < n; k++) c = Math.round(c * B.steepMul);
     return c;
   }
-  /* 强化体力：成本超线性增长（每级 ×1.2），避免「无脑升级」把上限堆到几百 */
+  /* 强化体力：20→100 每档 ×1.25；100 以后每档再 ×4（100→110 起显著变贵） */
   function upgradeCost(s) {
     const U = BALANCE.upgrade;
-    const tier = Math.max(0, (s.maxEnergy - U.from) / U.step);
-    return Math.round(U.baseCost * Math.pow(U.costMul, tier));
+    const tier = Math.max(0, Math.round((s.maxEnergy - U.from) / U.step));
+    let c = U.baseCost * Math.pow(U.costMul, tier);
+    if (s.maxEnergy >= U.steepFrom) {
+      c *= U.steepMul * Math.pow(2, (s.maxEnergy - U.steepFrom) / U.step);
+    }
+    return Math.round(c);
   }
   function workCost(s, mode) { return Math.round(mode === 'half' ? s.maxEnergy / 2 : s.maxEnergy); }
   function workPay(s, mode) {

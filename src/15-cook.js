@@ -31,13 +31,13 @@
       req: { fish: 4 }, fishPriced: true, priceMul: 4,
       cost: { fish: 2, crops: { potato: 1 } }, desc: '两条河鱼一锅炖' },
     { id: 'gameplatter', name: '野味拼盘', emoji: '🍖', lv: 5, energy: 2, restore: 30, days: 2, price: 300,
-      req: { forage: 6 }, cost: { fish: 1, crops: { mushroom: 2, berry: 2 } }, desc: '山里水里凑一桌' },
+      req: { forage: 6 }, cost: { fish: 2, crops: { mushroom: 2, berry: 2 } }, desc: '山里水里凑一桌' },
     { id: 'honeypumpkin', name: '蜂蜜烤南瓜', emoji: '🎃', lv: 5, energy: 2, restore: 30, days: 4, price: 330,
       source: 'shop', trade: 5, shopPrice: 3000,
       cost: { crops: { pumpkin: 1, berry: 2 } }, desc: '甜到心里' },
-    { id: 'ironpot', name: '铁锅乱炖', emoji: '🍳', lv: 4, energy: 2, restore: 26, days: 2, price: 240,
+    { id: 'ironpot', name: '铁锅乱炖', emoji: '🍳', lv: 4, energy: 2, restore: 26, days: 2, price: 190,
       source: 'iron',
-      cost: { fish: 1, crops: { potato: 1, carrot: 1 } }, desc: '铁制宝箱里翻出来的家常菜谱' },
+      cost: { fish: 2, crops: { potato: 1, carrot: 1 } }, desc: '铁制宝箱里翻出来的家常菜谱' },
     { id: 'pie', name: '南瓜派', emoji: '🥧', lv: 6, energy: 2, restore: 25, days: 4, price: 198,
       cost: { crops: { pumpkin: 1, corn: 2 } }, desc: '烤得金黄，切八块' },
     { id: 'sashimi', name: '鱼生拼盘', emoji: '🍣', lv: 7, energy: 2, restore: 28, days: 1,
@@ -79,7 +79,6 @@
     if (req.fish) parts.push('钓鱼 Lv' + req.fish);
     if (req.forage) parts.push('采集 Lv' + req.forage);
     if (r.source === 'shop') parts.push('百货店配方（交易 Lv' + r.trade + '）');
-    if (r.source === 'gold') parts.push('黄金宝箱掉落');
     return parts.join(' · ');
   }
   function recipeLockText(s, r) {

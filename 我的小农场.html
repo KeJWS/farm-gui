@@ -2162,7 +2162,7 @@ button{ color:inherit; font:inherit; }
     /* ---------------- 全局入口：所有可调数值都在这里，界面 / 分析脚本只读这里 ---------------- */
 
     /* 开局 */
-    start: { coins: 50, energy: 15, maxEnergy: 15, plots: 5 },
+    start: { coins: 50, energy: 20, maxEnergy: 20, plots: 5 },
     /* 各动作体力消耗（统一在这里改，不要在逻辑里写死数字） */
     energy: { plant: 1, water: 1, waterSummer: 2, harvest: 1, fert: 1, fish: 2 },
     /* 伙食费：base + (上限 − from) / perEnergy，最低 min；没钱吃饭只回 pct（至少 noMoneyMin）
@@ -2183,8 +2183,8 @@ button{ color:inherit; font:inherit; }
             goldRecipeChance: 0.09, ironRecipeChance: 0.06,
             /* 新鲜度：剩 0 天时卖价 / 回复打几折；刚做好是 1 */
             freshMin: 0.25 },
-    /* 体力上限强化：每次 +step，成本 baseCost × costMul^档（档 = (上限 − from) / step） */
-    upgrade: { step: 5, baseCost: 30, costMul: 1.2, from: 10 },
+    /* 体力上限强化：每次 +step，成本 baseCost × costMul^档；上限过 steepFrom 后每档再 ×steepMul */
+    upgrade: { step: 10, baseCost: 30, costMul: 1.25, from: 20, steepFrom: 100, steepMul: 4 },
     /* 一季 30 天（春 1–30 / 夏 31–60 / 秋 61–90 / 冬 91–120） */
     seasonDays: 30,
     /* 鱼汛：汛期权重 ×in、非汛期 ×off */
@@ -3189,11 +3189,15 @@ button{ color:inherit; font:inherit; }
     for (let k = B.steepFrom; k < n; k++) c = Math.round(c * B.steepMul);
     return c;
   }
-  /* 强化体力：成本超线性增长（每级 ×1.2），避免「无脑升级」把上限堆到几百 */
+  /* 强化体力：20→100 每档 ×1.25；100 以后每档再 ×4（100→110 起显著变贵） */
   function upgradeCost(s) {
     const U = BALANCE.upgrade;
-    const tier = Math.max(0, (s.maxEnergy - U.from) / U.step);
-    return Math.round(U.baseCost * Math.pow(U.costMul, tier));
+    const tier = Math.max(0, Math.round((s.maxEnergy - U.from) / U.step));
+    let c = U.baseCost * Math.pow(U.costMul, tier);
+    if (s.maxEnergy >= U.steepFrom) {
+      c *= U.steepMul * Math.pow(2, (s.maxEnergy - U.steepFrom) / U.step);
+    }
+    return Math.round(c);
   }
   function workCost(s, mode) { return Math.round(mode === 'half' ? s.maxEnergy / 2 : s.maxEnergy); }
   function workPay(s, mode) {
@@ -6860,13 +6864,13 @@ button{ color:inherit; font:inherit; }
       req: { fish: 4 }, fishPriced: true, priceMul: 4,
       cost: { fish: 2, crops: { potato: 1 } }, desc: '两条河鱼一锅炖' },
     { id: 'gameplatter', name: '野味拼盘', emoji: '🍖', lv: 5, energy: 2, restore: 30, days: 2, price: 300,
-      req: { forage: 6 }, cost: { fish: 1, crops: { mushroom: 2, berry: 2 } }, desc: '山里水里凑一桌' },
+      req: { forage: 6 }, cost: { fish: 2, crops: { mushroom: 2, berry: 2 } }, desc: '山里水里凑一桌' },
     { id: 'honeypumpkin', name: '蜂蜜烤南瓜', emoji: '🎃', lv: 5, energy: 2, restore: 30, days: 4, price: 330,
       source: 'shop', trade: 5, shopPrice: 3000,
       cost: { crops: { pumpkin: 1, berry: 2 } }, desc: '甜到心里' },
-    { id: 'ironpot', name: '铁锅乱炖', emoji: '🍳', lv: 4, energy: 2, restore: 26, days: 2, price: 240,
+    { id: 'ironpot', name: '铁锅乱炖', emoji: '🍳', lv: 4, energy: 2, restore: 26, days: 2, price: 190,
       source: 'iron',
-      cost: { fish: 1, crops: { potato: 1, carrot: 1 } }, desc: '铁制宝箱里翻出来的家常菜谱' },
+      cost: { fish: 2, crops: { potato: 1, carrot: 1 } }, desc: '铁制宝箱里翻出来的家常菜谱' },
     { id: 'pie', name: '南瓜派', emoji: '🥧', lv: 6, energy: 2, restore: 25, days: 4, price: 198,
       cost: { crops: { pumpkin: 1, corn: 2 } }, desc: '烤得金黄，切八块' },
     { id: 'sashimi', name: '鱼生拼盘', emoji: '🍣', lv: 7, energy: 2, restore: 28, days: 1,
@@ -6908,7 +6912,6 @@ button{ color:inherit; font:inherit; }
     if (req.fish) parts.push('钓鱼 Lv' + req.fish);
     if (req.forage) parts.push('采集 Lv' + req.forage);
     if (r.source === 'shop') parts.push('百货店配方（交易 Lv' + r.trade + '）');
-    if (r.source === 'gold') parts.push('黄金宝箱掉落');
     return parts.join(' · ');
   }
   function recipeLockText(s, r) {
