@@ -2110,8 +2110,8 @@ button{ color:inherit; font:inherit; }
     /* 鱼汛：汛期权重 ×in、非汛期 ×off */
     fishSeason: { in: 1.25, off: 0.3 },
 
+    /* 各饵咬钩基础率；天气修正只在 WEATHER[*].hookMod 里写一份，别处不要再抄 */
     hook: { dough: 0.92, worm: 0.97, lure: 0.72, lure2: 0.92, premium: 0.95 },
-    weatherHook: { sunny: -0.12, cloudy: 0, rain: 0.08 },
     bait: { wormGood: 1.35, lureTrash: 0.3, lureGood: 1.10, premiumGood: 1.25 },
     netChance: 0.8,
     /* 渔网抓完鱼要重新布置：每张 1 体力 */

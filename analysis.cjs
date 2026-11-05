@@ -32,7 +32,7 @@ const pad = function (s, n) { s = String(s); while (s.length < n) s += ' '; retu
 
 /* ---------- 1. 种田 ---------- */
 function farmRows(level) {
-  const bonus = Math.floor(level / 4);
+  const bonus = Math.floor(level / G.BALANCE.level.yieldEvery);
   return G.CROP_LIST.map(function (c) {
     const fert = !c.multi;                         // 大作物只吃肥料的品质加成
     const add = (fert && !c.big) ? G.FERT.normal.add : 0;
@@ -52,7 +52,7 @@ function farmRows(level) {
 console.log('== 种田：每块地每天的净收益 ==');
 [1, 5, 8].forEach(function (lv) {
   const rows = farmRows(lv);
-  console.log('\n  种田 Lv' + lv + '（产量 +' + Math.floor(lv / 5) + '）');
+  console.log('\n  种田 Lv' + lv + '（产量 +' + Math.floor(lv / G.BALANCE.level.yieldEvery) + '）');
   rows.forEach(function (r) {
     console.log('   ' + pad(r.name, 4) + pad(r.qty + '个/' + r.days + '天', 11) +
       pad('净 ' + Math.round(r.net) + ' 金', 11) +
@@ -67,6 +67,7 @@ function evBait(kind, weather, level, n) {
   s.levels.fish = level;
   if (kind === 'worm') s.bait.worm = 1e9;
   else if (kind === 'dough') s.bait.dough = 1e9;
+  else if (kind === 'premium') s.bait.premium = 1e9;
   else if (kind === 'lure2') s.lure2 = { owned: true, dur: 1e9 };
   else s.lure = { owned: true, dur: 1e9 };
   let sum = 0, bite = 0;
@@ -80,17 +81,25 @@ function evBait(kind, weather, level, n) {
 }
 
 console.log('\n== 钓鱼：每杆期望（阴天，Lv1 / Lv10）==');
-const baits = [['dough', '面团', 1], ['worm', '蚯蚓', 0], ['lure', '假饵', 0.25],
-               ['lure2', '高级假饵', 20 / 100]];
+const baitCost = {
+  dough: G.BAIT.dough.price,
+  worm: 0,
+  lure: G.BALANCE.lure.price / G.BALANCE.lure.dur,
+  lure2: G.BALANCE.lure2.price / G.BALANCE.lure2.dur,
+  premium: G.BAIT.premium.price
+};
+const baits = [['dough', '面团'], ['worm', '蚯蚓'], ['lure', '假饵'],
+               ['lure2', '高级假饵'], ['premium', '特级']];
 baits.forEach(function (b) {
   G.setRng(mulberry32(7));
   const a = evBait(b[0], 'cloudy', 1, 6000);
   G.setRng(mulberry32(7));
   const z = evBait(b[0], 'cloudy', 10, 6000);
+  const cost = baitCost[b[0]];
   console.log('   ' + pad(b[1], 4) + '咬钩 ' + (a.bite * 100).toFixed(0) + '% / ' + (z.bite * 100).toFixed(0) +
     '% · 每杆 ' + a.ev.toFixed(2) + ' / ' + z.ev.toFixed(2) + ' 金' +
-    ' · 净 ' + (a.ev - b[2]).toFixed(2) + ' / ' + (z.ev - b[2]).toFixed(2) +
-    ' · 每体力 ' + ((a.ev - b[2]) / 2).toFixed(2) + ' / ' + ((z.ev - b[2]) / 2).toFixed(2));
+    ' · 净 ' + (a.ev - cost).toFixed(2) + ' / ' + (z.ev - cost).toFixed(2) +
+    ' · 每体力 ' + ((a.ev - cost) / 2).toFixed(2) + ' / ' + ((z.ev - cost) / 2).toFixed(2));
 });
 
 const weatherRow = ['sunny', 'cloudy', 'rain'].map(function (w) {
@@ -125,11 +134,26 @@ console.log('   鱼汛表：' + G.FISH.filter(function (f) { return f.seasons; }
   .map(function (f) { return f.name + ' ' + f.seasons.map(function (i) { return G.SEASONS[i]; }).join(''); })
   .join(' · '));
 
-/* 蚯蚓要花体力挖：3 体力挖 1~3 条，晴天 −1、阴雨 +1 */
-const wormAvg = 3;                        // 阴天 2~4 条
-const wormPerCastE = 2 + 3 / wormAvg;     // 1 杆 2 点体力 + 一根蚯蚓摊到的挖掘体力
-console.log('   蚯蚓算上挖掘成本：阴天约 ' + (9.21 / wormPerCastE).toFixed(2) +
-  ' 金/体力，晴天约 ' + (8.1 / (2 + 3 / 1.5)).toFixed(2) + ' 金/体力');
+/* 蚯蚓要花体力挖：基础 1~3 条，Lv4/Lv8 各 +1，阴天 +1、晴天 −1；满级挖一次只要 2 体力 */
+function wormStats(lv, weather) {
+  const s = G.createState();
+  s.levels.dig = lv;
+  const avg = (G.BALANCE.dig.min + G.BALANCE.dig.max) / 2 +
+    G.digYieldBonus(s) + G.WEATHER[weather].wormMod;
+  const cost = G.digCost(s);
+  return { avg: avg, cost: cost };
+}
+['cloudy', 'sunny'].forEach(function (w) {
+  const lo = wormStats(1, w), hi = wormStats(G.BALANCE.level.max, w);
+  G.setRng(mulberry32(7));
+  const loEV = evBait('worm', w, 1, 3000).ev;
+  G.setRng(mulberry32(7));
+  const hiEV = evBait('worm', w, G.BALANCE.level.max, 3000).ev;
+  console.log('   蚯蚓算上挖掘成本（' + G.WEATHER[w].name + '）：Lv1 每杆 ' + loEV.toFixed(2) + ' 金、挖 ' +
+    lo.avg + ' 条/次 → ' + (loEV / (G.BALANCE.energy.fish + lo.cost / lo.avg)).toFixed(2) +
+    ' 金/体力；满级 ' + hiEV.toFixed(2) + ' 金、挖 ' + hi.avg + ' 条/次（' + hi.cost + ' 体力/次）→ ' +
+    (hiEV / (G.BALANCE.energy.fish + hi.cost / hi.avg)).toFixed(2) + ' 金/体力');
+});
 
 /* ---------- 3. 渔网 ---------- */
 const netPool = G.FISH.filter(function (f) { return !f.trash && !f.noOrder; });
@@ -192,7 +216,7 @@ const devRows = [
   ['渔网', G.NET_COST, netPerDay, 0],
   ['洒水器', G.SPRINKLER_COST, fishPerE - 3 / 7, 1],                 // 每天省 1 点浇水体力
   ['自动收获器(5 块地)', G.HARVESTER_COST, 1.25 * fishPerE - 5 / 7, 1.25],
-  ['自动收获器(36 块地)', G.HARVESTER_COST, 9 * fishPerE - 5 / 7, 9],
+  ['自动收获器(40 块地)', G.HARVESTER_COST, 10 * fishPerE - 5 / 7, 10],
   /* 自动播种器：一台 5 块地，每晚省 5 点播种体力，每台每周 6 金 */
   ['自动播种器(1 台/5 块)', G.SEEDER_COST,
     5 * fishPerE - G.BALANCE.upkeep.seeder / 7, 5],
@@ -218,7 +242,7 @@ function costs(maxEnergy, plots, sprinklers, nets, harvester, seeders) {
 /* ---------- 6. 三种经营模型 ---------- */
 function scenario(label, day, level, plots, energy, nets, sprinklers, harvester, cropId, coins) {
   const c = G.CROPS[cropId];
-  const bonus = Math.floor(level / 5);
+  const bonus = Math.floor(level / G.BALANCE.level.yieldEvery);
   const fert = !c.big && !c.multi;
   const qty = c.big ? 1 : (c.multi ? c.firstQty + c.regrowTimes * c.regrowQty : c.base + G.FERT.normal.add + bonus);
   const days = c.multi ? c.days + c.regrowTimes * c.regrowDays : c.days;
@@ -230,7 +254,8 @@ function scenario(label, day, level, plots, energy, nets, sprinklers, harvester,
   const otherPerDay = plots * (1 + (c.multi ? c.regrowTimes + 1 : 1)) / days;
   const farmEnergy = waterPerDay + otherPerDay;
   const fishCasts = Math.floor(Math.max(0, energy - farmEnergy) / 2);
-  const fishPerDay = fishCasts * (level >= 10 ? 6.73 : (level >= 5 ? 6.5 : 6.27));
+  const castNet = evBait('dough', 'cloudy', level, 2500).ev - G.BAIT.dough.price;
+  const fishPerDay = fishCasts * castNet;
   const netIncome = nets * netPerDay;
   const st = G.createState(); st.coins = coins; st.day = day;
   const tax = G.taxDue(st);
@@ -240,15 +265,17 @@ function scenario(label, day, level, plots, energy, nets, sprinklers, harvester,
   console.log('   种田 ' + farmPerDay.toFixed(0) + '（耗体力 ' + farmEnergy.toFixed(0) + '）' +
     ' + 钓鱼 ' + fishPerDay.toFixed(0) + '（' + fishCasts + ' 杆）' +
     ' + 渔网 ' + netIncome.toFixed(0) + ' = 毛收入 ' + gross.toFixed(0) + ' 金/天');
+  const net = gross - co.meal - co.upkeep - tax / 30;
   console.log('   伙食 ' + co.meal.toFixed(1) + ' + 维护 ' + co.upkeep.toFixed(1) +
     ' + 税 ' + (tax / 30).toFixed(1) + ' = 支出 ' + (co.meal + co.upkeep + tax / 30).toFixed(1) +
-    ' → 净 ' + (gross - co.meal - co.upkeep - tax / 30).toFixed(0) + ' 金/天');
+    ' → 净 ' + net.toFixed(0) + ' 金/天');
+  return net;
 }
 
 console.log('\n== 三种经营模型的日净收入 ==');
 scenario('早期', 3, 1, 5, 15, 0, 0, false, 'carrot', 100);
 scenario('中期', 20, 4, 15, 45, 3, 10, false, 'corn', 2000);
-scenario('后期', 60, 8, 36, 100, 9, 36, true, 'eggplant', 15000);
+const lateNet = scenario('后期', 60, 8, 40, 100, 9, 40, true, 'eggplant', 15000);
 
 /* ---------- 7. 委托 ---------- */
 console.log('\n== 委托收益 ==');
@@ -275,7 +302,7 @@ console.log('   鱼单：' + osFish.qty + ' 条 → ' + osFish.reward + ' 金（
 
 /* ---------- 8. 维护费 ---------- */
 console.log('\n== 维护费 ==');
-[[10, 0, 0, 0], [20, 10, 3, 1], [36, 36, 9, 1]].forEach(function (row) {
+[[10, 0, 0, 0], [20, 10, 3, 1], [40, 40, 9, 1]].forEach(function (row) {
   const plots = row[0], sp = row[1], nets = row[2], harv = !!row[3];
   const land = G.plotUpkeep(plots);
   const dev = sp * G.BALANCE.upkeep.sprinkle + nets * G.BALANCE.upkeep.net +
@@ -287,8 +314,11 @@ console.log('\n== 维护费 ==');
 });
 console.log('   土地：6–20 块 3 金/周、21–30 块 6 金/周、31 块以上 ' + G.BALANCE.upkeep.plotHigh + ' 金/周；' +
   '洒水器 3/周、收获器 5/周、渔网免费');
-console.log('   参考：36 地图后期日毛收入约 1073，维护费占 ' +
-  ((G.plotUpkeep(36) + 36 * 3 + 5) / 7 / 1073 * 100).toFixed(1) + '%');
+{
+  const week40 = (G.plotUpkeep(40) + 40 * G.BALANCE.upkeep.sprinkle + G.BALANCE.upkeep.harvester) / 7;
+  console.log('   参考：40 块地全自动每天维护 ' + week40.toFixed(1) + ' 金，占后期日净（约 ' +
+    Math.round(lateNet) + ' 金）的 ' + (week40 / lateNet * 100).toFixed(1) + '%');
+}
 
 /* ---------- 9. 市场价格 ---------- */
 console.log('\n== 市场价格 ==');
@@ -401,7 +431,7 @@ console.log('\n== 雇佣渔夫（钓鱼 Lv' + G.BALANCE.gate.fisher + ' 解锁�
     const wage = F.wageBase + F.wageStep * (lv - 1);
     const net = d.value - d.casts * 1 - wage;
     const cum = F.hire + F.upCost * (lv - 1) * lv / 2;
-    console.log('   ' + pad('Lv' + lv, 4) + pad(d.casts + ' 杆', 5) + pad(wage + ' 金', 6) +
+    console.log('   ' + pad('Lv' + lv, 5) + pad(d.casts + ' 杆', 5) + pad(wage + ' 金', 6) +
       pad(d.value.toFixed(1), 9) + pad(net.toFixed(1), 9) + pad(Math.round(cum) + ' 金', 10) +
       (net > 0 ? Math.round(cum / net) + ' 天' : '—'));
   }
@@ -452,8 +482,8 @@ console.log('\n== 小镇捐赠（后期金币出口）==');
       '（本档 ' + (t.need - prev) + ' 金）→ ' + t.desc);
     prev = t.need;
   });
-  console.log('   三档捐满共 ' + total + ' 金 —— 36 块地图后期日净约 1000，约 ' +
-    Math.ceil(total / 1000) + ' 天存款就能买完');
+  console.log('   三档捐满共 ' + total + ' 金 —— 40 块地后期日净约 ' + Math.round(lateNet) + '，约 ' +
+    Math.ceil(total / Math.max(1, lateNet)) + ' 天存款就能买完');
   console.log('   加成：委托 +5% / 商店进价 −10% / 买卖市价 +8%（可叠加）');
 }
 
@@ -467,17 +497,22 @@ console.log('\n== 果园（种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.B
   const fresh = G.BALANCE.market.supplyMax;
   const DAYS = 120;                       // 一年 = 4 季 × 30 天
   const avgFruit = (O.fruitMin + O.fruitMax) / 2;
-  console.log('   产量：当季每天随机 ' + O.fruitMin + '–' + O.fruitMax + ' 个/棵，期望 ' + avgFruit.toFixed(1) + ' 个；卖价：收购箱按次日市价 ×95% 结算，当季刚上市 ×' + fresh + '，囤到反季 ×' +
-    (fresh * off).toFixed(2) + '（每季只产 30 天，囤起来卖得掉吗？见文末）');
+  const fruitAt = function (lv) { return avgFruit + (lv - 1) * O.treeLvYield; };
+  const maxBonus = (O.treeLvMax - 1) * O.treeLvYield;
+  console.log('   产量：当季每天随机 ' + O.fruitMin + '–' + O.fruitMax + ' 个/棵（期望 ' + avgFruit.toFixed(1) +
+    '），挂到 ' + O.ripeCap + ' 个封顶；成树每高一级 +' + Math.round(O.treeLvYield * 100) +
+    '% 概率多挂 1 个（满级 +' + Math.round(maxBonus * 100) + '%）');
   const list = G.TREE_LIST.map(function (t) {
     const perDay = avgFruit * t.price;
-    const season = perDay * 30;
-    return { t: t, perDay: perDay, season: season, offSeason: Math.round(season * off) };
+    const season = perDay * G.BALANCE.seasonDays;
+    return { t: t, perDay: perDay, season: season, offSeason: Math.round(season * off),
+             maxSeason: Math.round(fruitAt(O.treeLvMax) * G.BALANCE.seasonDays * t.price) };
   });
   list.forEach(function (x) {
     console.log('   ' + pad(x.t.name, 4) + ' ' + S[x.t.season] + '季 · 种子 ' + pad(x.t.seed + ' 金', 6) +
-      ' / 树苗 ' + pad(x.t.sapling + ' 金', 7) + ' · 当季 ' + pad(x.perDay + ' 金/天', 9) +
-      ' · 一季 ' + pad(x.season + ' 金', 6) + '（囤到反季 ' + pad(x.offSeason + ' 金', 6) + '）');
+      ' / 树苗 ' + pad(x.t.sapling + ' 金', 7) + ' · 当季 ' + pad(Math.round(x.perDay) + ' 金/天', 9) +
+      ' · 一季 ' + pad(Math.round(x.season) + ' 金', 6) + '（囤到反季 ' + pad(x.offSeason + ' 金', 6) +
+      '）· 满级一季 ' + Math.round(x.maxSeason) + ' 金');
   });
   const saplingSum = list.reduce(function (n, x) { return n + x.t.sapling; }, 0);
   const seedSum = list.reduce(function (n, x) { return n + x.t.seed; }, 0);
@@ -487,11 +522,19 @@ console.log('\n== 果园（种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.B
   console.log('   起步（3 个免费坑各一棵树苗）：' + inv3 + ' 金 · 3 棵合计 ' + Math.round(avg3Day) +
     ' 金/天（每棵 ' + avgPerTreeDay.toFixed(1) + '）· 回本约 ' + Math.ceil(inv3 / avg3Day) + ' 天');
 
+  /* 成树等级：收一次 +1 经验，升 Lv2/3/4/5 各要 2/4/6/8 次 */
+  let lvXp = 0;
+  for (let l = 1; l < O.treeLvMax; l++) lvXp += O.treeXpBase + O.treeXpStep * (l - 1);
+  console.log('   成树等级：满级要 ' + lvXp + ' 次收获（当季天天收约 ' + (lvXp / 30).toFixed(1) +
+    ' 季）· 满级后期望 ' + fruitAt(O.treeLvMax).toFixed(1) + ' 个/天（+' +
+    Math.round((fruitAt(O.treeLvMax) / avgFruit - 1) * 100) + '%）· 挂果上限 ' + O.ripeCap +
+    ' 个，Lv1 约 ' + (O.ripeCap / avgFruit).toFixed(1) + ' 天挂满，再久不收就白挂');
+
   // 单棵树苗的回本：一次栽下，之后每年只产 30 天
   console.log('   单棵回本（按当季卖）：');
   list.forEach(function (x) {
     console.log('      ' + pad(x.t.name, 4) + '树苗 ' + pad(x.t.sapling + ' 金', 5) + ' vs 一季 ' +
-      pad(x.season + ' 金', 6) + ' → ' +
+      pad(Math.round(x.season) + ' 金', 6) + ' → ' +
       (x.t.sapling <= x.season
         ? '赶上当季就能回本（约 ' + Math.ceil(x.t.sapling / x.perDay) + ' 天产量）'
         : '要两季') +
@@ -509,7 +552,7 @@ console.log('\n== 果园（种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.B
       pad(Math.round(cost) + ' 金', 6) + ' · 回本 ' + Math.ceil(cost / avgSeason * DAYS) + ' 天');
   });
 
-  // 满配
+  // 满配（果园共 8 个坑）
   const treeCount = { peach: 3, mango: 3, apple: 2 };
   let yearIn = 0, yearOff = 0, trees = 0;
   list.forEach(function (x) {
@@ -519,27 +562,30 @@ console.log('\n== 果园（种田 Lv' + G.BALANCE.orchard.unlockLv + ' + ' + G.B
   const invest = O.unlockCost + O.slotCosts.reduce(function (a, b) { return a + b; }, 0) +
     list.reduce(function (n, x) { return n + (treeCount[x.t.id] || 0) * x.t.sapling; }, 0);
   console.log('   满配 ' + trees + ' 棵（桃 3 / 芒果 3 / 苹果 2，全树苗）：投入 ' + invest +
-    ' 金 · 当季卖年入 ' + yearIn + ' 金（' + Math.round(yearIn / DAYS) + ' 金/天）· 回本 ' +
+    ' 金 · 当季卖年入 ' + Math.round(yearIn) + ' 金（' + Math.round(yearIn / DAYS) + ' 金/天）· 回本 ' +
     Math.ceil(invest / (yearIn / DAYS)) + ' 天');
-  console.log('     囤到反季卖：年入 ' + yearOff + ' 金（' + Math.round(yearOff / DAYS) +
+  console.log('     囤到反季卖：年入 ' + Math.round(yearOff) + ' 金（' + Math.round(yearOff / DAYS) +
     ' 金/天）· 回本 ' + Math.ceil(invest / (yearOff / DAYS)) + ' 天');
   console.log('   种子路线：三棵合计 ' + seedSum + ' 金（树苗 ' + saplingSum + '，省 ' +
     Math.round((1 - seedSum / saplingSum) * 100) + '%）· 浇水 ' + O.grow.seed.water +
     ' 天 + 生长 ' + O.grow.seed.days + ' 天');
-  console.log('   体力：种子 30 点 / 树苗 15 点育苗浇水；收获 1 点/棵（攒到季末一次收）');
-  console.log('   对比：农田 1 块地约 10~26 金/天；果园 1 个坑（当季卖）约 ' +
+  console.log('   体力：种子 ' + O.grow.seed.water + ' 点 / 树苗 ' + O.grow.sapling.water +
+    ' 点育苗浇水；收获 ' + O.harvestEnergy + ' 点/棵（攒到季末一次收）');
+  const farmPerDay = farmRows(5).map(function (r) { return r.perDay; });
+  console.log('   对比：农田 1 块地约 ' + Math.round(Math.min.apply(null, farmPerDay)) + '~' +
+    Math.round(Math.max.apply(null, farmPerDay)) + ' 金/天；果园 1 个坑（当季卖）约 ' +
     Math.round(avgSeason / DAYS) + ' 金/天，约半块地');
   console.log('   ⚠️ 水果按季节算市价：当季 ×' + fresh + '、反季 ×' + (fresh * off).toFixed(2) +
-    '，囤一季 60 个到反季卖，单棵年收入从 ' + Math.round(avgSeason) + ' 涨到 ' +
-    Math.round(avgSeason * off) + ' 金');
+    '，一季 ' + Math.round(avgFruit * G.BALANCE.seasonDays) + ' 个囤到反季卖，单棵年收入从 ' +
+    Math.round(avgSeason) + ' 涨到 ' + Math.round(avgSeason * off) + ' 金');
 }
 
 /* ---------- 16. 钓鱼专项 ---------- */
 console.log('\n== 钓鱼专项 ==');
 {
-  const KIND_LABEL = { dough: '面团饵', worm: '蚯蚓', lure: '假饵', lure2: '高级假饵' };
-  const KIND_COST = { dough: 1, worm: 0, lure: G.BALANCE.lure.price / G.BALANCE.lure.dur,
-                      lure2: G.BALANCE.lure2.price / G.BALANCE.lure2.dur };
+  const KIND_LABEL = { dough: '面团饵', worm: '蚯蚓', lure: '假饵', lure2: '高级假饵', premium: '特级饵料' };
+  const KIND_COST = { dough: G.BAIT.dough.price, worm: 0, lure: G.BALANCE.lure.price / G.BALANCE.lure.dur,
+                      lure2: G.BALANCE.lure2.price / G.BALANCE.lure2.dur, premium: G.BAIT.premium.price };
 
   /* 一次模拟：咬钩率、毛收益、杂物/宝箱/鱼各多少 */
   function sim(kind, level, weather, day, n) {
@@ -548,6 +594,7 @@ console.log('\n== 钓鱼专项 ==');
     s.levels.fish = level;
     if (kind === 'worm') s.bait.worm = 1e9;
     else if (kind === 'dough') s.bait.dough = 1e9;
+    else if (kind === 'premium') s.bait.premium = 1e9;
     else if (kind === 'lure2') s.lure2 = { owned: true, dur: 1e9 };
     else s.lure = { owned: true, dur: 1e9 };
     let sum = 0, bite = 0, fishN = 0, junkN = 0, chestV = 0;
@@ -566,24 +613,24 @@ console.log('\n== 钓鱼专项 ==');
              fish: fishN / n, junk: junkN / n, chestV: chestV / n, chest: chest };
   }
 
-  /* 1) 每杆净收益：4 种饵 × 3 个等级 */
+  /* 1) 每杆净收益：5 种饵 × 3 个等级 */
   console.log('   ① 每杆净收益（阴天，扣饵成本；体力按 2 金/点另算）');
   console.log('   ' + pad('饵', 10) + pad('Lv1', 9) + pad('Lv5', 9) + pad('Lv10', 9) +
     pad('饵成本/杆', 11) + 'Lv10 金/体力');
   const sum1 = {}, sum10 = {};
-  [['dough', 1], ['worm', 0], ['lure', 0.25], ['lure2', 0.8]].forEach(function (b) {
+  ['dough', 'worm', 'lure', 'lure2', 'premium'].forEach(function (kind) {
     G.setRng(mulberry32(7));
-    const l1 = sim(b[0], 1, 'cloudy', 31, 6000);
+    const l1 = sim(kind, 1, 'cloudy', 31, 6000);
     G.setRng(mulberry32(7));
-    const l5 = sim(b[0], 5, 'cloudy', 31, 6000);
+    const l5 = sim(kind, 5, 'cloudy', 31, 6000);
     G.setRng(mulberry32(7));
-    const l10 = sim(b[0], 10, 'cloudy', 31, 6000);
-    const net = function (r) { return r.ev - KIND_COST[b[0]]; };
-    sum1[b[0]] = net(l1);
-    sum10[b[0]] = net(l10);
-    console.log('   ' + pad(KIND_LABEL[b[0]], 10) + pad(net(l1).toFixed(2), 9) +
+    const l10 = sim(kind, 10, 'cloudy', 31, 6000);
+    const net = function (r) { return r.ev - KIND_COST[kind]; };
+    sum1[kind] = net(l1);
+    sum10[kind] = net(l10);
+    console.log('   ' + pad(KIND_LABEL[kind], 10) + pad(net(l1).toFixed(2), 9) +
       pad(net(l5).toFixed(2), 9) + pad(net(l10).toFixed(2), 9) +
-      pad(KIND_COST[b[0]].toFixed(2), 11) + (net(l10) / 2).toFixed(2));
+      pad(KIND_COST[kind].toFixed(2), 11) + (net(l10) / 2).toFixed(2));
   });
 
   /* 2) 宝箱：掉率与开箱净收益 */
@@ -603,13 +650,18 @@ console.log('\n== 钓鱼专项 ==');
 
   /* 3) 各玩法 1 点体力能换多少金 */
   const farmBest = farmRows(5).slice().sort(function (a, b) { return b.perE - a.perE; })[0];
+  const wildBest = G.WILD_LIST.reduce(function (a, w) {
+    const per = w.price * qEV(1) * (1 + G.BALANCE.forage.qty2 + G.BALANCE.forage.qty3);
+    return (!a || per > a.per) ? { per: per, name: w.name } : a;
+  }, null);
+  const wildPerE = wildBest.per / G.forageCost(G.createState());
   const rows = [
     ['打零工（全天）', G.WORK_RATE_FULL, '稳，每天一次'],
     ['钓鱼 面团饵 Lv1', sum1.dough / 2, '还要 2 体力/杆'],
     ['钓鱼 面团饵 Lv10', sum10.dough / 2, ''],
-    ['钓鱼 高级假饵 Lv10', sum10.lure2 / 2, '最强饵'],
-    ['采集 松茸（秋）', 24 * qEV(1) * (1 + G.BALANCE.forage.qty2 + G.BALANCE.forage.qty3) /
-      G.BALANCE.forage.energy, '5 体力/次'],
+    ['钓鱼 高级假饵 Lv10', sum10.lure2 / 2, '省心'],
+    ['钓鱼 特级饵料 Lv10', sum10.premium / 2, '专门冲好鱼'],
+    ['采集 ' + wildBest.name, wildPerE, G.BALANCE.forage.energy + ' 体力/次'],
     ['种田 ' + farmBest.name + '（Lv5）', farmBest.perE, '折算到体力']
   ];
   rows.sort(function (a, b) { return b[1] - a[1]; });
@@ -633,7 +685,10 @@ console.log('\n== 钓鱼专项 ==');
   /* 5) 结论用数据 */
   console.log('   ⑤ 现状：Lv10 面团饵每杆净 ' + sum10.dough.toFixed(2) + '（' +
     (sum10.dough / 2).toFixed(2) + ' 金/体力），空竿率 ' + ((1 - c10.bite) * 100).toFixed(0) +
-    '%；Lv1 只有 ' + (sum1.dough / 2).toFixed(2) + ' 金/体力 —— 比打零工（2.00）高，比采集（松茸 10.39）低');
+    '%；Lv1 只有 ' + (sum1.dough / 2).toFixed(2) + ' 金/体力 —— 比打零工（' +
+    G.WORK_RATE_FULL.toFixed(2) + '）' + (sum1.dough / 2 >= G.WORK_RATE_FULL ? '高' : '低') +
+    '，比采集（' + wildBest.name + ' ' + wildPerE.toFixed(2) + '）' +
+    (sum1.dough / 2 >= wildPerE ? '高' : '低'));
 }
 
 /* ---------- 16. 交易等级 ---------- */
@@ -644,12 +699,12 @@ console.log('\n== 交易等级（买卖成交额换经验）==');
   let cumXp = 0, cumGold = 0;
   console.log('   每 ' + T.xpPer + ' 金交易额 = 1 经验 · 每级进价 −' +
     (T.buyCut * 100).toFixed(1) + '%（封顶 −' + (T.maxCut * 100).toFixed(1) + '%）');
-  console.log('   ' + pad('等级', 6) + pad('升级需经验', 12) + pad('累计经验', 10) +
+  console.log('   ' + pad('等级', 8) + pad('升级需经验', 12) + pad('累计经验', 10) +
     pad('累计交易额', 12) + '进价折扣');
   for (let lv = 1; lv < G.BALANCE.level.max; lv++) {
     const n = need(lv);
     cumXp += n; cumGold = cumXp * T.xpPer;
-    console.log('   ' + pad('Lv' + lv + '→' + (lv + 1), 6) + pad(n + ' 点', 12) +
+    console.log('   ' + pad('Lv' + lv + '→' + (lv + 1), 8) + pad(n + ' 点', 12) +
       pad(cumXp + ' 点', 10) + pad(cumGold + ' 金', 12) +
       '−' + (Math.min(T.maxCut, lv * T.buyCut) * 100).toFixed(1) + '%');
   }
@@ -725,33 +780,34 @@ console.log('\n== 成就（' + G.ACH.length + ' 项）==');
 console.log('\n== 其他活动收益（每体力 / 每天）==');
 {
   const B = G.BALANCE;
-  const q = 1.03;                                   // 平均品质倍率（不用肥）
   const line = function (name, gold, energy, note) {
     const per = energy ? (gold / energy).toFixed(2) + ' 金/体力' : '—';
     console.log('   ' + pad(name, 16) + pad(gold.toFixed(1) + ' 金', 10) + pad(per, 14) + (note || ''));
   };
 
   line('打零工（全天）', B.start.maxEnergy * B.work.full, B.start.maxEnergy, '每天 1 次');
-  [1, 4, 8].forEach(function (lv) {
-    const ev = (B.dig.min + B.dig.max) / 2 + Math.floor(lv / B.dig.yieldAt);
-    line('挖蚯蚓 Lv' + lv, ev * B.dig.value, B.dig.energy, '期望 ' + ev + ' 条');
+  [1, G.BALANCE.level.max].forEach(function (lv) {
+    const st = G.createState(); st.levels.dig = lv;
+    const ev = (B.dig.min + B.dig.max) / 2 + G.digYieldBonus(st);
+    line('挖蚯蚓 Lv' + lv, ev * B.dig.value, G.digCost(st), '期望 ' + ev + ' 条');
   });
   const avgWild = G.WILD_LIST.reduce(function (a, w) { return a + w.price; }, 0) / G.WILD_LIST.length;
   const evQty = 1 + B.forage.qty2 + B.forage.qty3;
-  line('采集 Lv1', evQty * avgWild * q, B.forage.energy, '期望 ' + evQty.toFixed(2) + ' 件 · 均 ' + avgWild.toFixed(1) + ' 金');
+  line('采集 Lv1', evQty * avgWild * qEV(1), B.forage.energy, '期望 ' + evQty.toFixed(2) + ' 件 · 均 ' + avgWild.toFixed(1) + ' 金');
   const fishEV = G.FISH.filter(function (f) { return !f.trash && !f.chest; })
-    .reduce(function (a, f) { return a + f.w * f.base * q; }, 0) /
+    .reduce(function (a, f) { return a + f.w * f.base * qEV(1); }, 0) /
     G.FISH.filter(function (f) { return !f.trash && !f.chest; }).reduce(function (a, f) { return a + f.w; }, 0);
-  line('渔网（每张）', G.NET_CHANCE * fishEV - B.lure.price, G.NET_CHANCE * B.netReset.energy,
+  const doughCost = G.BAIT.dough.price;
+  line('渔网（每张）', G.NET_CHANCE * fishEV - doughCost, G.NET_CHANCE * B.netReset.energy,
     '每天 1 份面团饵');
   [3, G.BALANCE.fisher.max].forEach(function (lv) {
     const casts = B.fisher.baseCasts + lv;
     const wage = B.fisher.wageBase + B.fisher.wageStep * (lv - 1);
-    line('渔夫 Lv' + lv, casts * (fishEV - B.lure.price) - wage, 0, casts + ' 杆 / 天，工资 ' + wage);
+    line('渔夫 Lv' + lv, casts * (fishEV - doughCost) - wage, 0, casts + ' 杆 / 天，工资 ' + wage);
   });
   G.TREE_LIST.forEach(function (t) {
     const perDay = (B.orchard.fruitMin + B.orchard.fruitMax) / 2;
     line(t.emoji + ' ' + t.name, perDay * t.price, 0,
-      '当季 ' + perDay + ' 个/天 · 一季 ' + Math.round(perDay * B.seasonDays * t.price) + ' 金 · 树苗 ' + t.sapling);
+      '当季 ' + perDay + ' 个/天（Lv1）· 一季 ' + Math.round(perDay * B.seasonDays * t.price) + ' 金 · 树苗 ' + t.sapling);
   });
 }
