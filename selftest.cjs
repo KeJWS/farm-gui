@@ -2906,6 +2906,11 @@ section('厨房与烹饪');
   ck.day = 10; ck.levels.farm = 3; ck.levels.fish = 2; ck.energy = 50; ck.maxEnergy = 50;
   ok(G.kitchenUnlocked(ck), '种田 Lv3 + 钓鱼 Lv2 解锁厨房');
   ok(G.cookRecipes().length === 17, '食谱 17 道', G.cookRecipes().length);
+  ok(G.cookRecipes().every(function (r) { return r.energy >= 2 && r.energy <= 5; }),
+     '食谱烹饪体力在 2–5 点之间', G.cookRecipes().map(function (r) { return r.energy; }));
+  const lockS = G.createState();
+  ok(G.recipeLockText(lockS, G.recipeById('royal')) === '未学会', '宝箱食谱不再显示黄金宝箱标签',
+     G.recipeLockText(lockS, G.recipeById('royal')));
   ok(G.cookRecipes().some(function (r) { return r.energy > 1; }), '不同食谱消耗不同体力',
      G.cookRecipes().map(function (r) { return r.energy; }));
   ok(!G.cookMeal(ck, 'soup').ok, '没食材做不了');

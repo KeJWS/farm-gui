@@ -2048,7 +2048,7 @@
             '成品品质至少比食材最好品质低 ' + G.BALANCE.cook.qualityFloorDrop + ' 档。',
           '<b>品质判定</b>：Lv' + G.BALANCE.cook.qualityAt[0] + ' / Lv' + G.BALANCE.cook.qualityAt[1] +
             ' 各多取一次最好，和施肥一个道理。',
-          '<b>体力按食谱算</b>：越简单的菜越省（1 点），硬菜要 2–3 点，食材不够 / 等级不够都做不了。'
+          '<b>体力按食谱算</b>：简单菜 2–3 点，硬菜 4–5 点，食材不够 / 等级不够都做不了。'
         ])) +
         '<table class="rule-table"><tr><th>菜</th><th>条件</th><th>食材</th><th>耗体力</th><th>回复</th><th>保质</th><th>卖价</th></tr>' +
         G.cookRecipes().map(function (r) {

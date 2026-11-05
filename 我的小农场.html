@@ -6840,47 +6840,47 @@ button{ color:inherit; font:inherit; }
    * price = 固定卖价；fishPriced + priceMul = 按实际食材价折算（鱼类食谱）
    * cost.crops 里的 id 可以是作物 / 野货 / 水果（都在 CROPS 表和仓库里） */
   const RECIPES = [
-    { id: 'soup', name: '蔬菜汤', emoji: '🥣', lv: 1, energy: 1, restore: 8, days: 3, price: 46,
+    { id: 'soup', name: '蔬菜汤', emoji: '🥣', lv: 1, energy: 2, restore: 8, days: 3, price: 46,
       cost: { crops: { carrot: 2, cabbage: 1 } }, desc: '萝卜炖白菜，暖胃' },
-    { id: 'grill', name: '香烤鱼', emoji: '🍢', lv: 1, energy: 1, restore: 10, days: 2,
+    { id: 'grill', name: '香烤鱼', emoji: '🍢', lv: 1, energy: 3, restore: 10, days: 2,
       fishPriced: true, priceMul: 5,
       cost: { fish: 1 }, desc: '现钓现烤，鱼越贵菜越值钱' },
-    { id: 'jam', name: '野莓酱', emoji: '🍯', lv: 2, energy: 1, restore: 9, days: 4, price: 66,
+    { id: 'jam', name: '野莓酱', emoji: '🍯', lv: 2, energy: 2, restore: 9, days: 4, price: 66,
       cost: { crops: { berry: 2 } }, desc: '抹面包能吃一星期' },
-    { id: 'cornsoup', name: '玉米浓汤', emoji: '🌽', lv: 2, energy: 1, restore: 15, days: 3, price: 100,
+    { id: 'cornsoup', name: '玉米浓汤', emoji: '🌽', lv: 2, energy: 3, restore: 15, days: 3, price: 100,
       req: { farm: 3 }, cost: { crops: { corn: 3 } }, desc: '奶油和玉米一起煮' },
-    { id: 'mushroomsoup', name: '菌菇汤', emoji: '🍲', lv: 2, energy: 1, restore: 18, days: 3, price: 112,
+    { id: 'mushroomsoup', name: '菌菇汤', emoji: '🍲', lv: 2, energy: 3, restore: 18, days: 3, price: 112,
       req: { forage: 3 }, cost: { crops: { mushroom: 1, shepherd: 2 } }, desc: '山里的鲜味' },
-    { id: 'stew', name: '蘑菇炖菜', emoji: '🥘', lv: 3, energy: 2, restore: 16, days: 3, price: 96,
+    { id: 'stew', name: '蘑菇炖菜', emoji: '🥘', lv: 3, energy: 3, restore: 16, days: 3, price: 96,
       cost: { crops: { mushroom: 1, potato: 2 } }, desc: '松茸配土豆，鲜掉眉毛' },
-    { id: 'stirfry', name: '辣味小炒', emoji: '🌶️', lv: 3, energy: 2, restore: 20, days: 2, price: 130,
+    { id: 'stirfry', name: '辣味小炒', emoji: '🌶️', lv: 3, energy: 4, restore: 20, days: 2, price: 130,
       req: { farm: 5 }, cost: { crops: { chili: 2, eggplant: 1 } }, desc: '下饭，就是有点辣' },
-    { id: 'steamedfish', name: '玉米蒸鱼', emoji: '🐟', lv: 3, energy: 2, restore: 24, days: 3, price: 210,
+    { id: 'steamedfish', name: '玉米蒸鱼', emoji: '🐟', lv: 3, energy: 4, restore: 24, days: 3, price: 210,
       source: 'shop', trade: 3, shopPrice: 1500,
       cost: { fish: 1, crops: { corn: 2 } }, desc: '玉米垫底，清蒸河鱼' },
-    { id: 'salad', name: '水果沙拉', emoji: '🥗', lv: 4, energy: 2, restore: 14, days: 2, price: 108,
+    { id: 'salad', name: '水果沙拉', emoji: '🥗', lv: 4, energy: 3, restore: 14, days: 2, price: 108,
       cost: { crops: { fruit_peach: 1, berry: 2 } }, desc: '桃子野莓拌一拌' },
-    { id: 'riversoup', name: '河鲜汤', emoji: '🐟', lv: 4, energy: 1, restore: 22, days: 2,
+    { id: 'riversoup', name: '河鲜汤', emoji: '🐟', lv: 4, energy: 3, restore: 22, days: 2,
       req: { fish: 4 }, fishPriced: true, priceMul: 4,
       cost: { fish: 2, crops: { potato: 1 } }, desc: '两条河鱼一锅炖' },
-    { id: 'gameplatter', name: '野味拼盘', emoji: '🍖', lv: 5, energy: 2, restore: 30, days: 2, price: 300,
+    { id: 'gameplatter', name: '野味拼盘', emoji: '🍖', lv: 5, energy: 4, restore: 30, days: 2, price: 300,
       req: { forage: 6 }, cost: { fish: 2, crops: { mushroom: 2, berry: 2 } }, desc: '山里水里凑一桌' },
-    { id: 'honeypumpkin', name: '蜂蜜烤南瓜', emoji: '🎃', lv: 5, energy: 2, restore: 30, days: 4, price: 330,
+    { id: 'honeypumpkin', name: '蜂蜜烤南瓜', emoji: '🎃', lv: 5, energy: 4, restore: 30, days: 4, price: 330,
       source: 'shop', trade: 5, shopPrice: 3000,
       cost: { crops: { pumpkin: 1, berry: 2 } }, desc: '甜到心里' },
-    { id: 'ironpot', name: '铁锅乱炖', emoji: '🍳', lv: 4, energy: 2, restore: 26, days: 2, price: 190,
+    { id: 'ironpot', name: '铁锅乱炖', emoji: '🍳', lv: 4, energy: 4, restore: 26, days: 2, price: 190,
       source: 'iron',
       cost: { fish: 2, crops: { potato: 1, carrot: 1 } }, desc: '铁制宝箱里翻出来的家常菜谱' },
-    { id: 'pie', name: '南瓜派', emoji: '🥧', lv: 6, energy: 2, restore: 25, days: 4, price: 198,
+    { id: 'pie', name: '南瓜派', emoji: '🥧', lv: 6, energy: 4, restore: 25, days: 4, price: 198,
       cost: { crops: { pumpkin: 1, corn: 2 } }, desc: '烤得金黄，切八块' },
-    { id: 'sashimi', name: '鱼生拼盘', emoji: '🍣', lv: 7, energy: 2, restore: 28, days: 1,
+    { id: 'sashimi', name: '鱼生拼盘', emoji: '🍣', lv: 7, energy: 5, restore: 28, days: 1,
       fishPriced: true, priceMul: 4,
       cost: { fish: 2, crops: { carrot: 1 } }, desc: '刀工比食材更值钱' },
-    { id: 'royal', name: '皇家宴席', emoji: '👑', lv: 8, energy: 3, restore: 55, days: 3, price: 760,
+    { id: 'royal', name: '皇家宴席', emoji: '👑', lv: 8, energy: 5, restore: 55, days: 3, price: 760,
       source: 'gold',
       cost: { fish: 2, crops: { watermelon: 1, pumpkin: 1, mushroom: 1, fruit_peach: 1 } },
       desc: '黄金宝箱里掉出来的宫廷菜谱' },
-    { id: 'feast', name: '农家盛宴', emoji: '🍱', lv: 9, energy: 3, restore: 45, days: 3, price: 520,
+    { id: 'feast', name: '农家盛宴', emoji: '🍱', lv: 9, energy: 5, restore: 45, days: 3, price: 520,
       cost: { fish: 2, crops: { watermelon: 1, pumpkin: 1, mushroom: 1 } }, desc: '一桌硬菜' }
   ];
 
@@ -6916,7 +6916,7 @@ button{ color:inherit; font:inherit; }
   }
   function recipeLockText(s, r) {
     if (!recipeKnown(s, r)) {
-      return r.source === 'shop' ? '百货店买配方（交易 Lv' + r.trade + '）' : '黄金宝箱掉落';
+      return r.source === 'shop' ? '百货店买配方（交易 Lv' + r.trade + '）' : '未学会';
     }
     if (cookLv(s) < r.lv) return '烹饪 Lv' + r.lv;
     const req = r.req || {};
@@ -9292,7 +9292,7 @@ button{ color:inherit; font:inherit; }
             '成品品质至少比食材最好品质低 ' + G.BALANCE.cook.qualityFloorDrop + ' 档。',
           '<b>品质判定</b>：Lv' + G.BALANCE.cook.qualityAt[0] + ' / Lv' + G.BALANCE.cook.qualityAt[1] +
             ' 各多取一次最好，和施肥一个道理。',
-          '<b>体力按食谱算</b>：越简单的菜越省（1 点），硬菜要 2–3 点，食材不够 / 等级不够都做不了。'
+          '<b>体力按食谱算</b>：简单菜 2–3 点，硬菜 4–5 点，食材不够 / 等级不够都做不了。'
         ])) +
         '<table class="rule-table"><tr><th>菜</th><th>条件</th><th>食材</th><th>耗体力</th><th>回复</th><th>保质</th><th>卖价</th></tr>' +
         G.cookRecipes().map(function (r) {
