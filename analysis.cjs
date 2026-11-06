@@ -273,7 +273,7 @@ function scenario(label, day, level, plots, energy, nets, sprinklers, harvester,
 }
 
 console.log('\n== 三种经营模型的日净收入 ==');
-scenario('早期', 3, 1, 5, 15, 0, 0, false, 'carrot', 100);
+scenario('早期', 3, 1, G.BALANCE.start.plots, G.BALANCE.start.energy, 0, 0, false, 'carrot', 100);
 scenario('中期', 20, 4, 15, 45, 3, 10, false, 'corn', 2000);
 const lateNet = scenario('后期', 60, 8, 40, 100, 9, 40, true, 'eggplant', 15000);
 
@@ -810,4 +810,51 @@ console.log('\n== 其他活动收益（每体力 / 每天）==');
     line(t.emoji + ' ' + t.name, perDay * t.price, 0,
       '当季 ' + perDay + ' 个/天（Lv1）· 一季 ' + Math.round(perDay * B.seasonDays * t.price) + ' 金 · 树苗 ' + t.sapling);
   });
+}
+
+/* ---------- 13. 烹饪 ---------- */
+console.log('\n== 烹饪（厨房 / 熟食，满级视角）==');
+{
+  const B = G.BALANCE;
+  const fishables = G.FISH.filter(function (f) { return !f.trash && !f.chest && f.base < 100; });
+  const fishAvg = fishables.reduce(function (a, f) { return a + f.base; }, 0) / fishables.length;
+  const box = 1 - B.market.boxFee - B.market.boxFoodExtra;
+  const rolls = 1 + (B.cook.qualityAt || []).filter(function (at) { return G.BALANCE.level.max >= at; }).length;
+  const ev = qEV(rolls);
+  console.log('   食材按基准价计入成本（卖原料的机会成本），成品按 ' + rolls +
+    ' 次取好（×' + ev.toFixed(2) + '）、收购箱 ×' + box.toFixed(2) + ' 折算');
+
+  const rows = G.cookRecipes().map(function (r) {
+    const crops = r.cost.crops || {};
+    let cost = 0;
+    Object.keys(crops).forEach(function (id) {
+      cost += (G.CROPS[id] ? G.CROPS[id].price : 0) * crops[id];
+    });
+    cost += (r.cost.fish || 0) * fishAvg;
+    const base = r.fishPriced ? Math.round(cost * r.priceMul) : r.price;
+    const net = base * ev * box - cost;
+    return { r: r, cost: cost, base: base, net: net, perE: net / r.energy, mul: base / Math.max(1, cost) };
+  }).sort(function (a, b) { return b.perE - a.perE; });
+
+  rows.forEach(function (x) {
+    console.log('   ' + pad(x.r.emoji + ' ' + x.r.name, 9) + pad('Lv' + x.r.lv, 5) +
+      pad(x.r.energy + ' 体力', 8) + pad('卖 ' + x.base + ' 金', 10) +
+      pad('料 ' + Math.round(x.cost) + ' 金', 9) + pad('×' + x.mul.toFixed(1), 6) +
+      pad('净 ' + x.net.toFixed(0) + ' 金', 10) +
+      pad(x.perE.toFixed(1) + ' 金/体力', 13) + '保质 ' + x.r.days + ' 天 · 回复 +' + x.r.restore);
+  });
+
+  const best = rows[0], mid = rows[Math.floor(rows.length / 2)];
+  console.log('   份数：每天 3 份（Lv4 4 份 / Lv8 5 份）· 失败率 ' + B.cook.failBase * 100 + '% → ' +
+    B.cook.failMin * 100 + '%');
+  console.log('   品质：Lv1 取 1 次 ×' + qEV(1).toFixed(2) + ' · Lv4 2 次 ×' + qEV(2).toFixed(2) +
+    ' · Lv8 3 次 ×' + qEV(3).toFixed(2) + '（成品至少比最好食材低 1 档）');
+  console.log('   新鲜度：线性 100% → ' + Math.round(B.cook.freshMin * 100) + '%，平均 ≈' +
+    Math.round((1 + B.cook.freshMin) / 2 * 100) + '% —— 囤着卖一定亏，做完就吃掉/卖掉');
+  console.log('   头部 ' + best.r.name + ' ' + best.perE.toFixed(1) + ' 金/体力 · 尾部 ' +
+    rows[rows.length - 1].r.name + ' ' + rows[rows.length - 1].perE.toFixed(1) +
+    ' · 中位 ' + mid.perE.toFixed(1));
+  console.log('   每天上限：' + best.r.name + ' × 5 份 ≈ ' + Math.round(best.net * 5) +
+    ' 金（不吃不卖则无收益）· 食材够不够才是真瓶颈');
+  console.log('   对照：西瓜 18.9 金/体力 · 采集松茸 10.4 · 高级假饵钓鱼 6.2 —— 烹饪单体力最高，但每天只有 3~5 份');
 }
