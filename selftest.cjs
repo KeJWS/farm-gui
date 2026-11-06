@@ -999,18 +999,31 @@ ok(G.checkAchievements(achs).length === 0, '开局不会白送成就');
 achs.stats.harvests = 1;
 const achC0 = achs.coins;
 const achUn1 = G.checkAchievements(achs);
-ok(achUn1.some(x => x.id === 'harvest1') && achs.coins === achC0 + 15, '成就同时发点数与金币', achUn1);
+ok(achUn1.some(x => x.id === 'harvest1') && achs.coins === achC0,
+  '解锁成就只记进度，奖励不自动发', achs.coins - achC0);
 ok(G.achPts(achs) === 1, '解锁后获得 1 点成就点', G.achPts(achs));
-ok(G.checkAchievements(achs).length === 0, '同一成就不会重复发奖');
+ok(G.achInfo(achs).filter(x => x.id === 'harvest1')[0].claimable, '解锁后成就奖励可领取');
+const achCl1 = G.claimAchievement(achs, 'harvest1');
+ok(achCl1.ok && achs.coins === achC0 + 15, '手动领取后金币到账', achs.coins - achC0);
+ok(!G.claimAchievement(achs, 'harvest1').ok, '同一个成就不能重复领奖');
+ok(G.checkAchievements(achs).length === 0, '同一成就不会重复解锁');
 
 achs.fishBook.count = 1;
 const achD0 = achs.bait.dough;
 const achUn2 = G.checkAchievements(achs);
-ok(achUn2.some(x => x.id === 'fish1') && achs.bait.dough === achD0 + 5, '成就也会发实物奖励（面团饵）', achUn2);
+ok(achUn2.some(x => x.id === 'fish1') && achs.bait.dough === achD0, '实物奖励也要手动领');
+ok(G.claimAchievement(achs, 'fish1').ok && achs.bait.dough === achD0 + 5,
+  '领取后发实物奖励（面团饵）', achs.bait.dough);
 
 achs.coins = 100000;
 while (achs.plots.length < 10) G.expand(achs);
 ok(G.checkAchievements(achs).some(x => x.id === 'plot10'), '10 块地解锁成就');
+
+const achPend = G.achClaimList(achs).length;
+ok(achPend >= 1, '解锁后有待领取的成就奖励', achPend);
+const achAll = G.claimAllAchievements(achs);
+ok(achAll.ok && achAll.n === achPend && G.achClaimList(achs).length === 0, '一键领取清空待领列表', achAll);
+ok(!G.claimAllAchievements(achs).ok, '没有待领奖励时一键领取给提示');
 
 const achInf = G.achInfo(achs);
 ok(achInf.length === G.ACH.length, '成就面板条目数一致', achInf.length);
@@ -1022,12 +1035,23 @@ ok(G.fishDesc('不存在的鱼') === '', '未知渔获没有简述');
 
 const achRT = G.deserialize(G.serialize(achs));
 ok(achRT.ach.harvest1 && achRT.shop && typeof achRT.shop.stock === 'object', '成就与库存写进存档');
+ok(achRT.achClaim.harvest1 &&
+   Object.keys(achRT.achClaim).length === Object.keys(achRT.ach).length,
+   '已领状态一起存进存档', [Object.keys(achRT.achClaim).length, Object.keys(achRT.ach).length]);
 
 const achLegacy = JSON.parse(G.serialize(G.createState()));
 delete achLegacy.shop; delete achLegacy.ach;
 const achMig = G.deserialize(achLegacy);
 ok(achMig.shop && Object.keys(achMig.shop.stock).length > 0, '老存档自动补进货表');
 ok(achMig.ach && Object.keys(achMig.ach).length === 0, '老存档成就为空');
+
+/* 老存档（没有 achClaim 字段）：当年奖励已自动发过，读档视为已领，不重复发 */
+const achOld = JSON.parse(G.serialize(G.createState()));
+achOld.ach = { harvest1: 3 };
+delete achOld.achClaim;
+const achOldS = G.deserialize(achOld);
+ok(achOldS.achClaim.harvest1 === 3, '老存档的成就奖励视为已领', achOldS.achClaim);
+ok(G.achClaimList(achOldS).length === 0, '老存档不会冒出待领奖励');
 
 /* ---------- v1.7 农产品店 / 等级 / 委托池 / 假饵 ---------- */
 section('v1.7 农产品店与等级');
@@ -2479,25 +2503,44 @@ section('图鉴奖励');
   };
   addFish(['crucian', 'carp']);
   const got1 = G.checkCodexRewards(c);
-  ok(got1.length === 1 && got1[0].id === 'fish2', '收集 2 种鱼解锁第一档', got1);
-  ok(c.coins === G.BALANCE.start.coins + 150, '第一档奖励 150 金到账', c.coins);
-  ok(G.checkCodexRewards(c).length === 0, '同一档不会重复领取');
+  ok(got1.length === 1 && got1[0].id === 'fish2', '收集 2 种鱼：提示可领取', got1);
+  ok(c.coins === G.BALANCE.start.coins, '提示不等于发奖', c.coins);
+  ok(G.codexRewards(c).fish.filter(function (m) { return m.id === 'fish2'; })[0].claimable,
+    '第一档标记为可领取');
+  const cl1 = G.claimCodexReward(c, 'fish2');
+  ok(cl1.ok && c.coins === G.BALANCE.start.coins + 150, '手动领取后 150 金到账', c.coins);
+  ok(!G.claimCodexReward(c, 'fish2').ok, '同一档不能重复领取');
+  ok(G.checkCodexRewards(c).length === 0, '同一档不会重复提示');
 
   addFish(['mandarin', 'bass', 'puffer', 'koi']);
   const got2 = G.checkCodexRewards(c);
-  ok(got2.length === 2, '集满 6 种鱼一次补发后两档', got2.map(function (g) { return g.id; }));
-  ok(c.bait.dough === 15, '鱼档奖励的面团饵到账（5 + 10）', c.bait.dough);
+  ok(got2.length === 2, '集满 6 种鱼提示后两档', got2.map(function (g) { return g.id; }));
+  ok(c.bait.dough === 0, '提示时饵料还没到账');
+  const clAll = G.claimAllCodex(c);
+  ok(clAll.ok && clAll.n === 2 && c.bait.dough === 15, '一键领取后两档饵料到账', c.bait.dough);
 
   G.CROP_LIST.forEach(function (crop) {
     c.codex.crops[crop.id] = { n: 1, best: 'std', first: 1, value: 5 };
   });
   const got3 = G.checkCodexRewards(c);
   ok(got3.length === 3, '作物 5 / 10 / 14 三档一次补齐', got3.map(function (g) { return g.id; }));
+  ok(c.ferts.normal === 0 && c.ferts.special === 0, '作物档也要手动领取');
+  ok(G.claimAllCodex(c).n === 3, '作物三档一键领取');
   ok(c.ferts.normal === 3 && c.ferts.special === 3, '作物档奖励的肥料到账', [c.ferts.normal, c.ferts.special]);
 
   const round = G.deserialize(G.serialize(c));
   ok(G.checkCodexRewards(round).length === 0, '读档后已领的档位不会重发');
   ok(G.codexRewards(round).crops.every(function (m) { return m.claimed; }), '读档保留领取状态');
+
+  /* 已达标但没领的档位，存档往返后仍然可领 */
+  const pend = G.createState();
+  G.CROP_LIST.slice(0, 5).forEach(function (crop) {
+    pend.codex.crops[crop.id] = { n: 1, best: 'std', first: 1, value: 5 };
+  });
+  G.checkCodexRewards(pend);
+  const pendRT = G.deserialize(G.serialize(pend));
+  ok(G.codexRewards(pendRT).crops.filter(function (m) { return m.id === 'crop5'; })[0].claimable,
+    '未领取的图鉴奖励读档后仍可领');
 
   const fake = JSON.parse(G.serialize(c));
   fake.codexClaim = { hackReward: 9 };

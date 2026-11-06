@@ -2003,20 +2003,23 @@
         '<h4>🏆 成就</h4>' +
         guideList([
           '共 <b>' + G.ACH.length + '</b> 项，分<b>种田 / 钓鱼 / 设备 / 经营 / 收集</b>五类，顶栏 🏆 里按分类翻页看。',
-          '每项给<b>成就点</b>和<b>实质奖励</b>（金币 / 种子 / 肥料 / 饵料）；每 10 点 <b>+1% 售价</b>（最多 +20%，作用于商店与收购箱）。',
-          '顶栏 🏆 里能看每项进度。'
+          '解锁即计入<b>成就点</b>（每 10 点 <b>+1% 售价</b>，最多 +20%，作用于商店与收购箱）；' +
+            '<b>金币 / 种子 / 肥料 / 饵料等奖励要自己点「领取」</b>，也可以一键领取。',
+          '顶栏 🏆 里能看每项进度、待领数量与领取按钮。'
         ]) +
       '</div>' +
 
       '<div class="rule-sec">' +
         '<h4>📖 图鉴奖励</h4>' +
         guideList([
-          '第一次钓到 / 收到某种鱼或作物就进图鉴；收集到一定数量会<b>自动发奖</b>：鱼类分 ' +
+          '第一次钓到 / 收到某种鱼或作物就进图鉴；收集到一定数量会<b>解锁奖励档位</b>：鱼类分 ' +
             G.BALANCE.codex.fish.map(function (m) { return m.need; }).join(' / ') + ' 种，作物分 ' +
-            G.BALANCE.codex.crops.map(function (m) { return m.need; }).join(' / ') + ' 种，每档只发一次（金币 / 饵料 / 肥料）。',
+            G.BALANCE.codex.crops.map(function (m) { return m.need; }).join(' / ') +
+            ' 种，每档只发一次（金币 / 饵料 / 肥料）。',
+          '达标后不会自动进账，要在图鉴顶部<b>点「领取」</b>（也可以一键领完）。',
           '图鉴还会单独记录<b>野货</b>（' + G.WILD_LIST.map(function (w) { return w.name; }).join(' / ') +
             '）、<b>水果</b>和<b>菜品</b>，这几类只做收集展示，不计入上面两档奖励。',
-          '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态（奖励区可折叠）；旧存档按现有进度补发。'
+          '顶栏 <b>📖 图鉴</b> 里能看到每档进度和领取状态（奖励区可折叠）；旧存档里已经自动发过的奖励视为已领取。'
         ]) +
       '</div>' +
 
@@ -2143,21 +2146,27 @@
       '<div><b>' + cropValue + '</b><span>作物 + 野货 + 水果价值</span></div>' +
     '</div>';
 
-    /* 图鉴奖励：收集到 N 种鱼 / 作物自动发奖，这里显示进度和领取状态 */
+    /* 图鉴奖励：收集到 N 种鱼 / 作物后要自己点「领取」，这里显示进度与按钮 */
     const rw = G.codexRewards(state);
     const rwAll = rw.fish.concat(rw.crops);
     const rwDone = rwAll.filter(function (m) { return m.claimed; }).length;
+    const rwWait = rwAll.filter(function (m) { return m.claimable; }).length;
     const rewardHtml =
-      '<details class="codex-rw-box"><summary>🎁 图鉴奖励 · ' + rwDone + '/' + rwAll.length +
-        ' 已领取（点开看进度）</summary>' +
+      '<details class="codex-rw-box"' + (rwWait ? ' open' : '') + '><summary>🎁 图鉴奖励 · ' + rwDone + '/' +
+        rwAll.length + ' 已领取' + (rwWait ? ' · <b class="cw-pending">' + rwWait + ' 档可领</b>' : '') +
+        '（点开看进度）</summary>' +
+      (rwWait ? '<div class="cw-all"><button class="btn mini" data-claimcodexall>一键领取 ' + rwWait +
+        ' 档</button></div>' : '') +
       rwAll.map(function (m) {
         const pct = Math.max(0, Math.min(100, Math.round(m.got / m.need * 100)));
-        const ico = m.claimed ? '✅' : (m.got >= m.need ? '🎁' : '🔒');
-        return '<div class="codex-rw' + (m.claimed ? ' got' : '') + '">' +
+        const ico = m.claimed ? '✅' : (m.claimable ? '🎁' : '🔒');
+        return '<div class="codex-rw' + (m.claimed ? ' got' : '') + (m.claimable ? ' ready' : '') + '">' +
           '<span class="cw-k">' + ico + ' ' + m.label + ' ' + m.need + ' 种</span>' +
           '<span class="cw-bar"><i style="width:' + pct + '%"></i></span>' +
           '<span class="cw-n">' + m.got + '/' + m.need + '</span>' +
-          '<span class="cw-r">' + (m.claimed ? '已领取' : m.text.replace(/^奖励\s*/, '')) + '</span>' +
+          '<span class="cw-r">' + (m.claimed ? '已领取'
+            : (m.claimable ? '<button class="btn mini" data-claimcodex="' + m.id + '">领取</button>'
+              : m.text.replace(/^奖励\s*/, ''))) + '</span>' +
         '</div>';
       }).join('') + '</details>';
 
@@ -2258,7 +2267,10 @@
     const items = list.filter(function (a) { return a.cat === achCat; });
     const rows = items.map(function (a) {
       const pct = Math.round(a.cur / a.goal * 100);
-      return '<div class="ach-row' + (a.done ? ' done' : '') + '">' +
+      const right = a.claimable
+        ? '<button class="btn mini" data-claimach="' + a.id + '">领取</button>'
+        : (a.claimed ? '<span class="adm">已领</span>' : '<span class="ap">' + a.cur + '/' + a.goal + '</span>');
+      return '<div class="ach-row' + (a.done ? ' done' : '') + (a.claimable ? ' ready' : '') + '">' +
         '<span class="ae">' + a.emoji + '</span>' +
         '<div class="ai">' +
           '<div class="an">' + a.name +
@@ -2266,9 +2278,15 @@
           '<div class="ad">' + a.desc + ' · ' + a.reward + '</div>' +
           '<div class="abar"><i style="width:' + pct + '%"></i></div>' +
         '</div>' +
-        '<span class="ap">' + a.cur + '/' + a.goal + '</span>' +
+        right +
       '</div>';
     }).join('');
+
+    const pend = list.filter(function (a) { return a.claimable; }).length;
+    const claimBar = pend
+      ? '<div class="ach-claimbar">🎁 <b>' + pend + '</b> 项成就奖励待领取' +
+        '<button class="btn mini" data-claimachall>一键领取</button></div>'
+      : '';
 
     const idx = ACH_ORDER.indexOf(achCat);
     const nav = (idx > 0
@@ -2279,11 +2297,11 @@
         : '<button class="btn" disabled>下一类 →</button>');
 
     openModal('🏆 成就',
-      stat + '<div class="rule-tabs">' + tabs + '</div>' +
+      stat + claimBar + '<div class="rule-tabs">' + tabs + '</div>' +
       '<div class="rule-crumb">' + G.ACH_CATS[achCat] + ' · ' +
         items.filter(function (a) { return a.done; }).length + '/' + items.length + ' 已解锁</div>' +
       (rows || '<div class="store-empty">这一类还没有成就</div>') +
-      '<div class="shop-tip">每个成就给<b>成就点</b>，每 10 点 +1% 售价（最多 +20%，只作用于商店 / 收购箱）。进度存在存档里。</div>',
+      '<div class="shop-tip">成就点解锁即生效（每 10 点 +1% 售价，最多 +20%）· <b>金币 / 种子 / 肥料等奖励要自己点「领取」</b>。</div>',
       nav + '<button class="btn" data-close>关闭</button>');
   }
 
@@ -2291,13 +2309,13 @@
   function achToasts(list) {
     if (!list || !list.length) return;
     if (list.length > 3) {
-      toast('🏆 解锁 ' + list.length + ' 项成就，奖励已到账', 'good');
+      toast('🏆 解锁 ' + list.length + ' 项成就，奖励在成就面板等领取', 'good');
       SFX.good();
       return;
     }
     list.forEach(function (a, i) {
       setTimeout(function () {
-        toast('🏆 ' + a.emoji + ' ' + a.name + ' · ' + (a.text || a.reward), 'good');
+        toast('🏆 ' + a.emoji + ' ' + a.name + ' · 奖励待领取', 'good');
         SFX.good();
       }, 260 + i * 620);
     });
@@ -2308,8 +2326,8 @@
     if (!list || !list.length) return;
     setTimeout(function () {
       toast(list.length === 1
-        ? '📖 图鉴奖励：' + list[0].label + ' ' + list[0].need + ' 种 · ' + list[0].text
-        : '📖 图鉴奖励 ×' + list.length + ' 档，奖励已到账', 'good');
+        ? '📖 图鉴奖励可领：' + list[0].label + ' ' + list[0].need + ' 种 · ' + list[0].text
+        : '📖 图鉴奖励 ×' + list.length + ' 档可领（图鉴里点领取）', 'good');
       SFX.good();
     }, 500);
   }
@@ -3778,6 +3796,36 @@
         i = Math.max(0, Math.min(ACH_ORDER.length - 1, i));
         achCat = ACH_ORDER[i];
         achModal();
+        return;
+      }
+      // 成就奖励：手动领取
+      const claimAch = t.closest('[data-claimach]');
+      if (claimAch && !claimAch.disabled) {
+        const r = G.claimAchievement(state, claimAch.dataset.claimach);
+        if (r.ok) { commit(r); toast('🎁 ' + r.text, 'good'); SFX.coin(); achModal(); }
+        else { toast(r.msg, 'warn'); SFX.bad(); }
+        return;
+      }
+      const claimAchAll = t.closest('[data-claimachall]');
+      if (claimAchAll && !claimAchAll.disabled) {
+        const r = G.claimAllAchievements(state);
+        if (r.ok) { commit(r); toast('🎁 ' + r.msg, 'good'); SFX.coin(); achModal(); }
+        else { toast(r.msg, 'warn'); SFX.bad(); }
+        return;
+      }
+      // 图鉴奖励：手动领取
+      const claimCx = t.closest('[data-claimcodex]');
+      if (claimCx && !claimCx.disabled) {
+        const r = G.claimCodexReward(state, claimCx.dataset.claimcodex);
+        if (r.ok) { commit(r); toast('📖 ' + r.text, 'good'); SFX.coin(); codexModal(); }
+        else { toast(r.msg, 'warn'); SFX.bad(); }
+        return;
+      }
+      const claimCxAll = t.closest('[data-claimcodexall]');
+      if (claimCxAll && !claimCxAll.disabled) {
+        const r = G.claimAllCodex(state);
+        if (r.ok) { commit(r); toast('📖 ' + r.msg, 'good'); SFX.coin(); codexModal(); }
+        else { toast(r.msg, 'warn'); SFX.bad(); }
         return;
       }
 

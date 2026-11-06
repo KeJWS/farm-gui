@@ -71,6 +71,36 @@
         achModal();
         return;
       }
+      // 成就奖励：手动领取
+      const claimAch = t.closest('[data-claimach]');
+      if (claimAch && !claimAch.disabled) {
+        const r = G.claimAchievement(state, claimAch.dataset.claimach);
+        if (r.ok) { commit(r); toast('🎁 ' + r.text, 'good'); SFX.coin(); achModal(); }
+        else { toast(r.msg, 'warn'); SFX.bad(); }
+        return;
+      }
+      const claimAchAll = t.closest('[data-claimachall]');
+      if (claimAchAll && !claimAchAll.disabled) {
+        const r = G.claimAllAchievements(state);
+        if (r.ok) { commit(r); toast('🎁 ' + r.msg, 'good'); SFX.coin(); achModal(); }
+        else { toast(r.msg, 'warn'); SFX.bad(); }
+        return;
+      }
+      // 图鉴奖励：手动领取
+      const claimCx = t.closest('[data-claimcodex]');
+      if (claimCx && !claimCx.disabled) {
+        const r = G.claimCodexReward(state, claimCx.dataset.claimcodex);
+        if (r.ok) { commit(r); toast('📖 ' + r.text, 'good'); SFX.coin(); codexModal(); }
+        else { toast(r.msg, 'warn'); SFX.bad(); }
+        return;
+      }
+      const claimCxAll = t.closest('[data-claimcodexall]');
+      if (claimCxAll && !claimCxAll.disabled) {
+        const r = G.claimAllCodex(state);
+        if (r.ok) { commit(r); toast('📖 ' + r.msg, 'good'); SFX.coin(); codexModal(); }
+        else { toast(r.msg, 'warn'); SFX.bad(); }
+        return;
+      }
 
       // 果园：开垦 / 种树 / 浇水 / 收获 / 买树苗
       const orcUnlock = t.closest('[data-orchard-unlock]');

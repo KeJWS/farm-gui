@@ -1199,7 +1199,7 @@ button{ color:inherit; font:inherit; }
 @media (max-width:560px){ .cook-grid{ grid-template-columns:1fr; } }
 
 
-/* ---------- Í¼¼ø¿¨Æ¬²¼¾Ö ---------- */
+/* ---------- Í¼ï¿½ï¿½ï¿½ï¿½Æ¬ï¿½ï¿½ï¿½ï¿½ ---------- */
 .codex-sec{ margin-top:14px; }
 .codex-sec-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; font-weight:900; color:var(--ink); padding-bottom:6px; border-bottom:1px solid var(--line); margin-bottom:8px; }
 .codex-prog{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--ink-3); font-weight:800; }
@@ -1216,18 +1216,18 @@ button{ color:inherit; font:inherit; }
 @media (max-width:520px){ .codex-grid{ grid-template-columns:repeat(2,1fr); } }
 
 
-/* ÊìÊ³ÁÙÆÚÌáÊ¾ */
+/* ï¿½ï¿½Ê³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¾ */
 .exp-soon{ color:#c0392b; font-weight:900; }
 
 
-/* ³ø·¿·ÖÇø */
+/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 .cook-sec{ margin-top:12px; }
 .cook-sec-t{ display:flex; align-items:center; justify-content:space-between; font-size:12px; font-weight:900; color:var(--ink); padding-bottom:6px; border-bottom:1px solid var(--line); margin-bottom:8px; }
 .cook-sec-t span{ font-size:10.5px; font-weight:800; color:var(--ink-3); }
 .cc-req{ color:var(--ink-3); }
 
 
-/* Í¼¼ø½±ÀøÕÛµş / ³ø·¿·ÖÒ³ */
+/* Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ûµï¿½ / ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò³ */
 .codex-rw-box{ margin:8px 0 2px; padding:0 10px; border:1px solid var(--line); border-radius:10px; background:var(--card); }
 .codex-rw-box summary{ list-style:none; cursor:pointer; padding:8px 0; font-size:11.5px; font-weight:900; color:var(--ink-2); }
 .codex-rw-box summary::-webkit-details-marker{ display:none; }
@@ -1237,3 +1237,16 @@ button{ color:inherit; font:inherit; }
 .cook-tabs{ margin:10px 0 0; }
 .cook-tabs .rule-tab{ flex:0 1 auto; min-width:0; padding:7px 10px; }
 
+
+/* æˆå°± / å›¾é‰´å¥–åŠ±æ”¹ä¸ºæ‰‹åŠ¨é¢†å– */
+.ach-claimbar{ display:flex; align-items:center; gap:8px; margin:8px 0 2px; padding:8px 10px;
+  border-radius:10px; background:rgba(217,159,43,.12); border:1px solid rgba(217,159,43,.35);
+  font-size:11.5px; font-weight:800; color:var(--ink-2); }
+.ach-claimbar .btn.mini{ margin-left:auto; }
+.ach-row .btn.mini{ flex:none; }
+.ach-row .adm{ flex:none; font-size:10.5px; font-weight:800; color:var(--ink-3); }
+.ach-row.ready{ border-color:rgba(217,159,43,.5); background:rgba(217,159,43,.09); }
+.cw-pending{ color:var(--gold); }
+.cw-all{ display:flex; justify-content:flex-end; padding:0 0 5px; }
+.codex-rw.ready{ background:rgba(217,159,43,.1); border-radius:8px; }
+.codex-rw .btn.mini{ min-height:22px; padding:1px 8px; font-size:11px; }

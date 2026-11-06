@@ -132,12 +132,16 @@ const G = require('./game.js');
   /* 恶意存档文本：验证导入后不会被当成 HTML 执行（见下方「存档文本安全」一节） */
   st.log.unshift({ day: 5, text: '<img src=x onerror=alert(1)> 假日志', kind: 'info' });
   st.ledger.unshift({ day: 5, label: '<b>注入</b>', income: 1, expense: 0, balance: 5001 });
+  /* 统计弹窗需要至少一条能归类的账目（成就奖励改成手动领之后不再自动产生） */
+  st.ledger.unshift({ day: 6, label: '卖作物 · 萝卜', income: 120, expense: 0, balance: 5120 });
+  st.ledger.unshift({ day: 6, label: '伙食费', income: 0, expense: 5, balance: 5115 });
   st.fishBook.entries.unshift({ day: 5, fish: '<svg onload=alert(2)>', emoji: '<i>', quality: null, price: 1 });
   st.fishBag.push({ name: '<iframe src=//x>', emoji: '<u>', q: 'std', v: 3, d: 5 });
   st.nets = 2;
   st.netSet = 2;
   st.levels.fish = 5;
   st.levels.farm = 4;
+  st.stats.harvests = 5;   /* 让「第一筐菜」在启动时解锁，用来测手动领奖 */
   st.seeder = 0;
   st.seeds = { carrot: 10, potato: 5 };
   st.fisher = { lv: 3, xp: 4 };
@@ -395,6 +399,16 @@ ok(html('#modal-root').indexOf('已解锁') >= 0 && html('#modal-root').indexOf(
 ok(html('#modal-root').indexOf('成就点') >= 0 && html('#modal-root').indexOf('售价加成') >= 0,
    '成就弹窗显示成就点与售价加成');
 ok((html('#modal-root').match(/data-achcat=/g) || []).length === 5, '成就按 5 类分页');
+ok(html('#modal-root').indexOf('data-claimach="harvest1"') >= 0, '已解锁成就显示领取按钮');
+ok(html('#modal-root').indexOf('待领取') >= 0, '成就面板显示待领取提示');
+const coinsBeforeClaim = document.querySelector('#hud-coins').innerHTML;
+(function achClaim() {
+  const btn = { dataset: { claimach: 'harvest1' }, disabled: false };
+  const target = { closest: function (s) { return s === '[data-claimach]' ? btn : null; }, classList: classList() };
+  (docListeners.click || []).forEach(function (fn) { fn({ target: target, clientX: 0, clientY: 0 }); });
+})();
+ok(html('#modal-root').indexOf('data-claimach="harvest1"') < 0, '领完后领取按钮消失');
+ok(document.querySelector('#hud-coins').innerHTML !== coinsBeforeClaim, '领奖后顶栏金币变化');
 (function achCollect() {
   const btn = { dataset: { achcat: 'all' }, disabled: false };
   const target = { closest: function (s) { return s === '[data-achcat]' ? btn : null; }, classList: classList() };

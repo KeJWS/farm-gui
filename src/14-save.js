@@ -456,6 +456,14 @@
     Object.keys(s.codexClaim || {}).forEach(function (id) {
       if (claimable[id]) merged.codexClaim[id] = Math.round(num(s.codexClaim[id], 1, 1, 100000));
     });
+    // 「已提示可领取」：老存档把已领的当作已看过，免得读档时刷一排提示
+    merged.codexSeen = {};
+    Object.keys(s.codexSeen || {}).forEach(function (id) {
+      if (claimable[id]) merged.codexSeen[id] = Math.round(num(s.codexSeen[id], 1, 1, 100000));
+    });
+    Object.keys(merged.codexClaim).forEach(function (id) {
+      if (!merged.codexSeen[id]) merged.codexSeen[id] = merged.codexClaim[id];
+    });
     // 老存档回填：从最近 40 条钓鱼记录里反推图鉴
     if (!Object.keys(merged.codex.fish).length) {
       ((merged.fishBook && merged.fishBook.entries) || []).forEach(function (e) {
@@ -482,6 +490,18 @@
         if (d) merged.ach[a.id] = Math.round(num(d, 1, 1, 100000));
       });
     }
+    // 成就奖励领取记录；老存档没有这一项 → 当年奖励已自动发过，视为已领
+    merged.achClaim = {};
+    const rawAchClaim = (s.achClaim && typeof s.achClaim === 'object') ? s.achClaim : null;
+    ACH.forEach(function (a) {
+      if (!merged.ach[a.id]) return;
+      if (rawAchClaim) {
+        const d = rawAchClaim[a.id];
+        if (d) merged.achClaim[a.id] = Math.round(num(d, 1, 1, 100000));
+      } else {
+        merged.achClaim[a.id] = merged.ach[a.id];
+      }
+    });
 
     // 水产店：老存档没有进货记录，按当天重新进一次货
     const rawShop = s.shop && typeof s.shop === 'object' ? s.shop : null;
@@ -648,7 +668,9 @@
     farmYieldBonus: farmYieldBonus, fishHookBonus: fishHookBonus, fishGoodBonus: fishGoodBonus,
     taxBase: taxBase, taxInDays: taxInDays, orderWeight: orderWeight, ORDER_TIERS: ORDER_TIERS,
     ACH: ACH, ACH_CATS: ACH_CATS, checkAchievements: checkAchievements, achInfo: achInfo, rewardText: rewardText,
+    claimAchievement: claimAchievement, claimAllAchievements: claimAllAchievements, achClaimList: achClaimList,
     CODEX_TOTAL: CODEX_TOTAL, codexRewards: codexRewards, checkCodexRewards: checkCodexRewards,
+    claimCodexReward: claimCodexReward, claimAllCodex: claimAllCodex, codexClaimList: codexClaimList,
     achPts: achPts, sellBonus: sellBonus, makeLongOrder: makeLongOrder, deliverLong: deliverLong,
     fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
     fishForecast: fishForecast, expectedQualityMul: expectedQualityMul,

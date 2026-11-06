@@ -977,7 +977,7 @@
     return kind === 'fish' ? fishSpeciesOwned(s) : cropSpeciesOwned(s);
   }
 
-  /* 每档奖励 + 当前进度，给界面用 */
+  /* 每档奖励 + 当前进度，给界面用（达标但没领的档位 claimable = true） */
   function codexRewards(s) {
     s.codexClaim = s.codexClaim || {};
     const out = { fish: [], crops: [] };
@@ -988,6 +988,7 @@
           id: m.id, kind: kind, label: CODEX_LABEL[kind], need: m.need,
           total: CODEX_TOTAL[kind], have: have, got: Math.min(have, m.need),
           claimed: !!s.codexClaim[m.id], day: s.codexClaim[m.id] || 0,
+          claimable: have >= m.need && !s.codexClaim[m.id],
           text: rewardText({ reward: m.reward })
         });
       });
@@ -995,25 +996,65 @@
     return out;
   }
 
-  /* 达标就发奖，每个 id 只发一次；返回本次新领到的档位 */
+  function codexClaimList(s) {
+    const rw = codexRewards(s);
+    return rw.fish.concat(rw.crops).filter(function (m) { return m.claimable; });
+  }
+
+  /* 只记「可以领了」并提示，真正发奖要玩家自己点「领取」 */
   function checkCodexRewards(s) {
     s.codexClaim = s.codexClaim || {};
+    s.codexSeen = s.codexSeen || {};
     const out = [];
     ['fish', 'crops'].forEach(function (kind) {
       const have = codexSpecies(s, kind);
       (BALANCE.codex[kind] || []).forEach(function (m) {
-        if (s.codexClaim[m.id] || have < m.need) return;
-        s.codexClaim[m.id] = s.day || 1;
-        applyReward(s, m.reward, '图鉴奖励');
+        if (s.codexClaim[m.id] || s.codexSeen[m.id] || have < m.need) return;
+        s.codexSeen[m.id] = s.day || 1;
         const text = rewardText({ reward: m.reward });
-        log(s, '📖 图鉴奖励：' + CODEX_LABEL[kind] + '收集 ' + m.need + ' 种（' + text + '）', 'good');
+        log(s, '📖 图鉴奖励可领取：' + CODEX_LABEL[kind] + '收集 ' + m.need + ' 种（' + text + '）', 'good');
         out.push({ id: m.id, kind: kind, label: CODEX_LABEL[kind], need: m.need, text: text });
       });
     });
     return out;
   }
 
-  /* 成就表：val(s) 是当前进度，达到 goal 就算解锁，奖励自动发放 */
+  /* 手动领取一档图鉴奖励 */
+  function claimCodexReward(s, id) {
+    s.codexClaim = s.codexClaim || {};
+    s.codexSeen = s.codexSeen || {};
+    let hit = null;
+    ['fish', 'crops'].forEach(function (kind) {
+      (BALANCE.codex[kind] || []).forEach(function (m) {
+        if (m.id === id) hit = { kind: kind, m: m };
+      });
+    });
+    if (!hit) return { ok: false, msg: '没有这档图鉴奖励' };
+    if (s.codexClaim[id]) return { ok: false, msg: '这档已经领过了' };
+    if (codexSpecies(s, hit.kind) < hit.m.need) return { ok: false, msg: '还没收集够' };
+    s.codexClaim[id] = s.day || 1;
+    s.codexSeen[id] = s.codexClaim[id];
+    applyReward(s, hit.m.reward, '图鉴奖励');
+    const text = rewardText({ reward: hit.m.reward });
+    log(s, '📖 领取图鉴奖励：' + CODEX_LABEL[hit.kind] + ' ' + hit.m.need + ' 种（' + text + '）', 'good');
+    return { ok: true, id: id, kind: hit.kind, need: hit.m.need, text: text };
+  }
+
+  /* 一键领取所有达标档位 */
+  function claimAllCodex(s) {
+    const list = codexClaimList(s);
+    if (!list.length) return { ok: false, msg: '没有可领取的图鉴奖励' };
+    let coins = 0, n = 0;
+    list.forEach(function (m) {
+      const r = claimCodexReward(s, m.id);
+      if (!r.ok) return;
+      n++;
+      coins += (m.text.match(/(\d+)\s*金/) ? Number(m.text.match(/(\d+)\s*金/)[1]) : 0);
+    });
+    return { ok: true, n: n, msg: '领取了 ' + n + ' 档图鉴奖励' };
+  }
+
+  /* 成就表：val(s) 是当前进度，达到 goal 就算解锁（奖励要手动领） */
   const ACH = [
     /* 种田 */
     { id: 'harvest1',  cat: 'farm', emoji: '🌱', name: '第一筐菜',   desc: '收获 1 次作物',        goal: 1,
@@ -1240,7 +1281,7 @@
     return 1 + Math.min(0.2, Math.floor(achPts(s) / 10) * 0.01);
   }
 
-  /* 检查并解锁：点数 + 实质奖励一起发放 */
+  /* 检查并解锁：只记解锁日与成就点，实质奖励留在面板里等玩家领 */
   function checkAchievements(s) {
     s.ach = s.ach || {};
     const out = [];
@@ -1248,22 +1289,52 @@
       if (s.ach[a.id]) return;
       if (a.val(s) < a.goal) return;
       s.ach[a.id] = s.day;
-      applyReward(s, a.reward);
       const bonus = Math.round((sellBonus(s) - 1) * 100);
       log(s, '🏆 成就解锁：' + a.emoji + ' ' + a.name + '（' + rewardText(a) +
-        ' · 售价 +' + bonus + '%）', 'good');
+        ' 待领取 · 售价 +' + bonus + '%）', 'good');
       out.push({ id: a.id, name: a.name, emoji: a.emoji, pts: a.pts, bonus: bonus, text: rewardText(a) });
     });
     return out;
   }
 
+  /* 手动领取一个成就的实质奖励 */
+  function claimAchievement(s, id) {
+    s.ach = s.ach || {};
+    s.achClaim = s.achClaim || {};
+    const a = ACH.filter(function (x) { return x.id === id; })[0];
+    if (!a) return { ok: false, msg: '没有这个成就' };
+    if (!s.ach[id]) return { ok: false, msg: '这个成就还没解锁' };
+    if (s.achClaim[id]) return { ok: false, msg: '奖励已经领过了' };
+    s.achClaim[id] = s.day || 1;
+    applyReward(s, a.reward);
+    log(s, '🎁 领取成就奖励：' + a.emoji + ' ' + a.name + '（' + rewardText(a) + '）', 'good');
+    return { ok: true, id: id, name: a.name, emoji: a.emoji, text: rewardText(a) };
+  }
+
+  /* 成就面板上可领的数量 / 一键领取 */
+  function achClaimList(s) {
+    s.ach = s.ach || {};
+    s.achClaim = s.achClaim || {};
+    return ACH.filter(function (a) { return s.ach[a.id] && !s.achClaim[a.id]; });
+  }
+  function claimAllAchievements(s) {
+    const list = achClaimList(s);
+    if (!list.length) return { ok: false, msg: '没有可领取的成就奖励' };
+    list.forEach(function (a) { claimAchievement(s, a.id); });
+    return { ok: true, n: list.length, msg: '领取了 ' + list.length + ' 项成就奖励' };
+  }
+
   /* 单个成就的进度信息，给界面用 */
   function achInfo(s) {
     s.ach = s.ach || {};
+    s.achClaim = s.achClaim || {};
     return ACH.map(function (a) {
       const cur = Math.min(a.val(s), a.goal);
+      const done = !!s.ach[a.id];
+      const claimed = !!s.achClaim[a.id];
       return { id: a.id, cat: a.cat, emoji: a.emoji, name: a.name, desc: a.desc,
-               goal: a.goal, cur: cur, done: !!s.ach[a.id], day: s.ach[a.id] || 0,
+               goal: a.goal, cur: cur, done: done, day: s.ach[a.id] || 0,
+               claimed: claimed, claimable: done && !claimed,
                pts: a.pts, reward: rewardText(a) };
     });
   }
@@ -1612,6 +1683,9 @@
       levels: { farm: 1, fish: 1, farmXp: 0, fishXp: 0, dig: 1, digXp: 0, forage: 1, forageXp: 0,
                 trade: 1, tradeXp: 0, cook: 1, cookXp: 0 },
       ach: {},
+      achClaim: {},
+      codexClaim: {},
+      codexSeen: {},
       fishBook: { count: 0, entries: [], best: null, priciest: null },
       stats: { harvests: 0, casts: 0, dug: 0, planted: 0, orders: 0, cropsSold: 0, works: 0,
                longOrders: 0, boxItems: 0, boxIncome: 0, teas: 0, chests: 0, forages: 0,
@@ -5141,6 +5215,14 @@
     Object.keys(s.codexClaim || {}).forEach(function (id) {
       if (claimable[id]) merged.codexClaim[id] = Math.round(num(s.codexClaim[id], 1, 1, 100000));
     });
+    // 「已提示可领取」：老存档把已领的当作已看过，免得读档时刷一排提示
+    merged.codexSeen = {};
+    Object.keys(s.codexSeen || {}).forEach(function (id) {
+      if (claimable[id]) merged.codexSeen[id] = Math.round(num(s.codexSeen[id], 1, 1, 100000));
+    });
+    Object.keys(merged.codexClaim).forEach(function (id) {
+      if (!merged.codexSeen[id]) merged.codexSeen[id] = merged.codexClaim[id];
+    });
     // 老存档回填：从最近 40 条钓鱼记录里反推图鉴
     if (!Object.keys(merged.codex.fish).length) {
       ((merged.fishBook && merged.fishBook.entries) || []).forEach(function (e) {
@@ -5167,6 +5249,18 @@
         if (d) merged.ach[a.id] = Math.round(num(d, 1, 1, 100000));
       });
     }
+    // 成就奖励领取记录；老存档没有这一项 → 当年奖励已自动发过，视为已领
+    merged.achClaim = {};
+    const rawAchClaim = (s.achClaim && typeof s.achClaim === 'object') ? s.achClaim : null;
+    ACH.forEach(function (a) {
+      if (!merged.ach[a.id]) return;
+      if (rawAchClaim) {
+        const d = rawAchClaim[a.id];
+        if (d) merged.achClaim[a.id] = Math.round(num(d, 1, 1, 100000));
+      } else {
+        merged.achClaim[a.id] = merged.ach[a.id];
+      }
+    });
 
     // 水产店：老存档没有进货记录，按当天重新进一次货
     const rawShop = s.shop && typeof s.shop === 'object' ? s.shop : null;
@@ -5333,7 +5427,9 @@
     farmYieldBonus: farmYieldBonus, fishHookBonus: fishHookBonus, fishGoodBonus: fishGoodBonus,
     taxBase: taxBase, taxInDays: taxInDays, orderWeight: orderWeight, ORDER_TIERS: ORDER_TIERS,
     ACH: ACH, ACH_CATS: ACH_CATS, checkAchievements: checkAchievements, achInfo: achInfo, rewardText: rewardText,
+    claimAchievement: claimAchievement, claimAllAchievements: claimAllAchievements, achClaimList: achClaimList,
     CODEX_TOTAL: CODEX_TOTAL, codexRewards: codexRewards, checkCodexRewards: checkCodexRewards,
+    claimCodexReward: claimCodexReward, claimAllCodex: claimAllCodex, codexClaimList: codexClaimList,
     achPts: achPts, sellBonus: sellBonus, makeLongOrder: makeLongOrder, deliverLong: deliverLong,
     fertilizeAll: fertilizeAll, canFert: canFert, fertTargets: fertTargets, sleep: sleep, fish: fish,
     fishForecast: fishForecast, expectedQualityMul: expectedQualityMul,
